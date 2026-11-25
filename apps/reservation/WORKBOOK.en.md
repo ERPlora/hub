@@ -1,12 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:f246ec4966b99741518d21feb4a645a1e176fd078337fcb07b791c0e620d4cd7 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:a1dffdc4e7a2 -->
 
 Reservations is the reservation book of your restaurant or bar: when and for how many people you take reservations,
 each reservation with its customer and its table, from the call until they leave, and a waitlist for whoever does not
 fit. The table of each confirmed reservation is set aside on the floor plan of Tables.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:9f120041512f -->
 
 Reservations is the **reservation book of the restaurant or bar**: it decides when and for how many
 people reservations are taken (time slots with a maximum of reservations and, if wanted, of guests,
@@ -14,6 +14,7 @@ inside the business's opening hours; and blocked days), notes down each reservat
 its table, takes it from Pending to Completed and keeps on a **waitlist** whoever does not fit.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:acc369c8bfe2 -->
 
 - The **employee** who picks up the phone or attends the door (the host or the server) notes down,
   confirms, seats, changes and cancels reservations and keeps the waitlist.
@@ -25,6 +26,7 @@ reservation), does not charge (that is **Sales**) and is not the appointment boo
 **Appointments**).
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:8235e2df680f -->
 
 ERPlora does not invent flows: it adopts the ones the market has already proven (OpenTable, Resy,
 SevenRooms, Toast Tables, Square, Lightspeed, TouchBistro, Tablein, TablesReady, CoverManager, TheFork
@@ -70,6 +72,7 @@ sources, is in "Market research", at the end of this manual.
   day is already yesterday.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:cfd03dd7d8f4 -->
 
 - Reservations needs **Tables** (the table of each reservation and its hold on the floor plan),
   **Customers** (the card of each customer) and **Schedules** (the business's opening hours). They are
@@ -98,19 +101,23 @@ Initial setup, step by step:
 6. Create a test reservation and check in **Availability → Occupancy** that its slot goes down by one.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:16dfa2eec7b7 -->
 
 The **Reservations** menu has three entries: **Reservations**, **Waitlist** and **Availability**. Below,
 the tabs of the three plus **Settings**; **Availability** and **Settings**, only for whoever can change them. The buttons the
 profile cannot use do not show.
 
 ### Reservations
+<!-- from WORKBOOK.md sha256:9b04856924c4 -->
 Here is the day's book: at the top, the date with its arrows and three figures (covers, reservations and how much is
 left in the next slot); below, the day's reservations by time, with their customer, their guests, their table and
 their status. With "New reservation" you note down one that comes by phone or at the door; on each row you confirm
 it, seat it when the party arrives, complete it when they leave or cancel it. The search finds a reservation in the
-whole book by name, phone or email.
+whole book by name, phone or email; by the phone and the email, only for whoever sees the customers' contact
+details.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:cd02e9eb9301 -->
 Menu **Reservations → Reservations**. At the top, the **day bar**: "Previous day", the date, "Next day"
 and "Today" when on another day; the day in words; and three figures: **covers** (people coming, without
 the cancelled ones nor the no-shows), **bookings** and **next slot** (the first one that has not ended,
@@ -123,7 +130,9 @@ typed, or "Released: never confirmed"; a long one, shortened with "…"); search
 **whole** book, also by the digits of the phone without the prefix (results by day and time); filters by
 time, guests, table and status; table or cards view. Main action **"New reservation"** and, per row,
 according to its status: "Confirm", "Seat", "Complete", "Cancel", "No-show", "Edit" and "Delete" (the
-administrator only). Tapping a row opens it to edit it.
+administrator only). Tapping a row opens it to edit it. Whoever does not see the customers' contact details has
+the table without "Phone" and the search box "Search guest…", which only looks at the name. Nobody
+sorts the table by the phone: the order would tell the number to whoever does not see it.
 
 Empty: "No reservations this day", with an explanation and "New reservation". Searching without results:
 "No reservations match your search" and "Clear filters". Loading: "Loading…" and the figures in grey.
@@ -135,27 +144,34 @@ name or phone, with "+ New customer"), Guest (the name), Phone, Email, Date, Tim
 Table (the free ones at that time, with their capacity and their zone; the ones that do not fit the party,
 flagged), Booked through (Phone, In person), Guest notes and Internal notes. A reservation already seated,
 completed, cancelled or not shown only changes its notes, and says so on top; a cancelled one, also with its
-whole reason.
+whole reason. Whoever does not see the customers' contact details does not see the Phone nor the Email of the
+reservation they edit, and saving it keeps them; with a card chosen in "New reservation", neither: the reservation
+takes the card's.
 
 ### Waitlist
+<!-- from WORKBOOK.md sha256:b44da4aabb3e -->
 Here you note down whoever wants a table and does not fit, in the order they arrive, with the day and the time they
 prefer and their guests. When you call them, you mark them "Contacted"; if there is room, "Convert" makes their
 reservation with their details, and "Remove" takes them off the list.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:27ccdc352e21 -->
 Menu **Reservations → Waitlist**. Table, in the order in which they were added (by day and preferred
-time): Date, Pref. time, Guest, Phone (as in Customers), Party, Contacted, Status (Waiting, Converted);
-search box and filters (date, contacted, converted). Main action **"Add guest"** (Customer, Guest, Phone,
+time): Date, Pref. time, Guest, Phone (as in Customers, only for whoever sees the customers' contact details),
+Party, Contacted, Status (Waiting, Converted); search box and filters (date, contacted, converted), as in
+Reservations. Main action **"Add guest"** (Customer, Guest, Phone,
 Date, Time, Party, Notes → "Add to waitlist"); per row "Contacted", "Convert" and "Remove". Empty:
 "Waitlist is empty.". Loading: "Loading…". Error: the table's message with "Retry".
 
 ### Availability
+<!-- from WORKBOOK.md sha256:fe9ec03df23c -->
 Here you decide when and for how many people reservations are taken. "Occupancy" shows, for one day, how much is
 left free in each slot. In "Time slots" you create the services of each day of the week with their maximum of
 reservations and, if you want, of guests: without slots, that day cannot be booked. In "Blocked dates" you close a
 whole day or some hours, for example a bank holiday or a private event.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:5830154d68d0 -->
 Menu **Reservations → Availability**. Three stacked sections:
 - **Occupancy**: a date (today by default) and, for each slot of that day, Slot, Reserved, Max, Guests
   and Available; the slot without room is seen dimmed with the "Full" mark, and the one that falls
@@ -164,18 +180,20 @@ Menu **Reservations → Availability**. Three stacked sections:
   blocked, its reason. It refreshes by itself when a reservation comes in, changes or is cancelled.
   Empty: "No service that day (no time slots).".
 - **Time slots**: Day, From, To, Max (of reservations), Max guests; "Add slot" (Day, From, To, Max,
-  Max guests (optional) → "Create slot") and "Remove" per row. Empty: "No time slots.".
+  Max guests —with "Optional" below— → "Create slot") and "Remove" per row. Empty: "No time slots.".
 - **Blocked dates**: Date, Reason, Hours (Whole day, or from–to); "Add blocked date" (Date, Reason,
   Whole day, From, Until → "Block date") and "Remove". Empty: "No blocked dates.".
 Each section paints its own "Loading…" and its error with retry.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:66a20dd98bde -->
 Here you change the rules of reservations: how many guests, how much notice and how many days ahead people book
 online or through WhatsApp, how long a reservation lasts, whether new ones confirm themselves, whether the phone or
 the email are required and how many minutes after its time a pending one that nobody confirmed is released. Only
 whoever can change them sees it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:d087f738899c -->
 Tab **Settings** (only for whoever can change them). Minimum and maximum guests, minimum notice (hours,
 for online and WhatsApp), maximum days ahead, default duration, confirm new reservations automatically,
 phone required, email required and the minutes after the time to release a pending one. "Save". On a phone it
@@ -183,6 +201,7 @@ fits whole, in Spanish and in English: a switch's long sentence breaks onto two 
 the end (hub#906).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:30655557dd5e -->
 
 | Screen | Loading | Empty | Error | No permission | App off |
 |---|---|---|---|---|---|
@@ -194,12 +213,14 @@ the end (hub#906).
 While the live connection is recovered, "Reconnecting…" on top, without erasing what is painted.
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:8ba4f2de4923 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -228,6 +249,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | RESERVATION-F23 | Pick a free table for the reservation | done |
 
 ### RESERVATION-F01 Create and remove time slots
+<!-- from WORKBOOK.md sha256:38652b732eda -->
 Status: done
 Actor: manager
 Screen: Availability (Time slots)
@@ -243,11 +265,12 @@ of a field goes away as soon as that field is corrected, even if another one say
 Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F02 Block a day or some hours
+<!-- from WORKBOOK.md sha256:c68877bc3a78 -->
 Status: done
 Actor: manager, assistant
 Screen: Availability (Blocked dates)
 Steps:
-1. Tap "Add blocked date", type the date and the reason (holiday, closure, private event).
+1. Tap "Add blocked date", pick the date and type the reason (holiday, closure, private event).
 2. Leave "Whole day" ticked or, for some hours, untick it and set from and until.
 3. That day (or those hours) no new reservations are taken; the ones already there stay.
 4. To lift the block, "Remove" on its row and confirm.
@@ -259,6 +282,7 @@ field goes away as soon as that field is corrected, even if another one says the
 Involved: RESERVATION-F05, RESERVATION-F06
 
 ### RESERVATION-F03 Adjust the booking rules
+<!-- from WORKBOOK.md sha256:83f7395069af -->
 Status: done
 Actor: manager
 Screen: Settings
@@ -275,6 +299,7 @@ the next try is refused too. A refusal that names no field stays until the next 
 Involved: RESERVATION-F06, RESERVATION-F13, RESERVATION-F17
 
 ### RESERVATION-F04 Choose whether reservations confirm themselves
+<!-- from WORKBOOK.md sha256:5438b48a8f48 -->
 Status: done
 Actor: manager
 Screen: Settings
@@ -289,6 +314,7 @@ said above the button and the switch goes back to how it was.
 Involved: RESERVATION-F07, TABLE-F25
 
 ### RESERVATION-F05 Check how much is left free on a day
+<!-- from WORKBOOK.md sha256:c35c4a37425c -->
 Status: done
 Actor: employee, manager
 Screen: Availability (Occupancy); Reservations (day bar)
@@ -308,6 +334,7 @@ the section with "Retry".
 Involved: RESERVATION-F01, RESERVATION-F02, SCHEDULE-F02
 
 ### RESERVATION-F06 Take a reservation by hand (phone or counter)
+<!-- from WORKBOOK.md sha256:b1d2347d3c72 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations ("New reservation")
@@ -318,13 +345,16 @@ Steps:
    duration, where it was booked through and the notes. "Reserve".
 3. The reservation is born Pending (or Confirmed, if they confirm themselves: then it holds its table).
 4. By voice: "book for 4 tomorrow at 9 pm under the name Ana, at table 5". Before noting it down, the
-   assistant's card says who it is for, by the name of their card, the day and the time ("Create in
-   Reservations: Ana García · 15 Oct 2026 · 21:00"), and carries the table with its zone, as Tables names it
-   ("5 (Terrace)": the number repeats across zones), never by a code.
+   assistant's card first says who it is for, by the name of their card (also when it was named by its phone)
+   or, without a card, by the name that was said, and only once; then the day and the time, before the phone
+   ("Create in Reservations: Ana García · Date: Oct 15, 2026 · Time: 9:00 PM"). It carries the table with its zone, as
+   Tables names it ("5 (Terrace)": the number repeats across zones), never by a code.
 In: customer (or name and phone), date, time, guests, table, duration, booked through, notes. The phone is
 saved in international format, as in Customers (`+34` and the digits together, without spaces), also the
 one typed with the card already chosen; one written with another country's prefix keeps its own. It is
-the number with which WhatsApp finds the customer's conversation (RESERVATION-F19).
+the number with which WhatsApp finds the customer's conversation (RESERVATION-F19). Whoever does not see the
+customers' contact details (BASE-F119) searches the customer by their name only and, with the card chosen, does not
+see their phone nor their email: the reservation takes the card's, and the answer reaches them without them.
 Out: the reservation, linked to the customer's card (announces: `reservation.reservation.created`).
 If it fails: nothing is saved and what was typed stays; the first reason that applies, in this order: a
 phone that is not of its country (Customers' reason, "This is not a valid phone number of its country:
@@ -345,9 +375,10 @@ on the last place or on the same table and time: one goes in and the other gets 
 slot, the staff can then book anyway; on the table, never). In the window, the reason of a field (the
 Table included) shows under it and goes away as soon as that field is corrected, even if another one says
 the same.
-Involved: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
+Involved: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25, BASE-F119
 
 ### RESERVATION-F07 Confirm a reservation
+<!-- from WORKBOOK.md sha256:addbb503a91a -->
 Status: done
 Actor: employee, manager
 Screen: Reservations (row → "Confirm")
@@ -363,6 +394,7 @@ table out of service (blocked, deactivated, deleted or in a deactivated zone), w
 Involved: TABLE-F25, RESERVATION-F19
 
 ### RESERVATION-F08 Change a reservation (day, time, guests, table)
+<!-- from WORKBOOK.md sha256:7a3e4eead4a3 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations (row → "Edit", or tap the row)
@@ -376,17 +408,20 @@ Steps:
 3. A seated, completed, cancelled or no-show reservation only changes its notes.
 4. By voice: "move Ana's reservation to table 7 on the terrace". Before changing it, the assistant's card
    says the reservation by its customer, its day and its time and the new table with its zone, as Tables
-   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · 7 (Terrace)"), never by a code.
+   names it ("Change in Reservations: Ana García · 15 Oct 2026 · 21:00 · Table: 7 (Terrace)"), never by a code.
 In: the changed fields. The new phone is saved in international format, as on a new reservation; the
-same number written another way (with spaces or without the prefix) is not a change.
+same number written another way (with spaces or without the prefix) is not a change. Whoever does not see the
+customers' contact details (BASE-F119) does not see the phone nor the email and does not change them: saving keeps
+them.
 Out: the changed reservation (announces: `reservation.reservation.updated`).
 If it fails: the same reasons as when taking a reservation by hand, and the first one, a phone that is not of its country:
 "This is not a valid phone number of its country: check the digits or write it with its international
 prefix (+44…).", in the Phone field, and nothing changes; in another status: "This reservation can no
 longer change: only its notes.".
-Involved: TABLE-F26, RESERVATION-F06, RESERVATION-F18
+Involved: TABLE-F26, RESERVATION-F06, RESERVATION-F18, BASE-F119
 
 ### RESERVATION-F09 Cancel a reservation
+<!-- from WORKBOOK.md sha256:8b75e88cddab -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations (row → "Cancel")
@@ -402,6 +437,7 @@ If it fails: from another status: "This reservation is seated: it cannot be canc
 Involved: TABLE-F27, RESERVATION-F18
 
 ### RESERVATION-F10 Mark that they did not show up
+<!-- from WORKBOOK.md sha256:f881bd32d484 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations (row → "No-show")
@@ -414,6 +450,7 @@ If it fails: from another status: "This reservation is seated: it cannot be mark
 Involved: TABLE-F27
 
 ### RESERVATION-F11 Seat the reservation
+<!-- from WORKBOOK.md sha256:31e89f912fe0 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations (row → "Seat")
@@ -439,6 +476,7 @@ seat).
 Involved: TABLE-F10, TABLE-F28, FLOW-F12
 
 ### RESERVATION-F12 Complete the reservation
+<!-- from WORKBOOK.md sha256:99944064f804 -->
 Status: done
 Actor: employee, manager
 Screen: Reservations (row → "Complete")
@@ -453,6 +491,7 @@ is seated.".
 Involved: RESERVATION-F11
 
 ### RESERVATION-F13 Release the pending reservations nobody confirmed
+<!-- from WORKBOOK.md sha256:13554dc170b0 -->
 Status: done
 Actor: system
 Screen: Reservations (the day's list, open: it sees it without reloading)
@@ -473,6 +512,7 @@ If it fails: a pass that fails changes nothing and the next one tries again.
 Involved: RESERVATION-F03
 
 ### RESERVATION-F14 Put someone on the waitlist
+<!-- from WORKBOOK.md sha256:b1b0bb0fff1f -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Waitlist ("Add guest")
@@ -490,6 +530,7 @@ reason of a field goes away as soon as that field is corrected, even if another 
 Involved: RESERVATION-F16, CUSTOMER-F10
 
 ### RESERVATION-F15 Mark as contacted or remove from the waitlist
+<!-- from WORKBOOK.md sha256:23af61194596 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Waitlist (row → "Contacted", "Remove")
@@ -503,6 +544,7 @@ If it fails: an entry that is no longer there: "That waitlist entry does not exi
 Involved: RESERVATION-F14
 
 ### RESERVATION-F16 Convert a waitlist entry into a reservation
+<!-- from WORKBOOK.md sha256:e78c85baaa6e -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Waitlist (row → "Convert")
@@ -521,6 +563,7 @@ If it fails: time passed, full slot or blocked day: its reason, and nothing chan
 Involved: RESERVATION-F06, RESERVATION-F14
 
 ### RESERVATION-F17 Reservation that comes in through WhatsApp
+<!-- from WORKBOOK.md sha256:d9ed54e0abf4 -->
 Status: done
 Actor: customer, owner, assistant
 Screen: Reservations; it is turned on in WhatsApp inbox → Settings and approved in Automations
@@ -549,6 +592,7 @@ Involved: CUSTOMER-F10, RESERVATION-F04, RESERVATION-F19, WHATSAPP_INBOX-F15, WH
 WHATSAPP_INBOX-F24
 
 ### RESERVATION-F18 Change or cancel the reservation through WhatsApp
+<!-- from WORKBOOK.md sha256:ca55579be031 -->
 Status: done
 Actor: customer, owner, assistant
 Screen: Reservations; it is approved in Automations
@@ -576,6 +620,7 @@ answers in 72 hours, nothing changes.
 Involved: RESERVATION-F08, RESERVATION-F09, RESERVATION-F17, WHATSAPP_INBOX-F25
 
 ### RESERVATION-F19 Tell through WhatsApp when the restaurant confirms
+<!-- from WORKBOOK.md sha256:e2b47ca2d6b4 -->
 Status: done
 Actor: manager, customer
 Screen: Reservations
@@ -595,6 +640,7 @@ reservation stays confirmed; the reason stays in the automation's history.
 Involved: RESERVATION-F07, RESERVATION-F17, WHATSAPP_INBOX-F26
 
 ### RESERVATION-F20 Delete a reservation
+<!-- from WORKBOOK.md sha256:679ce5e6073b -->
 Status: done
 Actor: administrator, owner, assistant
 Screen: Reservations (row → "Delete")
@@ -609,6 +655,7 @@ If it fails: without permission to delete, "Delete" does not show; a reservation
 Involved: TABLE-F27
 
 ### RESERVATION-F21 Merge the reservations of two customer cards
+<!-- from WORKBOOK.md sha256:d95911d30df6 -->
 Status: done
 Actor: system
 Screen: none
@@ -623,6 +670,7 @@ If it fails: it retries by itself; repeating it changes nothing.
 Involved: CUSTOMER-F13
 
 ### RESERVATION-F22 Erase a customer's personal data (GDPR)
+<!-- from WORKBOOK.md sha256:66039a9bf529 -->
 Status: done
 Actor: system
 Screen: Reservations, Waitlist
@@ -641,6 +689,7 @@ If it fails: it retries by itself; repeating it changes nothing.
 Involved: CUSTOMER-F16, TABLE-F31
 
 ### RESERVATION-F23 Pick a free table for the reservation
+<!-- from WORKBOOK.md sha256:7aab98c6e059 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations (Table field of the reservation form)
@@ -658,6 +707,7 @@ reason.
 Involved: RESERVATION-F06, TABLE-F25
 
 ## Reservations: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:7d9f62222194 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's
 own session) and the API, with the same rules and the same permissions. Designed for voice: a reservation
@@ -671,9 +721,14 @@ separate reservation. If a reference matches several, it is refused saying which
 (`on_behalf_of`, their card; today, from WhatsApp): only their reservation, with their customer rules and
 without touching the table, the internal notes nor booking anyway (F18).
 
+The phone and the email of the customer of a reservation or of the waitlist only reach whoever sees the customers'
+contact details (BASE-F119): anyone else gets them empty, the search and a reference ("the reservation of 600 111
+222") only match the name for them, filtering by the phone is refused to them as an action without permission (403
+`permission_denied`) and sorting by it does not exist for anyone.
+
 Before changing anything, the assistant asks for confirmation with its card (BASE-F97), which names each
 record as the Reservations screens name it, never by its code: a reservation, by its customer, its day and
-its time ("Ana García · 15 Oct 2026 · 21:00"; without a name, by its phone; with the customer's data
+its time ("Ana García · 15 Oct 2026 · 21:00"; without a name, by its phone to whoever sees it; with the customer's data
 erased, by the day and the time); a waitlist entry, the same; a slot, by its weekday and its hours
 ("Thursday · 20:00–23:30"); a blocked date, by its day and, if it is not the whole day, its hours; the
 customer, by the name of their card, and the table, with its zone ("5 (Terrace)"), as Tables names it.
@@ -683,13 +738,14 @@ whoever confirms cannot see (for example, the card of a customer, without permis
 does not show on the card.
 
 ### What it offers: queries (they read and change nothing)
+<!-- from WORKBOOK.md sha256:bcede70f38e1 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The reservations of some days (or of the whole book when searching), with filters, order and pages (up to 100) | view reservations | F05–F12 | `reservation.reservation.list` |
+| The reservations of some days (or of the whole book when searching), with filters, order and pages (up to 100) | view reservations | F05–F12, F17, F18 | `reservation.reservation.list` |
 | A reservation, with the words it is named with | view reservations | F08, F19 | `reservation.reservation.get` |
-| A day: covers, reservations, blocks, business hours and occupancy of each slot | view reservations | F05 | `reservation.availability.day` |
-| The free tables for a date, time, duration and party | view reservations | F23 | `reservation.availability.tables` |
+| A day: covers, reservations, blocks, business hours and occupancy of each slot | view reservations | F05, F17 | `reservation.availability.day` |
+| The free tables for a date, time, duration and party | view reservations | F17, F23 | `reservation.availability.tables` |
 | The time slots, with filters and pages | view slots | F01 | `reservation.time_slot.list` |
 | A slot, by its id or by its weekday and its start, with the words it is named with | view slots | F01 | `reservation.time_slot.get` |
 | The blocked dates, with filters and pages | view blocks | F02 | `reservation.blocked_date.list` |
@@ -708,12 +764,14 @@ date uses. They are those of the reservation as it was noted down, on the busine
 shifting with the time zone.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:2cbdaf8c3b48 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
-| Notes down a reservation (`overbook` knowingly fills a full slot, the staff only) | add reservations | F06 | `reservation.reservation.create` |
-| Changes a reservation | change reservations | F08 | `reservation.reservation.update` |
-| Confirms, seats, completes, cancels or marks a no-show | change reservations | F07, F09–F12 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` |
+| Notes down a reservation (`overbook` knowingly fills a full slot, the staff only) | add reservations | F06, F17 | `reservation.reservation.create` |
+| Changes a reservation | change reservations | F08, F18 | `reservation.reservation.update` |
+| Confirms, seats, completes or marks a no-show | change reservations | F07, F10–F12 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.no_show` |
+| Cancels a reservation | change reservations | F09, F18 | `reservation.reservation.cancel` |
 | Deletes a reservation | delete reservations | F20 | `reservation.reservation.delete` |
 | Releases the overdue pending ones | change reservations | F13 | `reservation.reservation.release_unconfirmed` |
 | Creates or removes a slot | change slots | F01 | `reservation.time_slot.create`, `.delete` |
@@ -725,6 +783,7 @@ For the platform only (without a route in the API, as the system): `reservation.
 `reservation.customer.erase` (reactions to Customers).
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:6dcdef6c0448 -->
 
 | Notice | When | What it carries |
 |---|---|---|
@@ -743,13 +802,15 @@ For the platform only (without a route in the API, as the system): `reservation.
 numbers. Tables does not listen to these notices: it receives the hold through the call of Reservations in the same transaction (TABLE-F25–F28).
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:91a2d7a1f30b -->
 
-| Notice | From | What it does | Service |
-|---|---|---|---|
-| `customer.customer.merged` | Customers | Moves their reservations and entries to the card that remains (F21) | `reservation.customer.reassign` |
-| `customer.customer.erased` | Customers | Erases their personal data from reservations and entries (F22) | `reservation.customer.erase` |
+| Notice | From | What it does | Flows | Service |
+|---|---|---|---|---|
+| `customer.customer.merged` | Customers | Moves their reservations and entries to the card that remains | F21 | `reservation.customer.reassign` |
+| `customer.customer.erased` | Customers | Erases their personal data from reservations and entries | F22 | `reservation.customer.erase` |
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:801f3d1cb777 -->
 
 - **Tables** (requirement): the table of each reservation (its tables, to choose it and to check that it
   is in service) and, in the same transaction of each change, the hold of its table:
@@ -764,12 +825,14 @@ numbers. Tables does not listen to these notices: it receives the hold through t
   day (`day_label`), the same one Appointments uses.
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:4ab3fcf90d3e -->
 
 | App | What for | Service |
 |---|---|---|
 | Tables | Hold, move and release the table of each reservation | none of Reservations: it is Reservations that calls its platform actions, in the same transaction |
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:1c6b03e59553 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

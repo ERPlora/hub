@@ -1,15 +1,17 @@
 """The table app declares its module metadata, its menu, its permissions, what each role gets and its hook of the
 Home."""
 
-
+import pytest
 from django.apps import apps
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs
 from live.operations import registry
 
 from apps.table import events as E
 from base import home
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.roles import grants_by_role
 from base.tests.shell_icons import shell_icon_registry
 
@@ -85,7 +87,7 @@ def test_table_is_in_the_store_and_in_the_restaurant_template():
 
 
 def test_permissions_are_the_workbook_ones():
-    assert table().permissions == PERMISSIONS
+    assert list(table().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -121,8 +123,21 @@ def test_navigation_is_four_sections_and_the_settings_with_registered_icons():
     ]
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert table().help == Help(videos={})
+def test_its_help_window_has_no_tour_yet():
+    assert table().help.videos == {}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("TABLE-F01", "TABLE-F06"), "0S_fWROlNYc", "Wsv-T4bTWww"),
+    (("TABLE-F02", "TABLE-F04"), "3UpXXiCV5Lk", "DiPULg6x8T4"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("table", language) == help_videos.by_task(TASK_VIDEOS, language)
 
 
 #: Done at the table by the waiter with the party in front (``ai.in_person``): seating a party, seating a parked
@@ -244,7 +259,7 @@ def test_the_homes_step_is_your_tables_done_once_one_table_is_in_use():
         False,
     )
     assert "usable_tables" in registry[step.operation].output.model_fields
-    assert home.level_of(f"table.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"table.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():

@@ -10,22 +10,15 @@ from live.operations import atomic
 
 from apps.service.models import ACTOR_MAX_LENGTH
 from apps.tax.models import TaxCategory
-from apps.tax.queries import held_categories
+from apps.tax.queries.categories import held_categories
+from base.queries.people import actor_name
 
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
 
 
 def _actor(ctx: OperationContext) -> str:
-    """Who acted, as a person reads it («Voided by …»): an account's full name, else its email, else
-    its username; the platform or an API key as they name themselves."""
-    actor = ctx.actor
-    if actor is None:
-        return ""
-    if hasattr(actor, "get_username"):
-        name = actor.get_full_name() or actor.email or actor.get_username()
-    else:
-        name = str(actor)
-    return name[:ACTOR_MAX_LENGTH]
+    """Who acted, as a colleague reads it («Voided by …»): never their e-mail address."""
+    return actor_name(ctx.actor)[:ACTOR_MAX_LENGTH]
 
 
 def _tidy(name: str) -> str:

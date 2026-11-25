@@ -26,10 +26,12 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   hub;
 - ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for (``requested``,
   ``creating``, ``migrating``, ``seeding`` or ``failed`` before), plus ``maintenance`` with control's active freeze
-  (``null`` when lifted); never where its database is nor part of the photo's monotonic ``state_version``;
+  (``null`` when lifted) and ``move_scheduled_for``, when the business's move asked for its night starts, in UTC
+  (``null`` without one); never where its database is or goes, nor part of the photo's monotonic ``state_version``;
 - ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202; a business with its own database is copied by the
   worker, ``offboarding``); ``POST /internal/hubs/{id}/restore`` → ``base.hub.restore`` (200; 409 ``hub_purged`` when
-  it can never come back);
+  it can never come back); ERPlora's own hub is never registered, cancelled nor restored (409
+  ``base.platform_hub_kept``);
 - ``GET /internal/hubs/{id}/dumps`` → ``base.hub.dump_list``: ``{available, dumps: [{id, kind, created_at, bytes,
   url}]}``, the copies of its data (``id``: the key in the bucket), newest first, each link signed for 15 minutes;
   ``available`` false for a business that never gets one (no database of its own); 200 for a business that left too
@@ -43,7 +45,8 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   ``verifactu.config.sync`` on the hub's slug, and its ``whatsapp`` (the number's state, door 4 of WhatsApp's
   contract) through ``whatsapp_inbox.channel.sync`` with the photo's version, when the app is on in that business,
   its ``members`` (who is in the business, with which role) on the business's memberships, and its ``custom_domain``
-  (the business's own domain, or none) on the row, which ``base.custom_domains`` reads;
+  (the business's own domain, or none) on the row, which ``base.custom_domains`` reads; of ERPlora's own hub, its
+  ``members`` alone are kept and applied;
 
 ``POST /internal/sessions/revoke`` (``{user_id, hub_id?}``) → ``base.session.revoke``, on the same
 scope: 200 ``{ended}`` with the sessions of that SaaS account it ended, on that business or, without it, everywhere

@@ -3,12 +3,12 @@
 import datetime as dt
 
 from django.db import IntegrityError
-from django.db.models import F
+from django.db.models import F, Sum
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict
-from live.operations import AI, atomic, operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.sale import events
@@ -31,6 +31,7 @@ from apps.sale.queries.service_lines import Booking
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.checkout import CompleteIn
 from apps.sale.schemas.sales import SaleOut
+from apps.sale.services import charge_card, charge_kitchen
 from apps.sale.services.charge_validation import (
     _check_discounts,
     _check_drawer,
@@ -43,7 +44,7 @@ from apps.sale.services.charge_validation import (
 from apps.sale.services.documents import RECIPIENT_KEYS, _fiscal_document, _issue_waiting_document
 from apps.sale.services.orders import _recount, _save_lines
 from apps.sale.services.printouts import _print_sale
-from apps.sale.services.sale_lines import _completed_payload, _sale_lines
+from apps.sale.services.sale_lines import _completed_payload, _sale_lines, _sale_payments
 from base.business import business_zone
 
 CUSTOMER_REQUIRED = _("This business requires a customer on every sale.")
@@ -80,13 +81,19 @@ def _replay(ctx: OperationContext, data: CompleteIn) -> dict | None:
         same = sale.order_id == data.order_id and (
             not data.line_ids or set(sale.order_lines.values_list("id", flat=True)) == set(data.line_ids)
         )
-    if not same:
+    if not same or not _same_additions(sale, data):
         raise Conflict(str(KEY_REUSED), code="sale.idempotency_key_reused")
     # The same attempt again is the till's retry: a document that waited is asked for once more (no relay issues it on
     # its own); still refused, it keeps waiting, in sight.
     _issue_waiting_document(ctx, sale)
     with translation.override(ctx.language):
         return sale_detail(sale, already=True)
+
+
+def _same_additions(sale: Sale, data: CompleteIn) -> bool:
+    """Whether the attempt adds to its tenders what the sale it charged added: another amount is another charge."""
+    charged = sale.payments.aggregate(added=Sum("extra"))["added"] or 0
+    return charged == sum(leg.extra for leg in data.payments)
 
 
 def _claim_counter(ctx: OperationContext, data: CompleteIn) -> Order | dict:
@@ -200,7 +207,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         )
     counter_sale = order.source == Order.Source.COUNTER and not order.lines.exists()
     operation = operation_total(None if counter_sale else order, closes, valuation, on=day)
-    legs = _legs(data, valuation.total, settings, operation)
+    legs = _legs(ctx, data, valuation.total, settings, operation)
     _check_drawer(ctx, legs)
 
     if counter_sale:
@@ -275,22 +282,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     sale_lines = SaleLine.objects.bulk_create(
         _sale_lines(sale, parts, valuation, session_values)
     )
-    payments = SalePayment.objects.bulk_create(
-        [
-            SalePayment(
-                sale=sale,
-                position=position,
-                method=leg["method"],
-                method_name=leg["method"].name,
-                method_type=leg["method"].type,
-                amount=leg["amount"],
-                tendered=leg["tendered"],
-                change=leg["change"],
-                reference=leg["reference"],
-            )
-            for position, leg in enumerate(legs, start=1)
-        ]
-    )
+    payments = SalePayment.objects.bulk_create(_sale_payments(sale, legs))
     OrderLine.objects.filter(pk__in=[line.id for line in lines]).update(sale=sale)
     if closes:
         order.status = Order.Status.COMPLETED
@@ -356,15 +348,18 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     input=CompleteIn,
     output=SaleOut,
     expose_api=True,
-    ai=AI(
-        description="Charge a sale: an open check (all its lines, or some for a partial charge) or loose lines (products by "
-        "SKU or name, services by name, open prices by department). The sessions of the lines paid with a voucher are "
-        "spent with it (the sale must be charged to the voucher's owner). Payments: cash with what was handed over (change), card or other "
+    # A dict, not AI(...): AI has no ``summary``, the card's own words (base.assistant.cards.card).
+    ai={
+        "description": "Charge a sale: an open check (all its lines, or some for a partial charge) or loose lines (products by "
+        "SKU or name, services by name, open prices by department). What an open check has not sent to the kitchen "
+        "yet goes to it first, as a new round, as the till's Charge does. The sessions of the lines paid with a "
+        "voucher are spent with it (the sale must be charged to the voucher's owner). Payments: cash with what was "
+        "handed over (change), card or other "
         "methods for the exact amount, or split. The server prices, taxes and numbers it; a ticket up to 3,000 €, above "
         "or on request an invoice with the customer's name, tax ID and address (ask for them). Send the same "
         "idempotency_key on a retry: it never charges twice.",
-        risk="high",
-        asks={
+        "risk": "high",
+        "asks": {
             "en": (
                 "charge table 4",
                 "she paid cash with a 20",
@@ -378,10 +373,11 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                 "la mitad en efectivo y el resto con tarjeta",
             ),
         },
-    ),
+        "summary": charge_card.summary,
+    },
 )
 def complete(ctx: OperationContext, data: CompleteIn) -> dict:
-    return _complete(ctx, data, over_limit=False)
+    return _complete(ctx, charge_kitchen.send_pending(ctx, data), over_limit=False)
 
 
 @operation(
@@ -390,13 +386,13 @@ def complete(ctx: OperationContext, data: CompleteIn) -> dict:
     permission="sale.discount_over_limit",
     input=CompleteIn,
     output=SaleOut,
-    ai=AI(
-        description="The manager's door to the very same charge as sale.sale.complete, for a discount bigger than the "
+    ai={
+        "description": "The manager's door to the very same charge as sale.sale.complete, for a discount bigger than the "
         "business's cap. For a named open check, resolve it with sale.order.list(search=...) and charge it directly; "
         "do not stop at sale.order.set_discount_over_limit or ask the person for order_id. Never use it to dodge the "
         "cap when the discount fits under it.",
-        risk="high",
-        asks={
+        "risk": "high",
+        "asks": {
             "en": (
                 "charge it with 50% off, I'm authorising the discount",
                 "ring it up with a discount above the cap",
@@ -406,7 +402,8 @@ def complete(ctx: OperationContext, data: CompleteIn) -> dict:
                 "cobra con el descuento aunque pase del máximo",
             ),
         },
-    ),
+        "summary": charge_card.summary,
+    },
 )
 def complete_over_limit(ctx: OperationContext, data: CompleteIn) -> dict:
-    return _complete(ctx, data, over_limit=True)
+    return _complete(ctx, charge_kitchen.send_pending(ctx, data), over_limit=True)

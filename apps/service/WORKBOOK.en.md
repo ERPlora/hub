@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:ba3814de3ea3137051a399231c4c62fb1cad53f12d37e2ada1cb09dc5534de34 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:e70996cba8ad -->
 
 Services is the catalogue of what your hair salon or your beauty centre sells: each service with its price, its
 duration and its category, and which professionals perform it. It also keeps the vouchers, packages of sessions that
@@ -8,6 +7,7 @@ a customer buys once and spends over several visits. The agenda, the till and on
 catalogue.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:0882ea401126 -->
 
 Services is the **catalogue of what a hair salon or a beauty centre sells when what is sold is not an
 item**: each service with its name, its pricing, its price, its duration, its category and its tax
@@ -22,6 +22,7 @@ buys once and spends over several visits. A voucher pays for a whole service lin
 not a gift card), and its owner is a single customer.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:01847c068bb4 -->
 
 - The **employee** (front desk, till): sees the catalogue, the categories and the vouchers, adds
   services, sees the sold vouchers and their movements, grants a voucher to a customer and spends
@@ -36,6 +37,7 @@ Only the hair salon uses it: the restaurant template does not bring it and no re
 on it.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:a29f8d52c583 -->
 
 - **Salon catalogue** (Fresha, Vagaro, Mangomint, DaySmart, Square Appointments): a service = name,
   price, duration and category; archive instead of delete; a service without a set price ("From",
@@ -56,6 +58,7 @@ on it.
   transferred) and ADR-0085 (VAT is linked through the tax category of Taxes).
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:6a87ddf5f278 -->
 
 1. Services turns on **Taxes**, **Staff** and **Customers** with it, and they cannot be turned off while
    Services is on: the tax category of each service belongs to Taxes, the professionals belong to Staff
@@ -80,18 +83,21 @@ the same. While the business has not answered, an amount shows as "—", never i
 examples in this document are from a business in Spain, in euros.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:a80c078dabc8 -->
 
 Services opens from the **Services** menu and has three tabs: **Services**, **Categories** and
 **Packages**, plus **Settings** for whoever may change them. What a person cannot do does not show, and
 the app refuses it even if they try through the API or the assistant.
 
 ### Services
+<!-- from WORKBOOK.md sha256:373d2a6899e7 -->
 Here is your catalogue of services. The list shows each one with its photo, its category, its pricing, its price,
 its duration and whether it can be charged yet; search, filter and sort them. With **New service** you add one; tap
 a row to change it and say which professionals perform it, and **Archive** stops offering it without losing its
 history.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:650d7f28342e -->
 Table with the search box "Search service…", columns **Photo** (the thumbnail, or the initials over its
 colour), **Name, Category, Pricing** (Fixed price, Hourly,
 From, Variable, Free), **Price** (in the business's currency), **Duration (min)** and **Status**: **Active**, **Not configured** (with the
@@ -120,11 +126,13 @@ up to 2 MB". The "Image library" window is Inventory's, with "Hair" and "Beauty"
 uploads, the button says "Uploading photo…".
 
 ### Categories
+<!-- from WORKBOOK.md sha256:b1c7d60328a6 -->
 Categories group your services in the list, at the till and in online booking, for example "Haircut", "Colour" or
 "Beauty", and one can sit inside another. Here you create them, order them, rename them and delete them; when you
 delete one, its services are left without a category.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:1d6cf1f936c5 -->
 Table with the search box "Search category…" and columns **Name, Parent category, Order** and
 **Services** (how many services on offer it has). **New category** opens the form: **Name, Parent
 category** ("No parent (root)" or another) and **Order**, with **Create category** / **Save changes**.
@@ -133,12 +141,14 @@ disappears; the services in it are kept, without a category." and, if it has ser
 services will be left without a category." (with one, "1 service will be left without a category.").
 
 ### Packages
+<!-- from WORKBOOK.md sha256:946a7d04016a -->
 Here you create the vouchers you sell: their name, the services they include with their sessions, their price or
 their discount, how many uses they give and how many days they last. For each voucher you see who has bought it and
 its movements, and from there you spend a session outside the checkout, give sessions as a gift or void one sold by
 mistake. At the top, **Vouchers with no customer** gathers the vouchers whose customer was deleted.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:64a747432988 -->
 At the top, **Vouchers with no customer** (manager, owner and administrator only). Table with the search
 box "Search package…", columns **Name, Discount, Closed price, Lines** and **Status** (Active, Archived or
 Deleted). In **Filters**, the Status filter on **Deleted** switches to the view of the vouchers deleted
@@ -169,7 +179,7 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
   Empty: "Nobody has bought this voucher yet.".
   - **Spend a session** opens its dialog: "Mark one session of <customer>'s "<voucher>" voucher as delivered,
     outside the till.", the balance "{n} sessions left · {after} after this one" ("1 session left · 0 after this
-    one"; "No session limit" on one without a limit), **Service** ("Choose the service", only those the voucher
+    one"; "No session limit" on one without a limit), **Service** (only those the voucher
     covers; with a single one, already chosen), **Professional** (Staff's team; "Who did it: what the session is
     worth counts in their production in Sales. Optional."), **Note** and the **Cancel** and **Spend session**
     buttons. While it checks the voucher, "Checking the voucher…".
@@ -179,17 +189,20 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
   lost its customer.".
 
 ### Settings
+<!-- from WORKBOOK.md sha256:6c3da2a66cf2 -->
 Here you decide what a new service takes when you do not say it: its duration, its buffer time and its tax
 category; and whether online booking shows the prices and the duration and lets people book. Only whoever may
 change the settings sees it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:f3372c451d1f -->
 Only for whoever may change them. Fields: "Default duration (min)", "Default buffer time (min)",
 "Default tax category", "Show prices", "Show duration" and "Allow online booking"; **Save** button.
 While the business has never saved, the factory ones show (60 min, 0 min, no category, yes, yes, yes).
 Saved: "Settings saved.".
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:578db094b24c -->
 
 | State | What the person sees |
 |---|---|
@@ -203,12 +216,14 @@ Saved: "Settings saved.".
 Amounts, durations and dates show in the format of the language of whoever is looking.
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:a79c91b7f40b -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -250,6 +265,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SERVICE-F36 | Say later which sale charged a voucher | done (assistant and API); in **Sold vouchers**, not (see "What is left out") |
 
 ### SERVICE-F01 Add a service
+<!-- from WORKBOOK.md sha256:a5a521258115 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Home, Services
@@ -289,6 +305,7 @@ Involved: TAX-F01, BASE-F01, BASE-F119, BASE-F114 (the ERPlora staff get back fr
 each by this same creation)
 
 ### SERVICE-F02 Edit a service
+<!-- from WORKBOOK.md sha256:849f1542475b -->
 Status: done
 Actor: manager, assistant
 Screen: Services
@@ -307,6 +324,7 @@ operation they may not run.
 Involved: SERVICE-F31, BASE-F119
 
 ### SERVICE-F03 Give a service an open price
+<!-- from WORKBOOK.md sha256:04fb852a6c31 -->
 Status: done
 Actor: manager, assistant
 Screen: Services
@@ -323,6 +341,7 @@ If it fails: a pricing outside the five or a minimum above the maximum are refus
 Involved: SALE-F09
 
 ### SERVICE-F04 Archive a service
+<!-- from WORKBOOK.md sha256:582b20506c7f -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Services
@@ -345,6 +364,7 @@ stops the archiving, and if Appointments does not answer the confirmation shows 
 Involved: APPOINTMENT-F01, APPOINTMENT-F26
 
 ### SERVICE-F05 See and restore the archived services
+<!-- from WORKBOOK.md sha256:0f7fd406633f -->
 Status: done
 Actor: manager, assistant
 Screen: Services
@@ -360,6 +380,7 @@ Edit or Archive and tapping it opens nothing.
 Involved: SERVICE-F04
 
 ### SERVICE-F06 Add many services in one go
+<!-- from WORKBOOK.md sha256:5d20e8b3bfeb -->
 Status: done (assistant and API; there is no importer on screen)
 Actor: manager, assistant
 Screen: none
@@ -376,6 +397,7 @@ of the fourth line).
 Involved: SERVICE-F01, SERVICE-F11
 
 ### SERVICE-F07 Create and edit categories
+<!-- from WORKBOOK.md sha256:33c7a10d485c -->
 Status: done
 Actor: manager, assistant
 Screen: Categories
@@ -397,6 +419,7 @@ Involved: SERVICE-F01, SERVICE-F08, BASE-F114 (the ERPlora staff recover from a 
 business no longer has, each by this same creation)
 
 ### SERVICE-F08 Delete a category
+<!-- from WORKBOOK.md sha256:a5dc1f4fc98a -->
 Status: done
 Actor: owner, administrator
 Screen: Categories
@@ -419,6 +442,7 @@ already and is not filled: what the business took out of it since stays out; if 
 failed halfway, asking for it again from the same copy fills it with what the business keeps untouched)
 
 ### SERVICE-F09 Sell a service at the till
+<!-- from WORKBOOK.md sha256:6a4c836211cc -->
 Status: done (Sales does it, SALE-F38)
 Actor: employee
 Screen: Sales: Sell
@@ -433,6 +457,7 @@ If it fails: Sales says it (SALE-F38).
 Involved: SALE-F01, SALE-F38
 
 ### SERVICE-F10 Give the catalogue to Appointments, Sales, Online booking and Price Lists
+<!-- from WORKBOOK.md sha256:955f2ef89194 -->
 Status: done
 Actor: system, assistant
 Screen: none
@@ -449,6 +474,7 @@ Involved: APPOINTMENT-F01, SALE-F01, ONLINE_BOOKING-F01, ONLINE_BOOKING-F07, PRI
 WHATSAPP_INBOX-F21
 
 ### SERVICE-F11 Change the Services settings
+<!-- from WORKBOOK.md sha256:3a300e36522f -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -470,6 +496,7 @@ refusal that names no field stays until the next try.
 Involved: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
 
 ### SERVICE-F12 Create a voucher
+<!-- from WORKBOOK.md sha256:d99ebbd7df37 -->
 Status: done
 Actor: manager, assistant
 Screen: Packages
@@ -497,6 +524,7 @@ reason) and offers "Retry", which asks for it again; as soon as it arrives, the 
 Involved: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Edit or delete a voucher
+<!-- from WORKBOOK.md sha256:f74fb2f26561 -->
 Status: done
 Actor: manager (edit), owner and administrator (delete)
 Screen: Packages
@@ -517,14 +545,15 @@ the confirmation.
 Involved: SERVICE-F12, SERVICE-F16
 
 ### SERVICE-F14 Sell a voucher to a customer
+<!-- from WORKBOOK.md sha256:1460062e2c72 -->
 Status: done — the grant, through the assistant and the API; not the sale at the till (see "What is left out")
 Actor: employee, manager, assistant
 Screen: assistant
 Steps:
 1. Ask the assistant to grant the voucher to the customer (by her name or her phone), with the amount
    charged and the sale that charged it. If that sale charged several lines, also which of them.
-2. The assistant's confirmation card names the voucher, the customer, the sale by its number
-   ("20261014-0007") and the line by what it charges; confirm it.
+2. The assistant's confirmation card puts first the voucher, the customer and the sale by its number
+   ("20261014-0007"), and then the line by what it charges and the amounts; confirm it.
 3. The voucher shows in **Sold vouchers** of that voucher (SERVICE-F16).
 In: the voucher of the catalogue, live and active, and the customer (Customers).
 Out: a sold voucher with the owner, the date, the amount and the "Uses" and the "Validity" of the
@@ -543,6 +572,7 @@ whoever cannot charge cannot say it. Nothing is granted.
 Involved: CUSTOMER-F01, SALE-F28, SERVICE-F24, SERVICE-F36
 
 ### SERVICE-F15 Look up a customer's vouchers
+<!-- from WORKBOOK.md sha256:f53c310c46e4 -->
 Status: done (assistant and API)
 Actor: employee, manager, assistant
 Screen: assistant
@@ -558,15 +588,18 @@ not find her, it says so.
 Involved: SERVICE-F14, SERVICE-F28, CUSTOMER-F01
 
 ### SERVICE-F16 See who has bought a voucher
+<!-- from WORKBOOK.md sha256:9701d705fac5 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Packages
 Steps:
 1. In the voucher's row tap **Sold vouchers** (for a deleted one, with Status on **Deleted**).
 2. One row per purchase shows, the most recent first.
-3. **Load more** brings the next page; **Close** goes back to the table.
+3. A purchase charged with its sale names it by the number Sales names it by, "Sale: 20261124-0001".
+   Whoever cannot see that sale (Sales off, or a sale that is not theirs) sees the row without a sale.
+4. **Load more** brings the next page; **Close** goes back to the table.
 In: the purchases of that voucher and the name of each customer (Customers); for a deleted card, its
-identifier.
+identifier; the number of the sale of each purchase, from Sales' read of the sale.
 Out: nothing; read only. **Spend a session** (SERVICE-F21), **Adjust** and **Void** show where they apply and
 for whoever may.
 If it fails: empty, "Nobody has bought this voucher yet."; if it cannot be read, "Could not load the sold
@@ -574,6 +607,7 @@ vouchers" with the reason.
 Involved: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Void a voucher sold by mistake
+<!-- from WORKBOOK.md sha256:40ffc7422eff -->
 Status: done
 Actor: manager, assistant
 Screen: Packages
@@ -585,15 +619,16 @@ Steps:
    with a return.".
 3. Type the Reason (required) and tap **Void**.
 In: the purchase and the reason.
-Out: the voucher can no longer be spent and stays as a trace, with who, when and the reason
-(`service.grant.voided`). It moves no money and issues no document. If a line of a sale paid for it, that part
+Out: the voucher can no longer be spent and stays as a trace, with who (by their name or, if their account has
+none, by what goes before the @ of their email, never the whole email), when and the reason (`service.grant.voided`). It moves no money and issues no document. If a line of a sale paid for it, that part
 counts for whoever sold it again, until a refund says otherwise (SALE-F28).
 If it fails: "That voucher was already used: it cannot be voided.", "That voucher was already voided." or
 "Say why this voucher is being voided: the reason stays on its record.". If another till spends a session
 at the same time, the void waits and gets the real reason.
-Involved: SERVICE-F16, SALE-F28, SALE-F32
+Involved: SERVICE-F16, SALE-F28, SALE-F32, BASE-F119
 
 ### SERVICE-F18 Give sessions, extend the expiry or correct the balance
+<!-- from WORKBOOK.md sha256:c1e5e89a1bb1 -->
 Status: done
 Actor: manager, assistant
 Screen: Packages
@@ -615,6 +650,7 @@ session limit…", "That voucher never expires…" or "That voucher was already 
 Involved: SERVICE-F16, SERVICE-F20
 
 ### SERVICE-F19 See a voucher's movements
+<!-- from WORKBOOK.md sha256:136e89fddd7d -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Packages
@@ -624,13 +660,19 @@ Steps:
    more** brings the next ones, each movement only once even if several carry the same time.
 3. A session spent saying who did it names her beside the customer, "Professional: Ana
    López"; if her name changes in Staff, the row says it at once.
-In: the sessions and the adjustments of that voucher; the name of each session's professional (Staff).
+4. A session charged at the till says its sale by the number Sales names it by, "Sale:
+   20261123-0003", also one given back, and the professional of its line (or the check's, when the line
+   says nobody), as Sales counts what each one did. Whoever cannot see that sale (Sales off, or a sale
+   that is not theirs) sees the row without a sale.
+In: the sessions and the adjustments of that voucher; the name of each session's professional (Staff); the
+number and the professional of the sale of each session of the till, from Sales' read of the sale.
 Out: nothing; read only.
 If it fails: empty, "This voucher has not been used yet."; if it cannot be read, "Could not load the
 movements" with the reason.
 Involved: SERVICE-F18, SERVICE-F21, SERVICE-F22
 
 ### SERVICE-F20 A voucher expires
+<!-- from WORKBOOK.md sha256:53fc29587d66 -->
 Status: done
 Actor: system
 Screen: none
@@ -646,6 +688,7 @@ expired.".
 Involved: SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F21 Spend a session outside the checkout
+<!-- from WORKBOOK.md sha256:02340cd66afa -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Packages, assistant
@@ -690,6 +733,7 @@ spend the last session at the same time go in line and the second one gets the r
 Involved: SERVICE-F16, SERVICE-F19, SERVICE-F20, SERVICE-F24, SALE-F28, STAFF-F21
 
 ### SERVICE-F22 Pay a line with a voucher
+<!-- from WORKBOOK.md sha256:0f3aa2abf391 -->
 Status: done (with Sales, SALE-F27)
 Actor: employee, manager
 Screen: Sales: Charge
@@ -723,6 +767,7 @@ sessions, the slot does not show.
 Involved: SALE-F27, CUSTOMER-F17
 
 ### SERVICE-F23 Release the session if the line or the check goes away
+<!-- from WORKBOOK.md sha256:b8522dd468d3 -->
 Status: done
 Actor: employee, manager
 Screen: Sales: Sell, Charge
@@ -741,6 +786,7 @@ moment, the line is removed all the same and the session comes back on its own a
 Involved: SALE-F18, SALE-F20, SALE-F27
 
 ### SERVICE-F24 Mark the sessions as spent when charging
+<!-- from WORKBOOK.md sha256:3b5846f1212d -->
 Status: done (not granting the vouchers sold on the receipt: see "What is left out")
 Actor: employee, manager
 Screen: Sales: Charge
@@ -768,6 +814,7 @@ the business, it is not charged either.
 Involved: SALE-F01, SALE-F22, SALE-F27, SALE-F28
 
 ### SERVICE-F25 The held session nobody charges comes back on its own
+<!-- from WORKBOOK.md sha256:95f10039a257 -->
 Status: done (on reading and with the hourly task)
 Actor: system
 Screen: none
@@ -785,6 +832,7 @@ balance does not count it.
 Involved: SALE-F17
 
 ### SERVICE-F26 Give the session back when the sale is refunded
+<!-- from WORKBOOK.md sha256:ed0bc100d33e -->
 Status: done (with Sales, SALE-F32)
 Actor: manager
 Screen: Sales: Refund
@@ -804,6 +852,7 @@ business, the whole refund is refused.
 Involved: SALE-F31, SALE-F32
 
 ### SERVICE-F27 Give the session back when the sale is voided
+<!-- from WORKBOOK.md sha256:b54cc6602a6a -->
 Status: done (not voiding the vouchers sold in it: see "What is left out")
 Actor: manager
 Screen: Sales: Void sale
@@ -820,6 +869,7 @@ sale is not voided and the window says so.
 Involved: SALE-F30
 
 ### SERVICE-F28 Merge two cards: the vouchers move to the one that stays
+<!-- from WORKBOOK.md sha256:5391c3f584a7 -->
 Status: done
 Actor: system
 Screen: none
@@ -837,6 +887,7 @@ If it fails: repeating the notice changes nothing.
 Involved: CUSTOMER-F13, SERVICE-F15, SERVICE-F22
 
 ### SERVICE-F29 Delete or anonymise a card: its vouchers are left with no customer
+<!-- from WORKBOOK.md sha256:1d8fc80611c9 -->
 Status: done
 Actor: system
 Screen: none
@@ -858,6 +909,7 @@ If it fails: repeating the notice changes nothing.
 Involved: CUSTOMER-F07, CUSTOMER-F16, CUSTOMER-F33
 
 ### SERVICE-F30 Rescue the vouchers with no customer
+<!-- from WORKBOOK.md sha256:333f9734ac24 -->
 Status: done (the list; a voucher is not moved to another card)
 Actor: manager
 Screen: Packages
@@ -874,6 +926,7 @@ customer could not be loaded.".
 Involved: SERVICE-F29, SERVICE-F17
 
 ### SERVICE-F31 Assign a professional to a service
+<!-- from WORKBOOK.md sha256:c6a833ee419b -->
 Status: done
 Actor: manager, assistant
 Screen: Services (Editing service)
@@ -902,6 +955,7 @@ same operation, to whoever performed it and the business still has on its staff;
 with why)
 
 ### SERVICE-F32 Change or remove a professional from a service
+<!-- from WORKBOOK.md sha256:450d63311b36 -->
 Status: done
 Actor: manager, assistant
 Screen: Services (Editing service)
@@ -922,6 +976,7 @@ currency, like **Assign**: the own price is read in it.
 Involved: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Know who can perform a service
+<!-- from WORKBOOK.md sha256:76b371301554 -->
 Status: done
 Actor: system, assistant
 Screen: none
@@ -936,6 +991,7 @@ If it fails: a service that does not exist, "That service does not exist in this
 Involved: SERVICE-F31, APPOINTMENT-F01
 
 ### SERVICE-F34 Choose a service's image from the library
+<!-- from WORKBOOK.md sha256:b3e04f876800 -->
 Status: done
 Actor: manager, assistant
 Screen: Services
@@ -950,8 +1006,8 @@ Steps:
 3. Tap **Create service** or **Save changes**: the photo stays on the service. Closing the form without
    saving discards it.
 4. Through the assistant: "put a photo on the women's haircut". The assistant shows up to five
-   candidate images by their title and asks which one; it never sets one on its own. When one is
-   chosen, it asks for the confirmation card and sets it.
+   candidate images by their title alone, without their internal code, and asks which one; it never
+   sets one on its own. When one is chosen, it asks for the confirmation card and sets it.
 In: the service and the ERPlora image library, the same one Inventory uses (INVENTORY-F30).
 Out: the service with its image from the library; the business keeps no copy, only which one it is, and
 it uses none of its plan's space. Services announces the change (`service.service.updated`). The service's
@@ -969,6 +1025,7 @@ assistant or the API too.
 Involved: SERVICE-F01, SERVICE-F02, SERVICE-F09, SALE-F38, INVENTORY-F30, INVENTORY-F32, BASE-F114
 
 ### SERVICE-F35 Upload the service's own photo
+<!-- from WORKBOOK.md sha256:fb667b6a4c15 -->
 Status: done
 Actor: manager
 Screen: Services
@@ -996,6 +1053,7 @@ could not be saved. Try again.".
 Involved: SERVICE-F01, SERVICE-F02, SERVICE-F04, SERVICE-F05, SERVICE-F09, INVENTORY-F31, INVENTORY-F33, BASE-F35
 
 ### SERVICE-F36 Say later which sale charged a voucher
+<!-- from WORKBOOK.md sha256:e495eebfd2a9 -->
 Status: done (assistant and API); in **Sold vouchers**, not (see "What is left out")
 Actor: manager, assistant
 Screen: assistant
@@ -1028,6 +1086,7 @@ whoever cannot charge cannot say it. Nothing changes.
 Involved: SERVICE-F14, SERVICE-F17, SERVICE-F24, SALE-F28, STAFF-F21
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:7db05cc4689a -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever speaks) and the API, with the same rules and the same permissions. A service, a category or a
@@ -1044,6 +1103,7 @@ the administrator and the manager); the others get it empty. The till keeps it a
 it sells, even if whoever charges does not see it.
 
 ### What it offers: queries (they read and change nothing)
+<!-- from WORKBOOK.md sha256:18e7cfe7c2a2 -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
@@ -1069,12 +1129,13 @@ it sells, even if whoever charges does not see it.
 | Whether a session can be spent and why not | spend sessions | F21 | `service.grant.redeem_check` |
 | The customer's vouchers that can pay for a service, the one spent first and why | spend sessions | F22 | `service.grant.tender_options` |
 | A voucher's movements | view voucher balances | F19 | `service.movement.list` |
-| Up to five images of the library for a service's photo, by its name and titled in the business's language; it sets none | view services | F34 | `service.service.suggest_image` |
+| Up to five images of the library for a service's photo, by its name and titled in the language of whoever asks; it sets none | view services | F34 | `service.service.suggest_image` |
 
 All of them, except the checks, the images proposed and the reads of an assignment, a sold voucher or a session, can
 be followed live.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:85b6f5a91475 -->
 
 | What it does | Who may | Flows | Service |
 |---|---|---|---|
@@ -1107,6 +1168,7 @@ be followed live.
 | Gives back to the voucher sessions spent in a voided or refunded sale (Sales calls it) | give sessions back | F26, F27 | `service.session.return` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:aab59fd4d3eb -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -1130,6 +1192,7 @@ be followed live.
 | Texts of the vouchers emptied | Anonymise a card with vouchers with text | The card | `service.grant.erased` |
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:a24ca892ebfc -->
 
 | Notice of another app | What Services does | Flows |
 |---|---|---|
@@ -1141,6 +1204,7 @@ From Taxes it reads the tax categories; from Staff, the cards (name, whether act
 Customers, the owner's name and whether her card was deleted.
 
 ### Contract with Sales
+<!-- from WORKBOOK.md sha256:80f0b5f38ad4 -->
 
 Sales does not depend on Services (Services is not in its `requires`): it uses its operations by name,
 with the session of whoever sells, as it does with Inventory.
@@ -1182,8 +1246,15 @@ with the session of whoever sells, as it does with Inventory.
   session of whoever asks, `sale.sale.get` (the sale's number), `sale.record.get` (a line of the sale with
   `sale_line_id`, one of the check with `line_id` and a refund with `refund_id`, "Refund of sale …") and
   `appointment.appointment.get` (the appointment's `label`). A `reference` that is no refund is the sale voided.
+- **What the sold vouchers and their movements say of Sales** (F16, F19): `service.grant.list` and
+  `service.movement.list` call by its name, with the session of whoever looks, `sale.sale.get`, once for each sale of
+  the page (`queries/sale_numbers.py`): its `number`; the movements, besides, who served the session's line, the one of
+  its `order_line_id` (its `staff_id` or, empty, the sale's, as Sales counts production). Nothing is copied into
+  Services. Without Sales, without permission to see sales or with a sale that is not theirs, `sale_number` is null and
+  the list comes all the same. The voucher's writes answer `GrantOut`, without `sale_number`: only the list asks for it.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:84571fb5682e -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

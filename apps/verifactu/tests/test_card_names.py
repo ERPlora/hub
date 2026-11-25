@@ -4,7 +4,6 @@ Invoicing names it: read as whoever asks, never by its id. Whoever may not read 
 is told nothing about it; and saying it changes nothing of the record nor sends anything."""
 
 import dataclasses
-import socket
 
 import pytest
 from live.context import OperationContext, Scope
@@ -16,7 +15,8 @@ from apps.verifactu.tests.conftest import HUB_DB, ISSUER, A, B, ctx_for, run
 from base import assistant
 from base.tests.test_assistant_card_values_references import AN_ID
 
-pytestmark = HUB_DB
+#: Saying a card sends nothing anywhere.
+pytestmark = [HUB_DB, pytest.mark.usefixtures("offline")]
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -30,17 +30,6 @@ ON_A_RECORD = [
 ]
 #: What the card calls the record and the invoice, as the VeriFactu screens do.
 TITLES = {"en": ("Record", "Invoice"), "es": ("Registro", "Factura")}
-
-
-@pytest.fixture(autouse=True)
-def offline(monkeypatch):
-    """Nothing here may leave the machine: a connection opened from Python fails the test (the database's is not)."""
-
-    def refuse(*args, **kwargs):
-        raise AssertionError(f"a test of the card opened a connection: {args!r}")
-
-    monkeypatch.setattr(socket.socket, "connect", refuse)
-    monkeypatch.setattr(socket, "create_connection", refuse)
 
 
 def sealed(unit_price: int = 1000, scope: Scope = A) -> Record:

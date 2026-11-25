@@ -9,33 +9,27 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.appointment import queries, services
-from apps.appointment.schemas import (
-    AppointmentCreateIn,
-    AppointmentListIn,
+from apps.appointment.schemas.agenda import AppointmentListIn, LanesIn
+from apps.appointment.schemas.appointments import (
     AppointmentRefIn,
-    BlockedTimeCreateIn,
-    BlockedTimeListIn,
-    BlockedTimeRefIn,
-    BulkCreateIn,
-    BulkDeleteIn,
-    CancelIn,
-    CheckIn,
     CountForServiceIn,
     ForCustomerIn,
     HistoryIn,
-    LanesIn,
-    MaterializeIn,
     NoticesIn,
+)
+from apps.appointment.schemas.availability import CheckIn, SlotsIn
+from apps.appointment.schemas.blocked_times import BlockedTimeCreateIn, BlockedTimeListIn, BlockedTimeRefIn
+from apps.appointment.schemas.booking import AppointmentCreateIn, BulkCreateIn
+from apps.appointment.schemas.changes import BulkDeleteIn, CancelIn, RescheduleIn, UpdateIn
+from apps.appointment.schemas.series import (
+    MaterializeIn,
     RecurringCreateIn,
     RecurringGetIn,
     RecurringListIn,
     RecurringRefIn,
     RecurringUpdateIn,
-    RescheduleIn,
-    SettingsIn,
-    SlotsIn,
-    UpdateIn,
 )
+from apps.appointment.schemas.settings import SettingsIn
 
 router = Router(tags=["appointment"])
 
@@ -45,17 +39,17 @@ router = Router(tags=["appointment"])
 
 @bind(router, "appointment.appointment.list", "/appointment/appointments")
 async def appointment_list(request, params: Query[AppointmentListIn]):
-    return await run_operation(request, queries.list_appointments, params)
+    return await run_operation(request, queries.appointments.list_appointments, params)
 
 
 @bind(router, "appointment.appointment.get", "/appointment/appointments/detail")
 async def appointment_get(request, params: Query[AppointmentRefIn]):
-    return await run_operation(request, queries.get_appointment, params)
+    return await run_operation(request, queries.appointments.get_appointment, params)
 
 
 @bind(router, "appointment.appointment.history", "/appointment/appointments/history")
 async def appointment_history(request, params: Query[HistoryIn]):
-    return await run_operation(request, queries.appointment_history, params)
+    return await run_operation(request, queries.appointments.appointment_history, params)
 
 
 @bind(
@@ -64,7 +58,7 @@ async def appointment_history(request, params: Query[HistoryIn]):
     "/appointment/appointments/for_customer",
 )
 async def appointment_for_customer(request, params: Query[ForCustomerIn]):
-    return await run_operation(request, queries.list_for_customer, params)
+    return await run_operation(request, queries.appointments.list_for_customer, params)
 
 
 @bind(
@@ -73,7 +67,7 @@ async def appointment_for_customer(request, params: Query[ForCustomerIn]):
     "/appointment/appointments/count_for_service",
 )
 async def appointment_count_for_service(request, params: Query[CountForServiceIn]):
-    return await run_operation(request, queries.count_active_for_service, params)
+    return await run_operation(request, queries.appointments.count_active_for_service, params)
 
 
 @bind(
@@ -82,12 +76,12 @@ async def appointment_count_for_service(request, params: Query[CountForServiceIn
     "/appointment/appointments/count_to_confirm",
 )
 async def appointment_count_to_confirm(request):
-    return await run_operation(request, queries.count_to_confirm)
+    return await run_operation(request, queries.appointments.count_to_confirm)
 
 
 @bind(router, "appointment.appointment.notices", "/appointment/appointments/notices")
 async def appointment_notices(request, params: Query[NoticesIn]):
-    return await run_operation(request, queries.notices, params)
+    return await run_operation(request, queries.notices.notices, params)
 
 
 # Appointments: writes
@@ -173,17 +167,17 @@ async def appointment_charge(request, data: AppointmentRefIn):
 
 @bind(router, "appointment.agenda.lanes", "/appointment/lanes")
 async def agenda_lanes(request, params: Query[LanesIn]):
-    return await run_operation(request, queries.agenda_lanes, params)
+    return await run_operation(request, queries.lanes.agenda_lanes, params)
 
 
 @bind(router, "appointment.availability.slots", "/appointment/availability/slots")
 async def availability_slots(request, params: Query[SlotsIn]):
-    return await run_operation(request, queries.availability_slots, params)
+    return await run_operation(request, queries.availability.availability_slots, params)
 
 
 @bind(router, "appointment.availability.check", "/appointment/availability/check")
 async def availability_check(request, params: Query[CheckIn]):
-    return await run_operation(request, queries.availability_check, params)
+    return await run_operation(request, queries.availability.availability_check, params)
 
 
 # Blocks
@@ -191,7 +185,7 @@ async def availability_check(request, params: Query[CheckIn]):
 
 @bind(router, "appointment.blocked_time.list", "/appointment/blocked_times")
 async def blocked_time_list(request, params: Query[BlockedTimeListIn]):
-    return await run_operation(request, queries.list_blocked_times, params)
+    return await run_operation(request, queries.blocked_times.list_blocked_times, params)
 
 
 @bind(
@@ -211,12 +205,12 @@ async def blocked_time_delete(request, data: BlockedTimeRefIn):
 
 @bind(router, "appointment.recurring.list", "/appointment/recurring")
 async def recurring_list(request, params: Query[RecurringListIn]):
-    return await run_operation(request, queries.list_series, params)
+    return await run_operation(request, queries.series.list_series, params)
 
 
 @bind(router, "appointment.recurring.get", "/appointment/recurring/detail")
 async def recurring_get(request, params: Query[RecurringGetIn]):
-    return await run_operation(request, queries.get_series, params)
+    return await run_operation(request, queries.series.get_series, params)
 
 
 @bind(router, "appointment.recurring.create", "/appointment/recurring", status=201)
@@ -254,7 +248,7 @@ async def recurring_delete(request, data: RecurringRefIn):
 
 @bind(router, "appointment.settings.get", "/appointment/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "appointment.settings.update", "/appointment/settings")

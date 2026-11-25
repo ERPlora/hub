@@ -4,7 +4,8 @@ the business leaves it unspent and the same request goes through with it after; 
 repeated; of two at once with the same pass, only one runs.
 """
 
-from base.models import Approval, Membership
+from base.models.approvals import Approval
+from base.models import Membership
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tenancy.tests.concurrency import plan_with_room
 from base.tests.test_approvals import (

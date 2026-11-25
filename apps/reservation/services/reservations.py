@@ -11,12 +11,13 @@ from live.outbox import record_event
 
 from apps.reservation import engine, events
 from apps.reservation.models import Reservation
-from apps.reservation.queries import find_reservation, reservation_out
-from apps.reservation.schemas import ReservationIn, ReservationOut, ReservationPatchIn, ReservationRefIn
+from apps.reservation.queries.reservations import find_reservation, reservation_out
+from apps.reservation.schemas.reservations import ReservationIn, ReservationOut, ReservationPatchIn, ReservationRefIn
 from apps.reservation.services.gate import choose_table, judge, lock_book
 from apps.reservation.services.guests import CARD_SOURCES, _guest_contact, card_for_phone, typed_phone
 from apps.reservation.services.other_apps import drop_hold, status_changed, sync_hold
 from apps.reservation.services.writes import S, _stamp
+from base.assistant import card_order
 
 #: What a reservation may still change once seated, completed, cancelled or not shown.
 NOTES_ONLY = {"notes", "internal_notes"}
@@ -31,6 +32,8 @@ STAFF_ONLY = _(
 #: What only the restaurant sets on a booking, never a channel acting for the guest, booking a full slot anyway
 #: included.
 STAFF_ONLY_FIELDS = ("table_id", "table", "zone", "no_table", "internal_notes", "overbook")
+#: The data that say for whom a booking is: the customer card, by its id or as said, else the guest's name.
+FOR_WHOM = ("customer_id", "customer", "guest_name")
 
 
 def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
@@ -38,6 +41,15 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
     return reservation_out(
         ctx, Reservation.objects.select_related("table__zone").get(pk=reservation.pk)
     )
+
+
+def _booking_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """For whom, the day and the time first, as the book lists a reservation: the card's line says only its first
+    three data, so a guest's name said as well goes after them."""
+    whom = next((field for field in fields if field["name"] in FOR_WHOM and field["kind"] == "text"), None)
+    if whom is None:
+        return fields
+    return card_order.put_first(fields, (whom["name"], "date", "time"))
 
 
 @operation(
@@ -66,6 +78,7 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
         "when the book confirms by itself, which holds its table. Somebody already on the waitlist is booked with "
         "reservation.waitlist.convert, which marks their entry converted.",
         "risk": "normal",
+        "summary": _booking_summary,
     },
 )
 def create_reservation(ctx: OperationContext, data: ReservationIn) -> dict:
@@ -168,7 +181,7 @@ CONTACT_FIELDS = ("guest_name", "guest_phone", "guest_email")
 )
 def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:  # noqa: C901
     settings = lock_book()
-    reservation = _named(data)
+    reservation = _named(ctx, data)
     if data.on_behalf_of is not None and any(
         getattr(data, field) not in (None, False) for field in STAFF_ONLY_FIELDS
     ):
@@ -240,15 +253,15 @@ def update_reservation(ctx: OperationContext, data: ReservationPatchIn) -> dict:
     return _loaded(ctx, reservation)
 
 
-def _named(data: ReservationRefIn) -> Reservation:
+def _named(ctx: OperationContext, data: ReservationRefIn) -> Reservation:
     """The reservation the input names, locked. On the guest's behalf (``on_behalf_of``), only hers: any other —
     somebody else's, a walk-in without a card, a deleted or a missing one — is the same refusal, asked before its
     status, so a channel learns nothing about a booking that is not the guest's."""
     guest = getattr(data, "on_behalf_of", None)
     if guest is None:
-        return find_reservation(data.id, data.guest, data.day, lock=True)
+        return find_reservation(ctx, data.id, data.guest, data.day, lock=True)
     try:
-        reservation = find_reservation(data.id, data.guest, data.day, lock=True)
+        reservation = find_reservation(ctx, data.id, data.guest, data.day, lock=True)
     except NotFound:
         reservation = None
     if reservation is None or reservation.customer_id != guest:

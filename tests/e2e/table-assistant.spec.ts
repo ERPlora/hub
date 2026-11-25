@@ -70,7 +70,7 @@ test('table-assistant-card — in Spanish taking a table to another zone names t
   await askForACard(page, `E2E-ASK table__table__update ${JSON.stringify({ id: five.id, move_to_zone_id: room })}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(`Cambiar en Mesas: 5 (${TERRACE}) · ${ROOM}`);
+    await expect(card(page)).toContainText(`Cambiar en Mesas: 5 (${TERRACE}) · Mover a la zona: ${ROOM}`);
     for (const id of [five.id, room]) await expect(card(page)).not.toContainText(id);
     await untilStill(page);
     await capture(page, `${KEY}-${vp.label}`);

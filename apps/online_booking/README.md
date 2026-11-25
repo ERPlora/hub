@@ -21,7 +21,9 @@ del dispositivo para los límites.
   por negocio y hora y las reservas próximas por móvil de los Ajustes (3 de fábrica).
 - **La bandeja** (F02–F06, F08): las citas con origen «Reserva online», con búsqueda, filtros por columna y
   orden; confirmar, completar, no presentada, cancelar con motivo y borrar, que son las operaciones de Citas
-  con el permiso de quien actúa (el de esta app **y** el de Citas). El empleado ve solo las de su agenda.
+  con el permiso de quien actúa (el de esta app **y** el de Citas). El empleado ve solo las de su agenda. El
+  teléfono y el email de la clienta solo llegan a quien ve el contacto de los clientes
+  (`base.view_customer_contact`); a quien no, ni se le enseñan ni le sirven para buscar o nombrar una reserva.
 - **Ajustes** (F07): textos, color y logo de la página (una imagen JPG, PNG o WebP que se sube y se sirve desde la
   dirección del negocio), email obligatorio, reservas próximas por móvil, elegir profesional y notas; las reglas de reserva son las de Citas (compartidas con WhatsApp) y se guardan
   con ellas, todo o nada; el interruptor de cada servicio se guarda en Servicios.
@@ -37,9 +39,9 @@ del dispositivo para los límites.
 | `LiveAppConfig` | `kind = "app"`, icono `ion:globe-outline`, categoría `people`, gratuita (`premium = False`), en la Tienda (`listed`) |
 | Verticales | `hair_salon` (entra en su plantilla) |
 | `requires` | `["appointment", "customer", "service", "staff"]` (y, por Citas, `schedule`) |
-| Usa de otras apps | Citas: `appointment.appointment.create`, `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `.update` (el email tecleado), `appointment.settings.update`, `appointment.availability.slots`, y sus lecturas (`bookable_members`, `current_settings`, el reloj del negocio). Clientes: `customer.customer.create`, el teléfono en E.164 y la búsqueda. Servicios y Personal: lectura del catálogo y de los profesionales. Las operaciones públicas, con un contexto delegado con solo los permisos que necesitan (`DELEGATED` de `queries.py`); la bandeja y los Ajustes, con el permiso de quien actúa |
+| Usa de otras apps | Citas: `appointment.appointment.create`, `.confirm`, `.complete`, `.mark_no_show`, `.cancel`, `.delete`, `.update` (el email tecleado), `appointment.settings.update`, `appointment.availability.slots`, y sus lecturas (`bookable_members`, `current_settings`, el reloj del negocio). Clientes: `customer.customer.create`, el teléfono en E.164 y la búsqueda. Servicios y Personal: lectura del catálogo y de los profesionales. Las operaciones públicas, con un contexto delegado con solo los permisos que necesitan (`DELEGATED` de `queries/visitors.py`); la bandeja y los Ajustes, con el permiso de quien actúa |
 | Pantallas | `/online_booking/bookings`, `/online_booking/settings`, la página de reservas sin sesión `/p/<slug>/book` (`public_pages` del `LiveAppConfig`, que sirve `base`) y, solo en el servidor de desarrollo, `/online_booking/preview` |
-| Operaciones | 7 consultas (`queries.py`) y 10 acciones (`services/`), todas con `ai=` (la subida del logo, `ai=INTERNAL`: lleva el fichero); no-show, cancelar, borrar y cancelar con el enlace, `risk = "high"`; 16 rutas en `/api/online_booking/…`, para todas salvo `online_booking.customer.erase` (la reacción al RGPD, solo del sistema) |
+| Operaciones | 7 consultas (`queries/`) y 10 acciones (`services/`), todas con `ai=` (la subida del logo, `ai=INTERNAL`: lleva el fichero); no-show, cancelar, borrar y cancelar con el enlace, `risk = "high"`; 16 rutas en `/api/online_booking/…`, para todas salvo `online_booking.customer.erase` (la reacción al RGPD, solo del sistema) |
 | Operaciones públicas | `online_booking.public.page`, `.services`, `.slots`, `.booking`, `.book`, `.cancel`, con el permiso `online_booking.public`: la página sin sesión las llama por `POST /p/<slug>/api/<operación>` de `base` (contrato en el WORKBOOK, «Contrato con la página pública») |
 | Consultas vivas | `online_booking.booking.list` y `.get` (avisos de Citas, fusión y borrado de Clientes, reserva nueva) y `online_booking.settings.get` (los ajustes de la app y las reglas de Citas) |
 | Eventos | 2: `online_booking.booking.created` y `online_booking.settings.updated`; solo los escucha Automatizaciones (`flow`, que se apunta a todos, FLOW-F21, `hecho`). Reacciona a `customer.customer.erased` (`online_booking.customer.erase`), que entrega el relay del worker |

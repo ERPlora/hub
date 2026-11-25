@@ -49,7 +49,7 @@ class SaleLineOut(Schema):
     unit: str = Field(description="Unit.")
     quantity: Decimal = Field(description="Quantity.")
     unit_price: int = Field(
-        description="Price in cents, per price_quantity of pricing_unit."
+        description="Price in cents, per price_quantity of pricing_unit.", json_schema_extra={"money": True}
     )
     price_quantity: Decimal = Field(description="Quantity the price refers to.")
     pricing_unit: str = Field(description="Unit the price refers to.")
@@ -68,9 +68,9 @@ class SaleLineOut(Schema):
         description="Region of the rule; empty = the whole country."
     )
     tax_rule_id: UUID | None = Field(description="Tax's rule.")
-    net_amount: int = Field(description="Base in cents.")
-    tax_amount: int = Field(description="Tax in cents.")
-    line_total: int = Field(description="Total in cents.")
+    net_amount: int = Field(description="Base in cents.", json_schema_extra={"money": True})
+    tax_amount: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
+    line_total: int = Field(description="Total in cents.", json_schema_extra={"money": True})
     returned_quantity: Decimal = Field(description="Units that came back with refunds.")
     modifiers: list[str] = Field(
         description="The options charged inside the line, as the receipt prints them under it."
@@ -91,16 +91,19 @@ class SalePaymentOut(Schema):
         description="Its name as charged (translated if it is a factory one)."
     )
     method_type: MethodType = Field(description="cash, card, transfer or other.")
-    amount: int = Field(description="Amount in cents.")
-    tendered: int = Field(description="Handed over, in cents.")
-    change: int = Field(description="Change given, in cents.")
+    amount: int = Field(description="Amount in cents.", json_schema_extra={"money": True})
+    tendered: int = Field(description="Handed over, in cents.", json_schema_extra={"money": True})
+    change: int = Field(description="Change given, in cents.", json_schema_extra={"money": True})
     reference: str = Field(description="Reference.")
+    extra: int = Field(description="What another app added to this leg (a tip), in cents: never part of the sale.", json_schema_extra={"money": True})
+    extra_label: str = Field(description="What that added amount is (e.g. «Tip»); empty when nothing was added.")
 
 
 class PaperOut(Schema):
     queued: bool = Field(
-        description="True: Printing queued it for its printer. False: Printing is not on, no printer takes it, its "
-        "fiscal document is still pending or Printing refused it — the device prints the screen's paper."
+        description="True: Printing queued it for its printer. False, only for the charge's own paper: Printing is "
+        "not on, no printer takes it, its fiscal document is still pending or Printing refused it — the device prints "
+        "the screen's paper. A reprint or a bill that is not queued fails and says why."
     )
     job_id: UUID | None = Field(description="Its job in the printing queue.")
     printer: str | None = Field(description="The printer it went to.")
@@ -115,7 +118,10 @@ class LetterheadIn(Schema):
 class LetterheadOut(Schema):
     sale_id: UUID | None = Field(description="The sale it was asked for, if any.")
     name: str = Field(description="The business's name on paper: the issuer's legal name.")
-    tax_id: str = Field(description="The business's tax ID; empty without an issuer.")
+    tax_id: str = Field(
+        description="The business's tax ID as the paper prints it (ESB12345674 while registered for intra-EU "
+        "operations, ROI); empty without an issuer."
+    )
     lines: list[str] = Field(description="What goes under the name: the address, then the receipt header's lines.")
 
 

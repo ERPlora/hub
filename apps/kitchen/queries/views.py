@@ -9,19 +9,21 @@ from decimal import Decimal
 from uuid import UUID
 
 from apps.kitchen.models import ItemStatus, Ticket, TicketItem
-from apps.kitchen.queries.reads import STRUCK, TO_DO
+from apps.kitchen.queries.reads import IN_FLIGHT, STRUCK, TO_DO
 from apps.sale.models import OrderLine
+from base.queries.people import without_address
 
 
 @dataclass
 class LineFacts:
-    """What Sales says today of the line of a dish: voided, and its check's status."""
+    """What Sales says today of the line of a dish: voided, and its check's status and title."""
 
     removed_at: dt.datetime | None
     void_reason: str
     order_id: UUID
     order_status: str
     order_closed_at: dt.datetime | None
+    order_label: str
 
 
 @dataclass
@@ -132,6 +134,7 @@ def line_facts(line_ids: Iterable[UUID]) -> dict[UUID, LineFacts]:
         "order_id",
         "order__status",
         "order__closed_at",
+        "order__label",
     )
     return {
         row["id"]: LineFacts(
@@ -140,9 +143,21 @@ def line_facts(line_ids: Iterable[UUID]) -> dict[UUID, LineFacts]:
             order_id=row["order_id"],
             order_status=row["order__status"],
             order_closed_at=row["order__closed_at"],
+            order_label=row["order__label"],
         )
         for row in rows
     }
+
+
+def check_title(ticket: Ticket, dishes: list[ItemView]) -> str:
+    """Where a ticket on the line goes now: the title of the check its dishes are on, after the check moved to another
+    table, was merged into another or was seated again; a dish voided in the till stays on its old check and does not
+    count. A ticket served or cancelled, made by hand, of a check with no title (what the send said stays) or whose dishes
+    are on checks with different titles keeps its own."""
+    if ticket.status not in IN_FLIGHT:
+        return ticket.label
+    titles = {dish.facts.order_label for dish in dishes if dish.facts and not dish.facts.removed_at} - {""}
+    return titles.pop() if len(titles) == 1 else ticket.label
 
 
 def saved_views(tickets: Iterable[Ticket]) -> list[TicketView]:
@@ -152,6 +167,10 @@ def saved_views(tickets: Iterable[Ticket]) -> list[TicketView]:
     facts = line_facts(
         item.sale_line_id for items in items_of.values() for item in items
     )
+    dishes_of = {
+        ticket.id: [_item_view(item, facts.get(item.sale_line_id)) for item in items_of[ticket.id]]
+        for ticket in tickets
+    }
     return [
         TicketView(
             id=ticket.id,
@@ -160,12 +179,14 @@ def saved_views(tickets: Iterable[Ticket]) -> list[TicketView]:
             sequence=ticket.sequence,
             order_id=ticket.order_id,
             round_no=ticket.round_no,
-            label=ticket.label,
+            label=check_title(ticket, dishes_of[ticket.id]),
             order_type=ticket.order_type,
             priority=ticket.priority,
             status=ticket.status,
             notes=ticket.notes,
-            waiter=ticket.waiter,
+            # A colleague's address only reaches whoever sees the team's contact details: a ticket saved with one reads
+            # without it.
+            waiter=without_address(ticket.waiter),
             received_at=ticket.received_at,
             started_at=ticket.started_at,
             ready_at=ticket.ready_at,
@@ -173,10 +194,7 @@ def saved_views(tickets: Iterable[Ticket]) -> list[TicketView]:
             cancelled_at=ticket.cancelled_at,
             rush_count=ticket.rush_count,
             saved=True,
-            items=[
-                _item_view(item, facts.get(item.sale_line_id))
-                for item in items_of[ticket.id]
-            ],
+            items=dishes_of[ticket.id],
         )
         for ticket in tickets
     ]

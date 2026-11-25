@@ -11,15 +11,17 @@ from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, OperationError
 from live.operations import UnknownOperation, get
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
+from apps.customer.queries.orders import linked_customer_id
 from apps.customer.tax_ids import IdTypeRequired, InvalidCountry, InvalidTaxId, normalize_country, normalize_tax_id
 from apps.sale import pricing
 from apps.sale.models import OrderLine, PaymentMethod, Settings
 from apps.sale.queries.business import CASH_LIMIT, LIMITS_CURRENCY, business_country, money_text
+from apps.sale.queries.checkout_steps import declared_steps, steps_at_the_charge
 from apps.sale.queries.line_parts import ratio_of
 from apps.sale.queries.other_apps import call_app
 from apps.sale.queries.payment_methods import METHOD_NOT_AVAILABLE, allowed_types, find_method, held_methods
-from apps.sale.schemas.checkout import CompleteIn
+from apps.sale.schemas.checkout import CompleteIn, PaymentIn
 from apps.sale.schemas.fields import COUNTRY_CODE
 from apps.sale.services.discounts import DISCOUNTS_NOT_ALLOWED, DISCOUNT_OVER_LIMIT, _cap
 
@@ -37,17 +39,30 @@ ID_TYPE_REQUIRED = _(
 CASH_REGISTER_CLOSED = _(
     "The cash register is closed: open a cash session to charge in cash."
 )
+ADDED_AMOUNT_NOT_ACCEPTED = _(
+    "This business has no app that adds anything to a charge, such as a tip: charge the sale alone."
+)
+ADDED_AMOUNT_NOT_ALLOWED = _(
+    "You have no permission to add anything to a charge, such as a tip: charge the sale alone."
+)
+
+
+def _card(ctx: OperationContext, data: CompleteIn):
+    """The card the charge names or, naming none, the one its check is for in Customers, as the till puts it back on a
+    check picked up again. It is locked before the check, as Customers' writes and the Hub admin's «Delete» of a card
+    take it: a deletion under way is waited for and the card is gone (404), and one that comes after waits for the
+    charge and finds the sale that protects the card."""
+    if data.customer_id is not None or data.customer:
+        return find_customer(ctx, data.customer_id, data.customer, lock=True)
+    linked = linked_customer_id(data.order_id) if data.order_id is not None else None
+    return find_customer(ctx, linked, None, lock=True) if linked else None
 
 
 def _customer_details(ctx: OperationContext, data: CompleteIn) -> tuple:
     """``(card, name, tax id, address, country)`` of the sale's customer: what was sent, else the card's.
     The name is the fiscal one, as Invoicing reads a card: its company when it has one (the NombreRazon
-    that goes with the company's tax ID), else the person. The card is locked before the check, as Customers'
-    writes and the Hub admin's «Delete» of a card take it: a deletion under way is waited for and the card is
-    gone (404), and one that comes after waits for the charge and finds the sale that protects the card."""
-    card = None
-    if data.customer_id is not None or data.customer:
-        card = find_customer(ctx, data.customer_id, data.customer, lock=True)
+    that goes with the company's tax ID), else the person."""
+    card = _card(ctx, data)
     name = data.customer_name or ((card.company_name or card.name) if card else "")
     tax_id = data.customer_tax_id or (card.tax_id if card else "")
     if data.customer_address:
@@ -129,25 +144,41 @@ def _check_discounts(  # noqa: PLR0913
         raise Conflict(str(DISCOUNT_OVER_LIMIT), code="sale.discount_over_limit")
 
 
-def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:  # noqa: C901, PLR0912
+def _legs(ctx: OperationContext, data: CompleteIn, total: int, settings: Settings, operation: int) -> list[dict]:
     """The tenders, resolved and checked: methods allowed, amounts adding up, cash tendered, change, and
-    no cash at all when the whole ``operation`` reaches the cash limit."""
+    no cash at all when the whole ``operation`` reaches the cash limit. What another app adds to a tender (a tip)
+    is charged with it, on top of its amount, but never counts as the sale's."""
+    _refuse_added_amounts(ctx, data.payments)
     if total == 0:
-        if any(leg.amount for leg in data.payments):
+        if any(leg.amount or leg.extra for leg in data.payments):
             raise Conflict(
                 str(PAYMENTS_MISMATCH), code="sale.payments_do_not_match_total"
             )
         return []
-    sent = data.payments or [None]
-    active = PaymentMethod.objects.filter(is_active=True)
-    allowed = allowed_types(settings, active)
+    legs = _resolved(data.payments or [PaymentIn(method="cash")], settings)
+    _fill_the_rest(legs, total)
+    for leg in legs:
+        _settle(leg)
+    _check_cash_limit(legs, operation)
+    return legs
+
+
+def _refuse_added_amounts(ctx: OperationContext, payments: list[PaymentIn]) -> None:
+    """An amount added to a tender is only taken when an app on adds a step to the charge of this person, which
+    records it in its own app too (SALE-F39): otherwise the drawer, the card total and the receipt would hold money
+    nobody accounts for. The refusal says whether the business has no such step or this person may not use it."""
+    if not any(leg.extra for leg in payments) or steps_at_the_charge(ctx):
+        return
+    reason = ADDED_AMOUNT_NOT_ALLOWED if declared_steps(ctx.scope) else ADDED_AMOUNT_NOT_ACCEPTED
+    raise Conflict(str(reason), code="sale.added_amount_not_accepted")
+
+
+def _resolved(sent: list[PaymentIn], settings: Settings) -> list[dict]:
+    """Each tender with its method, one the settings allow and that is still there."""
+    allowed = allowed_types(settings, PaymentMethod.objects.filter(is_active=True))
     legs = []
     for leg in sent:
-        method = (
-            find_method(None, "cash")
-            if leg is None
-            else find_method(leg.method_id, leg.method)
-        )
+        method = find_method(leg.method_id, leg.method)
         if method.type not in allowed:
             raise Conflict(
                 str(METHOD_NOT_AVAILABLE), code="sale.payment_method_not_available"
@@ -155,9 +186,11 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
         legs.append(
             {
                 "method": method,
-                "amount": leg.amount if leg else None,
-                "tendered": leg.tendered if leg else None,
-                "reference": leg.reference if leg else "",
+                "amount": leg.amount,
+                "tendered": leg.tendered,
+                "reference": leg.reference,
+                "extra": leg.extra,
+                "extra_label": leg.extra_label,
             }
         )
     # Held until the charge ends: one deleted since it was read is not available, as one never added.
@@ -166,35 +199,50 @@ def _legs(data: CompleteIn, total: int, settings: Settings, operation: int) -> l
         raise Conflict(
             str(METHOD_NOT_AVAILABLE), code="sale.payment_method_not_available"
         )
-    open_legs = [leg for leg in legs if leg["amount"] is None]
-    given = sum(leg["amount"] for leg in legs if leg["amount"] is not None)
-    if len(open_legs) > 1 or (open_legs and given >= total):
+    return legs
+
+
+def tender_amounts(sent: list[int | None], total: int) -> list[int] | None:
+    """What each tender pays: the one without an amount, what the others leave; ``None`` when they cannot add up to
+    the sale's ``total`` (more than one without an amount, or the others already reach it)."""
+    given = sum(amount for amount in sent if amount is not None)
+    amounts = [total - given if amount is None else amount for amount in sent]
+    if (None in sent and given >= total) or sum(amounts) != total:
+        return None
+    return amounts
+
+
+def _fill_the_rest(legs: list[dict], total: int) -> None:
+    amounts = tender_amounts([leg["amount"] for leg in legs], total)
+    if amounts is None:
         raise Conflict(str(PAYMENTS_MISMATCH), code="sale.payments_do_not_match_total")
-    if open_legs:
-        open_legs[0]["amount"] = total - given
-    if sum(leg["amount"] for leg in legs) != total:
-        raise Conflict(str(PAYMENTS_MISMATCH), code="sale.payments_do_not_match_total")
-    for leg in legs:
-        if leg["method"].type == PaymentMethod.Type.CASH:
-            tendered = leg["amount"] if leg["tendered"] is None else leg["tendered"]
-            if tendered < leg["amount"]:
-                raise Conflict(
-                    str(INSUFFICIENT_TENDERED), code="sale.insufficient_tendered"
-                )
-            leg["tendered"], leg["change"] = tendered, tendered - leg["amount"]
-        else:
-            leg["tendered"], leg["change"] = leg["amount"], 0
+    for leg, amount in zip(legs, amounts, strict=True):
+        leg["amount"] = amount
+
+
+def _settle(leg: dict) -> None:
+    """What a tender takes is its amount and what is added to it: cash takes it out of what was handed over, and the
+    rest is change; any other method charges exactly that."""
+    owed = leg["amount"] + leg["extra"]
+    if leg["method"].type != PaymentMethod.Type.CASH:
+        leg["tendered"], leg["change"] = owed, 0
+        return
+    tendered = owed if leg["tendered"] is None else leg["tendered"]
+    if tendered < owed:
+        raise Conflict(str(INSUFFICIENT_TENDERED), code="sale.insufficient_tendered")
+    leg["tendered"], leg["change"] = tendered, tendered - owed
+
+
+def _check_cash_limit(legs: list[dict], operation: int) -> None:
+    """By law, no cash at all, not even in part, when the whole operation reaches the country's limit."""
     limit = CASH_LIMIT.get(business_country())
-    if (
-        limit is not None
-        and operation >= limit
-        and any(leg["method"].type == PaymentMethod.Type.CASH for leg in legs)
-    ):
+    if limit is None or operation < limit:
+        return
+    if any(leg["method"].type == PaymentMethod.Type.CASH for leg in legs):
         raise Conflict(
             str(CASH_LIMIT_EXCEEDED) % {"limit": money_text(limit, LIMITS_CURRENCY)},
             code="sale.cash_limit_exceeded",
         )
-    return legs
 
 
 #: Cash register's answer to «may the till charge cash now?» (CASH_REGISTER-F04).

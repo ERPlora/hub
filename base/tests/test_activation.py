@@ -12,7 +12,7 @@ from live.meta import module_configs
 
 from base import activation
 from base.activation import OFF, ON, Activation
-from base.catalog import template_apps
+from base.catalog.verticals import template_apps
 
 #: A small graph: sale needs tax and customer, invoice needs sale (and so tax and customer), verifactu needs invoice.
 GRAPH = {
@@ -44,13 +44,12 @@ def test_the_roots_are_the_modules_on_that_no_other_module_on_needs():
     assert activation.roots(["tax", "customer"], GRAPH) == {"tax", "customer"}
 
 
-def test_every_module_on_has_17_roots_of_27_on_main():
+def test_every_module_on_has_18_roots_of_29_on_main():
     graph = activation.module_graph()
-    assert len(graph) == 27
+    assert len(graph) == 29
     assert sorted(activation.roots(graph, graph)) == [
-        "attendance", "cart_checkout", "cash_register", "combo", "demo", "flow", "kitchen", "modifier",
-        "online_booking", "payment", "pricing", "printing", "reservation", "task", "verifactu", "website",
-        "whatsapp_inbox",
+        "attendance", "cart_checkout", "combo", "demo", "flow", "kitchen", "modifier", "online_booking", "online_order",
+        "payment", "pricing", "printing", "reservation", "task", "tip", "verifactu", "website", "whatsapp_inbox",
     ]  # fmt: skip
 
 
@@ -265,7 +264,7 @@ def test_an_app_may_refuse_to_go_on_by_its_own_hook():
 
 
 # ── What a business must have on in its country (hub#997) ────────────────────────────────────────────────────────
-# An app says where it is mandatory (``mandatory`` on its LiveAppConfig, ``base.home.mandatory_in``). Once on in a
+# An app says where it is mandatory (``mandatory`` on its LiveAppConfig, ``base.home.mandatory_apps.mandatory_in``). Once on in a
 # business of one of those countries it never goes off there: base refuses it, with a reason of its own when the app
 # gives none, and turning off another app it came along with leaves it on.
 

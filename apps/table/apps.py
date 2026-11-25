@@ -33,23 +33,23 @@ class TableConfig(LiveAppConfig):
     # customer is Customers' order link. Sales does not require Tables: it only knows titles.
     requires = ["sale", "customer"]
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = [
-        "table.view_zone",
-        "table.add_zone",
-        "table.change_zone",
-        "table.delete_zone",
-        "table.view_table",
-        "table.add_table",
-        "table.change_table",
-        "table.delete_table",
-        "table.view_session",
-        "table.add_session",
-        "table.change_session",
-        "table.transfer_session",
-        "table.delete_session",
-        "table.view_settings",
-        "table.manage_settings",
-    ]
+    permissions = {
+        "table.view_zone": _("View zones"),
+        "table.add_zone": _("Create zones"),
+        "table.change_zone": _("Change zones"),
+        "table.delete_zone": _("Delete zones"),
+        "table.view_table": _("View tables"),
+        "table.add_table": _("Create tables"),
+        "table.change_table": _("Change and move tables"),
+        "table.delete_table": _("Delete tables"),
+        "table.view_session": _("View table checks"),
+        "table.add_session": _("Seat guests and open checks"),
+        "table.change_session": _("Change checks: close, split, guests, park and hold"),
+        "table.transfer_session": _("Move and merge checks"),
+        "table.delete_session": _("Delete checks from the history"),
+        "table.view_settings": _("View the settings"),
+        "table.manage_settings": _("Change the settings"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier (an
     # employee who also charges) is an employee.
     role_permissions = {
@@ -120,4 +120,11 @@ class TableConfig(LiveAppConfig):
         Nav("sessions", _("Sessions"), "ion:time-outline", "/table/sessions", permission="table.view_session"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/table/settings", permission="table.manage_settings"),
     ]
-    help = Help()
+    help = Help(
+        flow_videos={
+            "TABLE-F01": {"es": ["0S_fWROlNYc"], "en": ["Wsv-T4bTWww"]},
+            "TABLE-F02": {"es": ["3UpXXiCV5Lk"], "en": ["DiPULg6x8T4"]},
+            "TABLE-F04": {"es": ["3UpXXiCV5Lk"], "en": ["DiPULg6x8T4"]},
+            "TABLE-F06": {"es": ["0S_fWROlNYc"], "en": ["Wsv-T4bTWww"]},
+        },
+    )

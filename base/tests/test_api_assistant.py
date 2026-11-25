@@ -6,6 +6,7 @@ import json
 
 import pytest
 from asgiref.sync import async_to_sync
+from live import assistant as shared
 
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tests.fake_gateway import gateway, signed
@@ -121,20 +122,31 @@ def _rounds_of_reads(count: int) -> dict:
 def test_on_the_last_round_the_model_answers_without_tools(client, make_user, gateway):
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
-    got = frames(post(client, "/assistant/turn", _rounds_of_reads(6)))
+    got = frames(post(client, "/assistant/turn", _rounds_of_reads(shared.MAX_ROUNDS)))
     assert [frame["type"] for frame in got] == ["executed", "text", "done"]
     result, answer = got[-1]["append"]
-    assert result["tool_call_id"] == "r5"
+    assert result["tool_call_id"] == f"r{shared.MAX_ROUNDS - 1}"
     assert answer == {"role": "assistant", "content": "Hecho."}
     assert gateway.sent("/internal/assistant/chat/stream")[0].body["tools"] == []
 
 
-def test_past_the_last_round_it_stops_and_says_why(client, make_user, gateway):
+def test_a_read_asked_for_past_the_last_round_never_runs_and_the_model_answers(client, make_user, gateway):
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
-    got = frames(post(client, "/assistant/turn", _rounds_of_reads(7)))
-    assert [frame["type"] for frame in got] == ["executed", "error", "done"]
-    assert got[1]["code"] == "assistant.too_many_steps"
-    assert got[-1]["append"][0]["tool_call_id"] == "r6"
+    gateway.turn({"type": "text_delta", "text": "Hecho."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    got = frames(post(client, "/assistant/turn", _rounds_of_reads(shared.MAX_ROUNDS + 1)))
+    assert [frame["type"] for frame in got] == ["text", "done"]
+    told, answer = got[-1]["append"]
+    assert json.loads(told["content"])["error"]["code"] == "base.assistant_out_of_steps"
+    assert answer == {"role": "assistant", "content": "Hecho."}
+    assert gateway.sent("/internal/assistant/chat/stream")[0].body["tools"] == []
+
+
+def test_past_the_answer_it_was_owed_it_stops_and_says_why(client, make_user, gateway):
+    client.force_login(make_user("ana", host=A.key, role="hub_employee"))
+    got = frames(post(client, "/assistant/turn", _rounds_of_reads(shared.MAX_ROUNDS + 2)))
+    assert [frame["type"] for frame in got] == ["error", "done"]
+    assert got[0]["code"] == "assistant.too_many_steps"
+    assert got[-1]["append"][0]["tool_call_id"] == f"r{shared.MAX_ROUNDS + 1}"
     assert got[-1]["web"] is False  # no pages: it never reached the gateway (hub#870)
     assert gateway.requests == []
 
@@ -326,7 +338,8 @@ def test_its_yes_asks_for_a_managers_approval_as_the_screen_does_and_runs_nothin
 
 
 def test_with_the_managers_pass_it_runs_once_as_the_person_and_the_pass_is_spent(client, make_user, gateway, approvable_create):
-    from base.models import Approval, Credential
+    from base.models.approvals import Approval
+    from base.models.access import Credential
 
     _employee_and_manager(client, make_user)
     body = _answering_its_card(client, _create_turn())
@@ -355,7 +368,8 @@ def test_its_question_says_the_figures_of_the_write_and_the_record_keeps_them(cl
     command validates them; the pass spent keeps them."""
     from django.apps import apps
 
-    from base.models import Approval, Credential
+    from base.models.approvals import Approval
+    from base.models.access import Credential
 
     monkeypatch.setattr(apps.get_app_config("demo"), "approval_figures", {"demo.item.create": ["Create the item {name}"]}, raising=False)
     _employee_and_manager(client, make_user)
@@ -372,7 +386,7 @@ def test_its_question_says_the_figures_of_the_write_and_the_record_keeps_them(cl
 
 
 def test_a_pass_for_another_request_does_not_let_this_one_through(client, make_user, gateway, approvable_create):
-    from base.models import Credential
+    from base.models.access import Credential
 
     _employee_and_manager(client, make_user)
     asked = post(client, "/assistant/turn", _answering_its_card(client, _create_turn())).json()["error"]["approval"]
@@ -402,7 +416,8 @@ def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_i
     from django.core.cache import cache
 
     from apps.demo.models import Item
-    from base.models import Approval, Credential
+    from base.models.approvals import Approval
+    from base.models.access import Credential
 
     monkeypatch.setattr(
         apps.get_app_config("demo"), "approvals", {**APPROVED_CREATE, "demo.item.update": "Change an item"}, raising=False

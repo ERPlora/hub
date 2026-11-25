@@ -211,10 +211,10 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   await expect(summary).toContainText(`Expected: ${euros(expected)}`);
   await expect(summary).toContainText(`Difference: +${euros(25000 - expected)}`);
   // The summary was the Hub's own reading, sent to the model as it is: never a figure the model made up.
-  expect(toldSummary().summary).toMatchObject({ number: shift.number, closing_balance: 25000, expected_balance: expected });
+  expect(toldSummary().summary).toMatchObject({ number: shift.number, closing_balance: '250.00 EUR', expected_balance: `${(expected / 100).toFixed(2)} EUR` });
   // The read never says it closed anything; the card is the dangerous one, naming the session and the count.
   await expect(receipts(page).filter({ hasText: 'Close in Cash register' })).toHaveCount(0);
-  await expect(card(page)).toContainText('Close in Cash register. Check each datum before going on.');
+  await expect(card(page)).toContainText('Close in Cash register. Check each detail before you continue.');
   await expect(card(page)).toContainText(`Session: ${shift.number}`);
   await expect(card(page)).toContainText('Counted cash: €250.00');
   // And what closing gives (the close's summary, read as the owner): the session, its drawer, the expected and the
@@ -333,8 +333,8 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
   await expect(summary).not.toContainText('Difference');
   // Not even the model got them: the summary sent to it carries neither.
   const told = toldSummary();
-  expect(told.summary).toMatchObject({ number: shift.number, closing_balance: 25000, expected_balance: null, difference: null, expected_hidden: true });
-  expect(told.raw).not.toContain(String(expected));
+  expect(told.summary).toMatchObject({ number: shift.number, closing_balance: '250.00 EUR', expected_balance: null, difference: null, expected_hidden: true });
+  expect([told.raw.includes(String(expected)), told.raw.includes((expected / 100).toFixed(2))]).toEqual([false, false]);
   await expect(card(page)).toContainText('Counted cash: €250.00');
   // Nor does the card: what will happen names the session and its drawer, never the expected nor the difference.
   await expect(previewBlock(page).locator('li')).toHaveText([`Session: ${shift.number}`, `Drawer: ${DRAWER}`]);
@@ -388,7 +388,7 @@ test('cash-register-assistant-card — in Spanish renaming a drawer by its id na
   const renamed = `E2E Terraza ${RUN}`;
   await askForACard(page, `E2E-ASK cash_register__register__update ${JSON.stringify({ register_id: drawerId, name: renamed })}`, { timeout: 30_000 });
   // Renaming is not dangerous: its card says the action with its data, the drawer it renames first.
-  await expect(card(page)).toContainText(`Cambiar en Caja: ${DRAWER} · ${renamed}`);
+  await expect(card(page)).toContainText(`Cambiar en Caja: ${DRAWER} · Nombre: ${renamed}`);
   await expect(card(page)).not.toContainText(drawerId);
   await capture(page, `${RECORDS_KEY}-drawer-1440`);
   await cancelInSpanish(page);

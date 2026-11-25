@@ -64,18 +64,19 @@ class CashRegisterConfig(LiveAppConfig):
         ),
         ("register", "cajas de la"),
     )
-    permissions = [
-        "cash_register.view_session",
-        "cash_register.view_all_sessions",
-        "cash_register.add_session",
-        "cash_register.close_session",
-        "cash_register.view_movement",
-        "cash_register.add_movement",
-        "cash_register.view_count",
-        "cash_register.add_count",
-        "cash_register.view_expected_totals",
-        "cash_register.manage_settings",
-    ]
+    assistant_settings = ("cash_register.settings.get",)
+    permissions = {
+        "cash_register.view_session": _("View sessions, settings, drawers and currency"),
+        "cash_register.view_all_sessions": _("View everyone's sessions"),
+        "cash_register.add_session": _("Open a cash register session"),
+        "cash_register.close_session": _("Close a cash register session"),
+        "cash_register.view_movement": _("View cash movements"),
+        "cash_register.add_movement": _("Record cash in and out"),
+        "cash_register.view_count": _("View cash counts"),
+        "cash_register.add_count": _("Record cash counts"),
+        "cash_register.view_expected_totals": _("See the expected cash during a blind count"),
+        "cash_register.manage_settings": _("Change the settings and drawers"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The employee is the
     # cashier: opens, records, counts and closes, and reads their own shifts. The manager also sees a blind count's
     # expected and every shift.
@@ -118,7 +119,20 @@ class CashRegisterConfig(LiveAppConfig):
             permission="cash_register.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "rqBH2VUFcko", "en": "IEzfwEgMXwM"},
+        flow_videos={
+            "CASH_REGISTER-F01": {"es": ["dgr-M9sxkV0"], "en": ["zrWOUH8Kb4s"]},
+            "CASH_REGISTER-F02": {"es": ["HoqsdW2qM-8"], "en": ["IjMK8xGz_T0"]},
+            "CASH_REGISTER-F03": {"es": ["Ftpqm8vFpHo"], "en": ["KOYwIoKqcw4"]},
+            "CASH_REGISTER-F05": {"es": ["8AHpbffKmlo"], "en": ["ZEo0EiJqlDU"]},
+            "CASH_REGISTER-F06": {"es": ["RCCtdEgyaV8"], "en": ["n4dY9lEBttg"]},
+            "CASH_REGISTER-F07": {"es": ["dgr-M9sxkV0"], "en": ["zrWOUH8Kb4s"]},
+            "CASH_REGISTER-F08": {"es": ["uaqdwweCK5Q"], "en": ["liCdrUnVem0"]},
+            "CASH_REGISTER-F09": {"es": ["uaqdwweCK5Q"], "en": ["liCdrUnVem0"]},
+            "CASH_REGISTER-F11": {"es": ["dO3Ju_an_fs"], "en": ["kMgq2HIRE8I"]},
+        },
+    )
     # The Home's step and panels, on the queries the drawer's own screens read. The factory values apply from the
     # start, so «Your cash drawer» waits for the business's own save (CASH_REGISTER-F01), even of the values as they
     # came.

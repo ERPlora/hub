@@ -30,7 +30,8 @@ from base.tenancy.tests.test_offboarding import (
     one_shop_order,
     run_pass,
 )
-from control.models import Hub, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Hub
 
 # The fixtures these tests share with the rest of the way out of a business.
 moto_s3, aws_test_credentials, dumps_bucket = s3.moto_s3, s3.aws_test_credentials, s3.dumps_bucket

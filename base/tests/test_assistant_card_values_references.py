@@ -20,12 +20,13 @@ from django.conf import settings
 from django.utils import timezone, translation
 from live import assistant as shared
 from live.context import OperationContext, Scope
-from live.assistant import CHOICES_OF, NAMED, REFERS, choices_of
+from live.assistant import CHOICES_OF, NAMED, OWN_WORDS, REFERS, choices_of
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
 
 from base import access, assistant
-from base.models import Hub, Membership, TrustedDevice
+from base.models import Hub, Membership
+from base.models.access import TrustedDevice
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.card_values import ADMIN, VisitIn, ctx, is_attempt_key, reference_errors, values, writes
@@ -85,6 +86,18 @@ def test_a_booking_says_when_and_through_what_as_the_person_reads_them(language,
 def test_a_table_booking_says_its_day_its_time_and_through_what(language, expected):
     shown = values(assistant.cards.card(get("reservation.reservation.create"), TABLE_BOOKING, language))
     assert (shown["date"], shown["time"], shown["source"]) == expected
+
+
+@HUB_DB
+@pytest.mark.parametrize(
+    ("language", "expected"), [("es", ("14 de marzo", "1 jun 2015")), ("en", ("March 14", "Jun 1, 2015"))]
+)
+def test_a_day_without_its_year_is_said_by_its_day_and_its_month(language, expected):
+    """A birthday is often known without its year (``--03-14``, as vCard writes it): the card says the day and the
+    month, and a day with its year as any other."""
+    days = {"customer": "Lucía", "birthday": "--03-14", "anniversary": "2015-06-01"}
+    shown = values(assistant.cards.card(get("customer.customer.update"), days, language))
+    assert (shown["birthday"], shown["anniversary"]) == expected
 
 
 @HUB_DB
@@ -353,8 +366,8 @@ def test_a_list_with_a_value_nobody_can_name_says_the_rest_and_counts_it():
 
 
 def text_lists() -> dict[str, list[str]]:
-    """Each list of texts of the assistant's writes no schema says anything of (no record, moment or closed list): the
-    write and its datum."""
+    """Each list of texts of the assistant's writes no schema says anything of (no record, moment, closed list or the
+    person's own words): the write and its datum."""
     found: dict[str, list[str]] = {}
     for op in writes():
         schema = op.input.model_json_schema()
@@ -364,15 +377,16 @@ def text_lists() -> dict[str, list[str]]:
             if prop.get("type") != "array":
                 continue
             items = shared.resolved(prop.get("items", {}), defs)
-            if items.get("type") == "string" and not {"enum", "format", REFERS} & {*prop.keys(), *items.keys()}:
+            if items.get("type") == "string" and not {"enum", "format", REFERS, OWN_WORDS} & {*prop.keys(), *items.keys()}:
                 found.setdefault(op.name, []).append(name)
     return found
 
 
 @HUB_DB
 def test_no_list_of_texts_sent_as_they_are_is_named():
-    """Every one of them, codes or a person's own words: as sent, so never said item by item as if the server had named
-    it. A list the server says in words is (positive control: a series of visits, said as moments)."""
+    """Every one of them, codes or texts no schema marks as the person's own words: as sent, so never said item by item
+    as if the server had named it. A list the server says in words is (positive controls: a series of visits, said as
+    moments; the options of a select field, the person's own words, hub#2288)."""
     found = text_lists()
     assert "flow.draft.propose" in found
     named = [
@@ -385,6 +399,9 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
     starts = ["2026-11-02T10:00:00+01:00", "2026-11-09T10:00:00+01:00"]
     visits = list_field(assistant.cards.card(get("appointment.appointment.bulk_create"), {"starts": starts}, "es"), "starts")
     assert (visits["value"], visits.get(NAMED)) == (["2 nov 2026, 10:00", "9 nov 2026, 10:00"], True)
+    field = assistant.cards.card(get("customer.field.create"), {"options": ["Terraza", "Dentro"]}, "es")
+    options = list_field(field, "options")
+    assert (options["value"], options.get(NAMED)) == (["Terraza", "Dentro"], True)
 
 
 # ── The ratchet: references nobody marks and lists nobody labels, by app ──────────────────────────────────────────────
@@ -527,7 +544,7 @@ TITLED_IN_SPANISH = {
     "base.failed_event.retry:id": "Evento caído",
     "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
-    **{f"combo.combo.{action}:id": "Menú" for action in ("delete", "set_image", "update")},
+    **{f"combo.combo.{action}:id": "Menú" for action in ("delete", "set_active", "set_image", "update")},
     **{f"combo.group.{action}:id": "Plato" for action in ("delete", "update")},
     "combo.group.reorder:id": "Menú",
     **{f"combo.option.{action}:id": "Elección" for action in ("delete", "update")},
@@ -554,6 +571,7 @@ TITLED_IN_SPANISH = {
         f"online_booking.booking.{action}:id": "Reserva"
         for action in ("cancel", "complete", "confirm", "delete", "no_show")
     },
+    "online_order.qr_code.regenerate:id": "Mesa",
     **{f"payment.method.{action}:id": "Método" for action in ("activate", "deactivate", "update")},
     **{f"payment.payment.{action}:id": "Pago" for action in ("approve", "cancel", "mark_completed", "mark_sent")},
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
@@ -590,6 +608,7 @@ TITLED_IN_SPANISH = {
     **{f"task.project.{action}:id": "Proyecto" for action in ("delete", "update")},
     **{f"task.task.{action}:id": "Tarea" for action in ("assign", "complete", "delete", "set_status", "update")},
     **{f"tax.rule.{action}:id": "Regla" for action in ("activate", "deactivate", "end")},
+    **{f"tip.tip.{action}:id": "Propina" for action in ("update", "void")},
     **{f"whatsapp_inbox.conversation.{action}:id": "Conversación" for action in (
         "assign", "erase", "flag", "link_customer", "mark_read", "set_status",
     )},

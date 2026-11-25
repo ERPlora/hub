@@ -1,8 +1,8 @@
 """The Hub's context builder (``settings.LIVE["context_builder"]``).
 
 Scope = the one label of the Host in front of ``settings.HUB_BASE_DOMAIN`` (``a.localhost`` → ``a``,
-``acme.erplora.com`` → ``acme``) when it is a hub's slug (``live.slugs``); any other host (a reserved
-name such as ``hub`` or ``www``, an invalid label, the bare host, an IP, a host of another domain such
+``acme.erplora.com`` → ``acme``) when a hub is served under it (``base.platform_hub``: a business's slug, or the
+name of ERPlora's own hub); any other host (another reserved name such as ``hub`` or ``www``, an invalid label, the bare host, an IP, a host of another domain such
 as pre's ``acme.pre.erplora.com`` on prod's Hub) is no hub and raises ``Http404``: the SPA, the API,
 ``/api/live`` and ``/auth/callback`` answer 404. prod and pre share one ALB, whose wildcard
 ``*.erplora.com`` also matches ``*.pre.erplora.com``: the base domain keeps each Hub on its own hosts.
@@ -34,14 +34,14 @@ from live.context import OperationContext, Scope, system_context
 from live.errors import AppInactive, InvalidPayload, NotFound, OperationError, Unauthorized
 from live.operations import UnknownOperation
 from live.operations import get as get_operation
-from live.slugs import validate_hub_slug
 
-from base import meter
-from base import registry
+from base import meter, platform_hub, registry
+from base.access import CREDENTIAL_SESSION_KEY
 from base.api_keys import KeyCaller
 from base.approvals import Approved, consequence_context
 from base.business import country_or_market
-from base.permissions import permissions_for, reload_user
+from base.models.sessions import SessionOwner
+from base.permissions import access_for, reload_user
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import HUB_SCOPE_KIND, HubContextMissing, current_hub, use_hub
 from base.tenancy.identity import HubIdentityMismatch
@@ -58,7 +58,7 @@ class HostScopeResolver:
             raise Http404(f"{host!r} is not a host on {settings.HUB_BASE_DOMAIN!r}.")
         try:
             # A demo's slug (``demo-…``) is a hub's host too; whether it answers is the registry's (base.middleware).
-            validate_hub_slug(slug, allow_demo=True)
+            platform_hub.validate_served_slug(slug, allow_demo=True)
         except ValueError as exc:
             raise Http404(f"{slug!r} is no hub's slug ({exc}).") from None
         return Scope("host", slug)
@@ -87,9 +87,9 @@ def is_demo_hub(scope: Scope) -> bool:
 
 
 def is_platform_hub(scope: Scope) -> bool:
-    """Whether ``scope``'s hub is ERPlora's own, the one that issues ERPlora's invoices: the hub of the reserved slug
-    ``PLATFORM_HUB_SLUG``."""
-    return scope.key == settings.PLATFORM_HUB_SLUG
+    """Whether ``scope``'s hub is ERPlora's own, the one that issues ERPlora's invoices, under either of its names
+    (``base.platform_hub``)."""
+    return platform_hub.is_platform_slug(scope.key)
 
 
 #: The operation that answers a hub's business (``business_currency``).
@@ -223,12 +223,14 @@ def _session_ended(request: HttpRequest | None) -> bool:
 
 def _note_the_person(request: HttpRequest, user: Any) -> None:
     """The person of this request has activity in its business (``base.meter``, BASE-F40): here their session is already
-    read, so it adds no statement, and an API key or a visitor never get here. A demo is not measured; the platform's host
-    has no ``request.hub``."""
+    read, so it adds no statement, and an API key or a visitor never get here. A demo is not measured, nor ERPlora's
+    support, who is none of the business's people; the platform's host has no ``request.hub``."""
     from base.services.devices import saas_user_id_of
 
     hub = getattr(request, "hub", None)
-    if hub is not None and not hub.is_demo:
+    session = getattr(request, "session", None)
+    support = session is not None and session.get(CREDENTIAL_SESSION_KEY) == SessionOwner.Credential.SUPPORT
+    if hub is not None and not hub.is_demo and not support:
         meter.note_seen(hub.slug, saas_user_id_of(user))
 
 
@@ -241,7 +243,7 @@ class HubContextBuilder:
         caller = getattr(request, "auth", None)
         if isinstance(caller, KeyCaller):
             # A business's API key opened this published operation (``base.api_keys``): the key acts,
-            # with that operation's permission and base's data permissions.
+            # with what its maker holds today of that operation's permission and of the data.
             return OperationContext(
                 scope=scope,
                 actor=caller,
@@ -253,7 +255,7 @@ class HubContextBuilder:
         actor = user if user is not None and user.is_authenticated else None
         if actor is not None:
             _note_the_person(request, actor)
-        permissions = permissions_for(actor, scope)
+        permissions = access_for(actor, scope)
         approved = getattr(request, "approved", None)
         if isinstance(approved, Approved):
             # A manager approved this very request (``base.approvals``): its one permission more. What that
@@ -297,4 +299,4 @@ class HubContextBuilder:
         refusal = registry.refusal(registry.hub_by_slug(ctx.scope.key))
         if refusal is not None:
             raise HostClosed(refusal.message, code=refusal.code, status=refusal.status)
-        return dataclasses.replace(ctx, permissions=permissions_for(reload_user(ctx.actor), ctx.scope))
+        return dataclasses.replace(ctx, permissions=access_for(reload_user(ctx.actor), ctx.scope))

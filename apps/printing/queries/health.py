@@ -1,21 +1,15 @@
 """Whether a device is there to print now, and so whether the station of a function answers: the Home's health row and
 System's «Your printer» read the same answer."""
 
-import datetime as dt
-
 from django.utils import timezone
 from live.context import OperationContext
 from live.operations import operation
 
-# The package's own helpers: it imports this module first, so they are read when the query runs.
-from apps.printing import queries
 from apps.printing.models import PrintJob
-from apps.printing.schemas import CoverageIn
+from apps.printing.schemas.devices import CoverageIn
 from apps.printing.schemas.health import DeviceHealthOut
 
-#: A device set up here is there while its last news is this recent: its hello or a beat on base's /ws/print, asking for
-#: a job or being set up from it (the old hub's ``HOST_TTL_SECONDS``: three missed beats of 30 s).
-SEEN_WITHIN = dt.timedelta(seconds=90)
+from . import device_reads, waiting
 
 
 @operation(
@@ -43,9 +37,9 @@ SEEN_WITHIN = dt.timedelta(seconds=90)
 )
 def device_health(ctx: OperationContext, params: CoverageIn) -> dict:
     usage = params.usage
-    configured, _waiting = queries.coverage([usage])[usage]
+    configured, _waiting = waiting.coverage([usage])[usage]
     if not configured:
         return {"usage": usage, "state": "not_configured"}
-    there = queries.active_devices().filter(last_seen_at__gte=timezone.now() - SEEN_WITHIN)
-    papers, _takeable = queries._takeable(there, [usage])
+    there = device_reads.active_devices().filter(last_seen_at__gte=timezone.now() - device_reads.SEEN_WITHIN)
+    papers, _takeable = waiting._takeable(there, [usage])
     return {"usage": usage, "state": "ok" if (usage, PrintJob.Format.RECEIPT) in papers else "no_signal"}

@@ -3,7 +3,7 @@ dropped and purged by the worker once its hour is up.
 
 ``base.demo.create`` (``POST /internal/demos``) gives a browser, named by the sha256 of its SaaS token, its live demo
 or a new ``demo-<8 hex>`` up to ``MAX_CONCURRENT_DEMOS``, ``requested`` until the worker makes its database
-(``base/tenancy/tests/test_provision.py``; here :func:`ready` stands in for it); ``base.demo.code_create`` (``POST …/{slug}/codes``) a code
+(``base/tenancy/tests/test_provision_demos.py``; here :func:`ready` stands in for it); ``base.demo.code_create`` (``POST …/{slug}/codes``) a code
 of a minute for the browser that owns it, which the demo's ``/auth/callback`` redeems here (``redeem_demo_code``) and
 turns into a session as ``demo:<slug>``, the owner (``open_demo_session``). ``base.demo.expire`` ends one now; the
 reaper (``reap_demos``) purges those that ended and, after ``DEMO_TOMBSTONE_DAYS``, forgets them.
@@ -38,7 +38,7 @@ from base.tenancy.connections import control_name
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests.business import HUB_DB, A
 from base.tests.test_auth_views import demo
-from control.models import HubDue
+from control.models.hubs import HubDue
 from base.queries.demos import demo_get
 from base.schemas.demos import DemoCodeIn, DemoCreateIn, DemoSlugIn
 from base.services.demos import (
@@ -104,8 +104,8 @@ def a_request(rf):
 
 def open_session(request, hub: Hub, *, inside: Hub | None = None):
     """``open_demo_session`` as the demo's ``/auth/callback`` runs it: inside the demo's own database, or the one that
-    stands in for it here (``inside``) when the worker never made the demo's (``base/tenancy/tests/test_provision.py``):
-    a test case reaches only the databases its mark names."""
+    stands in for it here (``inside``) when the worker never made the demo's
+    (``base/tenancy/tests/test_provision_demos.py``): a test case reaches only the databases its mark names."""
     with use_hub(inside or hub):
         return open_demo_session(request, hub)
 
@@ -686,7 +686,7 @@ class TestReaper:
 
         def keep(hub: Hub) -> list:
             storages["hub_files"].save(f"{hub_prefix(hub.id)}/files/menu.pdf", ContentFile(b"bytes"))
-            return files.scan(storages["hub_files"], hub_prefix(hub.id))
+            return files.store.scan(storages["hub_files"], hub_prefix(hub.id))
 
         return keep
 
@@ -695,7 +695,7 @@ class TestReaper:
         hub = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="expired")
         assert kept(hub)
         purge_demo_data(hub)
-        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == []
+        assert files.store.scan(storages["hub_files"], hub_prefix(hub.id)) == []
 
     def test_a_demo_whose_row_names_another_database_keeps_its_files(self, kept, monkeypatch):
         monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: None)
@@ -704,7 +704,7 @@ class TestReaper:
         hub.db_name = names.hub_db_name(control_name(), hub.id)
         with pytest.raises(names.InvalidDatabaseName, match="not the demo"):
             purge_demo_data(hub)
-        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
+        assert files.store.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
 
     def test_a_business_handed_here_by_mistake_keeps_its_files(self, kept):
         # Even without a database named: only a demo's purge deletes a demo's files.
@@ -712,7 +712,7 @@ class TestReaper:
         stored = kept(hub)
         with pytest.raises(names.InvalidDatabaseName, match="not the demo"):
             purge_demo_data(hub)
-        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
+        assert files.store.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
 
 
 class TestTombstones:

@@ -13,7 +13,7 @@ from live.operations import UnknownOperation
 from live.operations import get as get_operation
 
 from apps.sale.api import router
-from apps.sale.tests.conftest import HOST, HUB_DB, A, run
+from apps.sale.tests.conftest import DECLARED_STEP, HOST, HUB_DB, A, run
 from base.tests.routes import bound_routes, spa_route_map
 from config.api import api
 
@@ -32,6 +32,7 @@ ROUTES = {
     ("POST", "/sale/sales/refund", "sale.sale.refund"),
     ("POST", "/sale/sales/issue_documents", "sale.sale.issue_documents"),
     ("GET", "/sale/checkout/preview", "sale.checkout.preview"),
+    ("GET", "/sale/checkout/steps", "sale.checkout.steps"),
     ("GET", "/sale/orders", "sale.order.list"),
     ("GET", "/sale/orders/detail", "sale.order.get"),
     ("POST", "/sale/orders", "sale.order.open"),
@@ -49,6 +50,7 @@ ROUTES = {
     ("POST", "/sale/orders/void_line", "sale.order.void_line"),
     ("POST", "/sale/orders/fire", "sale.order.fire"),
     ("POST", "/sale/orders/print_bill", "sale.order.print_bill"),
+    ("POST", "/sale/orders/note_bill", "sale.order.note_bill"),
     ("POST", "/sale/orders/split", "sale.order.split"),
     ("POST", "/sale/orders/merge", "sale.order.merge"),
     ("POST", "/sale/orders/void", "sale.order.void"),
@@ -193,6 +195,58 @@ def test_a_bad_payload_is_a_422_by_field(admin_client):
     response = post(admin_client, "/sale/sales", {"idempotency_key": "short"})
     assert response.status_code == 422
     assert "idempotency_key" in response.json()["error"]["fields"]
+
+
+@HUB_DB
+def test_an_added_amount_without_an_app_that_takes_it_is_a_409_over_http(employee_client, product):
+    product("Coffee", "COF", 150, "restaurant.drink")
+    refused = post(
+        employee_client,
+        "/sale/sales",
+        {
+            "idempotency_key": "http-extra-0003",
+            "lines": [{"product": "COF"}],
+            "payments": [{"method": "card", "extra": 100, "extra_label": "Tip"}],
+        },
+    )
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "sale.added_amount_not_accepted"
+    assert get(employee_client, "/sale/sales").json()["total"] == 0
+
+
+@HUB_DB
+def test_whoever_charges_reads_the_steps_the_apps_on_add_to_the_charge_over_http(employee_client, a_step_at_the_charge):
+    steps = get(employee_client, "/sale/checkout/steps")
+    assert steps.status_code == 200, steps.json()
+    assert steps.json() == {"steps": [DECLARED_STEP]}
+
+
+@HUB_DB
+def test_a_charge_takes_what_another_app_adds_to_a_tender_over_http(employee_client, product, a_step_at_the_charge):
+    product("Coffee", "COF", 150, "restaurant.drink")
+    tipped = {"method": "cash", "tendered": 500, "extra": 100, "extra_label": "Tip"}
+    charged = post(
+        employee_client,
+        "/sale/sales",
+        {"idempotency_key": "http-extra-0001", "lines": [{"product": "COF"}], "payments": [tipped]},
+    )
+    assert charged.status_code == 201, charged.json()
+    sale = charged.json()
+    assert (sale["total"], sale["tendered_total"], sale["change_total"]) == (150, 500, 250)
+    assert [(p["amount"], p["extra"], p["extra_label"], p["change"]) for p in sale["payments"]] == [
+        (150, 100, "Tip", 250)
+    ]
+    unnamed = post(
+        employee_client,
+        "/sale/sales",
+        {
+            "idempotency_key": "http-extra-0002",
+            "lines": [{"product": "COF"}],
+            "payments": [{"method": "cash", "extra": 100}],
+        },
+    )
+    assert unnamed.status_code == 422
+    assert "payments.0.extra_label" in unnamed.json()["error"]["fields"]
 
 
 @HUB_DB

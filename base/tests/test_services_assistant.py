@@ -17,11 +17,13 @@ from ninja import Schema
 
 from base import assistant
 from base.models import Hub, Membership
+from base.roles import ON
 from base.sensitive import VIEW_TEAM_CONTACT
 from base.services.assistant import LAST_ROUND
 from base.tenancy import context
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, in_business_a
 from base.tests.fake_gateway import gateway
+from base.tests.roles import a_role, held_by
 from base.tests.test_assistant import SECRET_SET
 from base.tests.test_assistant_previews import PricedPreviewOut, count_preview, declaring
 from base.tests.test_assistant_previews import settle  # a dangerous write with its preview
@@ -102,8 +104,8 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "demo__item__create" in names
     assert "Spanish" in plan["instructions"]
     assert (plan["append"], plan["executed"], plan["confirm"], plan["pending"]) == ([], [], None, [])
-    # The business's currency with its decimals: an amount in its minor unit.
-    assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
+    # The business's currency with its decimals: an amount sent in its minor unit, one of a result as it comes.
+    assert "17.00 EUR → 1700" in plan["instructions"] and '(`"17.00 EUR"`): say it as it comes' in plan["instructions"]
 
 
 def test_a_turn_whose_actor_has_no_role_here_names_none():
@@ -148,9 +150,35 @@ def test_a_read_the_model_asked_for_runs_alone_and_its_result_goes_back():
             "kind": "query",
             "outcome": "ok",
             "code": "",
+            "reason": {},
+            # A read that hands no file (a CSV export does: base/tests/test_handed_files.py).
+            "file": None,
         }
     ]
     assert (plan["confirm"], plan["pending"]) == (None, [])
+
+
+def test_the_reads_asked_for_in_one_answer_all_run_in_the_same_turn_in_the_order_asked():
+    """A model may ask for several tools in one answer: its reads run one after the other, without the person, and each
+    result goes back by its call before the model is asked again."""
+    run("demo.item.create", name="Terraza")
+    listed, counted = call("demo.item.list", {}, "c1"), call("demo.item.open_count", {}, "c2")
+    plan = turn(listed, counted)
+    assert [(row["call_id"], row["outcome"]) for row in plan["executed"]] == [("c1", "ok"), ("c2", "ok")]
+    assert [result["tool_call_id"] for result in plan["append"]] == ["c1", "c2"]
+    assert "Terraza" in plan["append"][0]["content"]
+    assert json.loads(plan["append"][1]["content"]) == {"count": 1}
+    assert (plan["confirm"], plan["pending"], bool(plan["tools"])) == (None, [], True)
+
+
+def test_a_read_asked_for_with_a_write_in_one_answer_runs_and_the_write_waits_for_its_card():
+    listed, write = call("demo.item.list", {}, "c1"), call("demo.item.create", {"name": "Mesa 4"}, "c2")
+    plan = turn(listed, write)
+    assert [(row["call_id"], row["outcome"]) for row in plan["executed"]] == [("c1", "ok")]
+    assert [result["tool_call_id"] for result in plan["append"]] == ["c1"]
+    assert plan["confirm"]["operation"] == "demo.item.create"
+    assert waiting(plan) == [write]
+    assert "Mesa 4" not in items()
 
 
 # ── A write waits for the person ─────────────────────────────────────────────────────────────────────────────────
@@ -354,7 +382,9 @@ def test_turning_an_app_on_or_off_names_it_on_its_card(name):
     """hub#539: «Activa la app de reservas» showed «online_booking», and Reservas online was the one confirmed."""
     admin = {"base.view_home", "base.administer_hub"}
     plan = turn(call(name, {"app": "online_booking"}), permissions=admin)
-    assert [(field["name"], field["value"]) for field in plan["confirm"]["fields"]] == [("app", "Reservas online")]
+    along = {"base.app.disable": [("along", "Citas y Servicios se desactivan con ella: solo las necesitaba Reservas online.")]}
+    shown = [(field["name"], field["value"]) for field in plan["confirm"]["fields"]]
+    assert shown == [("app", "Reservas online"), *along.get(name, [])]
     assert plan["executed"] == []
 
 
@@ -388,6 +418,33 @@ def test_each_write_of_a_chain_asks_its_own_yes():
     assert plan["confirm"]["fields"][0]["value"] == "Dos"
     assert waiting(plan) == [second]
     assert "Uno" in items() and "Dos" not in items()
+
+
+def test_a_no_to_the_first_of_two_writes_asked_in_one_answer_cancels_that_one_alone():
+    """Two changes asked for in one answer show their cards one after the other: a «no» to the first cancels it alone,
+    and the second still waits for its own answer, which runs it."""
+    first = call("demo.item.create", {"name": "Uno"}, "c1")
+    second = call("demo.item.create", {"name": "Dos"}, "c2")
+    plan = answered(first, second, decision={"call_id": "c1", "accepted": False})
+    assert [(row["call_id"], row["outcome"]) for row in plan["executed"]] == [("c1", "cancelled")]
+    assert plan["confirm"]["fields"][0]["value"] == "Dos"
+    assert waiting(plan) == [second]
+    assert items() == []
+    ran = turn(*plan["pending"], decision={"call_id": "c2", "accepted": True})
+    assert [(row["call_id"], row["outcome"]) for row in ran["executed"]] == [("c2", "ok")]
+    assert items() == ["Dos"]
+
+
+def test_a_yes_for_the_second_of_two_writes_asked_in_one_answer_runs_neither_while_the_first_waits():
+    """A yes names the call of its card: one for the second change while the first's card waits runs nothing, and the
+    first's card is shown again."""
+    first = call("demo.item.create", {"name": "Uno"}, "c1")
+    second = call("demo.item.create", {"name": "Dos"}, "c2")
+    plan = answered(first, second, decision={"call_id": "c2", "accepted": True})
+    assert (plan["executed"], plan["append"]) == ([], [])
+    assert plan["confirm"]["fields"][0]["value"] == "Uno"
+    assert waiting(plan) == [first, second]
+    assert items() == []
 
 
 def test_stop_cancels_this_write_and_the_rest_of_the_chain():
@@ -497,24 +554,92 @@ def test_the_reads_of_the_last_round_run_before_the_model_answers_without_tools(
     assert (plan["stop"], plan["tools"]) == ("", [])
 
 
-def test_past_its_last_round_the_turn_stops_and_says_why():
+def answered_writes(messages, count):
+    """``messages`` and ``count`` rounds more, each a write the person said yes to: a model that asks for one change
+    at a time takes a round for each."""
+    for at in range(count):
+        write = call("demo.item.create", {"name": f"Mesa {at}"}, f"w{at}")
+        messages = [*messages, asked(write), {"role": "tool", "tool_call_id": f"w{at}", "content": "{}"}]
+    return messages
+
+
+def test_a_read_and_a_whole_week_of_days_fit_in_one_request():
+    """«We open Tuesday to Sunday from 12:00 to 23:30 and we're closed on Mondays»: a read and a change per day is a
+    normal request, not a loop. After the seventh day the model still has its tools and nothing stops."""
+    plan = run("base.assistant.turn", messages=answered_writes(answered_rounds(1), 7))
+    assert plan["tools"]
+    assert (plan["stop"], LAST_ROUND in plan["instructions"]) == ("", False)
+
+
+def test_two_reads_and_six_changes_fit_in_one_request():
+    """Six categories of the menu sent to the bar or the kitchen, after reading the categories and the stations."""
+    plan = run("base.assistant.turn", messages=answered_writes(answered_rounds(2), 6))
+    assert (bool(plan["tools"]), plan["stop"]) == (True, "")
+
+
+def out_of_steps(content: str) -> bool:
+    return json.loads(content)["error"]["code"] == "base.assistant_out_of_steps"
+
+
+@pytest.mark.parametrize("late", [call("demo.item.create", {"name": "Mesa 4"}), call("demo.item.list", {})])
+def test_a_tool_the_model_asks_for_past_its_last_round_never_runs_and_the_model_answers(late):
+    """The last round offers no tool, and a model may still ask for one. It runs nothing and shows no card (nor a
+    receipt: nothing was shown to the person): the model hears it has no steps left and answers with what was done and
+    what is left, instead of the request stopping with no answer."""
+    plan = turn(late, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(late)])
+    assert (plan["confirm"], plan["executed"], plan["pending"]) == (None, [], [])
+    (told,) = plan["append"]
+    assert told["tool_call_id"] == "c1"
+    assert out_of_steps(told["content"])
+    assert (plan["stop"], plan["tools"]) == ("", [])
+    assert LAST_ROUND in plan["instructions"]
+    assert items() == []
+
+
+def test_after_its_first_try_past_the_last_round_the_model_still_gets_to_answer():
     plan = run("base.assistant.turn", messages=answered_rounds(shared.MAX_ROUNDS + 1))
+    assert (plan["stop"], plan["tools"]) == ("", [])
+    assert LAST_ROUND in plan["instructions"]
+
+
+def test_a_model_that_still_asks_for_tools_after_hearing_it_has_none_left_is_stopped_and_the_turn_says_why():
+    plan = run("base.assistant.turn", messages=answered_rounds(shared.MAX_ROUNDS + 2))
     assert plan["stop"] == "assistant.too_many_steps"
 
 
-def test_past_its_last_round_a_write_still_waits_for_the_answer_to_its_card():
+def test_on_its_last_round_a_write_still_waits_for_the_answer_to_its_card():
     write = call("demo.item.create", {"name": "Mesa 4"})
-    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(write)])
+    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS - 1), asked(write)])
     assert plan["confirm"] is not None
     assert plan["stop"] == ""
 
 
-def test_past_its_last_round_the_model_still_hears_that_the_person_stopped():
+def test_on_its_last_round_the_model_still_hears_that_the_person_stopped():
     write = call("demo.item.create", {"name": "Mesa 4"})
     stop = {"call_id": "c1", "accepted": False, "stop": True}
-    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(write)], decision=stop)
+    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS - 1), asked(write)], decision=stop)
     assert plan["executed"][0]["outcome"] == "cancelled"
     assert plan["stop"] == ""
+
+
+def test_a_request_the_person_stopped_on_its_last_round_is_still_on_its_last_round():
+    """«Cancel all» gives the request no rounds back: the model hears that the person stopped and answers, with no
+    tools to go on with."""
+    write = call("demo.item.create", {"name": "Mesa 4"})
+    stop = {"call_id": "c1", "accepted": False, "stop": True}
+    plan = turn(write, messages=[*answered_rounds(shared.MAX_ROUNDS - 1), asked(write)], decision=stop)
+    assert (plan["stop"], plan["tools"]) == ("", [])
+    assert LAST_ROUND in plan["instructions"]
+
+
+def test_every_tool_asked_for_at_once_past_the_last_round_hears_that_it_did_not_run():
+    """A model that asks for several tools in one message gets an answer to each: a request left with none is one the
+    gateway refuses."""
+    late = [call("demo.item.create", {"name": "Mesa 4"}, "c1"), call("demo.item.list", {}, "c2")]
+    plan = turn(*late, messages=[*answered_rounds(shared.MAX_ROUNDS), asked(*late)])
+    assert [told["tool_call_id"] for told in plan["append"]] == ["c1", "c2"]
+    assert all(out_of_steps(told["content"]) for told in plan["append"])
+    assert (plan["executed"], plan["pending"], items()) == ([], [], [])
 
 
 # ── The setup ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -653,3 +778,23 @@ def test_a_turn_reads_the_hubs_own_words():
     asked = {"role": "user", "content": "¿qué hay en la cuenta de la mesa 6?"}
     plan = run("base.assistant.turn", {"*"}, messages=[asked])
     assert shared.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]
+
+
+def test_a_turn_names_the_role_of_the_business_that_rules_over_the_membership(make_user):
+    luis = make_user("saas:6", host=A.key, role=Membership.Role.EMPLOYEE)
+    held_by(luis, a_role("Cajero sin anulaciones", base__view_home=ON))
+
+    said = run("base.assistant.turn", actor=luis, messages=[ASK])["instructions"]
+
+    assert "You talk to the «Cajero sin anulaciones» of this business" in said
+    assert "«Empleado»" not in said
+
+
+def test_a_turn_names_the_owner_whatever_role_their_row_names(make_user):
+    olga = make_user("saas:1", host=A.key, role=Membership.Role.OWNER)
+    held_by(olga, a_role("Cajero sin anulaciones", base__view_home=ON))
+
+    said = run("base.assistant.turn", actor=olga, messages=[ASK])["instructions"]
+
+    assert "You talk to the «Propietario» of this business" in said
+    assert "Cajero sin anulaciones" not in said

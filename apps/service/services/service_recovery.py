@@ -9,12 +9,14 @@ from live.operations import INTERNAL, operation
 from apps.service.models import Assignment, Service
 from apps.service.queries.catalog import find_service, load_service
 from apps.service.queries.reads import SYSTEM
-from apps.service.schemas import AssignIn, AssignmentPatchIn, ServiceIn, ServiceRecoveredOut, ServiceRecoverIn
+from apps.service.schemas.assignments import AssignIn, AssignmentPatchIn
+from apps.service.schemas.catalog import ServiceIn
+from apps.service.schemas.recovery import ServiceRecoveredOut, ServiceRecoverIn
 from apps.service.services.assignments import assign, update_assignment
 from apps.service.services.catalog import create_service
 from apps.service.services.service_images import _change_image
 from apps.staff.models import Member
-from apps.staff.queries import live_members
+from apps.staff.queries.reads import live_members
 from base import images
 from base.recovery import LeftOut
 

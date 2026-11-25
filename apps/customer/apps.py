@@ -26,19 +26,30 @@ class CustomerConfig(LiveAppConfig):
     )
     verticals = ["hair_salon", "restaurant"]
     default_auto_field = "django.db.models.BigAutoField"
+    # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms): a customer assigned to a check, as
+    # the till's button says it («Asignar cliente», «Assign customer»), or a check put in their name is what
+    # customer.order.link does. Only as phrases: «asigna», «pon» or «set» alone assign or set anything.
+    assistant_synonyms = (
+        (
+            "link", "enlaza", "assign customer", "assign a customer", "assign the customer", "set the customer",
+            "set a customer", "set customer", "in her name", "in his name", "in their name", "asignar cliente",
+            "asigna cliente", "asignar un cliente", "asigna un cliente", "asignar el cliente", "asigna el cliente",
+            "poner un cliente", "pon un cliente", "poner el cliente", "pon el cliente", "a su nombre",
+        ),
+    )
     # The product's 21 permissions, folded where every role held them together. Not declared on
     # purpose: ``customer.record_purchase``, which only the system context holds (the product's
     # ``internal`` commands): owner and admin get every declared permission.
-    permissions = [
-        "customer.view",
-        "customer.manage",
-        "customer.configure",
-        "customer.merge",
-        "customer.export",
-        "customer.delete",
-        "customer.erase",
-        "customer.record_activity",
-    ]
+    permissions = {
+        "customer.view": _("View customers, groups, tags, activity, purchases and consents"),
+        "customer.manage": _("Add, edit and import customers, add notes, groups and tags, and record consent"),
+        "customer.configure": _("Create and change groups, tags and custom fields"),
+        "customer.merge": _("Merge duplicate customers"),
+        "customer.export": _("Export customers to CSV"),
+        "customer.delete": _("Delete customers, groups and tags"),
+        "customer.erase": _("Erase a customer's personal data"),
+        "customer.record_activity": _("Note in a customer's activity what other apps bring"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The rights at
     # the counter (view, create, edit, notes, consent, link the order) are the employee's.
     role_permissions = {
@@ -93,7 +104,28 @@ class CustomerConfig(LiveAppConfig):
             permission="customer.configure",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "ggbb7gK64QA", "en": "Kqkvd9csYU0"},
+        flow_videos={
+            "CUSTOMER-F01": {"es": ["MyjzkT6rXfM"], "en": ["Oa8rsR8S4e0"]},
+            "CUSTOMER-F02": {"es": ["8MNU36kOqm8"], "en": ["mpE7xid1hUM"]},
+            "CUSTOMER-F03": {"es": ["qYp2QA6fiCQ"], "en": ["PyQCw1irq2A"]},
+            "CUSTOMER-F04": {"es": ["MyjzkT6rXfM"], "en": ["Oa8rsR8S4e0"]},
+            "CUSTOMER-F05": {"es": ["8TW6rkC6FPQ"], "en": ["LIX3G55DuEQ"]},
+            "CUSTOMER-F06": {"es": ["E98cCrGq7Cs"], "en": ["TZzcrWmx-Sg"]},
+            "CUSTOMER-F07": {"es": ["MyjzkT6rXfM"], "en": ["Oa8rsR8S4e0"]},
+            "CUSTOMER-F08": {"es": ["3WazHMlQIkY"], "en": ["DqXR6vfJffs"]},
+            "CUSTOMER-F09": {"es": ["rxfPiVW4Dhw"], "en": ["dI9ZQCy1tlg"]},
+            "CUSTOMER-F12": {"es": ["FYTeu4vFu_A"], "en": ["9I9ZK8qv3LA"]},
+            "CUSTOMER-F13": {"es": ["FYTeu4vFu_A"], "en": ["9I9ZK8qv3LA"]},
+            "CUSTOMER-F14": {"es": ["HOxJQoIca8Q"], "en": ["A2ny2_gcsO8"]},
+            "CUSTOMER-F15": {"es": ["HOxJQoIca8Q"], "en": ["A2ny2_gcsO8"]},
+            "CUSTOMER-F23": {"es": ["05K2nQZ_7cQ"], "en": ["pAh0BU7ll1s"]},
+            "CUSTOMER-F27": {"es": ["qcRUx6geFOM"], "en": ["PqBsh6c9Tws"]},
+            "CUSTOMER-F28": {"es": ["j99LxL3KfoA"], "en": ["NaUVuAl9Obw"]},
+            "CUSTOMER-F29": {"es": ["yptV7z91fyM"], "en": ["UoSCsyIBwto"]},
+        },
+    )
 
     fiscal_archive_models = ("Purchase",)
 
@@ -103,18 +135,18 @@ class CustomerConfig(LiveAppConfig):
         they go to the fiscal archive first (``fiscal_archive_models``)."""
         from apps.customer import queries  # the models are not loaded yet when this module is
 
-        return queries.keeps_fiscal_documents()
+        return queries.purchases.keeps_fiscal_documents()
 
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
-        recovers from it: of the copy's live cards (``queries.cards_in_copy``), each the business still holds deleted
-        comes back the same, with all that hangs from it (``queries.cards_deleted_in_business``,
+        recovers from it: of the copy's live cards (``queries.recovery.cards_in_copy``), each the business still holds
+        deleted comes back the same, with all that hangs from it (``queries.recovery.cards_deleted_in_business``,
         ``customer.customer.restore``, CUSTOMER-F33) and the groups, tags and custom field values the business deleted
-        since (hub#1356), and each it no longer has is made again by
-        ``customer.customer.recover`` (``queries.cards_not_in_business``): as ``customer.customer.create``, the till's
-        and the card's own, makes it, with its groups, tags and custom field values there
-        (``queries.recoverable_cards_in_copy``, hub#1285), each by the screen's own operation. Never one merged into
-        another or whose personal data was erased."""
+        since (hub#1356), and each it no longer has is made again by ``customer.customer.recover``
+        (``queries.recovery.cards_not_in_business``): as ``customer.customer.create``, the till's and the card's own,
+        makes it, with its groups, tags and custom field values there (``queries.recovery.recoverable_cards_in_copy``,
+        hub#1285), each by the screen's own operation. Never one merged into another or whose personal data was
+        erased."""
         from apps.customer import queries  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
@@ -122,10 +154,10 @@ class CustomerConfig(LiveAppConfig):
             Recoverable(
                 label=self.verbose_name,
                 reads_since="0001_initial",
-                read=queries.recoverable_cards_in_copy,
-                missing=queries.cards_not_in_business,
+                read=queries.recovery.recoverable_cards_in_copy,
+                missing=queries.recovery.cards_not_in_business,
                 create="customer.customer.recover",
-                deleted=queries.cards_deleted_in_business,
+                deleted=queries.recovery.cards_deleted_in_business,
                 restore="customer.customer.restore",
             )
         ]

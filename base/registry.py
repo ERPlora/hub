@@ -17,8 +17,9 @@ from django.utils.translation import gettext
 from live.context import OperationContext, Scope
 from live.errors import PermissionDenied
 
+from base import platform_hub
 from base.schemas.hub_registry import HubOut
-from control.models import Hub
+from control.models.hubs import Hub
 
 #: The scope of the registry's operations (``base.hub.*``): the platform's, never a hub's.
 REGISTRY_SCOPE = Scope("platform", "registry")
@@ -38,6 +39,11 @@ PREPARING_STATUSES = frozenset(
 def hub_by_slug(slug: str) -> Hub | None:
     """The registry's row of ``slug``, or ``None``."""
     return Hub.objects.filter(slug=slug).first()
+
+
+def platform_hub_row() -> Hub | None:
+    """ERPlora's own hub's row, under either of its names (``base.platform_hub``), or ``None``."""
+    return Hub.objects.filter(is_platform=True, slug__in=platform_hub.names()).first()
 
 
 def hub_id(slug: str) -> uuid.UUID | None:

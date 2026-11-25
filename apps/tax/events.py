@@ -1,4 +1,4 @@
-"""Events of the tax app (``<app>.<entity>.<fact>``): recorded by services.py, cited by live.py.
+"""Events of the tax app (``<app>.<entity>.<fact>``): recorded by services, cited by live.py.
 
 The tax app reacts to no event of another app, so this module only names its own.
 """

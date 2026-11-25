@@ -23,7 +23,8 @@ from base.tenancy.tests.test_recovery import (
     run,
     run_in,
 )
-from control.models import CopyRecovery, Hub
+from control.models.copies import CopyRecovery
+from control.models.hubs import Hub
 
 
 def created_events(hub: Hub) -> int:
@@ -272,7 +273,7 @@ class TestCustomersComeBack:
         [why] = customers["reasons"]
         from django.utils import translation
 
-        from apps.customer.services import PHONE_INVALID
+        from apps.customer.services.writes import PHONE_INVALID
 
         with translation.override("es"):
             assert why["reason"] == f"customer.phone_invalid: {PHONE_INVALID}"

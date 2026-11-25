@@ -26,13 +26,14 @@ from live.errors import NotFound, OperationError, PermissionDenied
 from live.operations import get
 
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import permissions_of_role
 from base.tenancy import connections, names
 from base.tenancy.context import HubWithoutDatabase, use_hub
 from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3, no_dumps_bucket  # noqa: F401
 from base.tests.test_internal import signed
-from control.models import Hub, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Hub
 
 pytestmark = pytest.mark.django_db
 
@@ -185,7 +186,7 @@ def person(slug: str, role=Membership.Role.OWNER) -> OperationContext:
     user = get_user_model().objects.create_user(username=f"{role}-{slug}", password="pw")
     Membership.objects.create(user=user, host=slug, role=role)
     scope = Scope("host", slug)
-    return OperationContext(scope=scope, actor=user, permissions=permissions_for(user, scope), language="es")
+    return OperationContext(scope=scope, actor=user, permissions=permissions_of_role(role), language="es")
 
 
 def call(ctx, name, /, **data):

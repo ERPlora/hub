@@ -8,7 +8,7 @@ from live.operations import operation
 
 from apps.kitchen.models import LogEntry
 from apps.kitchen.queries.reads import start_of
-from apps.kitchen.schemas import LogListIn, LogPage
+from apps.kitchen.schemas.history import LogListIn, LogPage
 from apps.sale.queries.people import person_names
 from base.relay import by_platform
 

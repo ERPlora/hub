@@ -9,18 +9,19 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
+from apps.service import grant_card
 from apps.service import events
 from apps.service.models import Assignment, Grant, GrantAdjustment, Redemption, Service
 from apps.service.queries.catalog import find_service
 from apps.service.queries.grant_checks import redeem_refusal, void_refusal
 from apps.service.queries.grants import balance, find_grant, load_grant, lock_grant, session_value
 from apps.service.queries.packages import PACKAGE_NOT_FOUND, find_package
-from apps.service.schemas import AdjustIn, GrantIn, GrantOut, RedeemIn, RedemptionOut, VoidIn
+from apps.service.schemas.grants import AdjustIn, GrantIn, GrantOut, RedeemIn, RedemptionOut, VoidIn
 from apps.service.services.grant_sales import charged_on, tell_sales
 from apps.service.services.writes import _actor
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 
 GRANT_ALREADY_VOIDED = _("That voucher was already voided.")
 GRANT_IN_USE = _("That voucher was already used: it cannot be voided.")
@@ -72,6 +73,7 @@ def _grant_payload(grant: Grant) -> dict:
         "and its expiry counts from the purchase. If it was charged at the till, say the sale: without it, its "
         "sessions count for nobody's commission.",
         "risk": "normal",
+        "summary": grant_card.summary,
         "asks": {
             "en": ("sell Inés the five-massage voucher", "Pilar has bought the laser pack, give it to her"),
             "es": ("véndele a Inés el bono de cinco masajes", "Pilar ha comprado el bono de láser, dáselo"),

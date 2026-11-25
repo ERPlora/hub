@@ -23,7 +23,7 @@ from apps.invoice.tests.conftest import (
 )
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, comparable, offered_to, place_of_no_ask
+from base.tests.test_assistant_asks import TOP, assert_offered_or_found, comparable, offered_to
 from base.tests.test_assistant_asks import probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, nobodys_words, own_words_test
 
@@ -194,12 +194,24 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     assert {probe["tool"] for probe in PROBES} == TOOLS  # positive control: one probe per tool, all read
 
 
+#: The task the model searches for when a reported request brings its tool, or the read that finds its record, past the
+#: places of a turn.
+SEARCHED = {
+    "flow.flow.detail": "ver una automatización",
+    "flow.draft.list": "ver los borradores de automatizaciones",
+    "flow.event.sample": "ver un evento de ejemplo",
+    "flow.flow.status": "contar las automatizaciones de un evento",
+    "flow.flow.grant": "conceder permisos a una automatización",
+}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_request_is_offered_its_tool_and_the_read_that_finds_it(catalog_of, name, phrase):
     tools = catalog_of(Membership.Role.OWNER, "es")
-    assert place_of_no_ask(tools, name, phrase) is not None
-    assert FINDS.get(name, name) in offered_to(tools, phrase)
+    assert_offered_or_found(tools, name, phrase, SEARCHED.get(name))
+    finds = FINDS.get(name, name)
+    assert_offered_or_found(tools, finds, phrase, SEARCHED.get(finds))
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
@@ -208,7 +220,8 @@ def test_every_probe_of_automations_offers_its_tool_without_being_one_of_its_ask
     """The owner's thirty phrases of layer 2, the ones the model answered right too: a tool of Automations that a new ask
     elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it."""
     assert (probe["app"], probe["role"], probe["language"]) == ("flow", "owner", "es")
-    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), probe["tool"], probe["phrase"]) is not None
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    assert_offered_or_found(tools, probe["tool"], probe["phrase"], SEARCHED.get(probe["tool"]))
 
 
 def test_the_hub_names_an_automation_its_runs_steps_questions_drafts_and_recipes():

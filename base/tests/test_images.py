@@ -424,7 +424,7 @@ def test_a_photo_past_the_plans_space_is_refused_and_not_kept(hub_files):
         images.keep_photo(ctx(), FOLDER, webp())
 
     assert refused.value.code == "base.file_no_space"
-    assert files.used_bytes(hub_files, hub_a()) == 0
+    assert files.space.used_bytes(hub_files, hub_a()) == 0
 
 
 def test_a_store_that_does_not_answer_says_the_photo_could_not_be_saved(hub_files, monkeypatch):

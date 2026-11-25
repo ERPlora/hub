@@ -1,6 +1,6 @@
 // APPOINTMENT-F01, F04, F14, F22: the booking panel. «New appointment» asks for the Customer (Customers'
 // own search, which also creates a card), one or more Services, the Professional (only who does them all),
-// the Day and the Time (with the free times), the Min. (the services' sum unless typed) and the notes;
+// the Day and the Time (with the free times), «Duration (min)» (the services' sum unless typed) and the notes;
 // «Add appointment» books it. An overlap asks first («Book anyway» / «Pick another time»); a refusal goes on
 // top, a bad field under it, and what was typed stays. «Edit appointment» sends only what changed, asks
 // «This appointment only» / «This and all following» for a series and shows the history below.
@@ -18,7 +18,7 @@ describe('AppointmentFormModal: New appointment', () => {
   it('asks for customer, services, professional, day, time and minutes, as the old panel', async () => {
     const s = await setup();
     expect(s.inDoc('appointment-form')?.getAttribute('aria-label')).toBe('New appointment');
-    expect([s.field('day').label, s.field('time').label, s.field('minutes').label]).toEqual(['Day', 'Time', 'Min.']);
+    expect([s.field('day').label, s.field('time').label, s.field('minutes').label]).toEqual(['Day', 'Time', 'Duration (min)']);
     expect(s.staffPicker().props('label')).toBe('Professional');
     expect(s.submit().textContent).toContain('Add appointment');
     expect(s.submit().disabled).toBe(true);
@@ -247,7 +247,7 @@ describe('AppointmentFormModal: New appointment', () => {
   it('speaks Spanish', async () => {
     const s = await setup({}, 'es');
     expect(s.inDoc('appointment-form')?.getAttribute('aria-label')).toBe('Nueva cita');
-    expect([s.field('day').label, s.field('time').label]).toEqual(['Día', 'Hora']);
+    expect([s.field('day').label, s.field('time').label, s.field('minutes').label]).toEqual(['Día', 'Hora', 'Duración (min)']);
     expect(s.submit().textContent).toContain('Añadir cita');
   });
 });

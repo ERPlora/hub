@@ -16,8 +16,9 @@ from live.operations import atomic
 from live.outbox import notify
 
 from base import events
-from base.models import EventDelivery, TaskSchedule
-from base.tenancy.context import HUB_SCOPE_KIND
+from base.models.relay import EventDelivery
+from base.models.scheduler import TaskSchedule
+from base.tenancy.context import HUB_SCOPE_KIND, current_hub
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,15 @@ def _note_an_event_recorded_by_the_delivery(sender, instance: OutboxEvent, creat
         recorded.append(instance)
 
 
+def _of_the_hub_at_work(event: OutboxEvent) -> OutboxEvent:
+    """``event`` in the scope its hub has now: an outbox holds its own hub's events alone, and that hub's address may
+    have changed since ``event`` was recorded, when its reactions would run for a hub that is not there."""
+    hub = current_hub()
+    if hub is not None:
+        event.scope_key = hub.slug
+    return event
+
+
 def relay_take_events(
     now: dt.datetime,
     *,
@@ -128,7 +138,7 @@ def relay_take_events(
         events = OutboxEvent.objects.select_for_update(skip_locked=True).filter(delivered_at__isnull=True)
         if not of_hubs:
             events = events.exclude(scope_kind=HUB_SCOPE_KIND)
-        taken = list(events.order_by("created_at", "id")[:limit])
+        taken = [_of_the_hub_at_work(event) for event in events.order_by("created_at", "id")[:limit]]
         _hand_over(taken, now=now, depth=0, listeners=listeners, max_depth=max_depth)
     return len(taken)
 
@@ -165,6 +175,7 @@ def relay_deliver_next(  # noqa: PLR0913
         delivery = due.select_related("event").order_by("event__created_at", "event_id", "app_label").first()
         if delivery is None:
             return None
+        _of_the_hub_at_work(delivery.event)
         delivery.attempts += 1
         try:
             with atomic():

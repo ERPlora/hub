@@ -1,22 +1,26 @@
 <script setup lang="ts">
-// Employees › Roles: erplora.com's roles. A role is given when a person is invited on erplora.com and changed
-// there, so this list is read only. No module brings a role of its own, so there is nothing to turn on or off. The
-// link leaves the Hub by `openExternalLink` (the installed app opens nothing on a `_blank` link) and is never offered
-// in the Google Play copy (`managementOffered`).
-import { DataTable, type DataTableColumn, StatusPill } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
-import { openExternalLink, useSession } from '@erplora/ui/shell';
-import { computed } from 'vue';
+// Employees › Roles: erplora.com's roles and, after them, the business's own. A basic role is given when a person is
+// invited on erplora.com and changed there; who manages the roles makes one of the business's own from any, and adjusts
+// or deletes it. A row opens what the role allows. The link leaves the Hub by `openExternalLink` (the installed app opens
+// nothing on a `_blank` link) and is never offered in the Google Play copy (`managementOffered`).
+import { ConfirmDialog, DataTable, type DataTableAction, type DataTableColumn, StatusPill } from '@erplora/ui/components';
+import { useCommand, useLive } from '@erplora/ui/sdk';
+import { openExternalLink, toastSuccess, useSession } from '@erplora/ui/shell';
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
-import { roleKey } from '../lib/people';
+import { roleName } from '../lib/people';
 import type { HubRoleRow } from '../operations/people';
+import NewRoleModal from './NewRoleModal.vue';
 
 const { t, locale } = useBaseI18n();
 const session = useSession();
+const router = useRouter();
 const admin = computed(() => session.can('base.administer_hub'));
+const manages = computed(() => session.can('base.manage_roles'));
 const membersUrl = readJsonBlock<HubHome>('hub-home')?.members_url ?? '';
 const offered = managementOffered();
 
@@ -25,14 +29,63 @@ const { data, status, refresh } = useLive('base.role.list', {});
 const rows = computed<HubRoleRow[]>(() => data.value?.roles ?? []);
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 const number = (n: number) => new Intl.NumberFormat(locale.value).format(n);
+const openRole = (key: string) => void router.push(`/employees/roles/${key}`);
 
 const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
-  { key: 'key', label: t('base.roles.columns.role'), format: (_, row) => t(roleKey(row.key)), width: 'minmax(10rem,2fr)' },
-  { key: 'origin', label: t('base.roles.columns.origin'), cell: 'origin', width: '8rem', sortable: false },
-  { key: 'available', label: t('base.roles.columns.available'), cell: 'available', width: '12rem', sortable: false },
-  { key: 'members', label: t('base.roles.columns.members'), cell: 'members', align: 'right', width: '8rem' },
-  { key: 'permissions', label: t('base.roles.columns.permissions'), cell: 'permissions', align: 'right', width: '8rem' },
+  { key: 'key', label: t('base.roles.columns.role'), format: (_, row) => roleName(row, t), width: 'minmax(10rem,2fr)' },
+  { key: 'origin', label: t('base.roles.columns.origin'), cell: 'origin', width: '12rem', sortable: false },
+  { key: 'members', label: t('base.roles.columns.members'), cell: 'members', align: 'right', width: '7rem' },
+  { key: 'permissions', label: t('base.roles.columns.permissions'), cell: 'permissions', align: 'right', width: '7rem', priority: 'low' },
 ]);
+
+const basic = (row: HubRoleRow) => row.origin === 'basic';
+const actions = computed<DataTableAction<HubRoleRow>[]>(() =>
+  manages.value
+    ? [
+        { id: 'duplicate', label: t('base.roles.duplicate'), icon: 'ion:copy-outline', pinned: true },
+        { id: 'edit', label: t('base.roles.edit'), icon: 'ion:create-outline', menuOnly: true, hidden: basic },
+        { id: 'delete', label: t('base.roles.delete'), icon: 'ion:trash-outline', color: 'danger', menuOnly: true, hidden: basic },
+      ]
+    : [],
+);
+
+function onAction({ actionId, row }: { actionId: string; row: HubRoleRow }): void {
+  if (actionId === 'duplicate') startFrom(row.key);
+  if (actionId === 'edit') openRole(row.key);
+  if (actionId === 'delete') ask(row);
+}
+
+// ── A new role, from another ──
+const creating = ref(false);
+const from = ref('');
+
+function startFrom(key: string): void {
+  from.value = key;
+  creating.value = true;
+}
+
+// ── Deleting one of the business's own ──
+const remove = useCommand('base.role.delete');
+const asking = ref(false);
+const deleting = ref<HubRoleRow>();
+
+function ask(row: HubRoleRow): void {
+  remove.error.value = null;
+  deleting.value = row;
+  asking.value = true;
+}
+
+async function confirmDelete(): Promise<void> {
+  const row = deleting.value;
+  if (!row) return;
+  try {
+    await remove.run({ role: row.key });
+  } catch {
+    return; // The question shows the refusal.
+  }
+  asking.value = false;
+  toastSuccess(t('base.roles.remove.done', { name: row.label }));
+}
 </script>
 
 <template>
@@ -59,27 +112,34 @@ const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
       :page-size="10"
       :page-size-options="[]"
       :views="['table', 'cards']"
-      :card-title="(row: HubRoleRow) => t(roleKey(row.key))"
+      :card-title="(row: HubRoleRow) => roleName(row, t)"
       card-title-column="key"
       :search-keys="['label']"
       :search-placeholder="t('base.roles.search')"
       :empty-message="t('base.roles.empty')"
       :loading="data === undefined && !failed"
       :error="failed ? t('base.roles.error') : undefined"
+      :addable="manages"
+      :labels="{ add: t('base.roles.new') }"
+      :actions="actions"
+      row-clickable
+      @row-click="(row: HubRoleRow) => openRole(row.key)"
+      @add="startFrom('hub_employee')"
+      @action="onAction"
       @retry="refresh()"
     >
-      <template #origin>
+      <template #origin="{ row }">
         <StatusPill
           size="sm"
           tone="neutral"
-          :label="t('base.roles.basic')"
+          :label="t(`base.roles.${(row as HubRoleRow).origin}`)"
         />
-      </template>
-      <template #available>
         <StatusPill
+          v-if="(row as HubRoleRow).to_review"
           size="sm"
-          tone="success"
-          :label="t('base.roles.always')"
+          tone="warning"
+          data-testid="roles-to-review"
+          :label="t('base.roles.toReview')"
         />
       </template>
       <template #members="{ row }">
@@ -89,6 +149,25 @@ const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
         <span data-testid="roles-permissions">{{ number((row as HubRoleRow).permissions) }}</span>
       </template>
     </DataTable>
+    <NewRoleModal
+      v-if="manages"
+      v-model:open="creating"
+      :roles="rows"
+      :from="from"
+      @created="openRole"
+    />
+    <ConfirmDialog
+      v-model:open="asking"
+      testid="role-delete"
+      tone="danger"
+      :title="t('base.roles.remove.title')"
+      :message="t('base.roles.remove.message', { name: deleting?.label ?? '' })"
+      :confirm-label="t('base.roles.delete')"
+      confirm-icon="ion:trash-outline"
+      :pending="remove.pending.value"
+      :error="remove.error.value"
+      @confirm="confirmDelete"
+    />
   </section>
 </template>
 

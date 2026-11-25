@@ -1,10 +1,14 @@
 """The customer app declares its module metadata, its menu, its permissions, what each role gets and
 its operations, every one usable by the assistant (``ai``)."""
 
+import pytest
 from django.apps import apps
 from django.utils import translation
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import AI, INTERNAL, registry
+
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "customer.view",
@@ -113,6 +117,9 @@ CARD_ONLY = {
     "customer.field.detail",
     "customer.order.get",
 }
+#: The writes whose card says their data by a summary of their own (the rows of a file by their names, the custom
+#: fields by their values): a dict, since ``AI`` holds no summary.
+CARD_SUMMARY = {"customer.customer.import", "customer.customer.update"}
 
 
 def customer():
@@ -153,7 +160,7 @@ def test_customer_is_listed_in_the_store_for_both_verticals():
 
 
 def test_permissions():
-    assert customer().permissions == PERMISSIONS
+    assert list(customer().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -227,16 +234,21 @@ def test_the_system_only_permission_is_declared_by_no_app():
 
 
 def test_every_operation_tells_the_assistant_what_it_does():
-    """Typed (``AI``), with what it does and how people ask for it in English and Spanish
-    (test_assistant_asks.py); the screen's health data, the sale's reactions and what names a record on the card are no
-    tool (``INTERNAL``)."""
+    """Typed (``AI``), or a dict with its card's summary, with what it does and how people ask for it in English and
+    Spanish (test_assistant_asks.py); the screen's health data, the sale's reactions and what names a record on the card
+    are no tool (``INTERNAL``)."""
     for name, op in customer_operations().items():
         if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY:
             assert op.ai is INTERNAL, name
             continue
-        assert isinstance(op.ai, AI), name
-        assert len(op.ai.description) > 20, name
-        assert set(op.ai.asks) == {"en", "es"}, name
+        if name in CARD_SUMMARY:
+            assert isinstance(op.ai, dict) and callable(op.ai["summary"]), name
+        else:
+            assert isinstance(op.ai, AI), name
+        spec = op.ai_spec()
+        assert isinstance(spec, AI), name
+        assert len(spec.description) > 20, name
+        assert set(spec.asks) == {"en", "es"}, name
 
 
 def test_commands_declare_their_risk_and_queries_do_not():
@@ -245,12 +257,12 @@ def test_commands_declare_their_risk_and_queries_do_not():
             continue
         if op.kind == "command":
             expected = "high" if name in HIGH_RISK else "normal"
-            assert op.ai.risk == expected, name
+            assert op.ai_spec().risk == expected, name
         elif name == "customer.customer.export":
             # The one query the assistant confirms: it hands out the whole directory's personal data.
-            assert op.ai.risk == "high"
+            assert op.ai_spec().risk == "high"
         else:
-            assert op.ai.risk == "normal", name
+            assert op.ai_spec().risk == "normal", name
 
 
 def test_api_keys_reach_what_the_product_exposed():
@@ -259,5 +271,29 @@ def test_api_keys_reach_what_the_product_exposed():
     } == EXPOSED
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert customer().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert customer().help.videos == {"es": "ggbb7gK64QA", "en": "Kqkvd9csYU0"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("CUSTOMER-F01", "CUSTOMER-F04", "CUSTOMER-F07"), "MyjzkT6rXfM", "Oa8rsR8S4e0"),
+    (("CUSTOMER-F02",), "8MNU36kOqm8", "mpE7xid1hUM"),
+    (("CUSTOMER-F08",), "3WazHMlQIkY", "DqXR6vfJffs"),
+    (("CUSTOMER-F09",), "rxfPiVW4Dhw", "dI9ZQCy1tlg"),
+    (("CUSTOMER-F03",), "qYp2QA6fiCQ", "PyQCw1irq2A"),
+    (("CUSTOMER-F05",), "8TW6rkC6FPQ", "LIX3G55DuEQ"),
+    (("CUSTOMER-F06",), "E98cCrGq7Cs", "TZzcrWmx-Sg"),
+    (("CUSTOMER-F23",), "05K2nQZ_7cQ", "pAh0BU7ll1s"),
+    (("CUSTOMER-F14", "CUSTOMER-F15"), "HOxJQoIca8Q", "A2ny2_gcsO8"),
+    (("CUSTOMER-F13", "CUSTOMER-F12"), "FYTeu4vFu_A", "9I9ZK8qv3LA"),
+    (("CUSTOMER-F27",), "qcRUx6geFOM", "PqBsh6c9Tws"),
+    (("CUSTOMER-F28",), "j99LxL3KfoA", "NaUVuAl9Obw"),
+    (("CUSTOMER-F29",), "yptV7z91fyM", "UoSCsyIBwto"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("customer", language) == help_videos.by_task(TASK_VIDEOS, language)

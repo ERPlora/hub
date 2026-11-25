@@ -1,16 +1,18 @@
 """The schedule app declares its module metadata, its menu entries, its permissions, what each role gets,
 the assistant's contract of every operation (``ai`` and described input fields) and its hook of the Home."""
 
-
+import pytest
 from django.apps import apps
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.schedule import events
 from apps.schedule import queries, services  # noqa: F401  (importing them registers the operations)
 from base import home
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
@@ -86,7 +88,7 @@ def test_schedule_has_the_store_metadata_and_belongs_to_both_verticals():
 
 
 def test_permissions():
-    assert schedule().permissions == PERMISSIONS
+    assert list(schedule().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -224,11 +226,10 @@ def test_the_homes_step_is_confirm_your_opening_hours_done_once_the_week_is_conf
         False,
     )
     assert "hours_confirmed" in registry[step.operation].output.model_fields
-    assert home.level_of(f"schedule.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"schedule.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
-def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
-    # The default week it names is the one migration 0002 plants: Monday to Friday, 09:00–18:00.
+def test_the_step_says_what_it_asks_in_the_language_of_whoever_reads_it():
     (step,) = schedule().setup
     with translation.override("en"):
         english = (str(step.title), str(step.description))
@@ -236,14 +237,13 @@ def test_the_step_says_the_old_words_in_the_language_of_whoever_reads_it():
         spanish = (str(step.title), str(step.description))
     assert english == (
         "Confirm your opening hours",
-        "We set up a default week for you (Monday to Friday, 09:00–18:00). If it matches your business, confirm it "
-        "in one tap; if not, edit the days that differ — bookings outside your opening hours are refused.",
+        "Check that the week's hours are your business's: if they are, confirm them in one tap; if not, edit the days "
+        "that differ — bookings outside your opening hours are refused.",
     )
     assert spanish == (
         "Confirma tu horario",
-        "Hemos puesto un horario por defecto por ti (de lunes a viernes, de 09:00 a 18:00). Si coincide con el de tu "
-        "negocio, confírmalo de un toque; si no, edita los días que cambien: las reservas fuera de tu horario se "
-        "rechazan.",
+        "Revisa que el horario de la semana es el de tu negocio: si lo es, confírmalo de un toque; si no, edita los "
+        "días que cambien: las reservas fuera de tu horario se rechazan.",
     )
 
 
@@ -266,5 +266,19 @@ def test_schedules_brings_no_panels_and_no_bell_rows_to_the_home():
     assert (schedule().widgets, schedule().bell) == ([], [])
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert schedule().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert schedule().help.videos == {"es": "50id_wAk79k", "en": "JXIPtMHdgpk"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("SCHEDULE-F02",), "v58AKat9mNQ", "U78Ugos-G1A"),
+    (("SCHEDULE-F04", "SCHEDULE-F06", "SCHEDULE-F13"), "CPWUbFbBxA8", "Orajt5aK6rU"),
+    (("SCHEDULE-F05",), "-ULk0OHUpfk", "RxKp9XMuNQM"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("schedule", language) == help_videos.by_task(TASK_VIDEOS, language)

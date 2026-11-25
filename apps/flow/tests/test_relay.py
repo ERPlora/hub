@@ -28,8 +28,8 @@ from apps.flow import http
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
 from base import catalog, hub_visits, relay, scheduler, worker
-from base.catalog import RegisterResult
-from base.models import EventDelivery
+from base.catalog.register_apps import RegisterResult
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
@@ -65,7 +65,7 @@ def tick(now: dt.datetime | None = None) -> None:
 def worker_loop(monkeypatch):
     """The worker without the SaaS (``register_apps``), as a fresh process (no business served yet, A first), in a pass
     that serves every business however slow the machine."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: REGISTERED)
     monkeypatch.setattr(hub_visits, "HUB_PASS_SECONDS", 3600)
     return tick
 

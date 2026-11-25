@@ -13,18 +13,24 @@ beside it, by its name (hub#1250) or by its id (hub#1278).
 """
 
 import dataclasses
-import json
 
 import pytest
 from live.operations import AI, registry
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
-from apps.combo.schemas import A_CHOICE, A_COURSE, A_MENU
+from apps.combo.schemas.fields import A_CHOICE, A_COURSE, A_MENU
 from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo, make_group, make_option, make_product
 from apps.combo.tests.test_apps import CHECKED_BY_THE_MENU
 from apps.combo.tests.test_assistant_card_records import fields_of, words
 from base.schemas.assistant import names
-from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_by_id, unless_of, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import (
+    no_card_but_the_model_hears,
+    read_as,
+    turn_as,
+    unless_by_id,
+    unless_of,
+    yes_to_its_card,
+)
 from base.tests.test_services_assistant import call
 
 pytestmark = HUB_DB
@@ -38,6 +44,7 @@ def by_its_name(said: str, combo: Combo) -> dict[str, dict]:
     takes the photo picked in the menu's form): no card ever shows it."""
     return {
         "combo.combo.delete": {"combo": said},
+        "combo.combo.set_active": {"combo": said, "is_active": False},
         "combo.combo.set_image": {"combo": said, "image": ""},
         "combo.combo.update": {"combo": said, "price": 1190},
         "combo.group.reorder": {"combo": said, "group_ids": [str(g.id) for g in combo.groups.order_by("-sort_order")]},
@@ -71,13 +78,6 @@ def assistant_writes() -> list:
 def id_mark(op) -> dict | None:
     """How the assistant's card names the record ``op``'s ``id`` says: as a menu, a course or a choice."""
     return getattr(op.input.model_fields.get("id"), "json_schema_extra", None)
-
-
-def no_card_but_the_model_hears(plan: dict, code: str) -> None:
-    """No card that would act on anything: the model hears ``code`` and asks the person which one."""
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
-    assert json.loads(plan["append"][0]["content"])["error"]["code"] == code
 
 
 def said_on(plan: dict) -> list[tuple[str, object]]:
@@ -374,24 +374,36 @@ def test_a_choice_is_read_by_its_product_with_its_menu_and_its_course_and_a_prod
 
 
 #: The writes of Menus that take their menu, or their course, by its name and have no read whose input fits theirs to
-#: check it with (``base.E012``: adding or ordering courses and choices).
+#: check it with (``base.E012``: adding a course and ordering choices).
 UNCHECKED = {
     "combo.group.create": lambda combo: {"combo": "vegano", "name": "Bebidas"},
-    "combo.option.create": lambda combo: {"combo": "vegano", "group": "postres", "product": "flan"},
-    "combo.option.bulk_create": lambda combo: {
-        "combo": "vegano", "group": "postres", "product_ids": [str(make_product("Natillas").id)],
-    },
     "combo.option.reorder": lambda combo: {
         "combo": "vegano", "group": "postres",
         "option_ids": [str(option.id) for option in ChoiceOption.objects.filter(group__combo=combo)],
     },
 }
 UNCHECKED_COURSE = sorted(name for name in UNCHECKED if name != "combo.group.create")
+#: The writes that add choices to a course said by its name: they check it with its menu, and the products they offer,
+#: before their card (``combo.option.check``, ``combo.option.bulk_check``, hub#2213).
+ADDING = {
+    "combo.option.create": lambda combo: {"combo": "vegano", "group": "postres", "product": natillas().name},
+    "combo.option.bulk_create": lambda combo: {"combo": "vegano", "group": "postres", "product_ids": [str(natillas().id)]},
+}
+#: Every write that adds or orders courses and choices, with or without a check.
+ADDING_OR_ORDERING = {**UNCHECKED, **ADDING}
+IN_A_COURSE = sorted([*UNCHECKED_COURSE, *ADDING])
+
+
+def natillas():
+    """The business's «Natillas», the one product a choice added in these cases names."""
+    from apps.inventory.models import Product
+
+    return Product.objects.filter(name="Natillas").first() or make_product("Natillas")
 
 
 @pytest.mark.parametrize("write", sorted(UNCHECKED))
 def test_a_menu_two_fit_stays_on_the_card_of_a_write_that_cannot_check_it(write):
-    """Adding or ordering courses and choices: «vegano» fits two menus and the card still says «vegano», as said."""
+    """Adding a course or ordering choices: «vegano» fits two menus and the card still says «vegano», as said."""
     combo = vegan_desserts()
     vegan_desserts("Menú vegano sin gluten")
     assert fields_of(write, UNCHECKED[write](combo), "es", as_admin())["combo"]["value"] == "vegano"
@@ -405,10 +417,24 @@ def test_a_course_two_fit_stays_on_the_card_of_a_write_that_cannot_check_it(writ
     assert fields_of(write, UNCHECKED[write](combo), "es", as_admin())["group"]["value"] == "postres"
 
 
-@pytest.mark.parametrize("write", sorted(UNCHECKED))
-def test_a_write_that_cannot_check_it_says_the_menu_and_the_course_it_finds(write):
+@pytest.mark.parametrize("write", sorted(ADDING))
+def test_adding_choices_to_a_menu_two_fit_draws_no_card_and_the_model_hears_it(write):
     combo = vegan_desserts()
-    fields = fields_of(write, UNCHECKED[write](combo), "es", as_admin())
+    vegan_desserts("Menú vegano sin gluten")
+    no_card_but_the_model_hears(turn_as(as_admin(), call(write, ADDING[write](combo))), "combo.combo_ambiguous")
+
+
+@pytest.mark.parametrize("write", sorted(ADDING))
+def test_adding_choices_to_a_course_two_fit_draws_no_card_and_the_model_hears_it(write):
+    combo = vegan_desserts()
+    another("group", combo, ALSO["group"])
+    no_card_but_the_model_hears(turn_as(as_admin(), call(write, ADDING[write](combo))), "combo.group_ambiguous")
+
+
+@pytest.mark.parametrize("write", sorted(ADDING_OR_ORDERING))
+def test_a_write_that_adds_or_orders_says_the_menu_and_the_course_it_finds(write):
+    combo = vegan_desserts()
+    fields = fields_of(write, ADDING_OR_ORDERING[write](combo), "es", as_admin())
     assert fields["combo"]["value"] == "Menú vegano"
     if "group" in fields:
         assert fields["group"]["value"] == FOUND["group"]
@@ -421,7 +447,7 @@ def test_the_card_says_the_course_or_the_choice_it_finds(write):
     assert fields_of(write, course_or_choice(write, "Menú vegano"), "es", as_admin())[datum]["value"] == FOUND[datum]
 
 
-@pytest.mark.parametrize("write", sorted(UNCHECKED))
+@pytest.mark.parametrize("write", sorted(ADDING_OR_ORDERING))
 def test_the_yes_to_adding_or_ordering_touches_only_the_menu_its_card_showed_although_another_fits_the_name_better(
     write,
 ):
@@ -429,7 +455,7 @@ def test_the_yes_to_adding_or_ordering_touches_only_the_menu_its_card_showed_alt
     orders nothing in either."""
     combo = vegan_desserts()
     meanwhile, seen = unchanged_after(lambda: vegan_desserts("Vegano"))
-    done = yes_to_its_card(as_admin(), write, UNCHECKED[write](combo), meanwhile=meanwhile)
+    done = yes_to_its_card(as_admin(), write, ADDING_OR_ORDERING[write](combo), meanwhile=meanwhile)
     assert done["executed"] == []
     assert everything() == seen["after"]
 
@@ -459,11 +485,11 @@ def test_the_card_says_the_product_of_inventory_it_finds_or_as_said_when_two_fit
 UNLESS = {
     **{(name, "combo"): {"id"} for name in CHECKED_BY_THE_MENU},
     ("combo.group.create", "combo"): {"combo_id"},
-    **{(name, "combo"): {"combo_id", "group_id"} for name in UNCHECKED_COURSE},
+    **{(name, "combo"): {"combo_id", "group_id"} for name in IN_A_COURSE},
     **{(name, "combo"): {"id", "combo_id"} for name in ("combo.group.delete", "combo.group.update")},
     **{(name, "combo"): {"id", "combo_id", "group_id"} for name in ("combo.option.delete", "combo.option.update")},
     **{(name, "group"): {"id"} for name in ("combo.group.delete", "combo.group.update")},
-    **{(name, "group"): {"group_id"} for name in UNCHECKED_COURSE},
+    **{(name, "group"): {"group_id"} for name in IN_A_COURSE},
     **{(name, "group"): {"id", "group_id"} for name in ("combo.option.delete", "combo.option.update")},
     ("combo.option.create", "product"): {"product_id"},
     **{(name, "product"): {"id"} for name in ("combo.option.delete", "combo.option.update")},
@@ -557,8 +583,8 @@ UNLESS_BY_ID = {
     ("combo.group.create", "combo_id"): set(),
     **{(name, "combo_id"): {"id"} for name in ("combo.group.delete", "combo.group.update")},
     **{(name, "id"): set() for name in ("combo.group.delete", "combo.group.update")},
-    **{(name, "combo_id"): {"group_id"} for name in UNCHECKED_COURSE},
-    **{(name, "group_id"): set() for name in UNCHECKED_COURSE},
+    **{(name, "combo_id"): {"group_id"} for name in IN_A_COURSE},
+    **{(name, "group_id"): set() for name in IN_A_COURSE},
     ("combo.option.create", "product_id"): set(),
     **{(name, "combo_id"): {"id", "group_id"} for name in ("combo.option.delete", "combo.option.update")},
     **{(name, "group_id"): {"id"} for name in ("combo.option.delete", "combo.option.update")},

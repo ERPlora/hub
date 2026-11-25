@@ -8,7 +8,6 @@ from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
-    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -21,6 +20,8 @@ from live.operations import INTERNAL, registry
 from apps.invoice import events as E
 from base import home
 from base.queries import app_help
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "invoice.view_invoice",
@@ -72,7 +73,7 @@ def test_invoice_is_in_the_store_and_in_both_verticals():
 
 def test_permissions():
     # The product's four, plus configuring the issuer (the business's tax identity) and the ticket's public page.
-    assert invoice().permissions == PERMISSIONS
+    assert list(invoice().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_customer_roles_with_the_hub_prefix():
@@ -126,10 +127,18 @@ def test_every_operation_is_described_for_the_assistant():
     ops = {name: op for name, op in registry.items() if name.startswith("invoice.")}
     assert set(ops) == {
         "invoice.invoice.list",
+        "invoice.invoice.export",
         "invoice.invoice.get",
         "invoice.invoice.by_source",
         "invoice.invoice.document",
+        "invoice.invoice.pdf",
         "invoice.invoice.print",
+        "invoice.email.send",
+        "invoice.email.list",
+        "invoice.email.claim",
+        "invoice.email.record",
+        "invoice.email.resume",
+        "invoice.email.forget_customer",
         "invoice.invoice.line_defaults",
         "invoice.invoice.create",
         "invoice.invoice.create_from_sale",
@@ -169,6 +178,7 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.issuer.sync",
         "invoice.invoice.issue_platform",
         "invoice.public.substitute",
+        "invoice.email.send",
     }
     # The ticket's public page's read is the page's own, never an assistant tool.
     assert ops.pop("invoice.public.ticket").ai is INTERNAL
@@ -178,6 +188,9 @@ def test_every_operation_is_described_for_the_assistant():
         )
         if op.kind == "command":
             assert op.ai.get("risk") == ("high" if name in high else "normal"), name
+        elif name in ("invoice.invoice.export", "invoice.invoice.pdf"):
+            # A file with customers' names and tax IDs, for a person to download: no automation runs it alone.
+            assert op.ai.get("risk") == "high"
         else:
             assert "risk" not in op.ai, name
 
@@ -258,7 +271,7 @@ def test_your_business_details_is_done_with_the_issuer_every_document_needs():
     )
     assert "configured" in registry[step.operation].output.model_fields
     # The ⛔ is base's (its LEGAL_STEPS, the old hub's BLOCKING_KEYS), never the module's.
-    assert home.level_of(f"invoice.{step.key}", step.required) == home.LEVEL_LEGAL
+    assert home.setup_steps.level_of(f"invoice.{step.key}", step.required) == home.setup_steps.LEVEL_LEGAL
 
 
 def test_your_invoice_numbering_is_done_once_the_business_has_its_numbering():
@@ -290,7 +303,7 @@ def test_your_invoice_numbering_is_done_once_the_business_has_its_numbering():
     )
     assert "total_series" in registry[step.operation].output.model_fields
     assert registry[step.operation].kind == "query"  # it only reads: it never opens the year's series
-    assert home.level_of(f"invoice.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"invoice.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_steps_speak_the_language_of_whoever_reads_them():
@@ -338,8 +351,24 @@ def test_the_app_brings_no_panels_nor_counters_to_the_home():
     assert (list(invoice().widgets), list(invoice().bell)) == ([], [])
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert invoice().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert invoice().help.videos == {"es": "vPFvdGPA6uw", "en": "QeiQzDdtJng"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("INVOICE-F03",), "nORuR2xG4qs", "TvR3mQZTxlo"),
+    (("INVOICE-F05",), "KtnQOADy0w4", "5wsz2czzqbs"),
+    (("INVOICE-F17", "INVOICE-F18"), "Yc8UiKuP1s8", "73SPPT0_dSY"),
+    (("INVOICE-F08",), "bUVP4k5SZs8", "b8EAicT5vjo"),
+    (("INVOICE-F21",), "3jb2tjLO8w8", "ASShGRv53hc"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("invoice", language) == help_videos.by_task(TASK_VIDEOS, language)
 
 
 @pytest.mark.parametrize("language", ["es", "en"])

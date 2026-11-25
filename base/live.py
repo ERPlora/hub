@@ -39,8 +39,8 @@ def events_of(hook: str) -> list[str]:
 
 live("base.setup.status", on=sorted({*events_of("setup"), *DATA_EVENTS}))
 live("base.widget.list", on=sorted({*events_of("widgets"), *DATA_EVENTS}))
-# The failed events of System change the bell's row of them too.
-live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS, *FAILED_EVENTS}))
+# The failed events of System change the bell's row of them too, and the roles of the business the one to review them.
+live("base.bell.counters", on=sorted({*events_of("bell"), *DATA_EVENTS, *FAILED_EVENTS, *events.ROLE_EVENTS}))
 live("base.notice.list", on=events_of("notices"))
 
 # ── Apps ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -97,17 +97,27 @@ live("base.profile.get", on=sorted({events.PROFILE_UPDATED, events.PIN_SET, even
 
 # ── People and permissions ─────────────────────────────────────────────────────────────────────────────────────────
 # Employees › Personal and a person's page follow the ways in (a PIN chosen or taken away, a badge), the names of «My
-# profile» and the photo (erplora.com's people and roles, and the plan's places); Roles, the photo.
+# profile» and the photo (erplora.com's people and roles, and the plan's places).
 _PEOPLE = sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS})
 live("base.person.list", on=_PEOPLE)
 live("base.person.detail", on=_PEOPLE)
-live("base.role.list", on=[HUB_STATE_APPLIED])
+# The roles and what each allows: the photo brings the basic ones and their people, the business makes its own, and an
+# app turned on or off adds or takes away its panel and what a role of the business has left to review.
+_ROLES = sorted({HUB_STATE_APPLIED, *APP_EVENTS, *events.ROLE_EVENTS})
+live("base.role.list", on=_ROLES)
+live("base.role.detail", on=_ROLES)
 # «No access» names who can give it: the photo brings the people and their roles, «My profile» their names.
 live("base.access.grantors", on=sorted({HUB_STATE_APPLIED, events.PROFILE_UPDATED}))
+# A device's own access: erplora.com's photo brings the roles, and the device reads its session again when it changes.
+live("base.session.access", on=[HUB_STATE_APPLIED])
 # The keys follow their own making, rotating and revoking; the apps a key may reach, the photo (a paid app comes or goes).
 live("base.api_key.list", on=sorted({HUB_STATE_APPLIED, *events.API_KEY_EVENTS, *APP_EVENTS}))
-# Approvals follow each approval given and each pass spent; who may approve, the ways in and the photo (the roles).
+# Approvals follow each approval given, each pass spent and each action done without needing one; who may approve, the
+# ways in, the photo and the business's own roles (the roles).
 live("base.approval.list", on=sorted(events.APPROVAL_EVENTS))
 # The API's documentation: shown or hidden. The document itself is asked once (far bigger than a live result may be).
 live("base.api_doc.settings", on=[events.API_DOC_SETTINGS_CHANGED])
-live("base.approval.approvers", on=sorted({events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS}))
+# Support access: turned on or off, and each entry of support.
+live("base.support_access.get", on=sorted({events.SUPPORT_ACCESS_CHANGED, events.SUPPORT_ACCESS_ENTERED}))
+_APPROVERS = {events.PIN_SET, events.PROFILE_UPDATED, HUB_STATE_APPLIED, *events.PERSON_EVENTS, *events.ROLE_EVENTS}
+live("base.approval.approvers", on=sorted(_APPROVERS))

@@ -1,9 +1,10 @@
 // flow: BASE-F13 (base/WORKBOOK.md) · HUBS-F26 and HUBS-F27 of the SaaS (hubs/WORKBOOK.md)
-// The owner changes an employee's role, or removes them from the business, in erplora.com's panel. The SaaS ends that
-// person's sessions in the Hub (`POST /internal/sessions/revoke`, after its COMMIT) and pushes the photo with the
-// business's members. The employee's open tab leaves by itself, never navigated by the test: its live stream hears the
-// end of its session and the SDK reloads the page (`@erplora/ui`, `host-closed.ts`), which goes through the SaaS:
-// back with the new role after a change (a manager's «New item»), «You don't have access to this hub» after a removal.
+// The owner changes an employee's role, or removes them from the business, in erplora.com's panel, and the SaaS pushes
+// the photo with the business's members. A new role reaches the employee's open tab in place, never navigated by the
+// test: its session stays and the screen gains a manager's «New item» without a reload. A removal also ends that
+// person's sessions in the Hub (`POST /internal/sessions/revoke`, after its COMMIT): the open tab's live stream hears
+// the end of its session and the SDK reloads the page (`@erplora/ui`, `host-closed.ts`), which goes through the SaaS to
+// «You don't have access to this hub».
 // The real Hub and the real SaaS of this run's stack (the SaaS's `HUB_INTERNAL_URL` points here) and fresh accounts
 // signed up on the SaaS's screens; the business is created through the SaaS's API as the panel creates it, so the SaaS
 // registers it in this Hub with the same id. The SaaS's changes are made on its panel, as the owner makes them.
@@ -122,7 +123,7 @@ test.afterAll(async () => {
   await employee?.context.close();
 });
 
-test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the business; back in, they work with it @smoke", async () => {
+test("BASE-F13 (HUBS-F26): a new role reaches the employee's open screen without ending their session @smoke", async () => {
   await login(tab, origin, '/demo/items', employee.credentials);
   await listReady(tab);
   await atEverySize(tab, 'BASE-F13-employee', async () => {
@@ -132,6 +133,7 @@ test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the busines
 
   const before = await hubSession(employee, origin);
   const documents = documentsLoaded(tab);
+  await tab.evaluate(() => Object.assign(window, { e2eStillHere: true }));
   const panel = await team(owner, business);
   await rowAction(panel, 'members', memberId, 'change_role');
   const modal = panel.getByTestId('role-modal');
@@ -141,13 +143,14 @@ test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the busines
   await panel.getByTestId('role-modal-submit').click();
   await expect(modal).toBeHidden();
 
-  // The open tab leaves by itself (the test never navigates it): its stream hears the end of its session, the page
-  // reloads, goes through the SaaS (still signed in there) and comes back with the new role: a manager adds items.
+  // The open tab follows the new role in place (the test never navigates it): a manager adds items, on the same page
+  // and with the same session, without going through the SaaS again.
   await expect(shown(tab).locator('[data-testid=demo-items-add]')).toBeVisible({ timeout: SAAS_STEP });
   expect(tab.url()).toBe(`${origin}/demo/items`);
-  expect(documents.some((url) => url.startsWith(`${SAAS}/hub-login/`)), documents.join(' ')).toBe(true);
-  expect(sessionAlive(before)).toBe(false);
-  expect(await hubSession(employee, origin)).not.toBe(before);
+  expect(await tab.evaluate(() => (window as { e2eStillHere?: boolean }).e2eStillHere)).toBe(true);
+  expect(documents, documents.join(' ')).toEqual([]);
+  expect(sessionAlive(before)).toBe(true);
+  expect(await hubSession(employee, origin)).toBe(before);
   expect(
     psql(
       `SELECT state->'members' @> jsonb_build_array(jsonb_build_object('role', 'hub_manager')) FROM base_hub WHERE id = '${business.id}'`,
@@ -161,10 +164,7 @@ test("BASE-F13 (HUBS-F26): a new role ends the employee's session in the busines
 });
 
 test('BASE-F13 (HUBS-F27): a person removed from the business loses their session there and cannot come back', async () => {
-  // Another tab: the one above reloaded a moment ago, and a tab reloads for this at most once every 30 s (the SDK's
-  // guard against a reload loop, `RELOAD_GUARD_MS`, kept in the tab's own storage).
-  tab = await employee.context.newPage();
-  await login(tab, origin, '/demo/items', employee.credentials);
+  // The same tab, still open on Demo with the role above: it never reloaded.
   await listReady(tab);
 
   const before = await hubSession(employee, origin);

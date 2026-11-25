@@ -21,6 +21,7 @@ from apps.inventory.services.writes import _record_link
     ai={
         "description": "Put a product in a category so that the till groups it there.",
         "risk": "normal",
+        "check": "inventory.product_category.check",
         "asks": {
             "en": (
                 "put the coffee in the Breakfasts category",
@@ -55,6 +56,7 @@ def add_product_category(ctx: OperationContext, data: ProductCategoryIn) -> dict
     ai={
         "description": "Take a product out of a category.",
         "risk": "normal",
+        "check": "inventory.product_category.check",
         "asks": {
             "en": (
                 "take the coffee out of the drinks category",

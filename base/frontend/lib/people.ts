@@ -1,7 +1,7 @@
 // Employees' tabs go in the address hash, so Back and a saved link open the same one. API keys and Approvals are only
 // for whoever runs the business: for anyone else the tab does not exist and its hash opens Personal, never a blank
 // page. Also how each person gets in, and what a badge looks like before it is sent.
-import type { HubRole, PersonWays } from '../operations/people';
+import type { HubRole, HubRoleInfo, PersonWays } from '../operations/people';
 
 export type EmployeesTab = 'personal' | 'roles' | 'apikeys' | 'approvals';
 
@@ -38,6 +38,11 @@ export function accessKeys(ways: PersonWays): string[] {
 /** The catalogue key of one of erplora.com's roles. */
 export function roleKey(role: HubRole): string {
   return `base.people.roles.${role}`;
+}
+
+/** A role by its name: one of erplora.com's in the screen's language, the business's own as the business wrote it. */
+export function roleName(role: Pick<HubRoleInfo, 'key' | 'label' | 'origin'>, t: (key: string) => string): string {
+  return role.origin === 'own' ? role.label : t(roleKey(role.key as HubRole));
 }
 
 const BADGE = /^[A-Za-z0-9_-]{4,64}$/;

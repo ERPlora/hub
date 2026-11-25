@@ -1,7 +1,7 @@
 """Turning a business's modules on and off, and the plan's limit on them.
 
 The rules, without the database: ``base.services`` (``base.app.enable``, ``base.app.disable``) and ``base.queries``
-(``base.app.list``, ``base.session.me``) read and write the rows, ``base.models.AppActivation``.
+(``base.app.list``, ``base.session.me``) read and write the rows, ``base.models.activation.AppActivation``.
 
 - A module (``kind = "app"``) is ``on`` or ``off`` in a hub. In a hub with its own database its tables are made the
   first time it is turned on: meanwhile it is ``creating`` and, if making them failed, ``failed`` (tried
@@ -21,7 +21,7 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
 - **Every module on** (:func:`every_on`), its roots chosen: what a hub without rows had before hubs started with every
   module off. The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
   and the developer's local hubs ``a`` and ``b`` are seeded with it. The platform always has it, rows or not: a scope
-  that is no business's and ERPlora's own hub (``PLATFORM_HUB_SLUG``, Invoicing and VeriFactu always active;
+  that is no business's and ERPlora's own hub (``base.platform_hub``, Invoicing and VeriFactu always active;
   :func:`is_platform`). The worker runs each hub's scheduled tasks on that hub's own scope (``base.scheduler``), so a
   business's apps are its own there too (hub#1053).
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
@@ -51,13 +51,13 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import Any
 
-from django.conf import settings
 from django.core.cache import cache
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 from live.context import Scope
 from live.meta import module_configs
 
+from base import platform_hub
 from base.business import country_name, country_or_market
 from base.tenancy.context import HUB_SCOPE_KIND
 
@@ -185,9 +185,9 @@ def baseline(graph: Graph) -> dict[str, Activation]:
 
 def born_on(country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
     """The modules a business of ``country`` is born with on: those it must have on there, as each says in its
-    ``mandatory`` (``base.home.mandatory_in``; without a country, Spain), that say the platform turns them on by itself
+    ``mandatory`` (``base.home.mandatory_apps.mandatory_in``; without a country, Spain), that say the platform turns them on by itself
     (``platform_turns_on``: Taxes), never one that binds the business to a tax authority (VeriFactu)."""
-    from base.home import MANDATORY_ATTRIBUTE, mandatory_in  # base.home reads the modules' declarations
+    from base.home.mandatory_apps import MANDATORY_ATTRIBUTE, mandatory_in  # base.home reads the modules' declarations
 
     return frozenset(
         config.label
@@ -302,10 +302,10 @@ def plan_limit(photo: Any) -> int | None:
 
 def mandatory_on(current: Mapping[str, Activation], country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
     """The modules on in ``current`` that a business of ``country`` must have on (hub#997), as each says in its
-    ``mandatory`` (``base.home.mandatory_in``; without a country, Spain): they never go off there, by themselves
+    ``mandatory`` (``base.home.mandatory_apps.mandatory_in``; without a country, Spain): they never go off there, by themselves
     (:func:`refusals`) nor along with another (:func:`disabling`). One being set up, or that could not be, binds
     nothing yet: it can still be given up on."""
-    from base.home import mandatory_in  # base.home reads the modules' declarations; this module is imported earlier
+    from base.home.mandatory_apps import mandatory_in  # base.home reads the modules' declarations; this module is imported earlier
 
     return frozenset(
         config.label
@@ -336,13 +336,19 @@ def refusals(  # noqa: PLR0913
         with translation.override(language) if language else nullcontext():
             reason = ask(ctx) if callable(ask) else None
             if not (isinstance(reason, str) and reason.strip()) and label in kept:
-                reason = MANDATORY_OFF % {
-                    "app": by_label[label].verbose_name,
-                    "country": country_name(country_or_market(country), translation.get_language()),
-                }
+                reason = mandatory_off(by_label[label], country)
         if isinstance(reason, str) and reason.strip():
             said[label] = reason.strip()
     return said
+
+
+def mandatory_off(config: Any, country: str) -> str:
+    """Base's reason (:data:`MANDATORY_OFF`) why ``config``'s app, which a business of ``country`` must have on, never
+    goes off there, in the language at work."""
+    return MANDATORY_OFF % {
+        "app": config.verbose_name,
+        "country": country_name(country_or_market(country), translation.get_language()),
+    }
 
 
 def veto(
@@ -355,7 +361,7 @@ def veto(
 def is_platform(scope: Scope) -> bool:
     """A scope that is no business choosing its apps: no business's at all, or ERPlora's own hub. Every module is on
     in it."""
-    return scope.kind != HUB_SCOPE_KIND or scope.key == settings.PLATFORM_HUB_SLUG
+    return scope.kind != HUB_SCOPE_KIND or platform_hub.is_platform_slug(scope.key)
 
 
 def states_of(scope: Scope) -> dict[str, Activation]:
@@ -393,7 +399,7 @@ def has_tables(hub: Any, label: str) -> bool:
     """Whether ``label``'s tables are in ``hub``'s own database, as far as control knows: only a module may lack them.
 
     What the row in hand lists has them, for free: this runs on every query. A row never confirmed (:data:`CONFIRMED_BY`:
-    ``migrator.is_behind`` says so too, and the next ``migrate_hubs`` confirms it) says nothing, and nothing is refused
+    ``migrator.hubs_pass.is_behind`` says so too, and the next ``migrate_hubs`` confirms it) says nothing, and nothing is refused
     on it. Only what a confirmed row does not list goes on: it may be a row read before the tables were made, so it asks
     what control says now, through the cache."""
     recorded = hub.schema_apps or ()
@@ -464,7 +470,7 @@ def changing(host: str) -> Iterator[None]:
 
 def forget(host: str) -> None:
     """Drop what is kept of ``host``'s apps from the cache: after the COMMIT of a change or the migrator's run
-    (``migrator.ensure_schema``), the next read sees it, in every process. A cache that does not answer is logged; what
+    (``migrator.schema.ensure_schema``), the next read sees it, in every process. A cache that does not answer is logged; what
     it kept ends with its timeout."""
     try:
         for key in (OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host, CREATED_APPS_CACHE + host):

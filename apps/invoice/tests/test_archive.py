@@ -13,9 +13,10 @@ from django.utils import translation
 from live.context import system_context
 from live.operations import UnknownOperation
 
-from apps.invoice import services
+from apps.invoice.services import issuing
 from apps.invoice.models import Invoice
-from apps.invoice.queries import fiscal_archive, render_document
+from apps.invoice.queries import fiscal_archive
+from apps.invoice.queries.documents import render_document
 from apps.invoice.tests.conftest import A, HUB_DB
 from apps.invoice.tests.test_integration_verifactu import manual
 from apps.verifactu import chain
@@ -81,7 +82,7 @@ def test_without_verifactu_an_invoice_is_kept_without_a_qr(issuer, printer, monk
         raise UnknownOperation(name)
 
     with monkeypatch.context() as without:
-        without.setattr(services, "get_operation", absent)
+        without.setattr(issuing, "get_operation", absent)
         invoice = manual()
     assert not Record.objects.exists()
 

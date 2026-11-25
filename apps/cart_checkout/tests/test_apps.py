@@ -112,7 +112,7 @@ def test_it_is_in_the_store_but_in_no_template():
 
 
 def test_permissions_are_the_old_module_ones():
-    assert cart_checkout().permissions == PERMISSIONS
+    assert list(cart_checkout().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -164,7 +164,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
     for name, op in ops.items():
         assert op.kind == ("command" if name in COMMANDS else "query"), name
         assert op.permission == PERMISSION_OF[name], name
-        assert set(op.ai) == {"description", "asks", "risk"}, name
+        assert set(op.ai) == {"description", "asks", "risk", *(("summary",) if name == "cart_checkout.item.add" else ())}, name
         assert op.ai["description"], name
         assert op.ai["risk"] == ("high" if name in HIGH_RISK else "normal"), name
         assert op.expose_api is True, name

@@ -15,7 +15,7 @@ from live.operations import AI, registry
 
 from apps.website.tests.conftest import HUB_DB
 from base.models import Membership
-from base.tests.test_assistant_asks import comparable, place_of_no_ask
+from base.tests.test_assistant_asks import assert_offered_or_found, comparable
 
 #: Website's assistant tools: what the page is, the categories its catalog can show, and the draft's save, publication
 #: and taking offline.
@@ -93,7 +93,11 @@ def test_the_reported_requests_are_the_owners_probes_of_layer_2():
     ]
 
 
+#: The task the model searches for when a request brings its tool past the places of a turn.
+SEARCHED = {"website.site.save": "cambiar el título de la web"}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_website_request_is_offered_its_tool_without_being_its_asks(catalog_of, name, phrase):
-    assert place_of_no_ask(catalog_of(Membership.Role.OWNER, "es"), name, phrase) is not None
+    assert_offered_or_found(catalog_of(Membership.Role.OWNER, "es"), name, phrase, SEARCHED.get(name))

@@ -21,7 +21,7 @@ from live.operations import AI, registry
 from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import TOP, assert_offered_or_found, assert_offered_with_room, comparable
 from base.tests.test_assistant_asks import offered_place, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 
@@ -137,19 +137,26 @@ def test_the_reported_requests_are_the_probes_of_layer_2():
     ]
 
 
+#: The task the model searches for when a request brings its tool past the places of a turn.
+SEARCHED = {
+    "modifier.link.get": "ver una asignación de modificador",
+    "modifier.group.get": "ver un grupo de modificadores",
+}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize(("role", "name", "phrase"), REPORTED, ids=[f"{role}-{name}" for role, name, _ in REPORTED])
 def test_the_reported_modifier_request_offers_its_existing_operation(catalog_of, role, name, phrase):
-    assert_offered_with_room(catalog_of(role, "es"), name, phrase)
+    assert_offered_or_found(catalog_of(role, "es"), name, phrase, SEARCHED.get(name))
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_modifiers_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's and the employee's phrases of layer 2, the ones the model answered right too: a tool of Modifiers
-    that a new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA
-    sees it. A write an employee asks for is refused by not being theirs at all (``NOT_THE_EMPLOYEES``), never by
-    ranking."""
+    that a new ask elsewhere pushes out of the ones a turn offers, or past them out of what the search of its task finds
+    (``SEARCHED``), fails here before the real-model QA sees it. A write an employee asks for is refused by not being
+    theirs at all (``NOT_THE_EMPLOYEES``), never by ranking."""
     assert (probe["app"], probe["language"]) == ("modifier", "es")
     role = ROLE_OF_PROBE[probe["role"]]
     tools = catalog_of(role, probe["language"])
@@ -157,7 +164,7 @@ def test_every_probe_of_modifiers_offers_its_tool_without_being_one_of_its_asks(
     if role == EMPLOYEE and name in NOT_THE_EMPLOYEES:
         assert name not in tools
         return
-    assert_offered_with_room(tools, name, phrase)
+    assert_offered_or_found(tools, name, phrase, SEARCHED.get(name))
 
 
 def test_the_probes_of_modifiers_are_read():

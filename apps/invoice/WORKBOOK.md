@@ -27,11 +27,13 @@ peluquería: no hay nada propio de un vertical.
 
 ### Quién la usa y qué hace cada uno
 
-- El **empleado** consulta sus facturas (las que emitió y las de sus ventas), las imprime, emite una
-  factura a mano, pasa uno de sus tiques a factura completa y marca pagada una de sus facturas.
-- El **responsable**, además, ve las facturas de todos, rectifica y lleva las series de numeración.
+- El **empleado** consulta sus facturas (las que emitió y las de sus ventas), las imprime, las descarga en PDF, las envía
+  por correo, emite una factura a mano, pasa uno de sus tiques a factura completa y marca pagada una de sus facturas.
+- El **responsable**, además, ve las facturas de todos, las descarga en Excel, rectifica y lleva las series de
+  numeración.
 - El **propietario** y el **administrador**, además, configuran el **emisor** (la identidad fiscal del
   negocio que sale en cada factura).
+- La **gestoría** ve las facturas de todos y las descarga, en Excel o una a una en PDF, sin emitir ni cambiar nada.
 - El **sistema**, sin nadie delante, factura cada cobro y rectifica cada devolución y cada anulación.
 
 No cobra ni devuelve dinero (eso es Ventas), no envía nada a la AEAT ni calcula la huella (eso es
@@ -72,7 +74,8 @@ Aquí manda la especificación oficial sobre el mercado:
   negocio». El emisor se escribe aquí, a mano: no llega de la cuenta de
   ERPlora.
 - **«Hoy» es el día del negocio**, en su zona horaria (la de «Ajustes»), no el de Madrid: decide la fecha de
-  cada documento y, con ella, el año de su serie. Un cobro a las 00:30 del 1 de enero numera en la serie del
+  cada documento y, con ella, el año de su serie; solo una factura hecha a mano puede llevar la de un día anterior
+  (INVOICE-F03). Un cobro a las 00:30 del 1 de enero numera en la serie del
   año nuevo, y uno a las 23:30 del 31 de diciembre en Canarias, en la del año que acaba, aunque en Madrid ya
   sea 1 de enero. Una devolución o una anulación llevan como fecha de la operación el día del negocio en que
   se hicieron.
@@ -97,8 +100,8 @@ Configuración inicial, paso a paso:
 
 ### Facturas
 Todas las facturas del negocio: los tiques de cada cobro, las facturas completas y las rectificativas, lo último
-emitido arriba. Búscalas por número, cliente o NIF, fíltralas por estado, tipo, serie, fecha o total, y ábrelas para
-verlas, imprimirlas o guardarlas en PDF. Desde cada una la marcas pagada, la rectificas o pasas un tique a factura
+emitido arriba. Búscalas por número, cliente o NIF, fíltralas por estado (también las vencidas sin cobrar), tipo, serie, fecha o total, y ábrelas para
+verlas, imprimirlas o descargarlas en PDF. Desde cada una la marcas pagada, la rectificas o pasas un tique a factura
 completa; con **+** emites una factura a mano. Un empleado ve solo las suyas: las que emitió, las de sus ventas
 (las que cobró y las que se le atribuyeron) y lo que rectifica o sustituye a una de ellas; el responsable, el
 propietario y el administrador ven las de todos.
@@ -106,13 +109,16 @@ propietario y el administrador ven las de todos.
 #### Detalle
 Menú **Facturación → Facturas**. Tabla paginada de 50 en 50 (vista de tabla o de tarjetas; en el móvil,
 tarjetas con el número como título) con «Número», «Cliente», «Total», «Estado», «Fecha» y «Tipo»; cada
-columna se ordena. Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»,
+columna se ordena. Una emitida que no se ha cobrado y cuyo vencimiento ya pasó dice «Vencida» en lugar de «Emitida».
+«Descargar en Excel», para quien ve las facturas de todos, guarda la lista tal como está filtrada (INVOICE-F24).
+Buscador «Buscar facturas…» (número, nombre o NIF del cliente) y filtros de «Estado»
+(«Emitida», que son las no cobradas, vencidas o no; «Vencida», «Pagada» y «Cancelada»),
 «Tipo», «Serie», «Origen», «Fecha» (entre dos días) y «Total» (entre dos importes, en la moneda del negocio). Sin ordenar, lo
 último emitido sale arriba. Mientras el emisor no está configurado, lo dice una sola vez el aviso «Todavía no puedes
 facturar» de la campana («No se podrá emitir ningún tique ni factura hasta que configures esto: Los datos de tu
 negocio.» y «Configurar los datos del negocio», que abre **Emisor**; a quien no puede cambiar el emisor, sin botón,
 «Esto lo tiene que configurar un administrador.»), sin otro aviso igual en la pantalla. Por fila: «Ver» (también al pulsar la fila), «Marcar pagada» (solo en las
-que están «Emitida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
+que están «Emitida» o «Vencida» y no son rectificativas) y «Rectificar» (solo en las que no son rectificativas, no
 están canceladas ni sustituidas). El botón **+** abre «Nueva factura manual» (INVOICE-F03); sin permiso
 de emitir no aparece, ni tampoco «Marcar pagada». La lista se pone al día sola cuando se emite, se
 rectifica o se paga una factura en cualquier dispositivo.
@@ -121,18 +127,21 @@ una acción de fila sale como aviso encima de la tabla.
 
 #### Ficha de factura
 Se abre desde una fila de **Facturas** (`/invoice/invoices/<id>`). Arriba, «Factura {número}» con la
-etiqueta de estado y los botones «Imprimir / PDF» y «← Volver». Si es una factura completa o una
+etiqueta de estado y los botones «Imprimir / PDF», «Descargar PDF», «Enviar por correo» (para quien emite facturas) y
+«← Volver». Si el último correo no salió, el aviso «La factura no se ha enviado por correo» y por qué. Si es una factura completa o una
 rectificativa de una factura completa sin NIF del cliente, el aviso «Esta factura no tiene el NIF del
 cliente: la impresora de tiques no puede sacarla como factura completa.». Debajo, «Tipo», «Serie»,
-«Fecha de emisión», «Fecha de operación» (si es otra), «Cliente», «NIF cliente», «Dirección», «Emisor»,
+«Fecha de emisión», «Fecha de operación» (si es otra), «Vencimiento» (si lo tiene), «Cliente», «NIF cliente», «Dirección», «Emisor»,
 «Origen» («Venta del TPV», «Alta manual», «Sustituye a una factura simplificada», «Rectificación»,
 «Devolución de la venta», «Anulación de la venta»), «Venta» (su número), «Rectifica a» (el número de la
 original, que la abre), «Sustituye a» / «Sustituida por» (enlaces), «Rectificativas» (las que la
-corrigen), «Pagada el» y «Notas». Las líneas: «#», «Descripción», «Cant.», «Precio», el tipo con el
+corrigen), «Pagada el» y «Notas»; debajo, «Correo»: a quién y cuándo se ha enviado cada vez («Enviada a … el …»,
+«Enviando a …» o «No enviada a …»). Las líneas: «#», «Descripción», «Cant.», «Precio», el tipo con el
 nombre del impuesto que declara la factura («IVA %», «IGIC %» o «IPSI %»; «Imp. %» si mezcla impuestos),
 «Base», «Impuesto», «Total» (en el móvil, cada línea en bloque); sin líneas, «Sin líneas de detalle.». El
 desglose por tipo («IVA 21 %», «Recargo de equivalencia 5,2 %», «Exento (E1)», «No sujeto»,
-«Inversión del sujeto pasivo») con su base y su cuota, y los totales «Base», «Impuestos» y «Total». Los
+«Inversión del sujeto pasivo») con su base y su cuota, y los totales «Base», «Impuestos» y «Total»; si la factura lleva
+retención, detrás, «Retención IRPF 15 %» (en negativo) y «Total a pagar». Los
 botones «Marcar pagada», «Rectificar» y «Factura completa» (solo en un tique que no se ha sustituido)
 con la misma regla que en la fila. Un rechazo sale justo encima de esos botones. Con **VeriFactu** activa y
 permiso para ver sus registros, debajo, la tarjeta «Justificante VeriFactu»: el estado del registro en la AEAT
@@ -140,6 +149,12 @@ permiso para ver sus registros, debajo, la tarjeta «Justificante VeriFactu»: e
 pruebas)» si es del entorno de pruebas), el «CSV» cuando la AEAT ya contestó, el QR y «Validar en la Agencia
 Tributaria ↗». Sin VeriFactu, sin registro todavía o sin permiso, no sale la tarjeta.
 Error al abrir: «Factura no encontrada» o el mensaje del fallo, con «← Volver».
+
+#### Enviar por correo
+Ventana que abre «Enviar por correo» en la ficha. Lleva el campo «Correo del cliente», con el correo de la ficha del
+cliente ya puesto (vacío si no lo tiene o si la factura no es de ninguna ficha), que se puede cambiar, la nota «La
+factura … va adjunta en PDF. Las respuestas llegan al correo del propietario del negocio.», «Enviar» (gris mientras no hay
+correo) y «Cancelar». Al enviar se cierra y un aviso dice «Enviando la factura a …».
 
 #### Rectificar
 Ventana que abre «Rectificar», desde la fila o desde la ficha. Título «Rectificar {número}», la nota
@@ -172,12 +187,15 @@ del servidor, «No se pudo cargar el tique. Inténtalo de nuevo.».
 
 #### Nueva factura manual
 Ventana con la «Serie» (las activas del año que emiten F1 o F2; de entrada, la predeterminada o FACT),
-el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
+la «Fecha» (hoy de entrada; el calendario no deja elegir un día posterior), el «Vencimiento» (vacío de entrada; no
+antes que la fecha), el buscador de clientes de Clientes, «Cliente», «NIF cliente», «Dirección», «País», «Notas» y las
 líneas: «Descripción», «Cant.» (1 de entrada; admite decimales), «Precio» (sin impuesto, en la moneda del negocio y con sus decimales; su símbolo o su código alrededor de la
 cifra no cuentan, como en 12,50 zł) y el
 tipo, con el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21 de entrada), «IGIC %» en
 Canarias o «IPSI %» en Ceuta y Melilla, que empiezan en el tipo general de su regla de Impuestos y vacíos
-si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. «Emitir
+si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. Debajo, la «Retención de
+IRPF» («Sin retención» de entrada; 15 %, 7 %, 1 % o 19 %), que no sale en una serie de tiques ni en un negocio de
+fuera de España. «Emitir
 factura» (con una rueda que gira mientras va) está en gris hasta que el negocio ha dicho su moneda y cada línea tiene
 descripción, cantidad, precio y tipo. Un rechazo sale encima de los botones, por campo cuando es de un campo.
 
@@ -189,7 +207,7 @@ seguir la numeración que traías de otro sistema. Solo la ve quien lleva las se
 #### Detalle
 Menú **Facturación → Series** (solo con permiso de llevar las series). La entrada «Cada serie define
 el prefijo, el formato y el contador de la numeración de un tipo de factura y un año…» y una tabla con
-«Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIX-YYYY-NNNNNN`), «Nº
+«Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIJO-AAAA-NNNNNN`), «Nº
 actual», «Activa» y «Predet.»; buscador «Buscar código, nombre…». Por debajo de 1280 px abre en
 tarjetas. **+** abre «Nueva serie de numeración»; «Editar» (o pulsar la fila) abre «Editar serie
 {código}» (INVOICE-F12, INVOICE-F13). Sin emisor, lo dice el mismo aviso «Todavía no puedes facturar» de la
@@ -199,13 +217,15 @@ la numeración de otro sistema.». Cargando: «Cargando series…».
 Error: «No se pudieron cargar las series» con «Reintentar».
 
 ### Emisor
-Los datos fiscales de tu negocio que salen en cada factura: razón social, NIF y domicilio completo. Sin ellos no se
-emite ningún tique ni factura. Solo el propietario y el administrador ven esta pestaña y
+Los datos fiscales de tu negocio que salen en cada factura: razón social, NIF y domicilio completo, y si está
+inscrito en el ROI. Sin ellos no se emite ningún tique ni factura. Solo el propietario y el administrador ven esta pestaña y
 los cambian.
 
 #### Detalle
 Menú **Facturación → Emisor**. «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad»,
-«Provincia» y «País», y «Guardar». Arriba, si aún no está completo, «Sin el emisor no se puede emitir
+«Provincia» y «País»; la casilla «Inscrito en el ROI (operaciones intracomunitarias)», apagada de entrada, con
+«Tus facturas y tiques imprimirán tu NIF con el prefijo de tu país (ES…). VeriFactu lo sigue recibiendo sin
+prefijo.» debajo; y «Guardar». Arriba, si aún no está completo, «Sin el emisor no se puede emitir
 ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu cuenta de ERPlora el
 {fecha}.». Solo lo cambian el propietario y el administrador; el resto lo ve sin poder editar.
 
@@ -254,6 +274,9 @@ territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierr
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
 | INVOICE-F21 | Configurar el emisor | hecho |
 | INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | hecho |
+| INVOICE-F24 | Descargar en Excel las facturas emitidas | hecho |
+| INVOICE-F25 | Descargar en PDF una factura | hecho |
+| INVOICE-F26 | Enviar una factura por correo | hecho |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
 Estado: hecho — Ventas lo pide dentro del mismo cobro
@@ -320,30 +343,48 @@ Pantalla: Facturas, Nueva factura manual
 Pasos:
 1. En **Facturas**, pulsa **+**: se abre «Nueva factura manual».
 2. Elige la «Serie» (las activas del año que emiten facturas, F1, o tiques, F2, y siempre «FACT» y «TICKET»
-   aunque el año aún no las haya abierto; empieza en la predeterminada o en «FACT») y, si quieres, busca al
-   cliente en Clientes: rellena nombre, NIF, dirección y país. Escribe o corrige «Cliente», «NIF
-   cliente», «Dirección» y «Notas».
-3. Rellena cada línea: «Descripción», «Cant.» (1 de entrada; hasta tres decimales), «Precio» sin impuesto
+   aunque el año aún no las haya abierto; empieza en la predeterminada o en «FACT»).
+3. Deja la «Fecha» en hoy o elige un día anterior, y pon el «Vencimiento» si la factura se paga más adelante.
+4. Si quieres, busca al cliente en Clientes: rellena nombre, NIF, dirección y país. Escribe o corrige «Cliente»,
+   «NIF cliente», «Dirección» y «Notas».
+5. Rellena cada línea: «Descripción», «Cant.» (1 de entrada; hasta tres decimales), «Precio» sin impuesto
    y en la moneda del negocio, y el tipo, que lleva el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21
    de entrada), «IGIC %» en Canarias o «IPSI %» en Ceuta y Melilla. Empieza en el tipo general de su regla
    de Impuestos (en Canarias, el de la regla de Canarias); si el territorio aún no tiene regla de su
    impuesto, está vacío: escríbelo tú. «+ Línea» añade otra, con el mismo tipo de entrada, y la cruz la
    quita.
-4. Pulsa «Emitir factura»; está en gris hasta que el negocio ha dicho su moneda (cada precio se lee en ella) y
+6. Si el cliente te retiene IRPF, elige la «Retención de IRPF»: 15 %, 7 %, 1 % o 19 %. Se calcula sobre la base
+   imponible de la factura entera y solo resta de lo que cobras: el IVA y el total no cambian.
+7. Pulsa «Emitir factura»; está en gris hasta que el negocio ha dicho su moneda (cada precio se lee en ella) y
    cada línea tiene descripción, cantidad, precio y tipo. La ventana se cierra y la factura aparece en la lista
    con su número, «Emitida» y «Origen» «Alta manual».
-Entra: lo que escribe la persona; el emisor configurado. Por la API o el asistente una línea puede
+8. El vencimiento se ve en la ficha y en el papel. Desde el día siguiente, si no se ha cobrado, la lista y la ficha
+   dicen «Vencida», y al marcarla pagada, «Pagada».
+9. La retención se ve en la ficha y en el papel, después del total: en una factura de 100 € más el 21 % de IVA con
+   retención del 15 %, «Total» 121,00 €, «Retención IRPF 15 %» -15,00 € y «Total a pagar» 106,00 €. La lista enseña el
+   total de la factura.
+Entra: lo que escribe la persona; el emisor configurado. La fecha, el vencimiento y la retención se pueden decir
+también al asistente («hazle una factura a Carpintería Lema con fecha de ayer y vencimiento a 30 días», «hazle una
+factura a Carpintería Lema con retención del 15») y por la API; sin fecha, la factura es de hoy, y sin retención, se
+cobra su total. Por la API o el asistente una línea puede
 llevar además la categoría fiscal de Impuestos: entonces su tipo y su calificación son los de la regla
-vigente hoy, no el tipo escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
+vigente el día de la factura, no el tipo escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
 (Impuestos → Ajustes, TAX-F11): en Canarias se declara como IGIC y en Ceuta y Melilla como IPSI.
-Sale: la factura (F1 en una serie de facturas, F2 en una de tiques) con el impuesto calculado encima del
+Sale: la factura (F1 en una serie de facturas, F2 en una de tiques), numerada en la serie del año de su fecha, con
+esa misma fecha como fecha de operación y con el impuesto calculado encima del
 precio, cerrado una vez por tipo y repartido entre las líneas por resto mayor (los conceptos suman el
 total impreso), y como descripción de la operación sus conceptos («Curso de corte, Kit de tinte», hasta
-500 caracteres); avisa `invoice.invoice.issued`.
+500 caracteres); avisa `invoice.invoice.issued`. El vencimiento no se declara en VeriFactu, y la retención tampoco: el
+registro de la factura, su huella y su QR son los mismos con ella que sin ella.
 Si falla: dentro de la ventana, encima de los botones: «Una factura completa necesita el nombre, el NIF y
 la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «Línea 2: el precio no es un
-importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro año
-(«Esa serie numera otro año…»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
+importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro año que la fecha
+(«Esa serie numera otro año…»), una fecha posterior a hoy («La fecha de una factura no puede ser posterior a hoy.») o
+anterior a la de la última factura de su serie («La fecha de una factura no puede ser anterior a la de la última de su
+serie, que es del 24/11/2026.»), un vencimiento anterior a la fecha («El vencimiento no puede ser anterior a la fecha
+de la factura.»), una retención en un tique, pedida por la API o el asistente («Un tique no lleva retención de IRPF:
+emite una factura (F1) con los datos del cliente.») o en un negocio de fuera de España («La retención de IRPF es
+un impuesto español: un negocio de fuera de España no la practica.»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
 puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. Una línea con categoría fiscal (por la API o
 el asistente) sin regla vigente en el territorio del negocio se rechaza en el campo de esa línea, con la
 categoría por el nombre que le da Impuestos en el idioma de quien mira (p. ej. «Producto — general») y
@@ -355,7 +396,7 @@ rechaza. Si no se puede leer el territorio fiscal, el tipo se llama «Imp. %», 
 pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; la factura se emite igual,
 con el impuesto del territorio. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emitir factura» se enciende.
-Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
+Implicados: TAX-F18, CUSTOMER-F17, TAX-F11, INVOICE-F16, INVOICE-F17, INVOICE-F18, INVOICE-F23
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
 Estado: hecho
@@ -397,7 +438,7 @@ Pasos:
    el número del tique; el tique dice «Sustituida por» con el de la F3.
 Entra: el tique (F2) que se sustituye y los datos fiscales del cliente.
 Sale: la F3 en la serie «FACT» del año, con las líneas y los importes del tique copiados al céntimo
-(misma operación) y la misma fecha de operación; el tique no se toca. Si el tique estaba pagado, la F3
+(misma operación) y la misma fecha de operación y, si lo tenía, el mismo vencimiento; el tique no se toca. Si el tique estaba pagado, la F3
 nace pagada. Avisa `invoice.invoice.issued`. Desde entonces, rectificar o devolver esa venta rectifica
 la F3, no el tique.
 Si falla: sin nombre, NIF o domicilio, rechazo; un NIF español que no es válido, «Ese NIF no es válido.»
@@ -476,8 +517,9 @@ Pasos:
 4. Con el asistente, antes de emitir nada te enseña la rectificativa que va a nacer: la factura que
    rectifica (número, fecha y cliente), el tipo (R1 de entrada, R5 si es un tique), el motivo, el
    siguiente número de la serie «RECT» del año (no queda reservado: lo toma al emitirse), la fecha de
-   hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura ya tenía rectificativas
-   por diferencias, también lo que queda por rectificar de ella.
+   hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura llevaba retención, también lo que se
+   deja de retener y lo que se devuelve, y si ya tenía rectificativas por diferencias, lo que queda por rectificar de
+   ella.
 5. En esa misma respuesta, sin que tengas que volver a pedírselo, sale «¿Ejecutar esta acción?» con el
    «Número» de la factura y el «Motivo» y, en «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa» por su nombre, nunca solo
    por su código («Rectificativa: resto de causas (R4)»; también si el asistente lo pide al rectificar), el
@@ -489,7 +531,8 @@ Pasos:
 Entra: la factura elegida, el tipo y el motivo, en la ventana o dichos al asistente. La fecha la pone el
 servidor: el día del negocio.
 Sale: la rectificativa numerada en la serie «RECT» del año, con el emisor y el cliente de la original,
-su desglose en negativo y sus líneas en negativo (la cantidad lleva el signo; el precio no); la
+su desglose en negativo y sus líneas en negativo (la cantidad lleva el signo; el precio no); si la original llevaba
+retención, la misma en sentido contrario («Total a pagar» en negativo es lo que se cobró); la
 original pasa a «Cancelada» (avisa `invoice.invoice.issued` y `invoice.invoice.rectified`). No mueve
 dinero ni caja. Si la original ya tenía rectificativas por diferencias (devoluciones parciales), esta
 rectifica exactamente lo que queda, con una línea por clave fiscal a su propio tipo.
@@ -553,15 +596,15 @@ Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Cada vez que se emite un documento (tique, factura, sustitutiva o rectificativa), Facturación toma
-   la serie de su código y del año del día del negocio; si no existe, la crea en ese momento con el
-   contador a 0, heredando nombre, prefijo y formato de la del año anterior con ese código (o, la
+   la serie de su código y del año de su fecha (el día del negocio o, en una factura manual, el que se haya elegido);
+   si no existe, la crea en ese momento con el contador a 0, heredando nombre, prefijo y formato de la del año anterior con ese código (o, la
    primera vez, con el código como prefijo).
 2. Sube el contador de esa serie en uno y escribe el número con el formato de la serie (sin formato,
    `TICKET-2026-000001`) en la misma operación que guarda el documento.
 3. El 1 de enero, a la hora del negocio, el siguiente documento abre la serie del año nuevo y vuelve a 1
    (o al «Siguiente número» que se le haya fijado).
 Entra: el código de serie que toca (TICKET para los tiques, FACT para las facturas completas y las
-sustitutivas, RECT para las rectificativas; en el alta manual, la serie elegida) y el día del negocio.
+sustitutivas, RECT para las rectificativas; en el alta manual, la serie elegida) y la fecha del documento.
 Sale: el número del documento. El número entra en la huella encadenada de VeriFactu.
 Si falla: si la emisión se rechaza o falla, no se guarda nada y el contador no sube: no queda hueco.
 Dos cobros a la vez en la misma serie esperan uno al otro y reciben números seguidos; dos documentos de
@@ -634,10 +677,14 @@ Pasos:
    «Hecho» sin recargar, y sigue hecho los años siguientes (la serie de un año nuevo hereda la del anterior).
 4. El asistente o la API preguntan además si la numeración del año está preparada: la respuesta dice el año
    del negocio y cuántas series ordinarias (F1, F2, F3), de rectificativas (R1–R5) y predeterminadas tiene ese
-   año, cuántas tiene en total, y si está preparada (al menos una ordinaria y una de rectificativas).
+   año, cuántas tiene en total, y si ese año ya tiene al menos una ordinaria y una de rectificativas. Sin
+   series no falta nada: el asistente contesta lo mismo que **Series**, que se crean solas con la primera
+   venta y que solo hace falta crear una para cambiar el prefijo o el formato, o para seguir la numeración
+   de otro sistema.
 Entra: las series del negocio.
 Sale: nada; solo se lee (ni el Inicio ni la pregunta crean ninguna serie).
-Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente y responde que no está preparada.
+Si falla: nada que fallar; un negocio recién creado tiene el paso pendiente (recomendado) y, preguntado, el
+asistente dice que aún no hay series y que se crearán solas con la primera venta.
 Implicados: ninguno
 
 ### INVOICE-F15 Comprobar que la numeración no tiene huecos
@@ -663,7 +710,8 @@ Pantalla: Facturas
 Pasos:
 1. Abre **Facturación → Facturas**.
 2. Escribe en «Buscar facturas…» un número, un nombre de cliente o un NIF; o filtra (estado, tipo,
-   serie, origen, fecha, total); o pulsa una columna para ordenar.
+   serie, origen, fecha, total); o pulsa una columna para ordenar. El estado «Vencida» deja las que no se han cobrado
+   y cuyo vencimiento ya pasó, en el día del negocio; las sustituidas por una factura completa no cuentan.
 3. La tabla enseña las que casan, de 50 en 50; lo último emitido, arriba. Un empleado solo ve las suyas:
    las que emitió él y las de sus ventas (las que cobró y las que se atribuyeron a su ficha de Personal), y
    lo que sigue a una de ellas: la factura completa que sustituyó a un tique suyo y la rectificativa de
@@ -678,7 +726,7 @@ en cualquier campo de importe del Hub y como en las demás listas («1.000,50»,
 («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.», «Este importe no puede ser negativo.» o, con
 «1.000» en euros, «Este importe se puede leer de dos maneras…»), y una fecha final anterior a la inicial,
 «La fecha final no puede ser anterior a la inicial.»; ninguno de los dos filtra.
-Implicados: ninguno
+Implicados: INVOICE-F03, INVOICE-F24
 
 ### INVOICE-F17 Ver una factura
 Estado: hecho
@@ -686,8 +734,9 @@ Actor: empleado (sus facturas), responsable y administrador (las de todos)
 Pantalla: Ficha de factura
 Pasos:
 1. En **Facturas**, abre la factura.
-2. Lee la cabecera, las líneas (con su «Precio» sin IVA y antes de descuentos y, si alguna lo tiene, la
-   columna «Dto.» con el descuento sin IVA), el desglose y los totales.
+2. Lee la cabecera (con el «Vencimiento», si lo tiene), las líneas (con su «Precio» sin IVA y antes de descuentos y, si alguna lo tiene, la
+   columna «Dto.» con el descuento sin IVA), el desglose y los totales (y, si lleva retención, lo retenido y lo que se
+   cobra).
 3. Con **VeriFactu**, lee debajo el «Justificante VeriFactu»: el estado del registro en la AEAT, su «CSV»
    cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗» (en la
    app instalada, en el navegador del dispositivo).
@@ -701,7 +750,7 @@ para verlo, la ficha sale sin la tarjeta del justificante. En la app instalada, 
 AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.». Una factura que la persona no ve (la de otro,
 para un empleado) no se abre, tampoco por su número: «Factura no encontrada», como una que no existe. Lo que
 rectifica o sustituye a una suya es suyo, así que sus enlaces se abren.
-Implicados: VERIFACTU-F19
+Implicados: INVOICE-F03, VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
 Estado: hecho
@@ -717,7 +766,7 @@ Pasos:
    instalada, su pantalla de impresión: el diálogo del sistema, con la impresora o «Guardar como PDF», y el
    trabajo llamado, por ejemplo, «Factura FACT-2026-000003») con la factura en A4 (con VeriFactu, arriba el QR del registro con
    «QR tributario:» y
-   «VERI*FACTU»; emisor, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
+   «VERI*FACTU»; emisor, con su NIF-IVA si está inscrito en el ROI, fecha y, si lo tiene, «Vencimiento», «Facturar a», líneas, desglose por tipo, totales, si lleva retención lo retenido y lo que se cobra, y la nota de lo que rectifica),
    desde donde se puede guardar como PDF. Mientras llega el registro, «Imprimir / PDF» espera: el papel
    nunca sale sin su QR.
 4. Siempre en el idioma de quien imprime. Un documento de una venta sale como «Copia» (el original fue
@@ -728,15 +777,18 @@ Si falla: «No se pudo imprimir la factura», también si no se puede leer el re
 factura que lo tiene (no se imprime sin su QR). Si la app instalada no abre su pantalla de impresión, el
 aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora no puede imprimir; actualízala»,
 «…: el servicio de impresión del dispositivo no se abrió»…). La de otro, para un empleado, ni se imprime ni
-se descarga: la API y el asistente dicen «Factura no encontrada.».
-Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF)
+se descarga: la API y el asistente dicen «Factura no encontrada.». Pedida al asistente, solo se hace si una impresora
+del sistema la recibe; si no, su recibo dice «No se hizo, falló: Imprimir en Facturación.» con el motivo, «Ninguna
+impresora del sistema recibe esta factura: ábrela para imprimirla o guardarla en PDF.» o, si no se puede leer su
+registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.».
+Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Marcar una factura como pagada
 Estado: hecho
 Actor: empleado (sus facturas), responsable y administrador (las de todos), asistente
 Pantalla: Facturas, Ficha de factura
 Pasos:
-1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida»; o pídeselo al
+1. En **Facturas** (fila) o en la ficha, pulsa «Marcar pagada» en una factura «Emitida» o «Vencida»; o pídeselo al
    asistente («marca como cobrada la FACT-2026-000001», «la factura de Carpintería Lema ya está pagada»)
    y sigue en el paso 4.
 2. Confirma en «¿Marcar FACT-2026-000001 como pagada?» («El cobro se registra con la fecha y la hora de
@@ -746,12 +798,13 @@ Pasos:
    «Pagada» igual que desde la pantalla, o «Cancelar» y no cambia nada.
 Entra: la factura elegida.
 Sale: el estado «Pagada» y la fecha de pago (avisa `invoice.invoice.paid`). Ningún importe cambia y la
-caja no se toca.
+caja no se toca. Con retención, la factura se da por pagada con lo que dice «Total a pagar»: lo retenido lo ingresa el
+cliente en Hacienda.
 Si falla: si mientras tanto alguien la pagó o la rectificó, «Esta factura no se puede marcar como
 pagada: solo se puede con una factura emitida que aún no esté pagada. No se ha cambiado nada.». La de
 otro, para un empleado, «Factura no encontrada.», sin cambiar nada. Las
 facturas que nacen de una venta ya nacen pagadas y una rectificativa no se paga: no ofrecen la acción.
-Implicados: ninguno
+Implicados: INVOICE-F23
 
 ### INVOICE-F20 Dar a otras apps la factura de una venta
 Estado: hecho
@@ -780,21 +833,29 @@ Pasos:
    aviso «Todavía no puedes facturar» de la campana, que sale en cualquier pantalla mientras no hay emisor (a quien
    no puede cambiar el emisor, el aviso le dice «Esto lo tiene que configurar un administrador.», sin botón).
 3. Escribe «Razón social», «NIF», «Domicilio», «Código postal», «Ciudad», «Provincia» y elige el «País»
-   (España de entrada).
+   (España de entrada). Si el negocio está inscrito en el Registro de Operadores Intracomunitarios, enciende
+   «Inscrito en el ROI (operaciones intracomunitarias)»; el NIF se sigue escribiendo sin prefijo.
 4. Pulsa «Guardar»: sale «Emisor guardado.», el aviso desaparece de la campana y el paso del Inicio queda «Hecho»,
    sin recargar y también en los demás dispositivos.
+5. También se le puede pedir al asistente («pon los datos fiscales de la empresa en las facturas: Bar Lema SL,
+   B12345674, Calle Mayor 10, 28013 Madrid»). Antes de guardar, su tarjeta enseña cada dato con el nombre de su
+   campo y el país por su nombre en el idioma de quien lo pide, como el selector de Emisor («País: España»,
+   «Country: Spain»), nunca su código. Al escribir «CONFIRMAR», se guarda igual que con «Guardar».
 Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
-avisa `invoice.issuer.updated`.
+avisa `invoice.issuer.updated`. Con «Inscrito en el ROI» encendido, la factura en pantalla, su A4 (PDF), el tique
+y la cuenta imprimen el NIF con el prefijo del país del emisor («NIF: ESB12345674»), también en las ventas
+nacionales; apagado, el NIF tal cual. Un documento ya emitido se reimprime como salió. El registro de VeriFactu y
+el QR siguen siempre con el NIF sin prefijo.
 Si falla: sin razón social, NIF o domicilio, bajo su campo; un NIF español que no es válido, «Ese NIF no
 es válido.». El motivo de un campo se quita en cuanto se corrige ese campo y vuelve si el siguiente intento
 también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente intento.
-Implicados: ninguno
+Implicados: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
 Estado: hecho
 Actor: sistema (la cuenta de ERPlora)
-Pantalla: ninguna (nadie entra en el hub de plataforma)
+Pantalla: ninguna (la emite la cuenta; se ve en Facturas)
 Pasos:
 1. Antes de cobrar con dinero real, la cuenta pregunta al hub de plataforma si está listo: lo está con su emisor
    y VeriFactu y, en producción, solo mientras el envío real a la AEAT está abierto en el servidor
@@ -811,6 +872,17 @@ Pasos:
    «aceptada con errores» o «rechazada» cuando contesta (con su código y su mensaje).
 5. El PDF es el mismo A4 de INVOICE-F18 en el idioma del pagador, con el QR de VeriFactu («QR
    tributario:», «VERI*FACTU») solo cuando la AEAT ya lo aceptó, como en la cuenta antigua.
+6. En el negocio de ERPlora, `ERP` y `ERPR` son solo de la cuenta: nadie numera en ellas a mano, las crea ni las
+   cambia (INVOICE-F12, INVOICE-F13), y no salen al hacer una factura (INVOICE-F03), en **Series** ni al preguntar
+   por la numeración (INVOICE-F14). Las ventas y las facturas hechas a mano van en las series del negocio («TICKET»,
+   «FACT», «RECT» o las que cree), en la misma cadena de VeriFactu. Una factura de la cuenta se corrige en la cuenta,
+   con su abono: aquí no se ofrece «Rectificar» (INVOICE-F08) ni «Factura completa» (INVOICE-F05).
+7. En **Facturas** y en su ficha (INVOICE-F16, INVOICE-F17), una factura de la cuenta sale como lo que es: «Origen»
+   «erplora.com» y «Pagada», porque la cuenta solo la manda cuando el cliente ha pagado; abonada entera, «Cancelada».
+   Su abono dice también «erplora.com» y, como toda rectificativa, «Emitida». Ninguna ofrece «Marcar pagada»
+   (INVOICE-F19). La lista filtra y ordena por ese mismo estado, y el filtro «Origen» no las da por hechas a mano: se
+   buscan por su serie.
+8. Quién entra en ese negocio y cómo es HUBS-F39 (erplora.com); que no tiene plan ni compra nada, BASE-F11 y BASE-F40.
 Entra: la factura de la cuenta: su número, su fecha, sus importes, cómo tributa, el pagador, sus líneas
 (cada una con su descuento) y, en un abono, la factura que corrige.
 Sale: la factura, con la referencia de la cuenta (avisa `invoice.invoice.issued`; un abono, además,
@@ -819,8 +891,99 @@ Si falla: la misma factura otra vez (o dos entregas a la vez) contesta lo que ya
 un abono de una factura que no llegó se rechaza; por encima de 400 € sin el NIF del pagador se rechaza; una
 factura que no sigue el contrato se rechaza con su motivo; un rechazo de VeriFactu deshace la factura
 entera; en producción con el envío real a la AEAT cerrado, «no listo»: «El envío real a la AEAT está cerrado en
-este servidor: las facturas de ERPlora no le llegarían.», y la cuenta no cobra.
-Implicados: VERIFACTU-F13
+este servidor: las facturas de ERPlora no le llegarían.», y la cuenta no cobra. Por la ventana, la API, el
+asistente o una automatización, elegir, crear o cambiar una de esas dos series, o dar a otra un prefijo o un formato
+que imprima sus números (`ERP-2026-00123`), «Las series ERP y ERPR las numera erplora.com: usa otra serie.»;
+rectificar o sustituir una factura de la cuenta, «Esta factura la emitió erplora.com y allí se corrige, en su serie
+ERPR: aquí no se puede corregir a mano.»; marcar pagada una factura de la cuenta o su abono, el rechazo de INVOICE-F19.
+No se escribe nada ni se gasta número.
+Implicados: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14, INVOICE-F16,
+INVOICE-F17, INVOICE-F19, HUBS-F39 (erplora.com), BASE-F11, BASE-F40
+
+### INVOICE-F24 Descargar en Excel las facturas emitidas
+Estado: hecho
+Actor: propietario, administrador, responsable, gestoría, asistente
+Pantalla: Facturas
+Pasos:
+1. En **Facturación → Facturas**, filtra la lista por lo que quieras: normalmente la fecha, entre el primer y el último
+   día del mes o del trimestre; también vale por estado, tipo, serie, origen, total o una búsqueda.
+2. Pulsa «Descargar en Excel».
+3. Se descarga un fichero de Excel, por ejemplo «facturas-2026-10.xlsx», con las facturas que la lista deja (todas,
+   no solo las de la página), de la más antigua a la más nueva. Una fila por factura y tipo de impuesto: «Número»,
+   «Fecha», «Cliente», «NIF», «Base imponible», «Tipo %», «Cuota» y «Total». Una factura con tres tipos tiene tres
+   filas, cada una con su parte; en la columna «Total», la suma de las filas de una factura es su total, y la suma de
+   toda la columna es el total de lo descargado. Si alguna lleva recargo de equivalencia, salen también «Tipo de
+   recargo %» y «Cuota de recargo»; si alguna lleva retención de IRPF, «Retención %», «Retención» (en negativo, repartida
+   por la base entre las filas de la factura) y «Total a pagar», que en las demás es su total. La moneda es la del negocio y
+   las cifras son números.
+4. La rectificativa sale con su importe en negativo y la factura que corrige, con el suyo, tal como las cuenta la lista.
+5. Lo mismo se puede pedir al asistente («descárgame en Excel las facturas de octubre para la gestoría»): el fichero
+   queda bajo su respuesta, con «Descargar» y su nombre.
+Entra: las facturas que la persona ve y que la lista filtra.
+Sale: el fichero; nada cambia. Sin ninguna factura, el botón está apagado.
+Si falla: un empleado no tiene el botón y la API le responde que no tiene permiso; si el negocio está ocupado u otro
+fallo lo impide, un aviso dice que no se han podido descargar las facturas y por qué, y se puede volver a pulsar.
+Implicados: INVOICE-F16, BASE-F112
+
+### INVOICE-F25 Descargar en PDF una factura
+Estado: hecho
+Actor: empleado (sus facturas), responsable, administrador, propietario y gestoría (las de todos), asistente
+Pantalla: Ficha de factura
+Pasos:
+1. En **Facturas**, abre la factura y pulsa «Descargar PDF».
+2. Se descarga un fichero que se llama como la factura, por ejemplo «FACT-2026-000003.pdf»; si el número lleva una barra
+   u otro signo que un fichero no admite, en su lugar va un guion. En la app instalada queda en Descargas y un aviso
+   dice dónde.
+3. Es el A4 que saca «Imprimir / PDF» y dice lo mismo: emisor, fecha y, si lo tiene, «Vencimiento», «Facturar a», las
+   líneas con sus descuentos, el desglose por tipo con su recargo, los totales, la retención y «Total a pagar» si la
+   lleva, lo que rectifica y las notas. Con VeriFactu, arriba va el QR del registro, con «QR tributario:» y
+   «VERI*FACTU», que se puede escanear. El texto se puede seleccionar y buscar. Una factura larga sigue en más páginas,
+   con la cabecera de las líneas en cada una y los totales al final.
+4. Sale en el idioma de quien la descarga, como su papel; la que emitió la cuenta de ERPlora, en el de su
+   pagador. Un documento de una venta sale como «Copia», igual que al imprimirlo desde la ficha.
+5. Lo mismo se puede pedir al asistente («descárgame el PDF de la FACT-2026-000003»): el fichero queda bajo su
+   respuesta, con «Descargar» y su nombre.
+Entra: la factura, sus líneas y, con VeriFactu, el QR de su registro.
+Sale: el fichero; la factura no cambia y el fichero no se guarda en el Hub. Mientras se hace, el botón dice
+«Preparando…».
+Si falla: un aviso dice «No se ha podido descargar el PDF» y por qué, y se puede volver a pulsar. Si no se puede leer el
+registro de VeriFactu de una factura que lo tiene, «No se pudo leer su registro de VeriFactu, y una factura nunca se
+imprime sin su QR.»; si el servidor no puede hacerlo, «El PDF no se puede hacer ahora mismo. Inténtalo más tarde.». La
+de otro, para un empleado, no se descarga, tampoco por la API ni con el asistente: «Factura no encontrada.».
+Implicados: INVOICE-F17, INVOICE-F18, INVOICE-F23, VERIFACTU-F19, BASE-F112
+
+### INVOICE-F26 Enviar una factura por correo
+Estado: hecho
+Actor: empleado (sus facturas), responsable, administrador y propietario (las de todos), asistente
+Pantalla: Ficha de factura
+Pasos:
+1. En **Facturas**, abre la factura y pulsa «Enviar por correo».
+2. La ventana propone el correo de la ficha del cliente. Déjalo o escribe otro: el que escribas vale para este envío y no
+   cambia la ficha.
+3. Pulsa «Enviar». La ventana se cierra y la ficha dice «Enviando a …» hasta que sale; entonces dice «Enviada a …» con el
+   día y la hora, sin que haya que hacer nada más.
+4. Al cliente le llega un correo en el idioma del negocio (el de la factura, si lo tiene guardado) con el número, la
+   fecha, el vencimiento si lo lleva y el total, o el «Total a pagar» si lleva retención, y con la factura adjunta en PDF:
+   el mismo fichero de «Descargar PDF», con el QR de su registro de VeriFactu.
+5. Lo envía ERPlora (noreply@erplora.com) en nombre del negocio. Si el cliente contesta, su respuesta llega al correo de
+   la cuenta del propietario.
+6. Se puede volver a enviar las veces que haga falta, a la misma dirección o a otra: la ficha guarda cada envío, con el
+   último arriba.
+7. Lo mismo se puede pedir al asistente («mándale la FACT-2026-000003 por correo a Ana»), que antes de enviarla enseña a
+   qué dirección va y pide confirmación.
+Entra: la factura y la dirección (sin ella, la de la ficha del cliente).
+Sale: un correo y su línea en la ficha. La factura, su registro de VeriFactu y su estado no cambian. Si se vuelve a
+enviar la misma petición tras un fallo de la red, el cliente no lo recibe dos veces.
+Si falla: una dirección mal escrita sale bajo su campo y no se envía nada. Si el correo no puede salir, la ficha no dice
+que se ha enviado: dice «No enviada a …» y, arriba, «La factura no se ha enviado por correo» con el motivo: «El correo no
+se ha podido enviar ahora mismo. Vuelve a intentarlo en unos minutos.», «Esa dirección no acepta el correo. Revísala y
+vuelve a enviarlo.», que no se puede hacer su PDF o leer su registro de VeriFactu, o que no se ha podido confirmar. Se
+envía otra vez con el mismo botón; solo no se repite. Que el buzón del cliente lo devuelva después no se sabe aquí. Si la
+cuenta del propietario no tiene correo, no se envía y lo dice; una demo no envía correos. Un negocio envía como mucho 50
+correos por hora, porque todos comparten el buzón de envío de ERPlora; el siguiente no se envía y dice «Este negocio ya
+ha enviado todos los correos que puede enviar en una hora. Vuelve a intentarlo más tarde.». La de otro, para un
+empleado, no se envía: «Factura no encontrada.». La gestoría ve los envíos y no envía.
+Implicados: INVOICE-F17, INVOICE-F25, CUSTOMER-F16, VERIFACTU-F19
 
 ## Servicios: lo que entra y lo que sale
 
@@ -829,7 +992,7 @@ persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la 
 nombra por su número (`FACT-2026-000012`), una venta por su número del día (`20261014-0003`), un
 cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie por su código.
 
-Lo que lee o toca una factura ya emitida (la lista, la factura, su documento y su papel, pasarla a completa,
+Lo que lee o toca una factura ya emitida (la lista, la factura, su documento, su PDF, su papel y sus correos, pasarla a completa,
 marcarla pagada y rectificarla) y la factura de una venta solo alcanzan las que la persona ve: sin «Ver todas
 las facturas», las que emitió, las de sus ventas y lo que rectifica o sustituye a una de ellas. Una que no ve no
 existe para ella (404 `invoice.not_found`;
@@ -841,11 +1004,14 @@ entera.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Las facturas, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F16 | `invoice.invoice.list` |
+| Las facturas, con búsqueda, filtros (también las vencidas sin cobrar), orden y páginas (hasta 100) | ver | F16 | `invoice.invoice.list` |
 | Una factura con sus líneas, desglose y enlaces, por su id o su número | ver | F17 | `invoice.invoice.get` |
+| Las facturas que deja la búsqueda y los filtros de la lista, en un Excel (una fila por factura y tipo de impuesto) | ver las de todos | F24 | `invoice.invoice.export` |
 | El tique que abre su código (número, fecha y total) y, si ya la tiene, su factura completa con su QR de VeriFactu | la página pública | F04 | `invoice.public.ticket` |
 | La factura vigente de una venta | ver | F20 | `invoice.invoice.by_source` |
 | El documento imprimible (HTML A4) de una factura | ver | F18 | `invoice.invoice.document` |
+| El PDF de una factura, con el QR de VeriFactu, en un fichero | ver | F25 | `invoice.invoice.pdf` |
+| Los correos en que se ha enviado una factura (a quién, cuándo y cómo acabó cada uno) y el correo de la ficha del cliente | ver | F26 | `invoice.email.list` |
 | La rectificativa que emitiría rectificar una factura, sin emitirla ni gastar número (lo que el asistente enseña antes de su confirmación y dentro de ella) | rectificar | F08 | `invoice.invoice.rectification_preview` |
 | El tipo con que empieza una línea tecleada: el general del territorio, de su propia regla en Impuestos (vacío sin ella) | emitir | F03 | `invoice.invoice.line_defaults` |
 | Las series, con búsqueda, filtros y páginas | ver | F12, F13 | `invoice.series.list` |
@@ -860,13 +1026,13 @@ entera.
 | El A4 de una factura de ERPlora, en su idioma | solo el sistema | F23 | `invoice.invoice.platform_document` |
 | Si el hub de plataforma puede emitir ahora (en producción, solo con el envío real a la AEAT abierto) | solo el sistema | F23 | `invoice.invoice.platform_health` |
 
-Todas se pueden seguir en vivo.
+Todas menos el Excel y el PDF se pueden seguir en vivo.
 
 ### Lo que ofrece: acciones (cambian datos)
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Emite una factura a mano | emitir | F03 | `invoice.invoice.create` |
+| Emite una factura a mano, con su fecha y, si se quiere, su vencimiento y su retención de IRPF | emitir | F03 | `invoice.invoice.create` |
 | Emite la factura de una venta cobrada (también la reacción a su cobro) | emitir | F01, F02, F06 | `invoice.invoice.create_from_sale` |
 | Sustituye un tique por una factura completa | emitir | F04, F05 | `invoice.invoice.substitute` |
 | Emite, con el código del tique y los datos del cliente, la factura completa que lo sustituye, y la devuelve con su QR de VeriFactu | la página pública | F04 | `invoice.public.substitute` |
@@ -877,7 +1043,9 @@ Todas se pueden seguir en vivo.
 | Crea una serie | llevar las series | F12 | `invoice.series.create` |
 | Cambia una serie | llevar las series | F13 | `invoice.series.update` |
 | Guarda el emisor | configurar el emisor | F21 | `invoice.issuer.update` |
-| Manda la página A4 de una factura a la cola de Impresión (o dice que no se encoló: la imprime el dispositivo) | ver | F18 | `invoice.invoice.print` |
+| Manda la página A4 de una factura a la cola de Impresión (sin una impresora que la reciba, falla y dice por qué) | ver | F18 | `invoice.invoice.print` |
+| Envía una factura por correo con su PDF (una sola vez por clave de petición) | emitir | F26 | `invoice.email.send` |
+| Toma un correo para enviarlo, guarda cómo acabó y, cada cinco minutos, retoma los que nadie tomó y da por no confirmados los que se quedaron a medias | solo el sistema | F26 | `invoice.email.claim`, `invoice.email.record`, `invoice.email.resume` |
 | Guarda el emisor como el sistema; hoy no la llama nadie | solo el sistema | — | `invoice.issuer.sync` |
 | Emite una factura de ERPlora con su registro de VeriFactu | solo el sistema | F23 | `invoice.invoice.issue_platform` |
 
@@ -891,6 +1059,7 @@ Todas se pueden seguir en vivo.
 | Serie nueva | Crear una serie | `id`, `code`, `year` | `invoice.series.created` |
 | Serie cambiada | Cambiar una serie | `id`, `code`, `year`, `fields` | `invoice.series.updated` |
 | Emisor cambiado | Guardar o recibir el emisor | `source` | `invoice.issuer.updated` |
+| Correo pedido, enviado o no enviado | Pedir que se envíe una factura, que el servidor de correo lo acepte o que no salga | `id` (del correo), `invoice_id`, `number`; nunca la dirección | `invoice.email.requested`, `invoice.email.sent`, `invoice.email.failed` |
 
 Contrato del origen con Ventas: `source.type` es el `source_type` del documento (`sale`, `manual`,
 `substitution`, `rectification`, `refund`, `void`); `source.sale_id` la venta de la que sale (también en
@@ -903,7 +1072,8 @@ cuando le llega después, ya no cambia nada.
 
 Qué refresca cada aviso: la lista, la ficha, la factura de una venta y el documento, con «emitido»,
 «rectificada» y «pagada»; las series, el siguiente número, el estado de la numeración, los huecos y el
-libro, con «emitido» y los de series; el emisor, con «emisor cambiado».
+libro, con «emitido» y los de series; los correos de una factura, con los tres avisos del correo y con los cambios de la ficha del
+cliente; el emisor, con «emisor cambiado».
 
 ### A qué reacciona
 
@@ -912,6 +1082,7 @@ libro, con «emitido» y los de series; el emisor, con «emisor cambiado».
 | Venta cobrada (`sale.sale.completed`) | Ventas | Emite su F2 o su F1 (F01, F02) | `invoice.invoice.create_from_sale` |
 | Venta devuelta (`sale.sale.refunded`) | Ventas | Emite la rectificativa de la devolución (F09, F10) | `invoice.invoice.rectify_from_refund` |
 | Venta anulada (`sale.sale.voided`) | Ventas | Emite la rectificativa del tique entero (F07) | `invoice.invoice.rectify_from_void` |
+| Datos de un cliente borrados (`customer.customer.erased`) | Clientes | Quita la dirección de los correos de sus facturas; las facturas se conservan (F26) | `invoice.email.forget_customer` |
 
 Cada reacción corre como el sistema, en su propia transacción, y es idempotente: una por venta, una
 por devolución y una por anulación. El documento lo pide antes Ventas dentro de su cobro, su anulación o
@@ -924,7 +1095,7 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
   `sale.sale.record_invoice`, por nombre y con el permiso de la plataforma, para dar a la venta, a su
   anulación o a su devolución el documento que esperaba (INVOICE-F06).
 - **Impuestos** (requisito): la regla congelada en cada línea de la venta (impuesto, régimen,
-  calificación, tipo y recargo) y, en el alta manual por categoría, la regla vigente hoy
+  calificación, tipo y recargo) y, en el alta manual por categoría, la regla vigente el día de la factura
   (`resolve_tax`, en el territorio fiscal del negocio); el impuesto de un territorio (`tax_kind_of`,
   `business_tax_kind`) para lo que no tiene regla: la línea con tipo tecleado (el territorio del negocio) y la
   de una venta cuya regla ya no existe (el territorio que la línea congeló al cobrarse); el redondeo a mitad
@@ -935,12 +1106,15 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
   nunca por el territorio de hoy: la misma regla que la cifra de impuestos de Ventas (SALE-F28), que dice el
   impuesto de las ventas del periodo, «Impuestos» si mezclan, y el del territorio solo sin ventas.
 - **Clientes** (requisito): la ficha del cliente (nombre o empresa, NIF, domicilio y país) que rellena
-  los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae.
+  los datos fiscales en el alta manual, en la sustitución y en la F1 de una venta que no los trae; y su correo, el que se
+  propone al enviar una factura (F26).
 - **Plataforma**: la moneda del negocio (`base.business.get`, la de su país), que guarda la factura que haces a mano.
 - **Impresión** (por nombre, sin requisito): `printing.job.create` con la página A4 de una factura para la
   impresora del sistema (F18), en un punto de guardado propio; sin Impresión encendida, sin impresora del
   sistema o si la rechaza, no se encola nada y la imprime el dispositivo.
 - **VeriFactu** (por nombre, sin requisito): `verifactu.record.by_invoice`, el QR que lleva esa página A4.
+- **Plataforma, el correo** (`base.business_mail`): el remitente de ERPlora, el correo del propietario para las respuestas y
+  el servidor de correo (F26).
 
 ### Quién la usa
 
@@ -956,9 +1130,10 @@ lo reintenta a los 2, 4, 8… segundos hasta 8 veces; pasado eso, sale con «Emi
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver facturas, series, numeración y emisor; imprimir | sí | sí | sí | sí | `invoice.view_invoice` |
+| Ver facturas, series, numeración y emisor; imprimir y descargar en PDF una factura | sí | sí | sí | sí | `invoice.view_invoice` |
 | Ver las facturas de todos (sin él, solo las suyas: las que emitió, las de sus ventas y lo que las rectifica o sustituye) | sí | sí | sí | no | `invoice.view_all_invoices` |
-| Emitir a mano, facturar una venta, sustituir un tique, marcar pagada | sí | sí | sí | sí | `invoice.add_invoice` |
+| Descargar en Excel las facturas emitidas | sí | sí | sí | no | `invoice.view_all_invoices` |
+| Emitir a mano, facturar una venta, sustituir un tique, marcar pagada, enviar una factura por correo | sí | sí | sí | sí | `invoice.add_invoice` |
 | Rectificar (a mano, por devolución y por anulación) | sí | sí | sí | no | `invoice.rectify_invoice` |
 | Crear y cambiar series | sí | sí | sí | no | `invoice.manage_series` |
 | Configurar el emisor | sí | sí | no | no | `invoice.manage_issuer` |
@@ -969,8 +1144,9 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 quien abre la página pública del tique, sin sesión y sin ningún otro permiso; ninguna automatización emite desde ella
 sola (riesgo alto, como sustituir un tique en el mostrador).
 
-La gestoría (`hub_accountant`) solo tiene «Ver facturas, series, numeración y emisor; imprimir» y «Ver las facturas de
-todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, rectificar ni configurar nada.
+La gestoría (`hub_accountant`) solo tiene «Ver facturas, series, numeración y emisor; imprimir y descargar en PDF una factura» y «Ver las facturas de
+todos»: abre, imprime y descarga en PDF (INVOICE-F25) y en Excel (INVOICE-F24) las facturas emitidas de todos, sin emitir, rectificar ni
+configurar nada.
 
 ## Para quien lo mantiene
 
@@ -978,7 +1154,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   contadores de la campana:
   - `business_identity` («Los datos de tu negocio», orden 40, `BLOCKING_KEYS`):
     hecho con `configured` de `invoice.issuer.get`, la misma condición con la que `_configured_issuer` rechaza
-    emitir, así que «bloquea ⇔ la emisión se rechaza». El ⛔ lo pone `base` (`base.home.LEGAL_STEPS`), nunca la app;
+    emitir, así que «bloquea ⇔ la emisión se rechaza». El ⛔ lo pone `base` (`base.home.setup_steps.LEGAL_STEPS`), nunca la app;
     pendiente, también se le dice a quien no tiene `invoice.manage_issuer` (`actionable: false`, gh:hub#435). El
     domicilio también es obligatorio y el texto lo dice. Lleva a `/invoice/issuer`, la pantalla con el NIF a la
     vista, y se refresca con `invoice.issuer.updated`.
@@ -1023,6 +1199,16 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
     recomendado, mientras se puede (antes del primer documento: luego la serie congela su prefijo y su formato), y
     queda hecho para siempre en cuanto el negocio tiene su numeración (la serie de un año nuevo hereda la del
     anterior). La respuesta de la API (`configured`: una ordinaria y una rectificativa del año) no cambia.
+- **El correo de una factura** (INVOICE-F26): `InvoiceEmail` (`models_email.py`, migración `0010`) es el registro de cada
+  envío (dirección, estado `queued` → `sending` → `sent` o `failed`, cuándo, el código del fallo y la clave de la
+  petición, única); la factura no se toca. `invoice.email.send` lo guarda en una transacción corta y, tras el COMMIT,
+  `base.outbound` lo entrega en un hilo: `invoice.email.claim` lo toma con `SKIP LOCKED`, el PDF se imprime sin
+  transacción (`queries/emails.py::message_of`, con `printed`), el servidor de correo se espera sin conexión a la BD y
+  `invoice.email.record` guarda cómo acabó, también ante un fallo que nadie previó. `invoice.email.resume` (cada 5 minutos)
+  entrega los que llevan más de 2 minutos sin que nadie los tome y da por `invoice.email_unconfirmed` los que llevan más de
+  10 enviándose. Un documento de una venta va como «Copia», igual que al descargarlo. El remitente, el «Responder a» y
+  los fallos del servidor de correo son de `base/business_mail.py`: hoy el SMTP de OVH, o SES si el despliegue lo vuelve a
+  elegir (`config/settings/mail.py`). `Message-ID` sale del id del envío. El registro no está en el archivo fiscal.
 - **Moneda**: la factura hecha a mano guarda la moneda del negocio, que Facturas pregunta a
   `base.operations.business_currency` como toda app que cobra (BASE-F50), sin copia propia: la de su país, que contesta
   `base.business.get` leído como la plataforma (una API key solo tiene el permiso de su operación); la nacida de una
@@ -1037,8 +1223,9 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   al forinto. El documento A4 escribe los importes con esos decimales. Los importes y precios unitarios agrupan
   los millares desde cuatro cifras («1.234,56 €», hub#1090) en la lista, la ficha y el aviso del tope del tique.
 - **Hub de plataforma** (INVOICE-F23; PLAN-SAAS §4): el hub propio de
-  ERPlora, el slug `PLATFORM_HUB_SLUG` (`erplora`, reservado en `live.slugs`: ningún negocio lo puede
-  coger y el alta normal del SaaS no lo crea). Las cuatro puertas viven en `base/internal_platform.py`
+  ERPlora, el slug `PLATFORM_HUB_SLUG` (`erp`, reservado en `live.slugs`: ningún negocio lo puede
+  coger y el alta normal del SaaS no lo crea). Mientras su fila conserva el nombre que tuvo antes (`erplora`), es el
+  mismo hub y sus facturas entran igual (`base/platform_hub.py`). Las cuatro puertas viven en `base/internal_platform.py`
   (`/internal/platform/invoices`, `/health`, `/{id}`, `/{id}/pdf`) y llaman como sistema a
   `invoice.invoice.issue_platform`, `platform_status`, `platform_document` y `platform_health` (permiso
   `invoice.issue_platform`, sin rol ni ruta ninja). Contrato: `POST /internal/platform/invoices` con el
@@ -1074,6 +1261,24 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
     con el formato del SaaS (`{prefix}-{year}-{seq:05d}`) y su contador no se usa. Dos entregas a la vez
     se ponen en cola en el bloqueo de esa serie y la segunda contesta lo de la primera (test con hilos);
     `platform_ref` es único en la base de datos.
+  - **Series cerradas a mano** (`platform_series.py`; solo en el negocio de plataforma, `is_platform_hub`): las
+    rechaza cada operación que elige, crea o cambia una serie, con 409 `invoice.platform_series_closed`
+    (`refuse_platform_series`); `refuse_platform_number` rechaza otra serie que imprimiría un número con la forma de
+    los de la cuenta, porque llevaría el de una factura suya. `business_series` (`queries/series.py`) son las del
+    negocio: la lista, el estado de la numeración y la predeterminada leen de ahí. Lo emitido por la cuenta
+    (`platform_ref`) no se rectifica ni se sustituye a mano: 409 `invoice.platform_invoice_closed`, y `can_rectify` y
+    `can_substitute` son falsos. TICKET, FACT y RECT no son códigos de la cuenta, así que el TPV, el canje de un tique y las
+    devoluciones no cambian. La numeración y la emisión de la cuenta no se tocan. El admin de la plataforma no
+    pasa por las operaciones: ahí `ERP` y `ERPR` se pueden editar, y lo emitido a mano no usa ninguna de las dos, pero sí
+    usaría otra serie hecha ahí que imprima números como los de la cuenta.
+  - **Cómo se leen** (`queries/platform_reading.py`): la emisión guarda `source_type` `manual` (`rectification` en un
+    abono), `status` `issued` y sin `paid_at`, y ni eso cambia ni se migra. Al leer, `platform_ref` dice lo demás:
+    `source_of` da `platform` y `status_of`, `paid`, salvo en un abono o en una abonada entera. De ahí salen la lista, la
+    ficha, los enlaces, `can_mark_paid`, el rechazo de `invoice.invoice.mark_paid` (409 `invoice.cannot_mark_paid`), el
+    filtro y el orden por estado y el filtro por origen, también en el Excel. `platform` solo sale en la respuesta: no es
+    un valor del filtro `source_type`, que Automatizaciones enseña en cualquier negocio. El día del cobro lo tiene la
+    cuenta, así que «Pagada el» no sale. El aviso `invoice.invoice.issued`, VeriFactu y el admin de la plataforma leen lo
+    guardado. Test: `tests/test_platform_reading.py`.
   - **Entorno**: el registro va al entorno de la AEAT del despliegue (`ERPLORA_ENVIRONMENT=prod` →
     producción; `pre` → pruebas; `verifactu.queries.route.effective_environment`), y su interruptor está fijo
     (409 `verifactu.platform_fixed`).
@@ -1096,13 +1301,19 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
   lanza una vez por entorno como tarea ECS puntual de la familia `worker`, que tiene las credenciales del
   migrador para hacer la BD, con el comando `python manage.py create_platform_hub --execute` (primero sin
-  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve.
+  `--execute` para ver lo que hará). Su emisor es solo el de su BD: ningún otro negocio lo ve. Una fila que ya existe
+  nunca se hace otra vez, se llame como se llame, y solo `--rename` le pone el nombre `PLATFORM_HUB_SLUG` (los pasos, en
+  el `README.md` del Hub, «Registro de hubs y `/internal`»).
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
   `migrations/`, `schemas/` (`platform.py`, el cuerpo que manda el SaaS al hub de plataforma;
   `document_issuer.py`, el emisor de `InvoiceOut`), `fiscal.py` (aritmética pura: cierre por clave fiscal,
   prorrateo, formato del número), `document_issuer.py` (puro: el emisor de un documento y el NIF que imprime),
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
+  `queries/` (un módulo por tema: `invoices`, `documents`, `refunds`, `series`, `rectifying`, `numbering`,
+  `issuer`, `platform_invoices`, `fiscal_archive` y `public`; cómo se lee un documento, en `rows`, y quién ve
+  qué, en `ownership`), `services/` (un módulo por tema: `issuer`, `numbering`, `issuing`, `recipient`, `manual`,
+  `from_sale`, `substitution`, `rectifying`, `paying`, `series`, `platform_invoices`, `paper` y `public`; lo que
+  comparten todos, en `writes`), `events.py`, `live.py`, `api.py`, `admin.py`,
   `templates/invoice/invoice.html`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero,
   más integración con Ventas y Clientes y concurrencia con hilos.
 - **Numeración**: `InvoiceSeries.current_number` se sube con `UPDATE … RETURNING` (Django 6 refresca el
@@ -1110,7 +1321,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   COMMIT, así que dos emisiones de la misma serie se ponen en cola y un rechazo deshace el número. Nunca
   secuencias de Postgres. Únicas en la base de datos: `(code, year)` de la serie, `(series, sequence)` y
   `(series_code, number)` del documento. Prefijo, formato y siguiente número se bloquean con el **primer
-  documento** de la serie (`queries.series_started`), no con el contador: una serie que empieza en el 7
+  documento** de la serie (`queries.series.series_started`), no con el contador: una serie que empieza en el 7
   para continuar otro sistema sigue editable hasta que numera (lo cazó el e2e de INVOICE-F12).
 - **Una por**: una factura por venta (`sale` con origen `sale`), una rectificativa por devolución
   (`refund`), una por anulación (`sale` con origen `void`) y una F3 por tique (`substitutes`), todas
@@ -1120,7 +1331,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   solo `status` y `paid_at` (pagar, cancelar al rectificar entera). Se corrige con una rectificativa
   por diferencias (importes negativos, `rectification_kind = "I"`); nunca se borra.
 - **Dinero**: céntimos enteros con signo (las R en negativo); `Decimal` y mitad hacia arriba
-  (`apps.tax.queries.round_half_up`); cantidades con tres decimales, como Ventas.
+  (`apps.tax.queries.calculation.round_half_up`); cantidades con tres decimales, como Ventas.
 - **El desglose** (`tax_breakdown`) es una lista, una entrada por clave fiscal, en orden estable:
   `{"tax", "regime", "qualification", "exempt_reason", "rate", "surcharge_rate", "base", "quota",
   "surcharge_quota"}` (sin recargo, `"surcharge_rate": "0.00"` y `"surcharge_quota": 0`); los tipos como
@@ -1135,7 +1346,21 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   si se lleva todo lo que queda de una clave, copia sus cifras tal cual. Entera, niega cabecera,
   desglose y líneas de la original.
 - **Fechas**: `issue_date` es el día del negocio al emitir, en su zona horaria; `operation_date`, el
-  del cobro (`Sale.business_day`), el de la devolución o el de la anulación; la F3 conserva el del tique.
+  del cobro (`Sale.business_day`), el de la devolución o el de la anulación; la F3 conserva el del tique. Una factura
+  manual puede llevar un `issue_date` anterior, que es también su `operation_date`: la AEAT no admite una fecha de
+  expedición futura ni anterior a la de operación. `issued_at` y el orden de la cadena de VeriFactu son siempre los
+  del momento en que se emite. La última factura de la serie se lee con la fila de la serie bloqueada, que sigue
+  bloqueada hasta que se toma el número: una que se está emitiendo a la vez cuenta.
+- **Vencimiento** (`due_date`, opcional, solo el alta manual y la F3 que sustituye un tique que lo tenía): «vencida» no
+  es un estado que se guarde. `queries/overdue.py` dice cuándo lo está una factura (emitida, sin sustituir y con el
+  vencimiento antes del día del negocio) y da el filtro de la lista, que es también el del Excel.
+- **Retención de IRPF** (`withholding_rate`, vacío sin ella, y `withholding_amount`, con el signo del documento; solo el
+  alta manual de una F1 y su rectificativa): `withholding.py` da la lista cerrada de tipos y lo retenido, el tipo sobre
+  `base_amount` entera, redondeado una vez. `payable_amount` es `total_amount` menos lo retenido y no se guarda. Ningún
+  otro importe de la factura depende de ella: base, cuota, total y desglose se cierran antes, y VeriFactu lee solo esos
+  (`tests/test_withholding_verifactu.py` emite la misma factura con ella y sin ella, en el mismo número y a la misma hora, y
+  compara el registro entero: columnas, XML, huella y QR; igual con su rectificativa). Un tique no la lleva (409
+  `invoice.withholding_on_ticket`), así que la F3 que lo sustituye tampoco.
 - **El emisor** (`Issuer`, una fila) se copia en cada documento. `invoice.issuer.sync` lo guarda como sistema
   con `{legal_name, tax_id, address, postal_code, city, province, country, version}` (una `version` menor o igual
   que la guardada se ignora), pero nadie lo llama: la foto del SaaS (`PUT /internal/hubs/{id}/state`) no lleva un
@@ -1147,10 +1372,14 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   rechaza), `issuer_vat_number`, el que imprimen el A4 y la pantalla. Un emisor inscrito en el ROI imprime su
   NIF-IVA con el prefijo de su país (`ESB27593136`; Grecia, `EL`; un NIF que ya lo trae no lo duplica) en todas
   sus facturas, también las nacionales; cualquier otro, su NIF tal cual. La composición es una sola,
-  `vat_number` de `apps/customer/tax_ids.py`, la misma que escribe el NIF-IVA de un destinatario. El Hub no
-  guarda la inscripción en el ROI de ningún negocio: solo sabe la de ERPlora, que está inscrita, por el NIF del
-  emisor de plataforma (`PLATFORM_ISSUER_TAX_ID`). La etiqueta sigue siendo «NIF» («Tax ID»). Que un negocio
-  diga que está en el ROI, y que su tique lo imprima también, es hub#1723.
+  `vat_number` de `apps/customer/tax_ids.py`, la misma que escribe el NIF-IVA de un destinatario. Un negocio dice
+  que está inscrito con la casilla del emisor (`Issuer.intra_eu_operator`, INVOICE-F21) y cada documento guarda la
+  marca con su copia del emisor (`Invoice.issuer_intra_eu_operator`; una rectificativa, la de su original), así que
+  una copia se imprime como se emitió. ERPlora lo está siempre: se reconoce por el NIF del emisor de plataforma
+  (`PLATFORM_ISSUER_TAX_ID`). `IssuerOut` lleva la marca y `vat_number`, el NIF tal como lo imprimen los
+  documentos; el tique y la cuenta de Ventas (`sale.letterhead.get`) leen ese o el `issuer_vat_number` de su
+  documento. La etiqueta sigue siendo «NIF» («Tax ID»). Se marca en el Hub y no llega de la cuenta de erplora.com
+  porque los datos fiscales del negocio viven en el Hub y la cuenta solo guarda a quien paga ERPlora.
 - **Contrato con VeriFactu** (`apps/verifactu`, `requires=["invoice"]`; su WORKBOOK, «Contrato con
   Facturación»): `_issue`, tras escribir el documento y su aviso y **dentro de la misma transacción**, llama
   por nombre a `verifactu.record.create` con `{"invoice_id": …}` y la misma sesión, en su savepoint. La
@@ -1246,7 +1475,7 @@ todos»: abre, imprime y descarga las facturas emitidas de todos, sin emitir, re
   (`base/assistant/relevance.py`) leen «pagada», «pagado» y «como cobrada» como una factura pagada (`paid`; «cobrar» y «cobro»
   a secas siguen siendo el cobro de una venta). Así marcar cobrada, rectificar y el resto de las 25 herramientas
   llegan a su operación desde el chat: las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno,
+  (`tests/e2e/qa/probes/owner-es-invoice-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el turno,
   «marca como cobrada la FACT-2026-000001» y «rectifícala con una R1» entre las 8 primeras, y una frase propia por
   herramienta solo llega con sus `asks` (`tests/test_assistant_asks.py`). La sonda «…sin tocar caja ni cambiar
   importes» sale 5.ª: live no lee como pedido el «cambiar» detrás de «ni» cuando
@@ -1265,7 +1494,7 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
   «Enviado a <impresora>.», el trabajo «Factura <número>»); la ayuda los enseña con un ejemplo (FACT-2026-000003,
   RECT-2026-000001, FACT, Oficina) o sin el hueco.
 - Los marcadores del formato de una serie (`{prefix}`, `{code}`, `{year}`, `{seq}` y `{seq:01d}`…`{seq:09d}`; vacío,
-  `PREFIX-YYYY-NNNNNN`) los enseña la ventana bajo el campo; el número es el `NumSerieFactura` de VeriFactu, solo
+  `PREFIJO-AAAA-NNNNNN`) los enseña la ventana bajo el campo; el número es el `NumSerieFactura` de VeriFactu, solo
   ASCII imprimible, y el código rechazado sin tarjeta del asistente es hub#872 (INVOICE-F12).
 - En INVOICE-F03, la categoría fiscal se nombra por su nombre y nunca por su clave (`product.generic`, hub#1149) y el
   botón se enciende al llegar la moneda (hub#938); el filtro de total lee el importe como el resto del Hub
@@ -1317,7 +1546,7 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
 18. **El formato de una serie exige el año** (si no, la serie del año siguiente, que nace de esta,
     repetiría sus números) y el número es ASCII imprimible de 60 caracteres como mucho.
 19. **Un tique manual respeta el límite de Ventas** (3.000 € en España, RD 1619/2012 art. 4) y una
-    factura manual solo se numera en una serie de este año.
+    factura manual solo se numera en una serie del año de su fecha.
 20. **Un rechazo de VeriFactu deshace la emisión** (revisión fiscal de VeriFactu, 2026-10-15): una
     factura sin su registro de alta no se emite ni se imprime; solo un error transitorio de la base de
     datos la deja «pendiente» de la reacción, y sin VeriFactu en el negocio sale sin registro.
@@ -1372,18 +1601,192 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
     o rectificarla. La numeración no se filtra: un hueco o el libro de números son de la serie entera y solo dan
     números, no clientes ni importes.
 
+24. **El Excel de las facturas emitidas** (INVOICE-F24):
+    - **El formato es `.xlsx`, con números**: la gestoría trabaja en hojas de cálculo y las cifras deben sumarse sin
+      convertirlas. Se escribe con XlsxWriter (la única pieza que se añade; el fichero lo abre cualquier programa).
+    - **Una fila por factura y tipo de impuesto, con su propio total** (la AEAT lo pide así: «una línea por cada tipo», y
+      el «Total Factura» de cada línea es su base más su cuota más su recargo, en una operación exenta coincide con su
+      base). Así la columna «Total» suma el total de lo descargado, sin contar dos veces una factura con varios tipos.
+    - **Los mismos filtros que la lista**: se descarga lo que la lista deja (fecha, estado, tipo, serie, búsqueda…), como
+      exportan Clientes, Inventario y Control horario. Los filtros de la lista no se vuelven a escribir en la descarga.
+    - **Recargo**: sus dos columnas salen solo si alguna factura de lo descargado lo lleva.
+    - **Fuera de Automatizaciones**: lleva el nombre y el NIF de todos los clientes y es para que lo baje una persona, como
+      el CSV de Clientes; ninguna automatización lo ejecuta sola.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | AEAT (libros registro) | una línea por cada tipo de IVA o recargo; «Total Factura» de cada línea es su subtotal (base + cuota + recargo); en una exenta, tipo y cuota son cero y el total es la base | https://sede.agenciatributaria.gob.es/Sede/iva/facturacion-registro/preguntas-frecuentes.html · https://sede.agenciatributaria.gob.es/Sede/iva/facturacion-registro/preguntas-frecuentes/libro-registro-facturas-expedidas-iva-irpf.html |
+    | Copilot Gestoría | una factura con varios tipos ocupa una fila por tipo; CSV con base, tipo, cuota y total | https://copilotgestoria.com/tutoriales/informes-libro-iva-emitidas |
+    | Holded | exporta el listado de facturas desde «Acciones» a Excel, PDF, Google Sheets o por líneas | https://intercom.help/holded/es/articles/6877413-gestionar-tus-facturas |
+    | Business Central | «Open in Excel» respeta los filtros de la lista: las mismas filas y columnas que se ven | https://learn.microsoft.com/en-us/dynamics365/business-central/across-work-with-excel |
+    | Shopify | los pedidos se filtran y después se exportan; cada impuesto va en sus columnas «Tax # Name» y «Tax # Value» | https://help.shopify.com/en/manual/orders/manage-orders/exporting-orders |
+    | Loyverse | los recibos se exportan a CSV con los filtros de fecha y tipo de recibo | https://help.loyverse.com/help/receipts-section-reports-back |
+    | Odoo | los informes contables se exportan a PDF o XLSX | https://www.odoo.com/documentation/16.0/applications/finance/accounting/reporting.html |
+    | Sage 50 | cualquier documento e informe se exporta a Excel, y también a CSV, PDF, HTML, texto y XML | https://www.sage.com/es-es/blog/exportacion-excel-programa-contabilidad/ |
+
+    Gana: un `.xlsx` sencillo, una fila por factura y tipo con su subtotal, con los filtros de la lista, para quien ve
+    todas las facturas. Un CSV con decimales de texto (como exportan Clientes e Inventario) obligaría a la gestoría a
+    convertir las cifras; un formato AEAT o varias hojas piden más de lo que ha pedido nadie.
+
+25. **La fecha y el vencimiento de la factura manual** (INVOICE-F03, INVOICE-F16):
+    - **La fecha es hoy si no se elige otra, y puede ser un día anterior** mientras no sea anterior a la de la última
+      factura de su serie: los números de una serie van en el orden de sus fechas. Es lo que hace Holded: guarda la
+      fecha pasada y rechaza la que va antes que facturas ya aprobadas con un número mayor. Nunca es futura: la AEAT
+      no admite una fecha de expedición posterior a hoy.
+    - **La fecha de operación es la misma**: la AEAT solo admite una fecha de expedición anterior a la de operación en
+      los regímenes 14 y 15, que Facturación no emite. Preguntar una segunda fecha complicaría la factura para un caso
+      que nadie ha pedido.
+    - **El vencimiento es opcional** (ninguna norma lo exige) y nunca anterior a la fecha, como en QuickBooks y Clear
+      Books. Sin condiciones de pago con nombre ni plazos: se elige el día.
+    - **«Vencida» se ve y se filtra como un estado más**, pero no se guarda ni lo cambia nadie: depende del día.
+      «Emitida» sigue trayendo todas las no cobradas, vencidas o no: en QuickBooks, donde son estados separados, se
+      pide una vista que las junte.
+    - **Sin columna de vencimiento en la lista**: casi todas sus filas son tiques pagados, que no lo tienen; está en la
+      ficha y en el papel.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | Holded | conserva la fecha anterior a hoy y avisa con un error si hay facturas aprobadas con un número mayor y fecha posterior | https://intercom.help/holded/es/articles/6887128-configurar-las-preferencias-de-conformidad |
+    | AEAT (validaciones de VERI*FACTU) | la fecha de expedición no puede ser futura ni, salvo en los regímenes 14 y 15, anterior a la de operación | https://www.agenciatributaria.es/static_files/AEAT_Desarrolladores/EEDD/IVA/VERI-FACTU/Validaciones_Errores_Veri-Factu.pdf |
+    | Sage | el vencimiento no es obligatorio, pero se recomienda; su foro cuenta que una fecha de operación posterior a la de la factura no se valida | https://www.sage.com/es-es/blog/fecha-de-vencimiento-en-facturas/ · https://communityhub.sage.com/es/sage-50/f/discusion-general/259019/configuracion-factura-fechas-operacion-y-emision/619807 |
+    | Quipu | el vencimiento es opcional y recomendable | https://getquipu.com/blog/fecha-vencimiento-factura/ |
+    | Odoo | la lista de facturas de cliente se filtra por «Overdue» | https://www.odoo.com/documentation/19.0/applications/finance/accounting/payments/follow_up.html |
+    | QuickBooks | «Overdue» es una opción del filtro de estado; sus usuarios echan en falta un «no cobradas» que junte las vencidas y las que no. No admite un vencimiento anterior a la fecha | https://quickbooks.intuit.com/learn-support/en-us/reports-and-accounting/is-there-a-way-to-filter-invoices-by-unpaid-status-and-not-just/00/1483510 · https://quickbooks.intuit.com/community/reports-and-accounting-5/please-enter-a-valid-due-date-2024-update-error-57096 |
+    | Zoho Invoice | «Overdue» es uno de los filtros de la lista: pasado el vencimiento y sin cobrar | https://www.zoho.com/invoice/help/invoice/more-with-invoice.html |
+    | Xero | las vencidas son una parte de las pendientes de cobro; avisa si el vencimiento va antes que la fecha | https://www.xero.com/id/resources/small-business-guides/invoicing/chasing-outstanding-invoices · https://productideas.xero.com/forums/967115-invoices-quotes/suggestions/50816498-invoices-able-to-enter-a-due-date-prior-to-the-i |
+    | Square | lo pendiente junta lo no cobrado y lo vencido; «vencida» no se guarda, se calcula con el vencimiento | https://squareup.com/help/au/en/article/6105 · https://developer.squareup.com/forums/t/overdue-in-invoice-status/8143 |
+    | Clear Books | el vencimiento tiene que ser posterior a la fecha | https://secure.clearbooks.co.uk/community/problems/17945/likes |
+
+26. **La retención de IRPF de la factura manual** (INVOICE-F03, INVOICE-F08, INVOICE-F17, INVOICE-F18, INVOICE-F24):
+    - **No entra en VeriFactu**: la AEAT lo dice sin dudas. La retención no afecta a la base, a la cuota ni al importe
+      total, altera solo lo que se paga y no se incluye en el registro de facturación; recomienda que la factura enseñe los
+      dos importes, el total y lo que se paga, bien diferenciados. Por eso «Total» sigue siendo el total de la factura y
+      debajo van la retención y «Total a pagar», las palabras de su propio ejemplo y las de Quipu y Holded.
+    - **Los tipos son los habituales de su cuadro vigente** (desde el 10 de septiembre de 2026): 15 % el general de los
+      profesionales, 7 % los que empiezan, 1 % las actividades en módulos y 19 % los alquileres. El 2 % agrícola y forestal
+      y los tipos reducidos un 60 % de Ceuta, Melilla y La Palma no los ha pedido nadie.
+    - **Es una para toda la factura, sobre toda la base**: es como la llevan Sage 200, Sage 50, Quipu y Chift. Holded la
+      deja poner por línea; es más que elegir una vez, y quien facture algo sin retención hace otra factura, como en
+      Sage 200.
+    - **El recargo de equivalencia no se retiene** (se calcula sobre la base) **y se cobra entero**; el descuento de una
+      línea ya está restado de la base; se redondea una vez, sobre la base entera, y no por línea ni por tipo.
+    - **Se elige en cada factura, «Sin retención» de entrada**: Sage 50 y Holded la recuerdan en la ficha del cliente y
+      TeamSystem Facturas en los ajustes, pero depende de a quién y qué se factura, y recordarla pediría un dato nuevo en
+      Clientes que nadie ha pedido.
+    - **La rectificativa la lleva en sentido contrario**, como el ejemplo de TaxDown (base −100 €, IVA −21 €, retención
+      +15 €, total a pagar −106 €).
+    - **Se cobra el líquido**: «Marcar pagada» no guarda importes, así que la factura queda pagada con lo que dice «Total
+      a pagar»; no hay un cobro pendiente por lo retenido.
+    - **En el Excel, con su signo y por filas**: «Retención» en negativo y «Total a pagar», repartida por la base entre las filas
+      de una factura con varios tipos, para que las columnas sumen; solo en un fichero que tenga alguna.
+    - **Solo en un negocio español**, como en Teamleader: el IRPF no existe fuera. La ventana no la pregunta y el
+      servidor la rechaza también si llega por la API o el asistente.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | AEAT (aclaraciones a los desarrolladores, apartado 20) | la retención no afecta a la base, la cuota ni el importe total, y no se incluye en el registro; recomienda «Total factura», las retenciones y «Total a pagar» | https://sede.agenciatributaria.gob.es/static_files/AEAT_Desarrolladores/EEDD/IVA/VERI-FACTU/FAQs-Desarrolladores.pdf |
+    | AEAT (cuadro de tipos desde el 10 de septiembre de 2026) | 15 % general de los profesionales, 7 % de inicio, 1 % en estimación objetiva, 19 % del arrendamiento | https://sede.agenciatributaria.gob.es/static_files/Sede/Programas_ayuda/Retenciones/2026/CUADRO_TIPOS_RETENCION_IRPF_2026_10sept.pdf |
+    | Holded | un porcentaje de retención, también por línea, que reduce el total; los impuestos se rellenan con los del contacto | https://www.holded.com/developers/api-reference/invoices/create-an-invoice · https://help.holded.com/en/articles/6834950-create-an-invoice |
+    | Quipu | un apartado aparte para el IRPF; base, IVA, «IRPF (15 %)» y «Total a pagar» | https://getquipu.com/blog/factura-con-retencion/ |
+    | Odoo | una retención se resta de lo que se paga | https://www.odoo.com/documentation/19.0/applications/finance/accounting/taxes/retention.html |
+    | Sage 200 | en la cabecera, para todas las líneas; en el foro, quien necesita dos casos hace dos albaranes | https://communityhub.sage.com/es/sage-200/f/gestion-comercial/226584/factura-con-irpf-pero-solo-en-determinadas-lineas/552868 |
+    | Sage 50 | el porcentaje está en la ficha del cliente y sale en el pie de la factura; en el foro, quien la ve calculada sobre la base más el IVA avisa de que va sobre la base | https://communityhub.sage.com/es/sage-50/f/discusion-general/257926/hacer-un-descuento-irpf-15 · https://communityhub.sage.com/es/sage-50/f/discusion-general/258605/factura-con-retencion |
+    | Chift (API única de contabilidades) | en la cabecera, no por línea, y reduce lo que se paga | https://docs.chift.eu/unified-apis/accounting/concepts/spanish-withholding-taxes.md |
+    | TeamSystem Facturas (Billin) | la misma retención, por defecto, en todas las facturas | https://www.billin.net/blog/ejemplo-factura-profesional-irpf |
+    | SumUp | sobre la base imponible; nunca a un particular | https://www.sumup.com/es-es/facturas/esenciales-de-facturacion/facturas-con-retencion-de-irpf/ |
+    | Teamleader | se ofrece si la empresa es de España o de Italia | https://support.focus.teamleader.eu/hc/en-150/articles/25691994541073-Can-I-add-IRPF-Withhold-taxes-on-my-invoice |
+    | Zoho (foro) | una factura de alquiler con retención del 19 % vuelve de la AEAT con «El campo ImporteTotal tiene un valor incorrecto» | https://help.zoho.com/portal/en/community/topic/error-al-enviar-factura-verifactu-a-aeat-con-retenci%C3%B3n-del-19-en-factura-de-alquiler |
+    | TaxDown | la rectificativa por diferencias lleva la retención en positivo y el total a cobrar en negativo | https://taxdown.es/informacion-autonomos/factura-rectificativa |
+
+27. **El PDF de una factura** (INVOICE-F25):
+    - **Un botón propio, «Descargar PDF», junto a «Imprimir / PDF»**: descargar e imprimir son dos acciones en Square,
+      Wix y QuickBooks; Holded y TeamSystem Facturas también descargan desde la factura. El diálogo de impresión sigue
+      como está.
+    - **Es el A4 que ya imprime el servidor**: la plantilla del papel (`templates/invoice/invoice.html`) pasada a PDF, la
+      misma del archivo fiscal de una baja y de las facturas de ERPlora. Una segunda maqueta acabaría diciendo otra cosa.
+      Por eso también tiene PDF un tique (Quipu no lo hace: sin cliente no genera PDF).
+    - **Se llama como la factura**: `queries/pdf.py::file_name`; lo que Windows, macOS o Android no admiten en un nombre
+      pasa a guion, como en Odoo, donde la barra del número se cambia.
+    - **El idioma es el del papel**: el de quien lo pide; una factura de la cuenta de ERPlora guarda el de su pagador, y en
+      Stripe el PDF va en el idioma del cliente. El cliente de un negocio no tiene idioma guardado.
+    - **El QR es el del registro, tal cual** (`verifactu.record.by_invoice`): no se recalcula nada. Lo lleva aunque quien
+      descarga no tenga permiso para ver los registros de VeriFactu: es parte de la factura. Un registro que no se puede
+      leer no deja hacer el PDF (`qr_of` de `queries/documents.py`, la misma regla que el papel).
+    - **Una función, dos puertas**: `printed(ctx, factura)` devuelve los bytes; la usan la descarga y el archivo fiscal, y
+      es la que llama quien adjunte la factura a un correo.
+    - **Con WeasyPrint, que ya estaba en la imagen** (0 MB más): fpdf2 (1,5 MB) y ReportLab (5 MB) obligan a escribir otra
+      maqueta. Medido en la imagen arm64 con medio procesador: 0,2 s una factura de 10 líneas y 1,3 s una de 200 (con el
+      equipo muy cargado, de 0,4 a 2,5 s y de 3,2 a 4,3 s); la primera de cada proceso carga la librería y tarda 1,6 s, con
+      unos 60 MB de memoria que se quedan. Se hace en la petición, dentro de la lectura, como el Excel: mientras tanto
+      ocupa una de las transacciones a la vez del plan. Quien imprima muchas, o antes de esperar un envío, lo hace fuera de
+      la transacción (`base/pdf.py`).
+    - **Fuera de Automatizaciones**: es un fichero con el nombre y el NIF de un cliente, para que lo baje una persona.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | Square | en la factura, «More»: imprimir y descargar el PDF son dos acciones | https://squareup.com/help/us/en/article/5137 |
+    | Wix | «Más acciones» › «Descargar PDF», aparte de «Imprimir» | https://support.wix.com/es/article/wix-invoices-administrar-las-facturas |
+    | QuickBooks | «Imprimir o descargar» › «Descargar» en la factura abierta | https://quickbooks.intuit.com/learn-support/es-global/help-article/customer-statements/descarga-guarda-extractos-formularios-de-ventas-en/L6pyi04NN_ROW_es |
+    | Holded | menú de los tres puntos de la factura › «Descargar» | https://intercom.help/holded/es/articles/6877413-gestionar-tus-facturas |
+    | TeamSystem Facturas (Billin) | se descarga en PDF desde la vista de cada factura | https://www.billin.net/crear-enviar-facturas/ |
+    | Odoo | «Send» › «Download»; en su foro, el nombre del fichero es el número sin las barras | https://www.odoo.com/documentation/18.0/applications/finance/accounting/customer_invoices.html · https://www.odoo.com/forum/help-1/change-pdf-file-name-in-invoice-report-definition-odoo-10-121429 |
+    | Cegedim | «Descargar» en la línea de la factura emitida | https://cegedim.helpjuice.com/es_ES/what-does-the-download-function-on-lines-in-sent-invoices-table-do |
+    | Stripe | el PDF sale en el idioma preferido del cliente | https://docs.stripe.com/invoicing/customize |
+    | Shopify | una vista previa de impresión desde la que se imprime o se guarda | https://help.shopify.com/en/manual/fulfillment/managing-orders/printing-orders/printing-documents |
+    | Sage 200 | al imprimir se elige la salida «Fichero pdf» | https://communityhub.sage.com/es/sage-200/f/gestion-comercial/257513/generar-pdf |
+    | Quipu | la factura simplificada no genera PDF | https://intercom.help/quipu/es/articles/7182269-crear-una-factura-o-ticket-de-ingreso |
+
+    De Contasimple, Anfix y FacturaDirecta no hay documentación pública de este paso.
+
+28. **El correo de una factura** (INVOICE-F26):
+    - **Un botón en la factura y una ventana con la dirección propuesta, editable**: así en FacturaDirecta, Quipu y Holded;
+      en Sage 50 el correo sale de la ficha del cliente. Un campo y un texto fijo: los demás dejan además asunto, texto, Cc
+      y plantillas, que aquí no hacen falta para mandar una factura.
+    - **Quien emite, envía** (`invoice.add_invoice`): en Odoo el botón «Send» es de quien factura. La Gestoría sigue siendo
+      de solo lectura: ve los envíos.
+    - **El remitente es de ERPlora y las respuestas van al negocio**: un remitente de la plataforma con «Responder a» del
+      negocio es lo que hace FacturaDirecta por defecto. En Square, que las respuestas no lleguen al negocio es una queja
+      repetida en su foro. El Hub no guarda un correo del negocio: se usa el de la cuenta del propietario, y sin él no se
+      envía. El «Responder a» lo pone el servidor, nunca quien llama.
+    - **Se reenvía cuanto haga falta y queda cada envío** con su fecha y su dirección (FacturaDirecta, Stripe, Square).
+    - **Un fallo se dice y no se reintenta solo** (FacturaDirecta). Un correo no tiene clave que el servidor de correo
+      entienda: repetir uno que quizá salió duplicaría el envío, así que el que se queda a medias se da por no confirmado
+      (Odoo lo marca como fallido antes de enviarlo por lo mismo:
+      https://github.com/odoo/odoo/blob/18.0/addons/mail/models/mail_mail.py). Lo que devuelva después el buzón del cliente no se lee:
+      el de ERPlora descarta lo que recibe.
+    - **Una demo no envía**: la lleva cualquiera y saldría con el remitente de todos los negocios.
+    - **Fuera de Automatizaciones**: lo que sale no se puede recoger; cada correo lo pide una persona.
+
+    | Producto | Cómo lo resuelve | Fuente |
+    |---|---|---|
+    | FacturaDirecta | «Enviar» en la factura; correos del contacto propuestos y editables, PDF adjunto; se reenvía cuanto se quiera y cada envío queda en el registro; un rechazo se ve y no se reintenta | https://help.facturadirecta.com/es/articles/15121935-enviar-factura-por-email |
+    | FacturaDirecta | el remitente es un dominio de la plataforma y «Responder a» es el correo de la empresa | https://www.facturadirecta.com/novedades/nuevo-modo-envio/ |
+    | Holded | enviar el documento, revisar el destinatario y el mensaje, confirmar | https://help.holded.com/en/articles/6836216-send-your-invoices-by-email |
+    | Quipu | «Enviar por correo» abre una ventana para la factura o el ticket | https://getquipu.com/Manual-de-usuario-de-Quipu-2-0.pdf |
+    | Odoo | «Send» en la factura emitida, con el PDF; filtro de las no enviadas | https://www.odoo.com/documentation/18.0/applications/finance/accounting/customer_invoices.html |
+    | Contasimple | se envía al cliente desde la factura guardada o la lista | https://www.contasimple.com/academia/como-crear-facturas/ |
+    | TeamSystem Facturas (Billin) | se envía desde la lista y desde la vista de cada factura, y se ve el estado del envío | https://www.billin.net/crear-enviar-facturas/ |
+    | Anfix | asunto y texto propuestos; dice qué pasó con el correo | https://www.anfix.com/facturacion/notificaciones-de-estado |
+    | Sage 50 | el correo va a la dirección de la ficha del cliente, con el PDF | https://communityhub.sage.com/es/sage-50/f/discusion-general/266223/ya-se-puede-enviar-facturas-desde-el-programa |
+    | Stripe | enviar y reenviar desde la factura, con registro de los correos | https://docs.stripe.com/invoicing/send-email |
+    | Square | se reenvía desde la factura; las respuestas no llegan al negocio, y se quejan | https://community.squareup.com/t5/Questions-How-to/Reply-to-Invoice/m-p/133019 |
+
 ### Lo que NO hace, a propósito
 
 - No envía nada a la AEAT ni calcula la huella ni el QR: eso es VeriFactu.
 - No cobra ni devuelve dinero: «Marcar pagada» no toca la caja y «Rectificar» no devuelve dinero.
 - No guarda la forma de pago: vive en la venta.
-- No envía facturas por correo ni por WhatsApp, ni genera un PDF propio (el PDF es el del diálogo de
-  impresión del navegador).
+- No envía facturas por WhatsApp, ni por correo sola: cada correo lo pide una persona (INVOICE-F26). No envía varias a la
+  vez, no deja escribir el texto del correo y no sabe si el cliente lo abrió.
 - No hace presupuestos, proformas, borradores ni albaranes.
-- No lleva vencimientos, cobros parciales ni recordatorios de impago.
-- No exporta el libro registro de facturas expedidas para la gestoría.
+- No lleva cobros parciales, plazos ni recordatorios de impago.
+- No recuerda la retención de un cliente ni la pone sola: se elige en cada factura. Tampoco lleva las retenciones de las
+  compras ni hace los modelos 111, 115, 180 y 190.
+- No exporta el libro registro de facturas expedidas en el formato oficial de la AEAT; el Excel de las facturas emitidas
+  es una hoja sencilla para la gestoría (INVOICE-F24).
 - No vigila el techo de la factura simplificada: lo pide Ventas al cobrar.
-- No borra ni anonimiza los datos de un cliente en sus facturas (la ley obliga a conservarlas).
+- No borra ni anonimiza los datos de un cliente en sus facturas (la ley obliga a conservarlas); de sus correos sí quita la
+  dirección.
 
 ### Qué queda fuera
 

@@ -12,12 +12,14 @@ from pydantic import ValidationInfo, field_validator
 
 from apps.whatsapp_inbox.schemas.fields import _blank, _text
 from apps.whatsapp_inbox.schemas.sending import TEXT_OR_TEMPLATE, TemplateSendIn
+from base.sensitive import CUSTOMER_CONTACT
 
 
 class NotifyIn(Schema):
     phone: _text(32) = Field(
         description="The customer's number, exactly in international format (+34600111222): only the conversation "
-        "of that number in this business is written to, never a new one."
+        "of that number in this business is written to, never a new one.",
+        json_schema_extra=CUSTOMER_CONTACT,
     )
     template: TemplateSendIn | None = Field(
         None,

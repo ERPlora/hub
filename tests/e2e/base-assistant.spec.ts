@@ -9,12 +9,31 @@ import {  } from 'node:child_process';
 
 import { expect, test } from '@playwright/test';
 
-import { answers, ask, box, freshPage, home, lastAnswer, lastAnswerAtEachSize, openPanel, openPanelAtTheDesk, panel, panelAtTheDesk, shots } from './assistant-panel';
-import { CLAIM_ANSWER, DICTATION, GREETING } from './assistant-provider';
+import {
+  answers,
+  ask,
+  askForACard,
+  box,
+  card,
+  confirmationReady,
+  confirmationSettled,
+  confirmedWithTheWord,
+  decide,
+  freshPage,
+  home,
+  lastAnswer,
+  lastAnswerAtEachSize,
+  openPanel,
+  openPanelAtTheDesk,
+  panel,
+  panelAtTheDesk,
+  shots,
+} from './assistant-panel';
+import { CLAIM_ANSWER, DICTATION, DONE, GREETING, LINK_ANSWER } from './assistant-provider';
 import { saasSql } from './assistant-real';
-import { A, capture, login, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
+import { A, api, capture, login, saveSessionForTheSweep, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
 import {  } from './stack';
-import { panelSpec, spend } from './provider-helpers';
+import { chats, panelSpec, spend } from './provider-helpers';
 import { pressAssistant, topbarMore, topbarMoreMenu } from './topbar';
 
 const provider = panelSpec();
@@ -186,6 +205,31 @@ test('an answer that says it changed something nothing changed is flagged, outsi
   await shots(page, 'BASE-G117');
 });
 
+test('an answer with a web address that nothing of the turn looked up is flagged, outside the answer', async ({ page }) => {
+  await panelAtTheDesk(page);
+  await ask(page, 'E2E-LINK ¿sube el IVA de la comida para llevar?');
+  await expect(lastAnswer(page)).toHaveText(LINK_ANSWER.en);
+  await expect(panel(page).locator('[data-testid="assistant-notice-unread_link"]')).toContainText(
+    'This answer shows a web address the assistant did not really look up. Do not trust it.',
+  );
+  await shots(page, 'BASE-G153');
+});
+
+test('two reads asked for in one answer run in the same round: the model hears each by its own call and answers (BASE-F101)', async ({ page }) => {
+  await panelAtTheDesk(page);
+  const before = chats(provider()).length;
+  await ask(page, 'E2E-READS');
+  await expect(lastAnswer(page)).toHaveText(/^Listed \d+ items; \d+ open\.$/);
+  await expect(card(page)).toBeHidden();
+  // One call asked for both and the next one heard both results: one round, not one per read.
+  type Said = { role: string; tool_call_id?: string; tool_calls?: { id: string }[] };
+  const turns = chats(provider()).slice(before).map((seen) => (seen.body as { messages: Said[] }).messages);
+  expect(turns).toHaveLength(2);
+  const heard = turns[1].slice(turns[1].findLastIndex((message) => message.role === 'user') + 1);
+  expect(heard.map((message) => message.role)).toEqual(['assistant', 'tool', 'tool']);
+  expect(heard.slice(1).map((message) => message.tool_call_id)).toEqual(heard[0].tool_calls?.map((call) => call.id));
+});
+
 test('the conversation stays in the tab across reloads, «New conversation» empties it, and signing out forgets it', async ({ page }) => {
   await panelAtTheDesk(page);
   await ask(page, 'Hola');
@@ -242,7 +286,7 @@ test('from 80 % the foot says what is left and each answer moves it; a spent mon
   await openPanel(employee);
   await ask(employee, 'Hola');
   const theirs = panel(employee).locator('[data-testid="assistant-failure"]').last();
-  await expect(theirs).toContainText('Ask whoever runs the business to upgrade the plan.');
+  await expect(theirs).toContainText("Ask the business's owner to upgrade the plan.");
   await expect(theirs.locator('[data-testid="assistant-upgrade"]')).toHaveCount(0);
   await employee.context().close();
 });
@@ -346,5 +390,81 @@ test.describe('dictation and files', () => {
     await expect(box(page)).toHaveValue(DICTATION);
     expect(await answers(page).count()).toBe(before);
     await shots(page, 'BASE-G112');
+  });
+});
+
+test.describe('a copy of a business attached in the panel', () => {
+  test('is offered by the attach button, loads with its card and the yes, and erplora.com only hears its name (BASE-F94)', async ({ page }) => {
+    await login(page, A, '/');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // A copy of this business as Settings › Data › Export gives it.
+    const copy = await api<{ content_base64: string }>(page.context(), A, 'GET', '/settings/data/export?name=Copia%20E2E&language=en&purpose=template');
+    expect(copy.status).toBe(200);
+    const name = 'copia-e2e.blueprint.zip';
+    await home(page);
+    await openPanel(page);
+    const input = panel(page).locator('[data-testid="assistant-attach-input"]');
+    expect((await input.getAttribute('accept'))?.split(',')).toEqual(expect.arrayContaining(['.zip', 'application/zip']));
+    const larger = Buffer.alloc(20 * 1024 * 1024 + 1);
+    await input.setInputFiles({ name: 'enorme.blueprint.zip', mimeType: 'application/zip', buffer: larger });
+    await expect(panel(page).locator('[data-testid="assistant-composer-problem"]')).toHaveText(
+      'The file could not be read: the file is larger than 20 MB.',
+    );
+    await input.setInputFiles({ name, mimeType: 'application/zip', buffer: Buffer.from(copy.data.content_base64, 'base64') });
+    await expect(panel(page).locator('[data-testid="assistant-file"]')).toHaveText([name]);
+    await shots(page, 'BASE-F94-copy-attached');
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    // Sent alone, and asked for in the next message: the panel still has the file it attached.
+    await ask(page, '');
+    await expect(panel(page).locator('[data-testid="assistant-bubble-user"]').last()).toContainText(name);
+    await askForACard(page, `E2E-ASK base__blueprint__import {"file_base64":"${name}"}`);
+    await expect(card(page)).toContainText(name);
+    await shots(page, 'BASE-F94-copy-card', () => confirmationReady(page), () => confirmationSettled(page));
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await confirmedWithTheWord(page);
+    const sent = JSON.stringify(chats(provider()).map((seen) => seen.body));
+    expect(sent).toContain(name);
+    expect(sent).not.toContain(copy.data.content_base64);
+  });
+});
+
+test.describe('files attached in the panel, kept in Files', () => {
+  test('a PDF and a photo sent before the order are kept whole in the folder with their cards and the yes (BASE-F94, BASE-F73)', async ({ page }) => {
+    await login(page, A, '/');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const folder = `Facturas E2E ${Date.now()}`;
+    expect((await api(page.context(), A, 'POST', '/files/folder', { parent: '', name: folder })).status).toBe(200);
+    const kept = {
+      'albaran.pdf': Buffer.from('%PDF-1.4\n% albaran E2E\n'),
+      'factura.png': Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'),
+    };
+    await home(page);
+    await openPanel(page);
+    await panel(page).locator('[data-testid="assistant-attach-input"]').setInputFiles([
+      { name: 'albaran.pdf', mimeType: 'application/pdf', buffer: kept['albaran.pdf'] },
+      { name: 'factura.png', mimeType: 'image/png', buffer: kept['factura.png'] },
+    ]);
+    await expect(panel(page).locator('[data-testid="assistant-file"]')).toHaveText(['albaran.pdf', 'factura.png']);
+    // Sent alone, and asked for in later messages: the panel sends the whole conversation, the files with it.
+    await ask(page, '');
+    for (const name of Object.keys(kept)) {
+      await askForACard(page, `E2E-ASK base__file__upload ${JSON.stringify({ folder, name, content_base64: name })}`);
+      await expect(card(page)).toContainText(name);
+      await decide(page, 'submit');
+      await expect(lastAnswer(page)).toContainText(DONE.en);
+    }
+
+    const listed = await api<{ files: { name: string }[] }>(page.context(), A, 'GET', `/files?folder=${encodeURIComponent(folder)}`);
+    expect(listed.data.files.map((file) => file.name).sort()).toEqual(['albaran.pdf', 'factura.png']);
+    for (const [name, bytes] of Object.entries(kept)) {
+      const raw = await page.context().request.get(`${A}/api/files/raw?path=${encodeURIComponent(`${folder}/${name}`)}`);
+      expect(Buffer.from(await raw.body()).equals(bytes)).toBe(true);
+    }
+    // The model heard the name of each file, the one it gave back for the upload.
+    const sent = JSON.stringify(chats(provider()).map((seen) => seen.body));
+    expect(sent).toContain('«albaran.pdf»');
+    expect(sent).toContain('«factura.png»');
+    await saveSessionForTheSweep(page.context());
   });
 });

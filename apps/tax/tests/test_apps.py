@@ -50,7 +50,7 @@ def test_tax_is_in_the_store_and_in_both_verticals():
 
 def test_permissions():
     # Viewing includes calculating: the old `calculate_tax` went to the very same roles as `view_tax`.
-    assert tax().permissions == ["tax.view", "tax.manage"]
+    assert list(tax().permissions) == ["tax.view", "tax.manage"]
 
 
 def test_roles_are_the_customer_roles_with_the_hub_prefix():
@@ -148,7 +148,7 @@ def test_the_homes_step_is_your_taxes_done_once_one_root_rule_applies_today():
         True,
     )
     assert "configured" in registry[step.operation].output.model_fields
-    assert home.level_of(f"tax.{step.key}", step.required) == home.LEVEL_FUNCTIONAL
+    assert home.setup_steps.level_of(f"tax.{step.key}", step.required) == home.setup_steps.LEVEL_FUNCTIONAL
 
 
 def test_the_step_says_the_words_of_the_notice_in_the_language_of_whoever_reads_it():
@@ -208,22 +208,22 @@ def test_every_business_is_born_with_taxes_on_and_none_with_verifactu(country):
 def test_while_taxes_is_off_whoever_runs_a_business_of_any_country_is_asked_to_turn_it_on():
     for country, named in (("PL", "Poland"), ("JP", "Japan"), ("", "Spain")):
         with translation.override("en"):
-            (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country=country)
+            (step,) = home.mandatory_apps.mandatory_steps([tax()], on=frozenset(), hub_country=country)
         assert (step["key"], step["title"], step["description"]) == (
             "base.mandatory.tax",
             "Turn on Taxes",
             f"It is mandatory for businesses in {named}.",
         )
     with translation.override("es"):
-        (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country="PT")
+        (step,) = home.mandatory_apps.mandatory_steps([tax()], on=frozenset(), hub_country="PT")
     assert (step["title"], step["description"]) == ("Activa Impuestos", "Es obligatoria para los negocios de Portugal.")
-    assert home.mandatory_steps([tax()], on=frozenset({"tax"}), hub_country="PT") == []
+    assert home.mandatory_apps.mandatory_steps([tax()], on=frozenset({"tax"}), hub_country="PT") == []
 
 
 def test_the_step_that_asks_to_turn_taxes_on_paints_an_icon_the_shell_has():
     """Its store icon (``calculator-outline``) is baked apart and the shell has not registered it: HubIcon would refuse
     it. The step paints Taxes as «My apps» does."""
-    (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country="ES")
+    (step,) = home.mandatory_apps.mandatory_steps([tax()], on=frozenset(), hub_country="ES")
     registry = shell_icon_registry()
     assert step["icon"] == tax().navigation[0].icon
     assert f"'{step['icon'].removeprefix('ion:')}'" in registry

@@ -38,7 +38,8 @@ from base.tenancy.tests.s3 import (  # noqa: F401
     nothing_kept,
     objects,
 )
-from control.models import Hub, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Hub
 
 pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES)]
 

@@ -68,7 +68,7 @@ def by_its_name(said: str) -> dict[str, dict]:
         "modifier.group.update": {"group": said, "max_choices": 3},
         "modifier.link.attach": {"group": said, "category": "Entrantes"},
         "modifier.link.detach": {"group": said, "product": "Hamburguesa"},
-        "modifier.option.create": {"group": said, "name": "Brava"},
+        "modifier.option.create": {"group": said, "name": "Brava", "price_delta": 0},
         "modifier.option.delete": {"group": said, "option": "Alioli"},
         "modifier.option.update": {"group": said, "option": "Alioli", "price_delta": 50},
     }
@@ -85,7 +85,7 @@ def a_group(name: str):
     """The group ``name`` as a restaurant's Modifiers screens show it: its option «Alioli», applied to
     «Hamburguesa»; the category «Entrantes» to apply it to. Made with each app's own operations."""
     group = run("modifier.group.create", {"name": name})
-    run("modifier.option.create", {"group_id": str(group.id), "name": "Alioli"})
+    run("modifier.option.create", {"group_id": str(group.id), "name": "Alioli", "price_delta": 0})
     run("modifier.link.attach", {"group_id": str(group.id), "product_id": str(burger().id)})
     if not _has_category("Entrantes"):
         make_category("Entrantes")
@@ -432,7 +432,7 @@ def test_the_yes_to_a_link_that_comes_by_its_id_lets_only_it_go_whatever_id_come
 
 # ── A product or a category said by its name, when a group is applied or let go (hub#1291) ───────────────────────────
 # Applying a group or letting it go finds a product by its id, else by its SKU or its name, and a category by its id,
-# else by its name (``services._target``): the card reads them by what was said, as the write will find them, and
+# else by its name (``services.links._target``): the card reads them by what was said, as the write will find them, and
 # says them as said when it cannot. Beside the id the write takes its record by instead (the product's or the
 # category's or, letting a group go, the link's), the card neither reads nor shows the name, which the write does not
 # use.

@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:44cc60501841943a463ca76f16148b71602f984bf00328de08b2307e892b5d4e -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:0c46a21dfe86 -->
 
 Kitchen receives every round the waiter sends from the till, before charging, and turns it into a
 **ticket**: it shows it on a kitchen display that reads from a metre away (the **Display**), shares its
@@ -8,6 +7,7 @@ dishes out among **stations** (grill, bar, desserts…), lets each station mark 
 pass **serve** them, and keeps a **history** of what was done.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:ae402ee0f382 -->
 
 - The kitchen or floor **employee** (cook, waiter): marks dishes ready, recalls them, serves, marks a
   round rush and sends rounds from the till. Only changes states.
@@ -28,6 +28,7 @@ ticket type and its priority, in their words ("Takeaway", "Rush"). What whoever 
 exists, does not show.
 
 ## Adopted reference
+<!-- from WORKBOOK.md sha256:8cf070913be7 -->
 
 ERPlora does not invent flows: it adopts the ones the market has already proven.
 
@@ -74,8 +75,15 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   - [Lightspeed K](https://k-series-support.lightspeedhq.com/hc/articles/4403006478107) lets you choose
     the fields of the ticket.
   - It is what the till itself promises in "Who is serving this check".
+- **The ticket says the table its check is at today**: the KDS names the ticket by its check's table
+  ([Toast — what the ticket shows on the KDS](https://doc.toasttab.com/doc/platformguide/adminUnderstandingOrderInfoAppearsKDSTickets.html))
+  and moving the check to another table changes the table of the whole check
+  ([Toast — transferring checks](https://support.toasttab.com/en/article/Transferring-Items-Checks-and-Payments)).
+  So the ticket under way of a check moved to another table, merged into another or seated again says the
+  new table; a Served or Cancelled one keeps the one it had, which is where it went.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:bc6aeda6f578 -->
 
 - Switching Kitchen on also switches on **Sales** and **Inventory**. **Tables** and **Customers** are not
   needed: without Tables, the ticket carries the check's label or its type.
@@ -96,14 +104,17 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   5. Send a test round from the till and check that each dish comes out at its station.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Display
+<!-- from WORKBOOK.md sha256:af285140ca82 -->
 The kitchen board: one card per ticket being cooked, with its dishes, the wait in colour and who is serving it. At
 the top you choose the view ("Tickets", "Ready" or "All-Day") and, if there are dishes from several stations, yours,
 which the tablet remembers. Tap a dish to mark it ready, "Ready" for the whole card and "Served" when it goes out; in
 "⋮" you have "Mark rush" and "Recall". It updates by itself, without reloading.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:2205fe06a92a -->
 Menu **Kitchen → Display**. The kitchen board. A single bar at the top, fixed while scrolling: the three
 views as tabs with their counter ("Tickets" and "Ready"; "All-Day" without a counter), the "Full screen"
 button and, if the tickets on the line have dishes from more than one station, the station buttons
@@ -131,12 +142,14 @@ its printer." until a later print comes out fine. It updates by itself with ever
 reloading.
 
 ### Tickets
+<!-- from WORKBOOK.md sha256:7d110a2b0a2d -->
 All the tickets, newest first, with their number, destination, type, priority, status, dishes and total. Search them
 by number or destination and filter them by type, priority or status. From each row you fire it, mark it ready,
 recall it, serve it, reprint it or cancel it; tapping it shows its detail. "New ticket" creates one by hand, for what
 does not go through the till.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:788a53080e5a -->
 Menu **Kitchen → Tickets**. Table of all the tickets, newest first, 50 per page (another size is chosen
 at the bottom):
 Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes (in words:
@@ -153,12 +166,14 @@ tickets.". Loading: the table skeleton. Load error: the table's, with retry; a r
 shows in its dialog or above the table, and one of the creation, inside the panel.
 
 ### Stations
+<!-- from WORKBOOK.md sha256:c5fddb736ba4 -->
 Your kitchen's stations (grill, bar, desserts…), each with its colour, where its dishes come out (on the display, on
 paper or both) and through which printer. "Add station" creates one; in each row you change it, delete it or send
 products to it. Below, the routing says which products and categories go to each station: whatever has no station
 shows under "No station".
 
 #### Detail
+<!-- from WORKBOOK.md sha256:c11404725295 -->
 Menu **Kitchen → Stations**. Table: Station (with its colour), Destination ("Screen and paper", "Screen
 only", "Paper only"), Printer (the function —"Kitchen", "Bar"— and, if one was chosen, the specific
 printer), In progress (dishes to cook at that station) and Active ("Yes"/"No"); search box "Search
@@ -172,25 +187,29 @@ to «No station».". Loading: the skeleton. Error: the table's, with retry; each
 its dialog. The actions only show to whoever can manage stations (manager, administrator, owner).
 
 ### History
+<!-- from WORKBOOK.md sha256:6757be72879f -->
 What has happened in the kitchen, latest first: what was done, on which ticket and with which dish, who and when.
 Search by the ticket's number or by words of its notes, and filter by action ("Received", "Ready", "Cancelled"…).
 
 #### Detail
+<!-- from WORKBOOK.md sha256:b5f628f3cab3 -->
 Menu **Kitchen → History**, title "Kitchen history". Table of what happened in the kitchen, latest first,
 50 per page (another size is chosen at the bottom): Action, Ticket (the number), Dish, Who (the person's
-name or, if they have none, their e-mail, or the API key's; "System" if no person did it: Kitchen by
-itself or an automation), Notes and When (date and
-time of the business). Search box "Search ticket or notes…" (a piece of the number or words of the notes);
+name or, if they have none, what goes before the @ of their e-mail, never the whole e-mail, or the API key's;
+"System" if no person did it: Kitchen by itself or an automation), Notes and When (date and time of the
+business). Search box "Search ticket or notes…" (a piece of the number or words of the notes);
 action filter with the same words as the column ("Received", "Created", "Fired", "Ready", "Dish ready",
 "Dish recalled", "Dish voided", "Served", "Recalled", "Cancelled", "Rush", "Rush removed", "Reprinted",
 "Deleted"). Empty: "No recent kitchen activity.". Loading: the skeleton. Error: the table's, with retry.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:c680f72f8776 -->
 How the kitchen display works: the timer, after how many minutes a card turns amber and red, the sound when a ticket
 comes in (with its volume and tone), whether the pass prints on paper when marked ready, whether the kitchen works
 with the display and the ticket type to start with. Only whoever can save the settings sees it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:7c28c37e0281 -->
 Tab **Kitchen → Settings** (only for whoever can save them: manager, administrator, owner). "Show timer",
 "Amber warning (minutes)", "Red alert (minutes)", "Colour semaphore", "Sound on a new ticket", "Sound
 volume (0-100)", "Sound tone" ("Chime", "Bell", "Buzzer"), "Print the pass when marked ready", "The
@@ -200,6 +219,7 @@ kitchen works from the screen" and "Default order type" ("Dine in", "Takeaway", 
 form with the field marked.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:487762f587bb -->
 
 | Screen | Loading | Empty | Error |
 |---|---|---|---|
@@ -210,12 +230,14 @@ form with the field marked.
 | Settings | "Loading settings…" | — | "Could not load the settings." + Retry |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:4bb6acf35cbf -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -252,6 +274,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | KITCHEN-F32 | Highlight the customer's allergy on the card and on paper | done |
 
 ### KITCHEN-F01 Create a station
+<!-- from WORKBOOK.md sha256:97eb1cb4e9b4 -->
 Status: done
 Actor: manager, administrator
 Screen: Stations
@@ -263,7 +286,10 @@ Steps:
 3. Press "Create station": the panel closes and the station shows in the table, "Active: Yes", "In
    progress: 0".
 In: what whoever creates it writes.
-Out: the station (announces: station created).
+Out: the station (announces: station created). A new station receives nothing until products or
+categories are routed to it (KITCHEN-F04): what is sent without a route shows under "No station". Asked of
+the assistant, on creating it it says nothing reaches it yet and offers to route the products or categories
+to it.
 If it fails: the rejection shows inside the panel; the reason of a field, under it, and it goes away as soon
 as that field is corrected, even if another one says the same. A name that another live station
 already has is rejected
@@ -272,6 +298,7 @@ again. Whoever cannot manage stations does not see the button.
 Involved: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
 
 ### KITCHEN-F02 Edit, rename or switch off a station
+<!-- from WORKBOOK.md sha256:63e39b0634c8 -->
 Status: done
 Actor: manager, administrator
 Screen: Stations
@@ -290,6 +317,7 @@ deleted says it no longer exists.
 Involved: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 
 ### KITCHEN-F03 Delete a station
+<!-- from WORKBOOK.md sha256:bd23df036df3 -->
 Status: done
 Actor: manager, administrator
 Screen: Stations
@@ -305,6 +333,7 @@ them to another station first.", inside the dialog.
 Involved: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10
 
 ### KITCHEN-F04 Send products and categories to a station (and remove them)
+<!-- from WORKBOOK.md sha256:45f875049c32 -->
 Status: done
 Actor: manager, administrator
 Screen: Stations
@@ -327,6 +356,7 @@ error.
 Involved: KITCHEN-F01, KITCHEN-F05, KITCHEN-F08, INVENTORY-F04, INVENTORY-F06, INVENTORY-F07, INVENTORY-F27
 
 ### KITCHEN-F05 Receive the round the till sends
+<!-- from WORKBOOK.md sha256:05d8dced4cc1 -->
 Status: done
 Actor: system
 Screen: none
@@ -334,22 +364,32 @@ Steps:
 1. The waiter sends the round (KITCHEN-F18) or Sales sends it by itself (through the assistant or the
    API); the one Sales sends by itself reaches Kitchen a moment later, without anyone doing anything.
 2. Kitchen opens a ticket with the day's number (`YYYYMMDD-NNNN`, the business day, in its time zone), the
-   check's round, the check's label ("Table 4"), the type, the priority and the waiter.
+   check's round, the check's label ("Table 4"), the type, the priority and the waiter: their name or, if
+   their account has none, what goes before the @ of their e-mail, never the whole e-mail (BASE-F119); a
+   ticket saved before with the e-mail reads the same way.
 3. Each line that is not a service is a dish, in the order of the check, sent to its station
    (KITCHEN-F04); a menu, one dish for each dish chosen (KITCHEN-F06). Service lines are not cooked.
 4. The ticket appears on the display as "To prepare", rings (KITCHEN-F16), comes out on paper
    (KITCHEN-F08) and the installed app shows its system notice, which opens Kitchen on a tap.
+5. If its check is later moved to another table (TABLE-F15), merged into another (TABLE-F16) or seated
+   again (TABLE-F24), the ticket under way says the check's new title ("Table 9") on the display, in
+   "Tickets" and to the assistant ("mark table 9's order urgent"), without reloading. A Served or
+   Cancelled ticket keeps the title it had.
 In: from Sales, the check's sent lines (their round, their sending time, their product, their quantity,
-their note, their modifiers, their category and, if it is a menu, its dishes) and, when Kitchen does the
-sending, the priority, the channel and who sends.
+their note, their modifiers, their category and, if it is a menu, its dishes), its check's title and,
+when Kitchen does the sending, the priority, the channel and who sends.
 Out: the ticket "To prepare" with its dishes and "Received" in the History, at the time of sending
 (announces: ticket received).
 If it fails: a round of services only does not open a ticket. What was sent before Kitchen existed in the
 business does not appear. The same round never opens two tickets, even if it arrives twice. No failure
-here blocks the waiter.
-Involved: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18
+here blocks the waiter. If the check has no title, the ticket keeps what the sending said ("Pickup Ana");
+if its dishes ended up on two checks with different titles (a split check and one of the two moved to
+another table), it keeps its own.
+Involved: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18, BASE-F119,
+TABLE-F15, TABLE-F16, TABLE-F24
 
 ### KITCHEN-F06 A menu of the day on the ticket
+<!-- from WORKBOOK.md sha256:76e8353a64f0 -->
 Status: done
 Actor: employee
 Screen: Display
@@ -376,6 +416,7 @@ changes afterwards.
 Involved: SALE-F12, SALE-F20, SALE-F42, COMBO-F11, KITCHEN-F04, KITCHEN-F08, KITCHEN-F29
 
 ### KITCHEN-F07 Notes on each dish
+<!-- from WORKBOOK.md sha256:a144f043f70f -->
 Status: done
 Actor: employee
 Screen: Display
@@ -396,6 +437,7 @@ comes out the same under its dish.
 Involved: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
 ### KITCHEN-F08 The ticket comes out on paper at each station
+<!-- from WORKBOOK.md sha256:9e781354cb0d -->
 Status: done
 Actor: system
 Screen: none
@@ -420,6 +462,7 @@ Check the kitchen printer in Printing." (KITCHEN-F18).
 Involved: KITCHEN-F05, KITCHEN-F06, KITCHEN-F07, KITCHEN-F09, KITCHEN-F18, SALE-F20, PRINTING-F04, PRINTING-F10, PRINTING-F18
 
 ### KITCHEN-F09 Reprint a ticket
+<!-- from WORKBOOK.md sha256:940b11ff065b -->
 Status: done
 Actor: employee, manager
 Screen: Tickets
@@ -435,6 +478,7 @@ an active kitchen or bar printer." and nothing is sent to the queue.
 Involved: KITCHEN-F08, KITCHEN-F21, PRINTING-F11
 
 ### KITCHEN-F10 See the kitchen board
+<!-- from WORKBOOK.md sha256:830fd9b28784 -->
 Status: done
 Actor: employee, manager
 Screen: Display
@@ -459,6 +503,7 @@ change tickets, the display is look-only: no buttons and the dishes do not respo
 Involved: KITCHEN-F11, KITCHEN-F12, KITCHEN-F13, KITCHEN-F14, KITCHEN-F15, KITCHEN-F16, KITCHEN-F26
 
 ### KITCHEN-F11 Mark dishes ready
+<!-- from WORKBOOK.md sha256:de0e43ccaa26 -->
 Status: done
 Actor: employee, manager
 Screen: Display (also the assistant: "mark table 4 ready")
@@ -477,6 +522,7 @@ try again.".
 Involved: KITCHEN-F10, KITCHEN-F12, KITCHEN-F17, KITCHEN-F25
 
 ### KITCHEN-F12 Recall what was marked by mistake
+<!-- from WORKBOOK.md sha256:1c74238c9176 -->
 Status: done
 Actor: employee, manager
 Screen: Display
@@ -491,6 +537,7 @@ If it fails: a Served or Cancelled ticket is not recalled.
 Involved: KITCHEN-F10, KITCHEN-F11, KITCHEN-F16, KITCHEN-F21, KITCHEN-F25
 
 ### KITCHEN-F13 Serve what is ready
+<!-- from WORKBOOK.md sha256:0b3e5a538523 -->
 Status: done
 Actor: employee, manager
 Screen: Display, Tickets
@@ -504,6 +551,7 @@ If it fails: only a Ready ticket is served.
 Involved: KITCHEN-F11, KITCHEN-F21, KITCHEN-F27
 
 ### KITCHEN-F14 Mark a round rush from the kitchen display
+<!-- from WORKBOOK.md sha256:9e028209d36d -->
 Status: done
 Actor: employee, manager
 Screen: Display
@@ -522,6 +570,7 @@ cooked."). If the notice does not print, the display says so.
 Involved: KITCHEN-F10, KITCHEN-F16, KITCHEN-F20, PRINTING-F10
 
 ### KITCHEN-F15 See how much is left to cook
+<!-- from WORKBOOK.md sha256:8b24c1faa59b -->
 Status: done
 Actor: employee, manager
 Screen: Display (also the assistant: "what is left on the grill")
@@ -535,6 +584,7 @@ If it fails: with nothing to cook, "Nothing left to cook.".
 Involved: KITCHEN-F10, KITCHEN-F29
 
 ### KITCHEN-F16 Ring when a ticket arrives
+<!-- from WORKBOOK.md sha256:31ea8410d784 -->
 Status: done
 Actor: system
 Screen: Display
@@ -555,6 +605,7 @@ still arrives.
 Involved: KITCHEN-F05, KITCHEN-F10, KITCHEN-F12, KITCHEN-F14, KITCHEN-F26
 
 ### KITCHEN-F17 Print the pass when marking ready
+<!-- from WORKBOOK.md sha256:8155e8a08e0a -->
 Status: done
 Actor: system
 Screen: none
@@ -570,6 +621,7 @@ If it fails: the display shows "The pass could not be printed. Check the printer
 Involved: KITCHEN-F11, KITCHEN-F26, PRINTING-F10
 
 ### KITCHEN-F18 Send the round from the till, normal or rush
+<!-- from WORKBOOK.md sha256:734b3309ebcd -->
 Status: done
 Actor: employee
 Screen: Sales: Sell
@@ -595,6 +647,7 @@ could not be sent to the kitchen. Try again.". Without Kitchen active, the till 
 Involved: SALE-F20, KITCHEN-F05, KITCHEN-F08, KITCHEN-F09, KITCHEN-F19, PRINTING-F10
 
 ### KITCHEN-F19 Follow the check's tickets from the till
+<!-- from WORKBOOK.md sha256:e8391da1a490 -->
 Status: done
 Actor: employee
 Screen: Sales: Sell ("Order tickets" sheet)
@@ -613,6 +666,7 @@ permission to see tickets, or without Kitchen active, the till does not show "Ti
 Involved: SALE-F20, SALE-F24, KITCHEN-F05, KITCHEN-F20, KITCHEN-F28, KITCHEN-F29
 
 ### KITCHEN-F20 Mark a round rush from the till
+<!-- from WORKBOOK.md sha256:3ef4295b5537 -->
 Status: done
 Actor: employee, manager
 Screen: Sales: Sell ("Order tickets" sheet)
@@ -633,6 +687,7 @@ change tickets see it. Without Kitchen active, the till shows none of this.
 Involved: SALE-F20, KITCHEN-F14, KITCHEN-F19
 
 ### KITCHEN-F21 Move a ticket from the Tickets list
+<!-- from WORKBOOK.md sha256:06e56ed8530f -->
 Status: done
 Actor: employee, manager
 Screen: Tickets
@@ -648,6 +703,7 @@ action requires. Refresh and try again.".
 Involved: KITCHEN-F11, KITCHEN-F12, KITCHEN-F13, KITCHEN-F19, KITCHEN-F22, KITCHEN-F23, KITCHEN-F25
 
 ### KITCHEN-F22 Cancel a ticket
+<!-- from WORKBOOK.md sha256:d64defdb69a2 -->
 Status: done
 Actor: manager
 Screen: Tickets (also the assistant)
@@ -664,6 +720,7 @@ If it fails: a Served or Cancelled ticket is not cancelled. One that never came 
 Involved: KITCHEN-F21, KITCHEN-F25, KITCHEN-F28, KITCHEN-F29, PRINTING-F10
 
 ### KITCHEN-F23 Create a ticket by hand
+<!-- from WORKBOOK.md sha256:348802b60a9e -->
 Status: done
 Actor: employee, manager
 Screen: Tickets
@@ -672,7 +729,10 @@ Steps:
    if you want, and add its dishes (product of the catalogue, quantity and note).
 2. "Create ticket": the panel closes and the ticket shows at the top of the list (even if you were on
    another page, the list goes back to the first) and on the display.
-In: the type, the destination, the notes and the dishes.
+In: the type, the destination, the notes and the dishes. Through the assistant, each dish goes by a product of the
+catalogue, by its name or by what is cooked, and its card says on its line the destination and the dishes, each by
+what was said, its note and how many ("Create in Kitchen: Staff · Dishes: Espresso · 2, Latte · 1"); the type and
+the notes come after.
 Out: a ticket To prepare, round 1, without a check, with the name of whoever creates it (announces: ticket
 created; History "Created"); its dishes go to their station like those of a round.
 If it fails: inside the panel, and what was typed stays. A ticket without dishes is rejected ("Add at least
@@ -684,6 +744,7 @@ another one is chosen). As it hangs from no check, charging does not close it.
 Involved: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
 
 ### KITCHEN-F24 Delete a ticket
+<!-- from WORKBOOK.md sha256:c28b95d70cde -->
 Status: done
 Actor: manager
 Screen: assistant or API
@@ -699,13 +760,14 @@ already deleted answers the same and changes nothing.
 Involved: KITCHEN-F22, KITCHEN-F23, KITCHEN-F25
 
 ### KITCHEN-F25 Look up the kitchen history
+<!-- from WORKBOOK.md sha256:8e8b4dffd1ff -->
 Status: done
 Actor: employee, manager, administrator
 Screen: History
 Steps:
 1. Open **Kitchen → History**: what happened, on which ticket and with which dish, who (their name or, if
-   they have none, their e-mail; "System" if it was no person: Kitchen by itself or an automation), their
-   notes and when, latest first.
+   they have none, what goes before the @ of their e-mail, never the whole e-mail; "System" if it was no
+   person: Kitchen by itself or an automation), their notes and when, latest first.
 2. In "Search ticket or notes…", write a piece of the ticket's number or a few words of the notes; filter
    by action ("Received", "Cancelled"…).
 3. At the bottom, change page or choose how many entries to see (25, 50…).
@@ -715,9 +777,10 @@ deleted.
 Out: nothing; it only shows.
 If it fails: if it cannot be loaded, "Could not load the history" with "Retry". Whoever has no permission to
 see the history reads "You do not have permission to see this.".
-Involved: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29
+Involved: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29, BASE-F119
 
 ### KITCHEN-F26 Adjust the kitchen display
+<!-- from WORKBOOK.md sha256:699bf7f28d71 -->
 Status: done
 Actor: manager, administrator
 Screen: Settings
@@ -741,6 +804,7 @@ is refused too. A refusal that names no field stays until the next try.
 Involved: KITCHEN-F10, KITCHEN-F16, KITCHEN-F17, KITCHEN-F23, KITCHEN-F27
 
 ### KITCHEN-F27 Close the rounds when the whole check is charged
+<!-- from WORKBOOK.md sha256:991c0fe6edf9 -->
 Status: done
 Actor: system
 Screen: none
@@ -761,6 +825,7 @@ charging even if nobody marked it; what was charged before switching it off is s
 Involved: SALE-F01, SALE-F22, KITCHEN-F13, KITCHEN-F25, KITCHEN-F26
 
 ### KITCHEN-F28 Withdraw the rounds of a check deleted or merged into another
+<!-- from WORKBOOK.md sha256:23d0b04172fc -->
 Status: done
 Actor: system
 Screen: none
@@ -770,8 +835,8 @@ Steps:
    History as cancelled. If the round came out on paper, the slip "CANCELLED · Table 4" comes out with
    what was left to cook (KITCHEN-F22).
 2. Two checks are joined: the rounds sent from the absorbed one move to the one that stays, like their
-   dishes, in the same state and with their label; on charging the one that stays they close like its
-   own.
+   dishes, in the same state and with the title of the one that stays (KITCHEN-F05); on charging the one
+   that stays they close like its own.
 In: from Sales, the voided check or the lines that changed check.
 Out: rounds cancelled (announces: ticket cancelled) or of another check.
 If it fails: a round already Served or Cancelled is not touched. A check without rounds under way changes
@@ -779,6 +844,7 @@ nothing in the kitchen, and neither does a repeated notice: no round is cancelle
 Involved: SALE-F18, SALE-F24, KITCHEN-F19, KITCHEN-F22, KITCHEN-F25, KITCHEN-F27
 
 ### KITCHEN-F29 Void a dish already sent, with a notice to the kitchen
+<!-- from WORKBOOK.md sha256:0e5ced7c4318 -->
 Status: done
 Actor: manager (at the till)
 Screen: Sales: Sell
@@ -796,6 +862,7 @@ If it fails: a Served or Cancelled round is not touched.
 Involved: SALE-F20, COMBO-F11, KITCHEN-F06, KITCHEN-F10, KITCHEN-F15, KITCHEN-F19, KITCHEN-F25
 
 ### KITCHEN-F31 Give Cash register the tickets still under way
+<!-- from WORKBOOK.md sha256:b5af3629810c -->
 Status: done
 Actor: system
 Screen: none
@@ -813,6 +880,7 @@ register.
 Involved: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 
 ### KITCHEN-F32 Highlight the customer's allergy on the card and on paper
+<!-- from WORKBOOK.md sha256:758f13fb02fb -->
 Status: done
 Actor: employee
 Screen: Display, Tickets

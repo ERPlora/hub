@@ -4,8 +4,11 @@ Every field carries a description: the schemas are the JSON Schema of the assist
 """
 
 import inspect
+import pkgutil
+import re
 import uuid
 from datetime import date
+from importlib import import_module
 
 import pydantic
 import pytest
@@ -13,27 +16,18 @@ from django.utils import translation
 from ninja import Schema
 
 from apps.customer import schemas
-from apps.customer.schemas import (
-    ActivityIn,
-    ConsentGrantIn,
-    ConsentWithdrawIn,
-    CustomerIn,
-    CustomerListIn,
-    CustomerPatchIn,
-    CustomerRefIn,
-    FieldIn,
-    FieldPatchIn,
-    GroupIn,
-    GroupPatchIn,
-    ImportIn,
-    MergeIn,
-    NoteIn,
-    OrderLinkIn,
-    PageIn,
-    PurchaseRecordIn,
-    SetGroupsIn,
-    TagIn,
-)
+from apps.customer.schemas.activity import ActivityIn, NoteIn
+from apps.customer.schemas.cards import CustomerIn, CustomerListIn, CustomerPatchIn
+from apps.customer.schemas.consent import ConsentGrantIn, ConsentWithdrawIn
+from apps.customer.schemas.custom_fields import FieldIn, FieldPatchIn
+from apps.customer.schemas.fields import CustomerRefIn, PageIn
+from apps.customer.schemas.groups import GroupIn, GroupPatchIn
+from apps.customer.schemas.importing import ImportIn
+from apps.customer.schemas.memberships import SetGroupsIn
+from apps.customer.schemas.merging import MergeIn
+from apps.customer.schemas.orders import OrderLinkIn
+from apps.customer.schemas.purchases import PurchaseRecordIn
+from apps.customer.schemas.tags import TagIn
 
 ID = uuid.uuid7()
 
@@ -56,13 +50,18 @@ def messages(schema, **data):
 
 
 def all_schemas():
-    return [
-        value
-        for value in vars(schemas).values()
-        if inspect.isclass(value)
-        and issubclass(value, Schema)
-        and value.__module__ == schemas.__name__
-    ]
+    """Every schema of the package once. A ``Page[X]`` keeps the module of ``Page`` itself, not the one that names it."""
+    modules = [import_module(f"{schemas.__name__}.{info.name}") for info in pkgutil.iter_modules(schemas.__path__)]
+    return list(
+        dict.fromkeys(
+            value
+            for module in modules
+            for value in vars(module).values()
+            if inspect.isclass(value)
+            and issubclass(value, Schema)
+            and value.__module__.startswith(f"{schemas.__name__}.")
+        )
+    )
 
 
 def test_every_field_of_every_schema_has_a_description():
@@ -165,7 +164,7 @@ def test_choices_and_dates():
         name="Ana", birthday="1990-05-04", lifecycle_stage="vip", source="whatsapp"
     )
     assert (data.birthday, data.lifecycle_stage, data.source) == (
-        date(1990, 5, 4),
+        "1990-05-04",
         "vip",
         "whatsapp",
     )
@@ -173,6 +172,48 @@ def test_choices_and_dates():
         "preferred_channel"
     }
     assert invalid_fields(CustomerIn, name="Ana", birthday="1990-02-31") == {"birthday"}
+
+
+@pytest.mark.parametrize(
+    ("sent", "kept"),
+    [
+        ("--03-14", "--03-14"),
+        (" --02-29 ", "--02-29"),
+        ("1990-03-14", "1990-03-14"),
+        # How a separate copy of the business taken before the card kept its days as text gives them back.
+        (date(1990, 3, 14), "1990-03-14"),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_a_birthday_or_an_anniversary_may_go_without_its_year(sent, kept):
+    data = CustomerIn(name="Ana", birthday=sent, anniversary=sent)
+    assert (data.birthday, data.anniversary) == (kept, kept)
+    assert CustomerPatchIn(id=ID, birthday=sent).birthday == kept
+
+
+@pytest.mark.parametrize("sent", ["--02-30", "--13-01", "1990-02-31", "03-14", "14/03", "14 de marzo", "--3-14", 314])
+def test_a_day_that_does_not_exist_is_refused_as_any_wrong_date(sent):
+    with pytest.raises(pydantic.ValidationError) as excinfo:
+        CustomerIn(name="Ana", birthday=sent)
+    assert [(error["loc"], error["type"]) for error in excinfo.value.errors()] == [(("birthday",), "date_parsing")]
+
+
+def test_the_assistant_is_told_a_day_may_go_without_its_year():
+    for schema in (CustomerIn, CustomerPatchIn):
+        birthday = schema.model_json_schema()["properties"]["birthday"]
+        branches = birthday["anyOf"]
+        assert {"type": "string", "format": "date"} in branches
+        assert {"type": "null"} in branches
+        yearless = next(branch for branch in branches if "pattern" in branch)
+        assert re.fullmatch(yearless["pattern"], "--03-14")
+        assert not re.fullmatch(yearless["pattern"], "1990-03-14")
+
+
+def test_an_imported_row_is_told_a_day_may_go_without_its_year():
+    days = ImportIn.model_json_schema()["$defs"]["ImportRowIn"]["properties"]
+    for field in ("birthday", "anniversary"):
+        assert "--MM-DD" in days[field]["description"]
 
 
 def test_a_patch_carries_only_what_was_sent():

@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from babel import Locale, UnknownLocaleError
 from babel.numbers import (
     format_currency,
+    format_percent,
     get_currency_name,
     get_currency_precision,
     get_currency_symbol,
@@ -76,7 +77,7 @@ def zone_name(zone: dt.tzinfo | None = None) -> str:
 def country_or_market(country: str) -> str:
     """The country (ISO 3166-1 alpha-2, upper-case) a business with ``country`` is in for every rule by country: its
     own, or ERPlora's market (:data:`MARKET_COUNTRY`, Spain) without one, as a demo is (hub#682). The one reading of
-    it: the Home's national steps (``base.home.applies_to_country``) and VeriFactu's «only in Spain» ask it here."""
+    it: the Home's national steps (``base.home.setup_steps.applies_to_country``) and VeriFactu's «only in Spain» ask it here."""
     return country.strip().upper() or MARKET_COUNTRY
 
 
@@ -117,6 +118,13 @@ def money_text(cents: int | Decimal, currency: str, *, language: str | None = No
         decimal_quantization=whole,
     )
     return _spaced(text, get_currency_symbol(currency, locale=locale))
+
+
+def percent_text(percent: Decimal, *, language: str | None = None) -> str:
+    """``percent`` (21 is 21 %) as the Hub writes a percentage, the same as the browser (``Intl.NumberFormat``), in
+    ``language`` (the active one by default): «21 %», «21%», «5,2 %»."""
+    locale = babel_locale(language or translation.get_language() or settings.LANGUAGE_CODE)
+    return format_percent(percent / 100, locale=locale, decimal_quantization=False)
 
 
 def _spaced(text: str, symbol: str) -> str:

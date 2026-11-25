@@ -10,7 +10,7 @@ from functools import cached_property
 from django.conf import settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
-from live.meta import LiveAppConfig, all_live_app_configs
+from live.meta import Help, LiveAppConfig, all_live_app_configs
 
 #: Where an app is said to go, beside its name: out of the menu turns it off, into it or in it turns it on.
 OUT_OF_THE_MENU = ("del menu", "from the menu", "out of the menu", "off the menu")
@@ -60,19 +60,20 @@ class BaseConfig(LiveAppConfig):
     # The four data permissions (base.sensitive) say which sensitive data a role sees: a manager sees them all, an
     # employee only the customers' contact details, which serving them needs.
     # Owning the business is the owner's alone (base.permissions.OWNER_ONLY): no role but the owner gets it.
-    permissions = [
-        "base.view_home",
-        "base.administer_hub",
-        "base.view_files",
-        "base.upload_files",
-        "base.delete_files",
-        "base.open_management",
-        "base.view_costs",
-        "base.view_customer_contact",
-        "base.view_team_contact",
-        "base.view_business_totals",
-        "base.own_business",
-    ]
+    permissions = {
+        "base.view_home": _("View the Home and its panels"),
+        "base.administer_hub": _("Run the business: apps, settings, people and devices"),
+        "base.view_files": _("View and open the files"),
+        "base.upload_files": _("Upload and rename files"),
+        "base.delete_files": _("Delete files"),
+        "base.open_management": _("Open this business on erplora.com"),
+        "base.manage_roles": _("Manage roles"),
+        "base.view_costs": _("View costs"),
+        "base.view_customer_contact": _("View customer contact details"),
+        "base.view_team_contact": _("View team contact details"),
+        "base.view_business_totals": _("View business totals"),
+        "base.own_business": _("Reset the business, download its backups and upgrade the plan"),
+    }
     role_permissions = {
         "hub_owner": ["base.*"],
         "hub_admin": ["base.*"],
@@ -88,6 +89,8 @@ class BaseConfig(LiveAppConfig):
         "hub_employee": ["base.view_home", "base.view_files", "base.view_customer_contact"],
         "hub_accountant": ["base.view_home", "base.view_business_totals"],
     }
+    # The help of the Hub's own screens (base.platform_screens).
+    help = Help()
 
     @cached_property
     def assistant_synonyms(self) -> tuple[tuple[str, ...], ...]:

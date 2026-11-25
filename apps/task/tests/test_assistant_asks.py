@@ -102,9 +102,11 @@ def test_the_guests_of_a_table_are_no_comment():
     )
 
 
-test_the_reported_task_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED))
+#: The task the model searches for when the owner's words bring its tool past the places of a turn.
+SEARCHED = {"task.task.complete": "marcar una tarea como hecha"}
+test_the_reported_task_request_offers_its_existing_operation = in_hubs(reported_test(REPORTED, SEARCHED))
 
 
 #: The owner's seventeen phrases of layer 2, the ones the model answered right too: a tool of Tasks that a new ask
 #: elsewhere pushes out of the ones a turn offers fails here before the real-model QA sees it.
-test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks = in_hubs(probes_test(PROBES, "task"))
+test_every_probe_of_tasks_offers_its_tool_without_being_one_of_its_asks = in_hubs(probes_test(PROBES, "task", SEARCHED))

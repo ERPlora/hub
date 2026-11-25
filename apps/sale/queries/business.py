@@ -6,12 +6,12 @@ from live.operations import AI, operation
 
 from apps.sale.schemas.fields import EmptyIn
 from apps.sale.schemas.figures import BusinessDayOut
-from apps.tax.queries import business_jurisdiction, business_tax_kind, business_today
-from apps.tax.schemas import TAX_KIND_NAMES
+from apps.tax.queries.jurisdiction import business_jurisdiction, business_tax_kind, business_today
+from apps.tax.schemas.jurisdiction import TAX_KIND_NAMES
 from base.approvals import approval_of, digest
 from base import operations as platform
 from base import business
-from base.models import Approval
+from base.models.approvals import Approval
 
 #: The currency Spanish law writes its limits in (Ley 7/2012, RD 1619/2012): the law's, not the business's.
 LIMITS_CURRENCY = "EUR"

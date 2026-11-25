@@ -14,8 +14,10 @@ from live.outbox import record_event
 
 from apps.reservation import engine, events
 from apps.reservation.models import Reservation
-from apps.reservation.queries import business_now, in_service, starts_at
-from apps.reservation.schemas import CancelIn, DeletedOut, NoIn, ReleasedOut, ReservationOut, ReservationRefIn
+from apps.reservation.queries.business import business_now, starts_at
+from apps.reservation.queries.gate import in_service
+from apps.reservation.schemas.fields import DeletedOut, NoIn
+from apps.reservation.schemas.reservations import CancelIn, ReleasedOut, ReservationOut, ReservationRefIn
 from apps.reservation.services.gate import lock_book, refuse
 from apps.reservation.services.other_apps import status_changed, sync_hold
 from apps.reservation.services.reservations import _loaded, _named
@@ -115,7 +117,7 @@ def held_table(reservation: Reservation) -> None:
     },
 )
 def confirm_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
-    reservation = _named(data)
+    reservation = _named(ctx, data)
     held_table(reservation)
     previous = step(ctx, reservation, S.CONFIRMED)
     reservation.save()
@@ -153,7 +155,7 @@ def confirm_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     },
 )
 def seat_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
-    reservation = _named(data)
+    reservation = _named(ctx, data)
     previous = step(ctx, reservation, S.SEATED)
     if reservation.table_id is not None:
         reservation.table_session_id = seat_at_table(ctx, reservation)
@@ -186,7 +188,7 @@ def seat_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     },
 )
 def complete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
-    reservation = _named(data)
+    reservation = _named(ctx, data)
     previous = step(ctx, reservation, S.COMPLETED)
     reservation.save()
     status_changed(ctx, reservation, previous)
@@ -218,7 +220,7 @@ def complete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     },
 )
 def cancel_reservation(ctx: OperationContext, data: CancelIn) -> dict:
-    reservation = _named(data)
+    reservation = _named(ctx, data)
     previous = step(ctx, reservation, S.CANCELLED)
     reservation.cancellation_reason = data.reason
     reservation.save()
@@ -252,7 +254,7 @@ def cancel_reservation(ctx: OperationContext, data: CancelIn) -> dict:
     },
 )
 def no_show_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
-    reservation = _named(data)
+    reservation = _named(ctx, data)
     previous = step(ctx, reservation, S.NO_SHOW)
     reservation.save()
     status_changed(ctx, reservation, previous)
@@ -285,7 +287,7 @@ def no_show_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
     },
 )
 def delete_reservation(ctx: OperationContext, data: ReservationRefIn) -> dict:
-    reservation = _named(data)
+    reservation = _named(ctx, data)
     reservation.is_deleted = True
     reservation.deleted_at = timezone.now()
     _stamp(reservation, ctx)

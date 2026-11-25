@@ -28,7 +28,7 @@ from apps.combo.models import ChoiceOption
 from apps.inventory.models import Product, StockMovement
 from apps.kitchen.models import Ticket
 from apps.kitchen.tests.conftest import add_printers
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
 from .conftest import FOOD, HUB_DB_COMMITTED, A, B, ctx_for

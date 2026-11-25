@@ -1,12 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:8e739ce4475a5fb0a1d5963c2c40dcc893034b65d6325c21d31eea2da4882a66 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:b6d18775c177 -->
 
 Schedules says when your business is open: each weekday's hours, the public holidays and the days with other hours,
 and a run of dates with other hours or closed, such as your vacation. Appointments and Reservations read it so as not to give
 a time or a table while the business is closed. These are the premises' hours; each professional's are kept in Staff.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:53a0304d4aca -->
 
 Schedules says **when the business is open**:
 
@@ -21,6 +21,7 @@ These are the **business's** hours. They are not each professional's shift nor t
 **Staff**'s), nor the hours that can be booked (that is decided by **Appointments**, crossing both).
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:e7d83aa8e466 -->
 
 - The **owner**, the **administrator** and the **manager** set the week, add, correct and delete special
   days and temporary changes, and change the settings.
@@ -31,6 +32,7 @@ the ones that come through Online booking); Reservations, so as not to give a ta
 closed; the assistant answers with it "are you open on Saturday at six?".
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:4ce969cee876 -->
 
 **What belongs to Schedules and what to Staff** (skill `market-decision`, 2026-10-14). All the products in
 the table keep two different things: the premises' opening hours (what the customer sees and what closes
@@ -78,6 +80,7 @@ And this is decided here (same comparison):
 - **A special day and a temporary change can be corrected** (Google, Fresha, Square edit them).
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:7eedc0a45ac8 -->
 
 1. Turn on **Schedules** (it comes with the hair salon and the restaurant). It already has a default week
    (SCHEDULE-F12): Monday to Friday from 09:00 to 18:00, Saturday and Sunday closed.
@@ -90,18 +93,21 @@ And this is decided here (same comparison):
 5. If you want the week to start on Sunday, change it in **Settings** (SCHEDULE-F08).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:cffd3397a615 -->
 
 Schedules opens from the **Schedules** menu and has three tabs: **Hours**, **Special days** and
 **Settings**. What a person cannot do does not show, and the app refuses it even if they try through the
 API or the assistant.
 
 ### Hours
+<!-- from WORKBOOK.md sha256:fb236108f460 -->
 Here is your week: one row per day with its hours (for example "10:00–14:00 · 17:00–20:00", "Open 24 hours" or
 "Closed") and whether you open that day. Tap a day to change it: close it, open it 24 hours or give it one or more
 intervals, such as a split shift or an interval that runs past midnight. While the week is the one we set by default, a
 yellow notice asks you to check it and confirm it with "Yes, these are my hours".
 
 #### Detail
+<!-- from WORKBOOK.md sha256:1b4cc0990a7a -->
 A table of **seven fixed rows**, one per weekday, with the columns **Day**, **Hours** and **Status**; there
 is no add button: a day is edited. **Hours** says, for example, "10:00–14:00 · 17:00–20:00", "Open 24
 hours", "Closed" or "Not set"; **Status** says "Open", "Closed" or "—" (not set); above it, **Columns** and
@@ -116,12 +122,14 @@ they match your business — appointments outside them are refused." shows above
 hours). On a phone the table is painted as cards.
 
 ### Special days
+<!-- from WORKBOOK.md sha256:ea1729ecba6e -->
 Here go the exceptions to your week. In "Special days" you note a single day, closed or with other hours, such as a
 holiday, which can repeat every year, like Christmas. In "Overrides" you note a run of dates with other hours or
 closed, such as your vacation or summer hours. A special day wins over an override, and both win over the week. Tap a
 row to correct it, or tap **Delete** on it to remove it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:6fa95797b305 -->
 Two tables, one under the other, each with its title.
 
 - **Special days**: columns **Date**, **Name**, **Status** ("Closed" or its hours, interval by interval)
@@ -139,17 +147,20 @@ Two tables, one under the other, each with its title.
   **Cancel** and **Delete**.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:cd0b8c68ae3e -->
 Here you choose whether the week starts on Monday or on Sunday, which only changes the order of the days in Hours. At
 the top you see the business's time zone, the Hub's, with which all the hours are read. Whoever cannot change the
 settings sees them without being able to save them.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:07c45a57a555 -->
 At the top, read-only, **Business timezone** with its name (for example, Europe/Madrid) and the note "It
 is the Hub's, and the single clock the schedule is read with.". Below, **Week starts** (Monday or Sunday)
 and **Save**, which confirms with "Saved". Whoever cannot change the settings sees the value without being
 able to change it and without **Save**.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:bba133ae1b6c -->
 
 | State | What the person sees |
 |---|---|
@@ -161,6 +172,7 @@ able to change it and without **Save**.
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:383184c7ac50 -->
 
 In "Edit hours" of a day, "New special day", "New override" and their correction ("Edit · …"), the phone's Back
 button asks "Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and
@@ -168,6 +180,7 @@ button asks "Discard changes?" when something typed or chosen has not been saved
 (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:318f41e9b1d2 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -186,6 +199,7 @@ button asks "Discard changes?" when something typed or chosen has not been saved
 | SCHEDULE-F13 | Correct a special day or a temporary change | done (server and screen) |
 
 ### SCHEDULE-F01 See the week's hours
+<!-- from WORKBOOK.md sha256:33ace6cd56d9 -->
 Status: done (server and screen)
 Actor: everyone
 Screen: Hours
@@ -201,6 +215,7 @@ like a business without hours.
 Involved: none
 
 ### SCHEDULE-F02 Set a day's hours
+<!-- from WORKBOOK.md sha256:973a199da7fa -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Hours
@@ -223,15 +238,15 @@ closed".
 Involved: Appointments and Reservations (they read the hours on the next booking)
 
 ### SCHEDULE-F03 Confirm the default week
+<!-- from WORKBOOK.md sha256:431216219319 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Home, Hours
 Steps:
 1. On the **Home**, while the week is the default one, "Finish setting up your business" brings "Confirm
-   your opening hours" ("We set up a default week for you (Monday to Friday, 09:00–18:00). If it matches
-   your business, confirm it in one tap; if not, edit the days that differ — bookings outside your
-   opening hours are refused."), "Recommended", to whoever may change the hours. "Set up" leads to
-   **Hours**.
+   your opening hours" ("Check that the week's hours are your business's: if they are, confirm them in
+   one tap; if not, edit the days that differ — bookings outside your opening hours are refused."),
+   "Recommended", to whoever may change the hours. "Set up" leads to **Hours**.
 2. With the yellow notice "These are default opening hours…" in sight, check that the days are your
    business's.
 3. Tap **Yes, these are my hours**; the button is disabled while it works.
@@ -241,25 +256,30 @@ Out: the week marked as confirmed, without changing a single hour, and a notice 
 then on the week also governs table reservations (SCHEDULE-F12). Confirming twice changes nothing and
 announces nothing. "Confirm your opening hours" is "Done" on the Home without a reload; also if, instead
 of confirming, a day is saved (SCHEDULE-F02), even as closed. Changing "Week starts", a special day or
-a temporary change does not confirm the week.
+a temporary change does not confirm the week. The done step stays on the list with the same line, which
+names no day and no hour: the assistant says it is done and, asked which hours there are, reads them in
+Schedules (SCHEDULE-F01), never from the step (BASE-F12).
 If it fails: above the table: "There are no weekly opening hours to confirm." if no day is saved (it cannot be
 reached from the screen: the notice only shows when there is a week).
-Involved: BASE-F01
+Involved: BASE-F01, BASE-F12
 
 ### SCHEDULE-F04 Add a special day
+<!-- from WORKBOOK.md sha256:fcea507009e8 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Special days
 Steps:
 1. In **Special days**, tap **+** (New special day).
-2. Type the **Date** and the **Name** (both required).
-3. Leave **Closed** (what it comes with) or choose "Open (with hours)" and type one or more intervals, as
-   when editing a day in **Hours**.
+2. Pick the **Date** in the calendar and type the **Name** (both required).
+3. Leave **Closed** (what it comes with) or choose "Open (with hours)" and pick the times of one or more
+   intervals, as when editing a day in **Hours**.
 4. Tick **Repeats every year** if it falls on the same day and month every year (Christmas); if you want,
    **Notes**.
 5. Tap **Add day**: the form closes and the day shows in the list.
 In: date (a real one: 31 February is not valid), name (up to 200), closed or intervals, yearly and notes
-(up to 1000).
+(up to 1000). Through the assistant, the card says on its line the name, the date and its hours, or that it is
+closed ("Create in Schedules: Christmas Eve · Date: Dec 24, 2027 · Opening intervals: 10:00 AM · 2:00 PM"; closed,
+"Closed: Yes"): intervals of a day left closed are not saved, and the card does not say them.
 Out: the special day (`schedule.special_day.created`). It beats everything else that day (SCHEDULE-F10,
 F11). A yearly day applies **every year**, also the ones before its date; the one on 29 February only
 exists in leap years.
@@ -269,17 +289,20 @@ name or one of only spaces, under the name. A date that had a deleted special da
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F05 Add a temporary change
+<!-- from WORKBOOK.md sha256:65cdd7daaa65 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Special days
 Steps:
 1. In the "Overrides" table, tap **+** (New override).
-2. Type **From**, **To** and **Reason** (all three required).
-3. Leave **Closed** (the business's holidays) or choose "Open (with hours)" and type the intervals that
-   apply on those dates (summer hours).
+2. Pick **From** and **To** in the calendar and type the **Reason** (all three required).
+3. Leave **Closed** (the business's holidays) or choose "Open (with hours)" and pick the times of the
+   intervals that apply on those dates (summer hours).
 4. Tap **Add override**.
 In: the two dates (both included), the reason (up to 200) and closed or intervals: the change applies to
-every day of the range with the same hours.
+every day of the range with the same hours. Through the assistant, the card says on its line the reason, its dates
+together and its hours, or that it is closed ("Create in Schedules: Summer hours · When: Jul 1 – Aug 31, 2027 ·
+Opening intervals: 8:00 AM · 3:00 PM").
 Out: the temporary change (`schedule.override.created`). It beats the week, but loses against a special
 day on that date (there is no warning that it overrides it: precedence settles it).
 If it fails: "The end date cannot be before the start date." under To; "Those dates overlap the temporary
@@ -289,6 +312,7 @@ editing a day in **Hours**.
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F06 Delete a special day or a temporary change
+<!-- from WORKBOOK.md sha256:2d7f84c39b99 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Special days
@@ -308,6 +332,7 @@ name or its date.
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F07 Load several special days at once
+<!-- from WORKBOOK.md sha256:0e2d8dfb0285 -->
 Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
@@ -325,6 +350,7 @@ without a name, is refused whole (422) before creating anything.
 Involved: none
 
 ### SCHEDULE-F08 Choose which day the week starts on
+<!-- from WORKBOOK.md sha256:4e6d5a82319c -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Settings
@@ -340,6 +366,7 @@ If it fails: if it cannot be saved, the reason shows under the field and nothing
 Involved: none
 
 ### SCHEDULE-F09 See the time zone the schedule is read with
+<!-- from WORKBOOK.md sha256:92b84971149c -->
 Status: done (server and screen)
 Actor: everyone
 Screen: Settings
@@ -355,6 +382,7 @@ If it fails: nothing to fail; the zone always comes from the server.
 Involved: none
 
 ### SCHEDULE-F10 Ask whether the business is open at a moment
+<!-- from WORKBOOK.md sha256:54ba4e906a23 -->
 Status: done (assistant and API)
 Actor: assistant, API
 Screen: none
@@ -378,6 +406,7 @@ If it fails: a moment that is not a real date and time: "That date and time are 
 Involved: none
 
 ### SCHEDULE-F11 Give Appointments the hours of some days
+<!-- from WORKBOOK.md sha256:21d859e1adf2 -->
 Status: done (Appointments and Reservations read it)
 Actor: system (Appointments and Reservations), assistant
 Screen: none
@@ -396,6 +425,7 @@ once." or, with a date outside 1900–2200, "Choose a date between 1900 and 2200
 Involved: Appointments, Reservations
 
 ### SCHEDULE-F12 Start from a default week when turned on
+<!-- from WORKBOOK.md sha256:dba10d6ca06d -->
 Status: done (when the tables are created)
 Actor: system
 Screen: none
@@ -412,6 +442,7 @@ If it fails: there is no screen; if there were no week, Appointments would see `
 Involved: none
 
 ### SCHEDULE-F13 Correct a special day or a temporary change
+<!-- from WORKBOOK.md sha256:50ac47c046ae -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Special days
@@ -430,6 +461,7 @@ does not exist in this business.".
 Involved: Appointments, Reservations
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:2099f80e580d -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever speaks) and the API, with the same rules and the same permissions. A weekday is named by its number
@@ -441,6 +473,7 @@ id: the special day by its name ("Special day: Christmas") and the temporary cha
 hours"). What the person asking cannot see is left out.
 
 ### What it offers: queries (they read and change nothing; all of them, except the assistant card's two, can be followed live)
+<!-- from WORKBOOK.md sha256:3fb3727ac190 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -454,6 +487,7 @@ hours"). What the person asking cannot see is left out.
 | A temporary change by its id, with its intervals: what the assistant's card reads to name it (BASE-F97); not an assistant tool and no route in the API | view | F06, F13 | `schedule.override.get` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:4e16834c6e58 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -469,6 +503,7 @@ hours"). What the person asking cannot see is left out.
 | Saves the settings (only what is sent) | settings | F08 | `schedule.settings.update` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:2cb00a6291d8 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -485,6 +520,7 @@ The notices do not carry a special day's name nor a change's reason: they are fr
 business can write people's names.
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:fd9f5d4bb6b8 -->
 Nothing: Schedules depends on no app (`requires = []`) and listens to no notice. From the platform it uses
 the business's time zone.
 
@@ -497,6 +533,7 @@ unconfirmed, does not limit it. Both say their days in the same form that Schedu
 the "Confirm your opening hours" step of "Finish setting up your business" (SCHEDULE-F03).
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:2ee7901293b1 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

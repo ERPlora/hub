@@ -30,12 +30,14 @@ from live.models import OutboxEvent
 from live.operations import get as get_operation
 
 from base import apps_on, catalog, hub_visits, relay, scheduler, worker
-from base.catalog import RegisterResult
-from base.models import AppActivation, EventDelivery, TaskSchedule
+from base.catalog.register_apps import RegisterResult
+from base.models.activation import AppActivation
+from base.models.relay import EventDelivery
+from base.models.scheduler import TaskSchedule
 from base.services import relay_runs
 from base.tenancy.context import current, use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import Hub
+from control.models.hubs import Hub
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
@@ -304,7 +306,7 @@ def test_a_task_of_an_app_that_is_off_is_left_as_it_is_while_the_others_run(hub_
 
 def test_the_worker_closes_its_listen_on_the_way_out(monkeypatch):
     closed = []
-    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
     monkeypatch.setattr(hub_visits.HubVisits, "close", lambda self: closed.append(self))
     stop = threading.Event()
     stop.set()
@@ -540,7 +542,7 @@ def test_a_demo_whose_time_is_up_is_never_entered(hub_a, worker_visits, monkeypa
 def test_a_hub_being_restored_or_moving_to_another_cluster_is_never_entered(hub_a, worker_visits, monkeypatch):
     # Its database is being put back as it was at a moment (base.tenancy.restore) or copied to another cluster
     # (base.tenancy.move): nothing is relayed nor run in it meanwhile.
-    from control.models import Cluster
+    from control.models.hubs import Cluster
 
     Hub.objects.filter(pk=hub_a.pk).update(
         restoring_from=Cluster.objects.create(name="restore", host="writer-restore.example", is_open=False)

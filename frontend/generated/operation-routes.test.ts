@@ -174,7 +174,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the 60 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
+  it('binds the 62 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
     const sale = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('sale.')));
     expect(sale).toEqual({
       'sale.sale.list': { method: 'get', path: '/api/sale/sales' },
@@ -191,6 +191,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.sale.refund': { method: 'post', path: '/api/sale/sales/refund' },
       'sale.sale.issue_documents': { method: 'post', path: '/api/sale/sales/issue_documents' },
       'sale.checkout.preview': { method: 'get', path: '/api/sale/checkout/preview' },
+      'sale.checkout.steps': { method: 'get', path: '/api/sale/checkout/steps' },
       'sale.order.list': { method: 'get', path: '/api/sale/orders' },
       'sale.order.open': { method: 'post', path: '/api/sale/orders' },
       'sale.order.get': { method: 'get', path: '/api/sale/orders/detail' },
@@ -208,6 +209,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.order.void_line': { method: 'post', path: '/api/sale/orders/void_line' },
       'sale.order.fire': { method: 'post', path: '/api/sale/orders/fire' },
       'sale.order.print_bill': { method: 'post', path: '/api/sale/orders/print_bill' },
+      'sale.order.note_bill': { method: 'post', path: '/api/sale/orders/note_bill' },
       'sale.order.split': { method: 'post', path: '/api/sale/orders/split' },
       'sale.order.merge': { method: 'post', path: '/api/sale/orders/merge' },
       'sale.order.void': { method: 'post', path: '/api/sale/orders/void' },
@@ -315,12 +317,16 @@ describe('OPERATION_ROUTES', () => {
     expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('cash_register.'))).toHaveLength(19);
   });
 
-  it('binds the twenty-five routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
+  it('binds the twenty-nine routed invoice operations to apps/invoice/api.py (issuer.sync is the system\'s)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'invoice.invoice.list': { method: 'get', path: '/api/invoice/invoices' },
+      'invoice.invoice.export': { method: 'get', path: '/api/invoice/invoices/export' },
       'invoice.invoice.get': { method: 'get', path: '/api/invoice/invoices/detail' },
       'invoice.invoice.by_source': { method: 'get', path: '/api/invoice/invoices/by_source' },
       'invoice.invoice.document': { method: 'get', path: '/api/invoice/invoices/document' },
+      'invoice.invoice.pdf': { method: 'get', path: '/api/invoice/invoices/pdf' },
+      'invoice.email.list': { method: 'get', path: '/api/invoice/emails' },
+      'invoice.email.send': { method: 'post', path: '/api/invoice/emails/send' },
       'invoice.invoice.print': { method: 'post', path: '/api/invoice/invoices/print' },
       'invoice.invoice.line_defaults': { method: 'get', path: '/api/invoice/invoices/line_defaults' },
       'invoice.invoice.create': { method: 'post', path: '/api/invoice/invoices' },
@@ -343,7 +349,7 @@ describe('OPERATION_ROUTES', () => {
       'invoice.issuer.get': { method: 'get', path: '/api/invoice/issuer' },
       'invoice.issuer.update': { method: 'post', path: '/api/invoice/issuer' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(25);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('invoice.'))).toHaveLength(29);
   });
 
   it('names every operation <app>.<entity>.<action> and keeps every route under /api/', () => {

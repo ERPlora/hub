@@ -136,7 +136,7 @@ def test_flow_has_the_store_metadata_and_belongs_to_both_verticals():
 
 
 def test_permissions():
-    assert flow_app().permissions == PERMISSIONS
+    assert list(flow_app().permissions) == PERMISSIONS
 
 
 def test_only_the_owner_and_the_admin_get_it_the_others_only_answer_what_they_are_asked():
@@ -197,6 +197,10 @@ def test_the_scheduled_tasks_run_as_the_platform_two_every_minute_and_the_prune_
 # The operations and the assistant's contract
 
 
+#: The writes whose card says when the automation starts and its steps in words, not its definition (hub#2300).
+SAID_IN_WORDS = {"flow.draft.propose", "flow.flow.create"}
+
+
 def test_the_operations_of_the_app(flow_operations):
     assert {
         name for name, op in flow_operations.items() if op.kind == "query"
@@ -216,6 +220,8 @@ def test_every_operation_tells_the_assistant_what_it_does(flow_operations):
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         if assistant.tools.is_tool(op):  # what a person says to ask for it (hub#1106); the engine's are no tool
             expected |= {"asks"}
+        if name in SAID_IN_WORDS:
+            expected |= {"summary"}
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name

@@ -6,39 +6,19 @@ import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 
-import { flush, mountBase, OWNER } from '../__tests__/mount-base';
+import { app } from '../__tests__/app-row';
+import { openFollower } from '../__tests__/followers';
+import { flush, OWNER } from '../__tests__/mount-base';
 import { sessionChanged } from '../lib/access';
 import type { AppList, AppRow } from '../operations/apps';
 import AppsFollower from './AppsFollower.vue';
 
-const me = ref<SessionMe | undefined>();
-vi.mock('@erplora/ui/shell', async (importOriginal) => {
-  const shell = await importOriginal<typeof import('@erplora/ui/shell')>();
-  return { ...shell, useSession: () => shell.createShellSession(me, ref('live')) };
-});
-vi.mock('../lib/access', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/access')>()),
-  sessionChanged: vi.fn(),
-}));
+vi.mock('../lib/access', async (importOriginal) => (await import('../__tests__/apps-page-spies')).accessWithSessionSpy(importOriginal));
+
+const me = ref<SessionMe>(OWNER);
 
 function row(id: string, state: AppRow['state'] = 'on'): AppRow {
-  return {
-    id,
-    name: id,
-    icon: 'ion:cube-outline',
-    category: 'sales',
-    category_label: 'Sales',
-    summary: '',
-    premium: false,
-    right: 'free',
-    state,
-    chosen: true,
-    path: state === 'on' ? `/${id}/home` : null,
-    requires: [],
-    required_by: [],
-    refusal: null,
-    mandatory: false,
-  };
+  return app(id, { name: id, state, path: state === 'on' ? `/${id}/home` : null });
 }
 
 function list(...apps: AppRow[]): AppList {
@@ -49,14 +29,8 @@ function session(states: Record<string, 'on' | 'off'>): SessionMe {
   return { ...OWNER, apps: Object.entries(states).map(([label, state]) => ({ label, state })) };
 }
 
-async function open(path = '/') {
-  const m = await mountBase(AppsFollower, { path, routes: ['/apps'] });
-  m.router.addRoute({ path: '/task/home', component: { template: '<div />' }, meta: { auth: true, app: 'task' } });
-  m.router.addRoute({ path: '/sale/home', component: { template: '<div />' }, meta: { auth: true, app: 'sale' } });
-  await m.router.replace(path);
-  const call = await m.live();
-  return { ...m, call };
-}
+const open = (path = '/') =>
+  openFollower(AppsFollower, { session: me, path, screens: ['/task/home', '/sale/home'], routes: ['/apps'] });
 
 beforeEach(() => {
   me.value = session({ task: 'on', sale: 'on' });

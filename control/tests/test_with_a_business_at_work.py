@@ -8,7 +8,8 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.concurrency import PLATFORM_HOST
 from control import services
-from control.models import Cluster, Freeze, Hub
+from control.models.freeze import Freeze
+from control.models.hubs import Cluster, Hub
 from control.schemas import ClusterIdIn, FreezeIn
 from control.tests.conftest import events
 
@@ -80,8 +81,8 @@ def test_an_operation_of_control_called_inside_a_business_runs_on_control(hub_a,
     cluster = a_cluster()
 
     with use_hub(hub_a):
-        services.freeze_set(admin_ctx, FreezeIn(frozen=True, reason="Aurora upgrade"))
-        services.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
+        services.freeze.freeze_set(admin_ctx, FreezeIn(frozen=True, reason="Aurora upgrade"))
+        services.clusters.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
 
     cluster.refresh_from_db()
     assert (Freeze.objects.get().frozen, cluster.is_open) == (True, False)

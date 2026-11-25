@@ -18,15 +18,19 @@ from base import catalog, workbook_help
 
 JOURNEYS = Path("qa/journeys")
 WORKBOOKS = ("base/WORKBOOK.md", "apps/*/WORKBOOK.md")
-#: How a source WORKBOOK, written in Spanish, opens the screen of a flow no one does on one: «ninguna (se ve en …)».
-NO_SCREEN = "ninguna"
+#: How a source WORKBOOK, written in Spanish, opens what a flow has none of: its screen, «ninguna (se ve en …)», or its
+#: operations.
+NONE = "ninguna"
 ANY_VERTICAL = "any"
 HEADER_FENCE = "---"
 HEADER_KEYS = ("title", "vertical", "roles")
 PURPOSE = "Para qué:"
 START = "## Punto de partida"
 STEPS = "## Recorrido"
-LEDGER_COLUMNS = ("flow", "date", "device", "app_version", "result", "issue")
+SCREEN = "screen"
+ASSISTANT_CHANNELS = ("assistant-es", "assistant-en")
+CHANNELS = (SCREEN, *ASSISTANT_CHANNELS)
+LEDGER_COLUMNS = ("flow", "date", "device", "app_version", "result", "issue", "channel", "phrase", "model_result")
 
 _FLOW_ID = r"[A-Z][A-Z0-9_]*-F\d+"
 _STEP = re.compile(rf"^(\d+)\. ({_FLOW_ID}(?:, {_FLOW_ID})*)(?: — \S.*)?$")
@@ -34,7 +38,7 @@ STEP_FORMAT = "«<n>. <FLOW-ID>[, <FLOW-ID>…][ — <note>]»"
 
 
 class LedgerError(Exception):
-    """A ledger of walks that cannot be read: a column is missing or a date is not ISO."""
+    """A ledger of walks that cannot be read: a column is missing, a date is not ISO or a channel is not one."""
 
 
 @dataclass(frozen=True)
@@ -43,6 +47,9 @@ class WorkbookFlow:
     app: str
     done: bool
     on_screen: bool
+    actor: str
+    screen: str
+    no_operations: bool
 
     @property
     def walkable(self) -> bool:
@@ -71,6 +78,9 @@ class Walk:
     app_version: str
     result: str
     issue: str
+    channel: str
+    phrase: str
+    model_result: str
 
 
 def workbook_flows(root: Path) -> dict[str, WorkbookFlow]:
@@ -78,17 +88,28 @@ def workbook_flows(root: Path) -> dict[str, WorkbookFlow]:
     with translation.override(workbook_help.SOURCE_LANGUAGE):
         vocabulary = workbook_help.words()
     flows: dict[str, WorkbookFlow] = {}
-    for path in sorted(found for pattern in WORKBOOKS for found in root.glob(pattern)):
-        markdown = catalog.user_part(path.read_text(encoding="utf-8"))
+    for path in workbooks(root):
+        markdown = catalog.workbooks.user_part(path.read_text(encoding="utf-8"))
         for flow_id, _title, fields in workbook_help.flow_fields(markdown, vocabulary):
-            done = workbook_help.is_done(" ".join(fields.get("status", [])), vocabulary)
-            flows[flow_id] = WorkbookFlow(flow_id, path.parent.name, done, _on_screen(fields.get("screen", [])))
+            done = workbook_help.is_done(_text(fields, "status"), vocabulary)
+            actor, screen = _text(fields, "actor"), _text(fields, "screen")
+            on_screen, no_operations = not _says_none(screen), _says_none(_text(fields, "operations"))
+            flows[flow_id] = WorkbookFlow(flow_id, path.parent.name, done, on_screen, actor, screen, no_operations)
     return flows
 
 
-def _on_screen(screen: list[str]) -> bool:
-    first = " ".join(screen).split(maxsplit=1)
-    return not first or first[0].strip(";,.:").casefold() != NO_SCREEN
+def workbooks(root: Path) -> list[Path]:
+    """The source WORKBOOKs under ``root``."""
+    return sorted(found for pattern in WORKBOOKS for found in root.glob(pattern))
+
+
+def _text(fields: Mapping[str, list[str]], key: str) -> str:
+    return " ".join(" ".join(fields.get(key, [])).split())
+
+
+def _says_none(text: str) -> bool:
+    first = text.split(maxsplit=1)
+    return bool(first) and first[0].strip(";,.:").casefold() == NONE
 
 
 def read_journeys(root: Path, verticals: Iterable[str]) -> list[Journey]:
@@ -195,9 +216,9 @@ def coverage(flows: Mapping[str, WorkbookFlow], journeys: Iterable[Journey]) -> 
     return {app: Coverage(*(tuple(ids) for ids in lists)) for app, lists in sorted(split.items())}
 
 
-def last_walks(path: Path) -> dict[str, Walk]:
-    """The last walk of each flow the ledger at ``path`` records: the one with its latest date."""
-    walks: dict[str, Walk] = {}
+def last_walks(path: Path) -> dict[str, dict[str, Walk]]:
+    """The last walk of each flow on each channel in the ledger at ``path``: the one with its latest date there."""
+    walks: dict[str, dict[str, Walk]] = {}
     with path.open(encoding="utf-8", newline="") as file:
         rows = csv.DictReader(file)
         missing = [column for column in LEDGER_COLUMNS if column not in (rows.fieldnames or ())]
@@ -206,8 +227,10 @@ def last_walks(path: Path) -> dict[str, Walk]:
         for row in rows:
             walk = Walk(*(row[column] or "" for column in LEDGER_COLUMNS[1:]))
             _check_date(walk.date, path, rows.line_num)
-            if row["flow"] not in walks or walk.date >= walks[row["flow"]].date:
-                walks[row["flow"]] = walk
+            _check_channel(walk.channel, path, rows.line_num)
+            by_channel = walks.setdefault(row["flow"], {})
+            if walk.channel not in by_channel or walk.date >= by_channel[walk.channel].date:
+                by_channel[walk.channel] = walk
     return walks
 
 
@@ -219,3 +242,8 @@ def _check_date(text: str, path: Path, line: int) -> None:
         canonical = False
     if not canonical:
         raise LedgerError(f"{path} line {line}: {text!r} is not a date written YYYY-MM-DD")
+
+
+def _check_channel(text: str, path: Path, line: int) -> None:
+    if text not in CHANNELS:
+        raise LedgerError(f"{path} line {line}: {text!r} is not a channel, one of {', '.join(CHANNELS)}")

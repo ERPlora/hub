@@ -37,6 +37,7 @@
     },
     "status": {
       "issued": "Emitida",
+      "overdue": "Vencida",
       "paid": "Pagada",
       "cancelled": "Cancelada"
     },
@@ -46,7 +47,8 @@
       "substitution": "Sustituye a una factura simplificada",
       "rectification": "Rectificación",
       "refund": "Devolución de la venta",
-      "void": "Anulación de la venta"
+      "void": "Anulación de la venta",
+      "platform": "erplora.com"
     },
     "taxes": {
       "vat": "IVA",
@@ -55,6 +57,12 @@
       "exemptCause": "Exento ({cause})",
       "notSubject": "No sujeto",
       "reverseCharge": "Inversión del sujeto pasivo"
+    },
+    "withholding": {
+      "label": "Retención de IRPF",
+      "none": "Sin retención",
+      "of": "Retención IRPF {rate}",
+      "payable": "Total a pagar"
     },
     "taxPct": {
       "vat": "IVA %",
@@ -86,7 +94,12 @@
         "markPaid": "Marcar pagada",
         "rectify": "Rectificar"
       },
-      "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros."
+      "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros.",
+      "export": {
+        "button": "Descargar en Excel",
+        "pending": "Preparando…",
+        "failed": "No se han podido descargar las facturas: {reason}"
+      }
     },
     "filters": {
       "series": "Serie",
@@ -101,12 +114,19 @@
       "print": "Imprimir / PDF",
       "printFailed": "No se pudo imprimir la factura",
       "queued": "Enviado a {printer}.",
+      "pdf": {
+        "button": "Descargar PDF",
+        "pending": "Preparando…",
+        "failed": "No se ha podido descargar el PDF: {reason}"
+      },
+      "emailButton": "Enviar por correo",
       "missingTaxId": "Esta factura no tiene el NIF del cliente: la impresora de tiques no puede sacarla como factura completa.",
       "fields": {
         "type": "Tipo",
         "series": "Serie",
         "issueDate": "Fecha de emisión",
         "operationDate": "Fecha de operación",
+        "dueDate": "Vencimiento",
         "customer": "Cliente",
         "customerTaxId": "NIF cliente",
         "address": "Dirección",
@@ -118,6 +138,7 @@
         "substitutedBy": "Sustituida por",
         "rectifications": "Rectificativas",
         "paidAt": "Pagada el",
+        "emailed": "Correo",
         "notes": "Notas"
       },
       "lines": {
@@ -143,6 +164,21 @@
         "rectify": "Rectificar",
         "substitute": "Factura completa"
       }
+    },
+    "email": {
+      "title": "Enviar por correo",
+      "to": "Correo del cliente",
+      "help": "La factura {number} va adjunta en PDF. Las respuestas llegan al correo del propietario del negocio.",
+      "submit": "Enviar",
+      "failed": "No se ha podido enviar la factura",
+      "onItsWay": "Enviando la factura a {to}…",
+      "sentTo": "Enviada a {to} el {date}",
+      "sent": "Enviada el {date}",
+      "sendingTo": "Enviando a {to}…",
+      "sending": "Enviando…",
+      "notSentTo": "No enviada a {to}",
+      "notSent": "No enviada",
+      "unsent": "La factura no se ha enviado por correo"
     },
     "verifactu": {
       "heading": "Justificante VeriFactu",
@@ -226,6 +262,8 @@
     "create": {
       "title": "Nueva factura manual",
       "series": "Serie",
+      "issueDate": "Fecha",
+      "dueDate": "Vencimiento",
       "customer": "Cliente",
       "taxId": "NIF cliente",
       "address": "Dirección",
@@ -245,7 +283,7 @@
     },
     "series": {
       "title": "Series de numeración",
-      "intro": "Cada serie define el prefijo, el formato y el contador de la numeración de un tipo de factura y un año (PREFIX-YYYY-NNNNNN). El código, el tipo, el año y el contador no cambian nunca; el prefijo, el formato y el siguiente número, solo hasta que la serie emite su primera factura.",
+      "intro": "Cada serie define el prefijo, el formato y el contador de la numeración de un tipo de factura y un año (PREFIJO-AAAA-NNNNNN). El código, el tipo, el año y el contador no cambian nunca; el prefijo, el formato y el siguiente número, solo hasta que la serie emite su primera factura.",
       "search": "Buscar código, nombre…",
       "columns": {
         "code": "Código",
@@ -258,7 +296,7 @@
         "active": "Activa",
         "default": "Predet."
       },
-      "defaultFormat": "PREFIX-YYYY-NNNNNN",
+      "defaultFormat": "PREFIJO-AAAA-NNNNNN",
       "entity": {
         "one": "serie",
         "many": "series"
@@ -285,7 +323,7 @@
         "default": "Serie predeterminada",
         "codeHint": "Identificador interno de la serie (no cambia tras crearla). Las ventas numeran en TICKET, FACT y RECT.",
         "prefixHint": "Texto antepuesto al número (ej. FAC → FAC-2026-000001); vacío toma el código.",
-        "formatHint": "Marcadores: {'{prefix}'}, {'{code}'}, {'{year}'}, {'{seq}'} y {'{seq:01d}'}…{'{seq:09d}'}. El año y una secuencia son obligatorios, sin tildes ni símbolos como º. Déjalo vacío para PREFIX-AAAA-NNNNNN. Lo demás se escribe literal (p. ej. VFT{'{year}'}-A-{'{seq:04d}'}). La anchura es un mínimo: un número más largo nunca se recorta.",
+        "formatHint": "Marcadores: {'{prefix}'}, {'{code}'}, {'{year}'}, {'{seq}'} y {'{seq:01d}'}…{'{seq:09d}'}. El año y una secuencia son obligatorios, sin tildes ni símbolos como º. Déjalo vacío para PREFIJO-AAAA-NNNNNN. Lo demás se escribe literal (p. ej. VFT{'{year}'}-A-{'{seq:04d}'}). La anchura es un mínimo: un número más largo nunca se recorta.",
         "lockedHint": "Esta serie ya ha emitido facturas, así que su prefijo, su formato y su siguiente número ya no se pueden cambiar: el número forma parte de la cadena de VeriFactu. Crea una serie nueva si necesitas otros.",
         "preview": "Siguiente número",
         "create": "Crear serie",
@@ -308,7 +346,9 @@
         "postalCode": "Código postal",
         "city": "Ciudad",
         "province": "Provincia",
-        "country": "País"
+        "country": "País",
+        "intraEuOperator": "Inscrito en el ROI (operaciones intracomunitarias)",
+        "intraEuOperatorHelp": "Tus facturas y tiques imprimirán tu NIF con el prefijo de tu país (ES…). VeriFactu lo sigue recibiendo sin prefijo."
       },
       "save": "Guardar",
       "saved": "Emisor guardado.",
@@ -323,6 +363,7 @@
       "number": "Nº",
       "date": "Fecha",
       "operationDate": "Fecha de operación",
+      "dueDate": "Vencimiento",
       "billTo": "Facturar a",
       "taxId": "NIF",
       "description": "Descripción",

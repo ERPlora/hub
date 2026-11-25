@@ -37,6 +37,7 @@
     },
     "status": {
       "issued": "Issued",
+      "overdue": "Overdue",
       "paid": "Paid",
       "cancelled": "Cancelled"
     },
@@ -46,7 +47,8 @@
       "substitution": "Replaces a simplified invoice",
       "rectification": "Rectification",
       "refund": "Sale refund",
-      "void": "Sale void"
+      "void": "Sale void",
+      "platform": "erplora.com"
     },
     "taxes": {
       "vat": "VAT",
@@ -55,6 +57,12 @@
       "exemptCause": "Exempt ({cause})",
       "notSubject": "Not subject",
       "reverseCharge": "Reverse charge"
+    },
+    "withholding": {
+      "label": "IRPF withholding",
+      "none": "No withholding",
+      "of": "IRPF withholding {rate}",
+      "payable": "Amount due"
     },
     "taxPct": {
       "vat": "VAT %",
@@ -86,7 +94,12 @@
         "markPaid": "Mark as paid",
         "rectify": "Rectify"
       },
-      "noResultsMessage": "Nothing matches your search or filters."
+      "noResultsMessage": "Nothing matches your search or filters.",
+      "export": {
+        "button": "Download in Excel",
+        "pending": "Preparing…",
+        "failed": "The invoices could not be downloaded: {reason}"
+      }
     },
     "filters": {
       "series": "Series",
@@ -101,12 +114,19 @@
       "print": "Print / PDF",
       "printFailed": "Could not print the invoice",
       "queued": "Sent to {printer}.",
+      "pdf": {
+        "button": "Download PDF",
+        "pending": "Preparing…",
+        "failed": "The PDF could not be downloaded: {reason}"
+      },
+      "emailButton": "Send by email",
       "missingTaxId": "This invoice has no customer tax ID: the ticket printer cannot print it as a full invoice.",
       "fields": {
         "type": "Type",
         "series": "Series",
         "issueDate": "Issue date",
         "operationDate": "Operation date",
+        "dueDate": "Due date",
         "customer": "Customer",
         "customerTaxId": "Customer tax ID",
         "address": "Address",
@@ -118,6 +138,7 @@
         "substitutedBy": "Replaced by",
         "rectifications": "Rectifying invoices",
         "paidAt": "Paid on",
+        "emailed": "Email",
         "notes": "Notes"
       },
       "lines": {
@@ -143,6 +164,21 @@
         "rectify": "Rectify",
         "substitute": "Full invoice"
       }
+    },
+    "email": {
+      "title": "Send by email",
+      "to": "Customer’s email",
+      "help": "Invoice {number} goes attached as a PDF. Replies reach the business owner’s email.",
+      "submit": "Send",
+      "failed": "The invoice could not be sent",
+      "onItsWay": "Sending the invoice to {to}…",
+      "sentTo": "Sent to {to} on {date}",
+      "sent": "Sent on {date}",
+      "sendingTo": "Sending to {to}…",
+      "sending": "Sending…",
+      "notSentTo": "Not sent to {to}",
+      "notSent": "Not sent",
+      "unsent": "The invoice was not sent by email"
     },
     "verifactu": {
       "heading": "VeriFactu receipt",
@@ -226,6 +262,8 @@
     "create": {
       "title": "New manual invoice",
       "series": "Series",
+      "issueDate": "Date",
+      "dueDate": "Due date",
       "customer": "Customer",
       "taxId": "Customer tax ID",
       "address": "Address",
@@ -308,7 +346,9 @@
         "postalCode": "Postal code",
         "city": "City",
         "province": "Province",
-        "country": "Country"
+        "country": "Country",
+        "intraEuOperator": "Registered in the ROI (intra-EU operations)",
+        "intraEuOperatorHelp": "Your invoices and tickets will print your tax ID with your country’s prefix (ES…). VeriFactu keeps receiving it without the prefix."
       },
       "save": "Save",
       "saved": "Issuer saved.",
@@ -323,6 +363,7 @@
       "number": "No.",
       "date": "Date",
       "operationDate": "Operation date",
+      "dueDate": "Due date",
       "billTo": "Bill to",
       "taxId": "Tax ID",
       "description": "Description",

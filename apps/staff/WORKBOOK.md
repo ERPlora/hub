@@ -12,7 +12,7 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 Personal es tu equipo: quién trabaja, con qué rol, en qué horario cada semana, cuándo falta y cuánto cobra por hora y
 de comisión. El responsable da de alta las fichas, aprueba las ausencias y ve en Comisiones lo que ha ganado cada
-profesional; cada empleado ve su ficha y pide sus ausencias. Citas, Servicios, Control horario, Tareas y el TPV leen de
+profesional; cada empleado ve su ficha, lo que ha ganado él en Comisiones y pide sus ausencias. Citas, Servicios, Control horario, Tareas y el TPV leen de
 aquí quién trabaja y quién atiende.
 
 ### En detalle
@@ -37,7 +37,7 @@ Quién la usa:
   aprueba, rechaza o cancela.
 - El **empleado** ve el directorio, los horarios y quién falta (nunca la tarifa ni el motivo de una
   ausencia ajena), ve su propia ficha y sus ausencias, **pide sus ausencias** y retira las que aún
-  están pendientes.
+  están pendientes. En **Comisiones** ve solo su propia fila: lo que ha hecho y lo que le corresponde.
 
 Citas (y con ella Reservas online) lee de aquí quién es reservable, su horario y sus ausencias
 aprobadas; Servicios, quién puede hacer cada servicio; Control horario, de quién es cada fichaje; Tareas, a
@@ -147,8 +147,8 @@ descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Aju
 Aquí ves lo que ha vendido cada profesional en un periodo y lo que le corresponde de comisión: «Hoy» al entrar, o
 «Ayer», «Esta semana», «Este mes» o «Personalizado», con sus fechas «Desde» y «Hasta». Arriba, el total de
 **Producción** y de **Comisiones**; debajo, una fila por persona con su rol, lo que ha vendido, su «Comisión %» y su
-«Comisión», en la moneda del negocio. Solo la ve quien puede ver la compensación, y se pone al día sola al cobrar,
-anular o devolver una venta.
+«Comisión», en la moneda del negocio. El propietario, el administrador y el responsable ven una fila por persona del
+equipo; un empleado ve solo la suya, con todo lo que hizo. Se pone al día sola al cobrar, anular o devolver una venta.
 
 #### Detalle
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
@@ -406,8 +406,8 @@ hora de inicio tiene que ser anterior a la de fin.», «El descanso necesita ini
 una vez.», «La vigencia del horario termina antes de empezar.»; «Ese miembro del personal no existe
 en este negocio.». Un turno que cruza la medianoche no se admite. «Un horario necesita al menos un día de
 trabajo con horas.» sale encima de la semana y se quita en cuanto se cambia cualquier día (se marca o se
-desmarca, o se escribe una hora), sin volver a guardar. El motivo de un día sale debajo de ese día y
-se quita en cuanto se cambia ese día (se marca o se desmarca, o se escribe una de sus horas), sin volver a
+desmarca, o se elige una hora), sin volver a guardar. El motivo de un día sale debajo de ese día y
+se quita en cuanto se cambia ese día (se marca o se desmarca, o se elige una de sus horas), sin volver a
 guardar; los de los demás días se quedan hasta que se cambian.
 Implicados: ninguno
 
@@ -466,6 +466,8 @@ Pasos:
 1. En **Ausencias**, pulsa **+**, elige el Miembro, el Tipo (viene Vacaciones), Desde y Hasta,
    «Día completo» (o sus horas) y, si quieres, el Motivo.
 2. Pulsa Guardar: la ausencia sale como **Pendiente**.
+3. Por el asistente, la tarjeta de confirmación pone delante de quién es, el tipo y sus días como un periodo
+   («21–31 dic 2026»; con sus horas si es una parte del día).
 Entra: la persona (cualquier ficha no dada de baja, también una Inactiva; por id o por nombre) y la
 ausencia, con motivo y notas opcionales. Con horas, valen las mismas cada día del rango.
 Sale: la ausencia Pendiente (`staff.time_off.created`; el aviso no lleva el motivo). Todavía no
@@ -528,13 +530,15 @@ Implicados: ninguno
 
 ### STAFF-F21 Dar la tarifa y la comisión de cada profesional
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable (todo el equipo); empleado (su propia fila de Comisiones)
 Pantalla: Personal (columna Tarifa/h y formulario), Comisiones
 Pasos:
 1. Quien puede ver la compensación ve la tarifa, la comisión y las notas de RRHH de cada ficha.
 2. En **Comisiones** sale cada persona que puede cobrar comisión (Activa o De baja) con su nombre, su rol
    y su comisión, también sin ventas o con comisión 0, y quien vendió en el periodo aunque ya no esté
-   («Ya no trabaja aquí» o «Inactivo» junto al nombre).
+   («Ya no trabaja aquí» o «Inactivo» junto al nombre). Esa es la lista de quien ve la compensación y los totales
+   del negocio (el propietario, el administrador y el responsable); quien no tiene los dos, como el empleado, ve
+   solo su propia fila, también sin ventas, y sin ficha en Personal no ve ninguna.
 3. Para saber lo que ha ganado cada profesional, abre la pestaña **Comisiones**. Sale «Hoy»: lo que ha
    vendido cada persona en el día del negocio, con lo devuelto ya restado, sin los bonos que vendió y
    sumado lo que valen las sesiones de bono que hizo, su comisión y lo que le
@@ -545,12 +549,14 @@ Pasos:
    «Hasta».
 5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella (la de una cita, a la
    profesional de la cita) o, si la línea no dice quién, quien atendió la cuenta. Con «Yo» en el TPV, es
-   quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie.
+   quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie. La fila
+   de cada persona cuenta todo lo que hizo, también en una venta que cobró otra persona o que se atribuyó a un
+   compañero, aunque no pueda abrir esa venta: el empleado ve en la suya lo mismo que el responsable ve de él.
 Entra: la tarifa y la comisión de cada ficha y, de Ventas, la producción de cada profesional en el periodo
 (ya resta lo devuelto: lo que vuelve, a quien lo vendió; deja fuera los bonos que vendió y suma el valor de
 sus sesiones de bono). Ventas es opcional.
 Sale: solo lectura.
-Si falla: sin permiso de compensación, su dirección dice «Sin acceso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
+Si falla: sin permiso para ver el equipo, su dirección dice «Sin acceso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
 «La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo
 personalizado necesita su primer y su último día.»; con más de dos años, «Pide como mucho 731 días de
 una vez.».
@@ -563,8 +569,8 @@ Pantalla: Ajustes
 Pasos:
 1. Abre **Ajustes**: sale la jornada por defecto guardada o, si nunca se guardó, la propuesta (de 09:00
    a 18:00 con 60 minutos de descanso).
-2. Cambia el inicio y el fin en HH:MM (el fin, después del inicio: un día de horario no cruza la
-   medianoche) y el descanso, de 0 (sin descanso) a 480 minutos y más corto que la jornada.
+2. Elige la hora de inicio y la de fin (el fin, después del inicio: un día de horario no cruza la
+   medianoche) y cambia el descanso, de 0 (sin descanso) a 480 minutos y más corto que la jornada.
 3. Pulsa **Guardar**.
    Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: lo enviado; lo demás se queda como estaba.
@@ -639,7 +645,7 @@ López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no p
 | La ficha de quien tiene la sesión, solo su id y su nombre: a ella atribuye Ventas «Yo» | cualquiera con sesión | SALE-F16 | `staff.member.current` |
 | Tarifa, comisión y notas de RRHH, con los filtros, el orden y las páginas del directorio (la columna Tarifa/h lee las mismas filas) | ver la compensación | F21 | `staff.member.compensation` |
 | La hoja de comisiones: quien puede cobrar comisión, con su ficha, su cuenta y su comisión | ver la compensación | F21 | `staff.commission.summary` |
-| Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver la compensación (y las ventas) | F21 | `staff.commission.report` |
+| Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver: la fila propia; con ver la compensación y los totales del negocio, las de todo el equipo | F21 | `staff.commission.report` |
 | Las cifras: fichas, activos, de baja, inactivos, ausentes hoy y solicitudes pendientes | ver | F23 | `staff.member.stats` |
 | Los roles con sus miembros activos, con filtros y orden | ver | F04, F23 | `staff.role.list` |
 | Un rol por su id, también retirado: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F01, F02, F04, F07 | `staff.role.detail` |
@@ -698,7 +704,7 @@ López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no p
 ### A qué reacciona y lo que necesita de otras apps
 No reacciona a ningún aviso y no requiere ninguna app. Para **Comisiones** pide a **Ventas**, si el
 negocio la tiene, lo vendido por cada profesional en el periodo, con lo devuelto ya restado
-(`sale.sale.by_staff`, con el permiso de ver las ventas de quien mira), y se pone al día con sus avisos
+(`sale.sale.by_staff`, leído como la plataforma: qué filas ve cada persona lo decide Personal), y se pone al día con sus avisos
 de venta cobrada, anulada o devuelta (`sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded`).
 Sin Ventas, Comisiones lo dice y no lista a nadie. De la plataforma usa las cuentas del negocio (para
 vincular una ficha) y la zona horaria del negocio (para el «hoy»).
@@ -715,9 +721,9 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
-| Ver el equipo, roles, horarios, disponibilidad, cifras y ajustes | sí | sí | sí | sí | `staff.view` |
+| Ver el equipo, roles, horarios, disponibilidad, cifras, ajustes y su propia fila de Comisiones | sí | sí | sí | sí | `staff.view` |
 | Ver el email y el teléfono del equipo (permiso de dato de la plataforma) | sí | sí | sí | no | `base.view_team_contact` |
-| Ver tarifa, comisión y notas de RRHH | sí | sí | sí | no | `staff.view_compensation` |
+| Ver tarifa, comisión y notas de RRHH, y en Comisiones las filas de todo el equipo (con los totales del negocio) | sí | sí | sí | no | `staff.view_compensation` |
 | Dar de alta fichas | sí | sí | sí | no | `staff.add_member` |
 | Editar fichas | sí | sí | sí | no | `staff.change_member` |
 | Desactivar y dar de baja | sí | sí | no | no | `staff.delete_member` |
@@ -734,9 +740,10 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
   `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas/`,
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
-  `tests/test_<fichero>.py` por fichero. Las páginas viven en `frontend/` («Cómo son las páginas»,
-  abajo), `UI-REQUESTS.md` lista lo que se pide a `@erplora/ui` y `README.md` es la ficha de la app.
+  `queries/`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `tests/test_<fichero>.py` por fichero (los de las lecturas, `test_queries_<módulo>.py`, y los de las escrituras,
+  `test_services_<módulo>.py`). Las páginas viven en `frontend/` («Cómo son las páginas», abajo), `UI-REQUESTS.md`
+  lista lo que se pide a `@erplora/ui` y `README.md` es la ficha de la app.
 - Modelos: `Role` (el rol de catálogo), `Member` (la ficha), `Schedule` y `ScheduleDay` (el horario y
   sus días, lunes = 0; un día que no está es libre), `TimeOff` (la ausencia) y `StaffSettings` (una
   sola fila, restricción `staff_settings_singleton`). UUIDv7, sin `hub_id`.
@@ -764,7 +771,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   primera y deciden sobre lo que dejó. Aprobar, rechazar, cancelar y tocar un horario bloquean la ficha
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
-- El «hoy» es el del reloj del negocio (`business_today()` de `queries.py`, por `base.business.business_zone`,
+- El «hoy» es el del reloj del negocio (`business_today()` de `queries/reads.py`, por `base.business.business_zone`,
   hub#771). Las comisiones piden las ventas por su día, que va en el mismo reloj.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#494).
@@ -777,7 +784,9 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   (`test_integration_assistant.py`). El importe
   de la comisión (`staff.commission.report`) es `vendido × comisión ÷ 100` en `Decimal`, redondeado a
   unidades menores enteras con `ROUND_HALF_UP` una sola vez por persona, sobre lo que Ventas le atribuye
-  (`total_revenue`, que ya resta lo devuelto). Una venta nombra a su profesional por el id de su ficha
+  (`total_revenue`, que ya resta lo devuelto). Las filas pasan por `COMMISSION_LINES`
+  (`queries/commissions.py`, con `Owned.counted`), y la producción se pide a Ventas como la plataforma: así la
+  fila propia no pierde lo que la persona hizo en una venta que no puede abrir. Una venta nombra a su profesional por el id de su ficha
   (UUID); la cuenta (`user_id`, un entero) nunca llega a una venta, así que no hay dos identidades que
   sumar.
 - Los avisos solo llevan identificadores: nunca el motivo de una baja ni de una ausencia (datos
@@ -809,7 +818,7 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (PLAN §17),
   para el staff de la plataforma; una escritura cruda del admin no deja aviso.
 - Borrar una ficha en el admin (`MemberAdmin.delete_model`, `delete_queryset` y, en POST,
-  `get_deleted_objects`) bloquea antes las fichas en orden de id con `lock_members` de `services.py` y
+  `get_deleted_objects`) bloquea antes las fichas en orden de id con `lock_members` de `services/locks.py` y
   después deja correr la cascada, y las acciones del listado van en una transacción (`response_action`):
   el mismo orden que las escrituras (la ficha primero, luego la fila hija), así que no se interbloquea
   con una escritura en curso, y lo protegido (fichajes y citas, `PROTECT`) responde como Django, «No se
@@ -837,14 +846,12 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
   (expand/contract, PLAN-DB), con su migración reversible, una vez desplegado hub#177. Al borrarlas,
   `apps/flow/tests/test_i18n.py` (recorre las columnas de cada modelo) dirá qué entradas del catálogo de
   Automatizaciones sobran.
-- **Fechas y horas en el orden del idioma del negocio**: los
-  campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga el suyo (`UI-REQUESTS.md`).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
 - `frontend/routes.ts`: `/staff/members`, `/staff/roles`, `/staff/time-off`, `/staff/schedules`,
   `/staff/commissions` y `/staff/settings`. El menú de `apps.py` lleva las seis, cada una con el permiso que la abre:
-  Personal y Horarios, `staff.view`; Ausencias, `staff.view_time_off`; Comisiones, `staff.view_compensation`; Roles y
+  Personal, Horarios y Comisiones, `staff.view`; Ausencias, `staff.view_time_off`; Roles y
   Ajustes, `staff.manage_settings`. La barra de pestañas son las entradas que la persona puede abrir
   (`useAppTabs`).
 - Comisiones (`frontend/pages/CommissionsPage.vue`) sigue `staff.commission.report`: el periodo lo
@@ -868,6 +875,9 @@ ofrece la plantilla «La lista de bienvenida de alguien nuevo en el equipo» sob
 - Los selectores de listas largas (miembro, rol, usuario del Hub) son el `Combo` de
   `@erplora/ui/components` y buscan en el servidor (`frontend/lib/pickers.ts`; «Sin rol» y «Sin acceso
   al Hub» van primero mientras no se teclea, con `asCombo`).
+- Los días y las horas de los formularios y de Comisiones son `DateField` y `TimeField` de
+  `@erplora/ui/components`: se eligen en el calendario o la rueda de horas de la app, en su idioma, nunca en
+  el selector del dispositivo.
 - Las cifras de Personal (`frontend/components/StaffFigures.vue`, `staff.member.stats`) y «Ausencias de
   hoy» (`frontend/components/AwayToday.vue`, `staff.time_off.today`) dan dentro de la app lo mismo que los
   paneles del Inicio (STAFF-G01…G05), como las cifras de Clientes y el panel de quién está fichado de

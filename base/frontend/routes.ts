@@ -8,7 +8,7 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'base-home',
     component: () => import('./pages/HomePage.vue'),
-    meta: { auth: true },
+    meta: { auth: true, help: true },
   },
   // ── Apps ───────────────
   // «My apps», with the catalogue in `#all` and `#paid`.
@@ -16,14 +16,14 @@ const routes: RouteRecordRaw[] = [
     path: '/apps',
     name: 'base-apps',
     component: () => import('./pages/AppsPage.vue'),
-    meta: { auth: true },
+    meta: { auth: true, help: true },
   },
   // System's tabs go in the address hash (`lib/system.ts`).
   {
     path: '/system',
     name: 'base-system',
     component: () => import('./pages/SystemPage.vue'),
-    meta: { auth: true },
+    meta: { auth: true, help: true },
   },
   // ── The way in ───────────────
   // «Access»: where Django's `way_in` sends a browser without a session; it paints its own frame.
@@ -51,7 +51,7 @@ const routes: RouteRecordRaw[] = [
     path: '/profile',
     name: 'base-profile',
     component: () => import('./pages/ProfilePage.vue'),
-    meta: { auth: true },
+    meta: { auth: true, help: true },
   },
   // ── Settings: General and Data ────────────────────────────
   // Its tab in the hash; the older `/import` and `/export` pages land on Settings › Data.
@@ -59,21 +59,27 @@ const routes: RouteRecordRaw[] = [
     path: '/settings',
     name: 'base-settings',
     component: () => import('./pages/SettingsPage.vue'),
-    meta: { auth: true },
+    meta: { auth: true, help: true },
   },
   // ── People and permissions ───────────────
-  // Employees, its tab in the hash; a person's page is for whoever runs the business.
+  // Employees, its tab in the hash; a person's page is for whoever runs the business; what a role allows, for anyone.
   {
     path: '/employees',
     name: 'base-employees',
     component: () => import('./pages/EmployeesPage.vue'),
-    meta: { auth: true },
+    meta: { auth: true, help: true },
+  },
+  {
+    path: '/employees/roles/:role',
+    name: 'base-role',
+    component: () => import('./pages/RolePage.vue'),
+    meta: { auth: true, help: true },
   },
   {
     path: '/employees/:person',
     name: 'base-person',
     component: () => import('./pages/PersonPage.vue'),
-    meta: { auth: true },
+    meta: { auth: true, help: true },
   },
   // The API's documentation, when the business shows it (Settings › General).
   {
@@ -90,7 +96,7 @@ const routes: RouteRecordRaw[] = [
     path: '/files',
     name: 'base-files',
     component: () => import('./pages/FilesPage.vue'),
-    meta: { auth: true },
+    meta: { auth: true, help: true },
   },
 ];
 

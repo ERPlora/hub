@@ -13,8 +13,8 @@ from django import forms
 from django.contrib import admin
 
 from apps.invoice.models import Invoice, InvoiceLine, InvoiceSeries, Issuer
-from apps.invoice.queries import series_started
-from apps.invoice.schemas import HOME_COUNTRY, check_tax_id
+from apps.invoice.queries.series import series_started
+from apps.invoice.schemas.fields import HOME_COUNTRY, check_tax_id
 
 #: Set by the database or the model: shown, never typed.
 AUDIT = ("id", "created_at", "updated_at")

@@ -26,13 +26,14 @@ from live.operations import get
 from base import blueprint, services, worker_data
 from base.services import provisioning
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.registry import REGISTRY_SCOPE
 from base.tenancy import dumps, provision
 from base.tenancy.context import HubWithoutDatabase, use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
-from control.models import Hub, HubDue, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Hub, HubDue
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
@@ -55,7 +56,7 @@ def call(ctx, name, /, **data):
 def owner_of(hub: Hub) -> OperationContext:
     user = get_user_model().objects.create_user(username=f"olga-{hub.slug}", password="pw", first_name="Olga")
     Membership.objects.create(user=user, host=hub.slug, role=Membership.Role.OWNER)
-    return OperationContext(scope=Scope("host", hub.slug), actor=user, permissions=permissions_for(user, Scope("host", hub.slug)), language="es")
+    return OperationContext(scope=Scope("host", hub.slug), actor=user, permissions=access_for(user, Scope("host", hub.slug)), language="es")
 
 
 def ready(hub: Hub) -> Hub:
@@ -191,13 +192,13 @@ def test_without_a_bucket_in_the_worker_nothing_is_emptied(hub_a, dumps_bucket, 
 
 def test_an_emptying_that_fails_keeps_the_copy_and_empties_nothing(hub_a, dumps_bucket, monkeypatch):
     owner = loaded_and_asked(ready(hub_a), ["table"])
-    real = blueprint.reset
+    real = blueprint.removal.reset
 
     def breaks_after_the_first_rows(ctx, chosen):
         assert real(ctx, chosen)["apps"][0]["removed"] == 12
         raise RuntimeError("the database went away")
 
-    monkeypatch.setattr(blueprint, "reset", breaks_after_the_first_rows)
+    monkeypatch.setattr(blueprint.removal, "reset", breaks_after_the_first_rows)
 
     run_pass()
 

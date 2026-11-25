@@ -26,11 +26,11 @@ pytestmark = pytest.mark.django_db
 def fresh(settings, monkeypatch):
     """A developer's database before its first seed: the suite's own `a` and `b` (conftest) are not there. Some app
     cannot live in a hub's own database here (``staff``, made unportable for these tests), so the command refuses
-    before making any: their own databases are ``base/tenancy/tests/test_provision.py``'s, on real ones."""
+    before making any: their own databases are ``base/tenancy/tests/test_provision_own_database.py``'s, on real ones."""
     settings.DEBUG = True
     Hub.objects.filter(slug__in=["a", "b"]).delete()
-    portable = tuple(label for label in migrator.portable_apps() if label != "staff")
-    monkeypatch.setattr(migrator, "portable_apps", lambda: portable)
+    portable = tuple(label for label in migrator.app_sets.portable_apps() if label != "staff")
+    monkeypatch.setattr(migrator.app_sets, "portable_apps", lambda: portable)
 
 
 def seed() -> str:
@@ -42,8 +42,8 @@ def seed() -> str:
 @pytest.mark.usefixtures("fresh")
 def test_refuses_while_some_app_cannot_live_in_a_hub_s_own_database():
     """There is no shared database to leave a and b on: while some app cannot live in a hub's own database
-    (``migrator.portable_apps``; here ``staff``), it refuses and writes nothing. Every real app can (hub#474): the
-    command then makes their databases (``base/tenancy/tests/test_provision.py``, on real ones)."""
+    (``migrator.app_sets.portable_apps``; here ``staff``), it refuses and writes nothing. Every real app can (hub#474): the
+    command then makes their databases (``base/tenancy/tests/test_provision_own_database.py``, on real ones)."""
     with pytest.raises(CommandError, match="staff"):
         seed()
     assert not Hub.objects.filter(slug__in=["a", "b"]).exists()
@@ -51,7 +51,7 @@ def test_refuses_while_some_app_cannot_live_in_a_hub_s_own_database():
 
 @pytest.mark.usefixtures("fresh")
 def test_the_operation_names_each_local_hub_s_own_database_and_leaves_it_due():
-    from control.models import HubDue
+    from control.models.hubs import HubDue
 
     from base.tenancy import connections as tenancy_connections
     from base.tenancy import names

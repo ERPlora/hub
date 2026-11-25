@@ -6,6 +6,7 @@ corrections of the port (SCHEDULE-F13, freed dates).
 """
 
 import datetime as dt
+from types import SimpleNamespace
 
 import pytest
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
@@ -19,20 +20,14 @@ from apps.schedule.models import (
     SpecialDayInterval,
     WeekDay,
 )
-from apps.schedule.schemas import (
-    BulkSpecialDayIn,
-    NoParamsIn,
-    OverrideIn,
-    OverridePatchIn,
-    OverrideRefIn,
-    SetDayIn,
-    SettingsIn,
-    SpecialDayIn,
-    SpecialDayPatchIn,
-    SpecialDayRefIn,
-)
+from apps.schedule.schemas.fields import NoParamsIn
+from apps.schedule.schemas.overrides import OverrideIn, OverridePatchIn, OverrideRefIn
+from apps.schedule.schemas.settings import SettingsIn
+from apps.schedule.schemas.special_days import BulkSpecialDayIn, SpecialDayIn, SpecialDayPatchIn, SpecialDayRefIn
+from apps.schedule.schemas.week import SetDayIn
+from apps.schedule.services import _apply_sent
 
-from apps.staff.tests.test_services import _race
+from apps.staff.tests.conftest import _race
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_override, make_special_day
@@ -564,6 +559,17 @@ def test_saving_the_settings_never_touches_the_confirmation():
     ScheduleSettings.objects.create(hours_confirmed=True)
     run("schedule.settings.update", SettingsIn(week_starts_on=1))
     assert confirmed()
+
+
+# ── What the corrections share (SCHEDULE-F13) ──────────────────────────────────────────────────
+
+
+def test_a_correction_sets_only_the_sent_values_that_change_the_row():
+    row = SimpleNamespace(name="Christmas", notes="Family", is_closed=True)
+    assert _apply_sent(row, {"name": "Christmas", "notes": None, "is_closed": False}) is True
+    assert (row.name, row.notes, row.is_closed) == ("Christmas", "Family", False)
+    assert _apply_sent(row, {"name": "Christmas", "notes": None, "is_closed": False}) is False
+    assert (row.name, row.notes, row.is_closed) == ("Christmas", "Family", False)
 
 
 # ── Two people at the same instant ─────────────────────────────────────────────────────────────

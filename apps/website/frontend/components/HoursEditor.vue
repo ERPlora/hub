@@ -3,8 +3,9 @@
 // the week, Monday first; each day open or closed, and an open day with up to three intervals (opens, closes; a
 // closing time earlier than the opening one runs past midnight). `v-model` is the whole week; every change emits a
 // new one (lib/hours).
+import { TimeField } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonItem, IonLabel, IonNote, IonToggle } from '@ionic/vue';
+import { IonButton, IonItem, IonLabel, IonNote, IonToggle } from '@ionic/vue';
 
 import { useT } from '../composables/useT';
 import { addInterval, MAX_INTERVALS, removeInterval, setOpen, setTime } from '../lib/hours';
@@ -71,23 +72,21 @@ const time = (day: Day, index: number, edge: keyof Interval, value: unknown) =>
         :key="index"
         class="wh-interval"
       >
-        <ion-input
-          type="time"
-          :data-testid="`website-hours-${row.day}-${index}-opens`"
+        <TimeField
+          :testid="`website-hours-${row.day}-${index}-opens`"
           :label="t('website.hours.opens')"
-          label-placement="stacked"
-          :value="interval.opens"
+          :model-value="interval.opens"
+          required
           :disabled="disabled"
-          @ion-input="time(row.day, index, 'opens', $event.detail.value)"
+          @update:model-value="time(row.day, index, 'opens', $event)"
         />
-        <ion-input
-          type="time"
-          :data-testid="`website-hours-${row.day}-${index}-closes`"
+        <TimeField
+          :testid="`website-hours-${row.day}-${index}-closes`"
           :label="t('website.hours.closes')"
-          label-placement="stacked"
-          :value="interval.closes"
+          :model-value="interval.closes"
+          required
           :disabled="disabled"
-          @ion-input="time(row.day, index, 'closes', $event.detail.value)"
+          @update:model-value="time(row.day, index, 'closes', $event)"
         />
         <ion-button
           fill="clear"

@@ -43,7 +43,7 @@ from apps.verifactu.tests.conftest import (
     schedule_alone,
 )
 from base import scheduler
-from base.models import TaskSchedule
+from base.models.scheduler import TaskSchedule
 from base.tenancy.context import current_alias
 
 #: The cluster's cut and a gateway slower than it: production's 30 s and 31 s, scaled down, and no further. The cut also

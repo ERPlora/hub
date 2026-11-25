@@ -14,7 +14,7 @@ from live.operations import get, registry
 from pydantic import ValidationError
 
 from apps.customer.models import Activity, Customer, CustomerGroup, CustomerTag, CustomField
-from apps.customer.schemas import A_CUSTOMER_REFERENCE
+from apps.customer.schemas.fields import A_CUSTOMER_REFERENCE
 from base import assistant
 from base.schemas.assistant import names
 from base.tenancy.context import use_hub
@@ -563,26 +563,6 @@ def test_the_reads_answer_the_name_of_what_they_read():
     assert read("customer.tag.detail", {"id": str(allergic.id)}).name == "Allergic"
     assert read("customer.field.detail", {"id": str(allergies.id)}).name == "Allergies"
     assert read("customer.order.get", {"order_id": str(order.id)}).name == "Table 4"
-
-
-@HUB_DB
-@pytest.mark.parametrize("kind", ["group", "tag", "field"])
-def test_the_reads_find_a_group_a_tag_or_a_field_by_its_name_as_their_writes_do(kind):
-    """In any case, the active one before one no longer active, as ``find_group`` and its neighbours find it (hub#1280);
-    a name that fits none is not found."""
-    MODELS[kind].objects.create(name="VIP", is_active=False)
-    active = MODELS[kind].objects.create(name="vip")
-    assert read(f"customer.{kind}.detail", {kind: "Vip"}).id == active.id
-    with pytest.raises(NotFound):
-        read(f"customer.{kind}.detail", {kind: "Nobody"})
-
-
-@HUB_DB
-@pytest.mark.parametrize("kind", ["group", "tag", "field"])
-def test_the_reads_take_a_group_a_tag_or_a_field_by_its_id_whatever_name_comes_beside_it(kind):
-    """The id wins, as in their writes (``_find_named``)."""
-    own, other = two(kind)
-    assert read(f"customer.{kind}.detail", {"id": str(own.id), kind: other.name}).id == own.id
 
 
 @HUB_DB

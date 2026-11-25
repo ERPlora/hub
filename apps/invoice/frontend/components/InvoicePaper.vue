@@ -12,6 +12,7 @@ import { computed } from 'vue';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate, formatMoney, formatPercent, formatQuantity, formatUnitPrice, moneyOf } from '../lib/format';
 import { documentNote, taxRows } from '../lib/invoice';
+import { withholdingOf } from '../lib/withholding';
 import type { InvoiceOut } from '../operations';
 
 const props = withDefaults(
@@ -55,6 +56,7 @@ const lines = computed(() =>
   })),
 );
 const taxes = computed(() => taxRows(props.invoice.tax_breakdown, t, locale.value));
+const withholding = computed(() => withholdingOf(props.invoice, t, locale.value));
 const note = computed(() => documentNote(props.invoice, t));
 </script>
 
@@ -123,6 +125,13 @@ const note = computed(() => documentNote(props.invoice, t));
               class="invoice-paper__v"
               data-testid="invoice-paper-operation-date"
             >{{ operationDate }}</span>
+          </template>
+          <template v-if="invoice.due_date">
+            <span class="invoice-paper__k">{{ $t('invoice.paper.dueDate') }}</span>
+            <span
+              class="invoice-paper__v"
+              data-testid="invoice-paper-due-date"
+            >{{ formatDate(invoice.due_date, locale) }}</span>
           </template>
         </div>
       </div>
@@ -244,6 +253,22 @@ const note = computed(() => documentNote(props.invoice, t));
             {{ money(invoice.total_amount) }}
           </td>
         </tr>
+        <template v-if="withholding">
+          <tr>
+            <td class="invoice-paper__muted">
+              {{ withholding.label }}
+            </td>
+            <td class="invoice-paper__num">
+              {{ money(withholding.amount) }}
+            </td>
+          </tr>
+          <tr class="invoice-paper__grand">
+            <td>{{ $t('invoice.withholding.payable') }}</td>
+            <td class="invoice-paper__num">
+              {{ money(invoice.payable_amount) }}
+            </td>
+          </tr>
+        </template>
       </table>
     </div>
     <div

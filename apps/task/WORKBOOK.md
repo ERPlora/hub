@@ -501,7 +501,7 @@ cliente o a un compañero).
 
 ## Para quien lo mantiene
 
-- Anatomía completa de una app: `apps.py`, `models.py`, `schemas.py`, `queries.py`, `services.py`,
+- Anatomía completa de una app: `apps.py`, `models.py`, `schemas.py`, `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_staff.py` con Personal de verdad y `tests/test_relay.py`, la baja
   en Personal entregada por el relay real del worker (TASK-F15, con dos negocios).
@@ -537,7 +537,7 @@ cliente o a un compañero).
   no por la palabra: «comentario» comparte raíz con los «comensales» de Mesas). Así comentar, cambiar el
   estado, completar o cambiar un proyecto desde el chat (TASK-F05, F06, F10 y F13) llegan a su operación: las
   frases reales de la QA del asistente (`tests/e2e/qa/probes/owner-es-task-2026-11-08.json`) quedan entre las
-  20 primeras herramientas del turno (`tests/test_assistant_asks.py`).
+  15 herramientas que ofrece el turno (`tests/test_assistant_asks.py`).
 - La tarjeta de confirmación del asistente (BASE-F97, hub#677) nombra el registro que una escritura señala por su id
   con las marcas `refers` de `schemas.py`, leídas como quien pregunta con las lecturas por id que ya existen: la
   tarea por su `title` con `task.task.detail` (`A_TASK`: el `id` de `TaskRefIn`, `parent_id` y el `task_id` de un

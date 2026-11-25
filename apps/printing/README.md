@@ -41,10 +41,10 @@ mandan el documento ya compuesto, y la app de ERPlora del dispositivo lo imprime
 | `requires` | ninguna: se enciende sola |
 | La usan | Ventas, Facturación, Caja, Inventario y Cocina (llaman a `printing.job.create` por su nombre; ninguna la requiere: sin Impresión, el papel sale por el diálogo del dispositivo); `base` con `/ws/print`, el Inicio y la campana |
 | Pantallas | `/printing/printers`, `/printing/devices`, `/printing/jobs`, `/printing/settings`; `PrintHost.vue` (`/printing/print-host`, `meta.background`) corre de fondo en el dispositivo dado de alta |
-| Operaciones | 12 consultas (`queries/`) y 15 acciones (`services.py`), todas con `ai=`; `printing.device.get`, `printing.device.seen` y `printing.job.prune` con `ai=INTERNAL` (las dos primeras, del canal del dispositivo; la última, del sistema); 24 rutas en `/api/printing/…` |
+| Operaciones | 12 consultas (`queries/`) y 15 acciones (`services/`), todas con `ai=`; `printing.device.get`, `printing.device.seen` y `printing.job.prune` con `ai=INTERNAL` (las dos primeras, del canal del dispositivo; la última, del sistema); 24 rutas en `/api/printing/…` |
 | Hooks del Inicio | `setup` «Configura la impresora» y `bell` «Nadie está imprimiendo «…»» por función, con `printing.device.coverage`; `bell_refresh_every` de 30 s; `health` «Impresora lista / sin conectar / sin configurar» de la fila de salud, con `printing.device.health`; y `print_presence = "printing.device.seen"` |
 | Eventos | 13, `printing.<entidad>.<hecho>` (`events.py`), solo con identificadores; no reacciona a ninguno |
-| Migraciones | `0001_initial`, `0002_print_device`, `0003_printdevice_last_seen_at`, `0004_printjob_document_type_labels` |
+| Migraciones | `0001_initial`, `0002_print_device`, `0003_printdevice_last_seen_at`, `0004_printjob_document_type_labels`, `0005_cancel_kitchen_orders_without_printer`, `0006_actor_without_address` (quien actuó guardado por su correo se queda con lo que va antes de la @) |
 | Admin | Django admin de ajustes, impresoras, trabajos y dispositivos en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (el documento de cada función, el protocolo de `/ws/print`, la presencia, el
@@ -63,8 +63,9 @@ pnpm e2e tests/e2e/printing-printers.spec.ts tests/e2e/printing-devices.spec.ts 
   tests/e2e/printing-locale-es.spec.ts tests/e2e/printing-ws-client.spec.ts tests/e2e/ws-print.spec.ts
 ```
 
-- `test_services.py` lleva la máquina de la cola (5 entregas, 90 s, confirmación tardía del mismo
-  dispositivo, reintento y cancelación); `test_concurrency.py`, las carreras: dos dispositivos a la vez se llevan
+- `test_services_claims.py` lleva la máquina de la cola (5 entregas, 90 s, confirmación tardía del mismo
+  dispositivo) y `test_services_job_actions.py`, el reintento y la cancelación; cada módulo de `services/` tiene su
+  `test_services_<módulo>.py`; `test_concurrency.py`, las carreras: dos dispositivos a la vez se llevan
   trabajos distintos, la misma clave a la vez es un trabajo y dos confirmaciones a la vez confirman una;
   `test_presence.py` prueba la presencia por el socket de verdad, con un empleado.
 - `test_integration_*.py` dan a Impresión las peticiones reales de Ventas, Cocina, Inventario, el Inicio y el

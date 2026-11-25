@@ -183,6 +183,13 @@ describe('LoginPage — what happened', () => {
     expect(notice.get('[data-testid="access-upgrade"]').attributes('href')).toBe('https://erplora.example/store/plans');
   });
 
+  it('where the plans’ address does not come (ERPlora’s own business has no plan) there is no «Upgrade plan»', async () => {
+    const { wrapper } = await login([{ ...NO_PIN, plan_url: '' }], '/login?next=%2F&notice=device_limit');
+    const notice = wrapper.get('[data-testid="access-notice"]');
+    expect(notice.text()).toContain('Session opened on another device');
+    expect(notice.find('[data-testid="access-upgrade"]').exists()).toBe(false);
+  });
+
   // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the notice says why
   // without it.
   it('«Upgrade plan» sells: never on the app surfaces, where the notice still says why', async () => {

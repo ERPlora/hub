@@ -134,6 +134,7 @@ def test_product_in_defaults():
         "track_stock": None,
         "category_ids": [],
         "is_active": True,
+        "show_on_website": True,
     }
 
 
@@ -397,7 +398,8 @@ def test_category_list_filters_and_orders():
     params = CategoryListIn(name="dri", slug="dri", icon="ion:wine", color="#ff0000", product_count_min=1, product_count_max=5, sort="-product_count")
     assert (params.product_count_min, params.product_count_max, params.sort) == (1, 5, "-product_count")
     assert CategoryListIn().sort == "name"
-    assert invalid_fields(CategoryListIn, sort="order") == {"sort"}
+    assert (CategoryListIn(sort="order").sort, CategoryListIn(sort="-order").sort) == ("order", "-order")
+    assert invalid_fields(CategoryListIn, sort="price") == {"sort"}
 
 
 def test_movement_list_by_dates_and_by_type():

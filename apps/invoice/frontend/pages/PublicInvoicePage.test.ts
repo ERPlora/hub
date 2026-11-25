@@ -21,8 +21,9 @@ const TICKET: PublicTicketOut = {
 };
 const INVOICE = {
   id: 'i1', number: 'FACT-2026-000001', invoice_type: 'F3', series_code: 'FACT', year: 2026,
-  issue_date: '2026-11-19', issued_at: '2026-11-19T10:00:00Z', customer_name: 'Ana López',
+  issue_date: '2026-11-19', due_date: null, overdue: false, issued_at: '2026-11-19T10:00:00Z', customer_name: 'Ana López',
   customer_tax_id: 'X1234567X', base_amount: 1000, tax_amount: 210, total_amount: 1210,
+  withholding_rate: null, withholding_amount: 0, payable_amount: 1210,
   currency: 'EUR', currency_decimals: 2, status: 'paid', source_type: 'substitution', rectifies_id: null,
   rectifies_number: '', substituted: false, can_mark_paid: false, can_rectify: true, can_substitute: false,
   series_id: 's1', sequence: 1, operation_date: '2026-11-19', issuer_name: 'Peluquería Ana',

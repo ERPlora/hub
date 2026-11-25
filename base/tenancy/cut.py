@@ -42,12 +42,12 @@ from psycopg import sql
 
 from base import registry
 from base.services import photo, provisioning
-from base.models import EventDelivery, HubIdentity
+from base.models.relay import EventDelivery
+from base.models.identity import HubIdentity
 from base.schemas.hub_registry import HubCutFinishIn
-from base.tenancy import connections as tenancy_connections
-from base.tenancy import identity, inventory, migrator, names, ops, provision
+from base.tenancy import connections as tenancy_connections, identity, inventory, migrator, names, ops, provision
 from base.tenancy.context import HUB_SCOPE_KIND, use_control, use_hub
-from control.models import Hub
+from control.models.hubs import Hub
 
 logger = logging.getLogger(__name__)
 
@@ -430,7 +430,7 @@ def _cut(hub_id, mode: str, dump: str, started: float) -> Outcome:
         renew()
         ddl = tenancy_connections.register_ddl_alias(hub.db_name, cluster=hub.cluster)
         identity.write(ddl, hub.id)
-        migrator.ensure_schema(hub, add=["base", *provision.vertical_apps(hub.vertical)], heartbeat=renew)
+        migrator.schema.ensure_schema(hub, add=["base", *provision.vertical_apps(hub.vertical)], heartbeat=renew)
         renew()
         copied = copy_rows(hub, heartbeat=renew) if mode == COPY_ALL else {}
         _seed_and_finish(hub, mode, copied, dump, renew)

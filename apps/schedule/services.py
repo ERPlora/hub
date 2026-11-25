@@ -1,7 +1,7 @@
 """Write operations of the schedule app: one operation = one transaction, with its events in the outbox.
 
 A refused command leaves no trace (the transaction rolls back: no row, no event). The rules of the
-intervals are ``schemas.check_intervals`` (engine.py underneath), applied again here to what a
+intervals are ``schemas.intervals.check_intervals`` (engine.py underneath), applied again here to what a
 correction leaves. Writes on the temporary changes lock the settings row first, so two that would
 cover the same day never slip past each other's check; a special day's date is unique in the database.
 """
@@ -17,7 +17,7 @@ from live.errors import Conflict, InvalidPayload
 from live.operations import atomic, operation
 from live.outbox import record_event
 
-from apps.schedule import events
+from apps.schedule import assistant_cards, events
 from apps.schedule.models import (
     Override,
     OverrideInterval,
@@ -35,27 +35,19 @@ from apps.schedule.queries import (
     special_day_out,
     week_out,
 )
-from apps.schedule.schemas import (
-    RANGE_BACKWARDS,
+from apps.schedule.schemas.fields import RANGE_BACKWARDS, DeletedOut, NoParamsIn
+from apps.schedule.schemas.intervals import IntervalIn, check_intervals
+from apps.schedule.schemas.overrides import OverrideIn, OverrideOut, OverridePatchIn, OverrideRefIn
+from apps.schedule.schemas.settings import SettingsIn, SettingsOut
+from apps.schedule.schemas.special_days import (
     BulkCreatedOut,
     BulkSpecialDayIn,
-    DeletedOut,
-    IntervalIn,
-    NoParamsIn,
-    OverrideIn,
-    OverrideOut,
-    OverridePatchIn,
-    OverrideRefIn,
-    SetDayIn,
-    SettingsIn,
-    SettingsOut,
     SpecialDayIn,
     SpecialDayOut,
     SpecialDayPatchIn,
     SpecialDayRefIn,
-    WeekOut,
-    check_intervals,
 )
+from apps.schedule.schemas.week import SetDayIn, WeekOut
 
 SPECIAL_DAY_EXISTS = _("There is already a special day on that date.")
 OVERRIDE_OVERLAPS = _(
@@ -109,6 +101,14 @@ def _same(left: list[IntervalIn], right: list[IntervalIn]) -> bool:
     return [(i.open_time, i.close_time) for i in left] == [
         (i.open_time, i.close_time) for i in right
     ]
+
+
+def _apply_sent(row: SpecialDay | Override, sent: dict[str, Any]) -> bool:
+    """Sets on ``row`` each sent value that changes it (``None`` changes nothing); whether any did."""
+    changed = {field: value for field, value in sent.items() if value is not None and getattr(row, field) != value}
+    for field, value in changed.items():
+        setattr(row, field, value)
+    return bool(changed)
 
 
 def _date_taken() -> Conflict:
@@ -258,7 +258,7 @@ def confirm_week(ctx: OperationContext, data: NoParamsIn) -> dict:
     output=SpecialDayOut,
     ai={
         "description": "Adds a special day: a date closed (a holiday) or with other opening hours, once or every year.",
-        "risk": "normal",
+        "risk": "normal", "summary": assistant_cards.special_day,
         "asks": {
             "en": (
                 "the 15th of August is a local holiday, we stay closed",
@@ -297,7 +297,7 @@ def create_special_day(ctx: OperationContext, data: SpecialDayIn) -> dict:
     ai={
         "description": "Adds several special days at once (up to 366, such as the year's holidays); a day whose date "
         "is taken or whose hours are not valid is skipped with its reason and the rest go in.",
-        "risk": "normal",
+        "risk": "normal", "summary": assistant_cards.special_days,
         "asks": {
             "en": (
                 "load all the national holidays of next year at once",
@@ -393,11 +393,7 @@ def update_special_day(ctx: OperationContext, data: SpecialDayPatchIn) -> dict:
         exclude_unset=True, exclude={"id", "special_day", "intervals"}
     )
     before = _stored(row)
-    fields_changed = False
-    for field, value in sent.items():
-        if value is not None and getattr(row, field) != value:
-            setattr(row, field, value)
-            fields_changed = True
+    fields_changed = _apply_sent(row, sent)
     intervals = data.intervals if data.intervals is not None else before
     if data.intervals is not None and row.is_closed and "is_closed" not in sent:
         # Hours sent for a closed day open it.
@@ -458,7 +454,7 @@ def delete_special_day(ctx: OperationContext, data: SpecialDayRefIn) -> dict:
     ai={
         "description": "Adds a temporary change of the opening hours for a range of dates (holidays, summer hours, "
         "works): closed, or the same intervals every day of the range.",
-        "risk": "normal",
+        "risk": "normal", "summary": assistant_cards.override,
         "asks": {
             "en": (
                 "we close from 1 to 15 August for the holidays",
@@ -517,11 +513,7 @@ def update_override(ctx: OperationContext, data: OverridePatchIn) -> dict:
     row = resolve_override(data.id, data.override, lock=True)
     sent = data.model_dump(exclude_unset=True, exclude={"id", "override", "intervals"})
     before = _stored(row)
-    fields_changed = False
-    for field, value in sent.items():
-        if value is not None and getattr(row, field) != value:
-            setattr(row, field, value)
-            fields_changed = True
+    fields_changed = _apply_sent(row, sent)
     if row.end_date < row.start_date:
         raise InvalidPayload(
             str(RANGE_BACKWARDS), fields={"end_date": str(RANGE_BACKWARDS)}

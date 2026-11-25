@@ -323,7 +323,7 @@ Actor: propietario, administrador, responsable
 Pantalla: Reglas
 Pasos:
 1. En la fila de la regla vigente pulsa «Poner fecha de fin».
-2. Escribe el último día que se aplica (el día antes de que empiece el tipo nuevo) y pulsa «Guardar
+2. Elige el último día que se aplica (el día antes de que empiece el tipo nuevo) y pulsa «Guardar
    fecha de fin».
 3. Crea la regla nueva con **+** y «Vigente desde» el día siguiente.
 4. La tabla enseña las dos con sus fechas; desde el día del cambio las ventas nuevas usan la nueva.
@@ -385,7 +385,7 @@ Si falla: un territorio que no tiene impuestos propios en el país del negocio s
 territorios fiscales, o ninguno.»); una categoría sin regla de su territorio no se cobra nunca al IVA
 nacional, igual que una categoría sin ninguna regla: el TPV no deja cobrarla («… no se puede cobrar:
 ninguna regla fiscal se aplica aquí a su categoría fiscal …»), la factura la rechaza debajo de su línea
-(«Ninguna regla fiscal se aplica hoy a la categoría fiscal …») y Categorías y las secciones de Ventas no le
+(«Ninguna regla fiscal se aplica ese día a la categoría fiscal …») y Categorías y las secciones de Ventas no le
 enseñan tipo; se arregla creando su regla (paso 2). Con «Todo el
 país (IVA)», las reglas regionales no se usan nunca. Quien solo consulta impuestos ve el
 territorio, pero no lo cambia.
@@ -541,7 +541,7 @@ Entra: lo que ya está guardado en Reglas y Categorías.
 Sale: lo que la línea de venta congela: categoría, tipo combinado, país, región y regla. Una línea con
 categoría y sin regla del país del negocio se rechaza (en un negocio de otro país, las reglas de España no
 se aplican nunca), nunca cae al 0 %: el TPV dice «… no se puede cobrar: ninguna regla
-fiscal se aplica aquí a su categoría fiscal …» y la factura, «Ninguna regla fiscal se aplica hoy a la
+fiscal se aplica aquí a su categoría fiscal …» y la factura, «Ninguna regla fiscal se aplica ese día a la
 categoría fiscal …» (TAX-F11). Qué hacer con una línea sin categoría es cosa de Ventas.
 Si falla: el cajero no cobra con un tipo supuesto.
 Implicados: COMBO-F09, INVENTORY-F01, INVENTORY-F02, INVOICE-F01, INVOICE-F03, MODIFIER-F07, SALE-F01,
@@ -563,7 +563,7 @@ reactivarla, la última desactivada).
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las categorías, con búsqueda, filtro de origen, páginas (hasta 100) y su tipo vigente hoy en un país y región | ver | F01, F19 | `tax.category.list` |
-| Una categoría por su clave, con su nombre traducido | ver | F02, F19 | `tax.category.get` |
+| Una categoría por su clave, su nombre o un alias, con su nombre traducido y con la etiqueta que dice su tipo de hoy en el país y la región del negocio («Producto — general · 21 %»; sin una regla en vigor, solo el nombre): la que lee la tarjeta del asistente (BASE-F97) | ver | F02, F19 | `tax.category.get` |
 | Las reglas, con búsqueda, filtros (país, región, categoría, tipo, calificación, estado) y páginas | ver | F03 | `tax.rule.list` |
 | Cuántas reglas raíz aplican hoy en el país del negocio y si los impuestos están configurados (el aviso y el paso «Tus impuestos» del Inicio) | ver | F17 | `tax.rule.status` |
 | Las reglas raíz de las que puede colgar un componente en un país, región y categoría: las mismas que acepta el alta (también una raíz que empieza en el futuro; una sin impuesto, solo para un componente al 0 %) | ver | F06 | `tax.rule.parent_candidates` |
@@ -642,7 +642,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   `test_a_component_stays_right_under_its_root_in_a_descending_list`.
 - Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`, `TaxSettings`),
   `migrations/` (`0002` siembra el catálogo de fábrica, con reverso; `0005` añade `retail.alcohol` sin tocar lo
-  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas.py`, `queries.py`, `services.py`, `events.py`,
+  que el hub ya tenga; `0006` crea `TaxSettings`), `schemas/`, `queries/`, `services/`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `locale/` y un `tests/test_<fichero>.py` por fichero, y las páginas
   (`frontend/`: Categorías, Reglas, Alias y Ajustes, con sus diálogos) con su Vitest y su e2e por flujo en
   tres tamaños (`tests/e2e/tax-flows.spec.ts`, más `tax-categories`, `tax-rules`, `tax-employee`,
@@ -654,11 +654,11 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   Servicios (servicio y ajustes), Ventas (sección), Menús y combos (menú) y Suplementos (opción). Ninguna
   operación borra ni desactiva una categoría; desactivarla en el admin del Hub no es un borrado (no espera a
   ninguna escritura) y deja sin vender lo que la nombra hasta que se elija otra.
-- **La lectura retenida de una categoría** (`queries.held_categories(keys)`, hub#62): `FOR KEY SHARE` en
+- **La lectura retenida de una categoría** (`queries.categories.held_categories(keys)`, hub#62): `FOR KEY SHARE` en
   orden de clave, el mismo patrón que `held()` de Inventario. La usa Servicios al guardar un servicio, el
   alta en bloque o sus ajustes, para que un borrado a la vez espere a la escritura o la rechace como una
   clave que no existe (422 `service.tax_category_unknown`), nunca con un 500 en el COMMIT.
-- **La resolución, una sola vez** (`queries.resolve_tax` y `queries.calculate_tax`): raíces activas y
+- **La resolución, una sola vez** (`queries.resolution.resolve_tax` y `queries.calculation.calculate_tax`): raíces activas y
   vigentes en la fecha, del país y la categoría; la región exacta gana a la del país entero y nunca se
   usa otra región; una región con impuesto propio (`own_tax_kind`: ES-CN, ES-CE, ES-ML) solo toma sus
   reglas, nunca las del país entero (`pick_root`, también en `current_rates`): sin la suya, `tax.no_rate`; dentro de un nivel, la de «Vigente desde» más reciente y, a igualdad, el `id` menor.
@@ -670,7 +670,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   componente con tipo mayor que 0: uno al 0 % nunca lleva cuota.
 - **País y región en cualquier caso**: `resolve_tax` y `calculate_tax` los pasan a mayúsculas, porque
   Ventas y Facturación los llaman sin pasar por los esquemas.
-- **La jurisdicción del negocio, una sola fuente** (TAX-F11, pm#629 VF-17): `queries.business_jurisdiction()`
+- **La jurisdicción del negocio, una sola fuente** (TAX-F11, pm#629 VF-17): `queries.jurisdiction.business_jurisdiction()`
   da `(país, región)`: el país es el que erplora.com registró para el negocio activo
   (`base.operations.current_business_country`: el de `base.business.get` del hub del contexto, `use_hub`, por
   `base.business.country_or_market`, la misma regla que Clientes y VeriFactu; España sin país; hub#996) y la
@@ -684,7 +684,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   `RULE_EVENTS`, así que la caja y las listas vivas se recalculan. Ventas (`business_country`, el tipo de
   las secciones y `tax_closer`) y Facturación (`resolve_tax` de una línea con categoría) no pasan región
   suelta: leen esta fuente.
-- **El impuesto de un territorio** (`REGION_TAX_KINDS`; `queries.tax_kind_of(país, región)` y
+- **El impuesto de un territorio** (`REGION_TAX_KINDS`; `queries.jurisdiction.tax_kind_of(país, región)` y
   `business_tax_kind()`): `igic` en ES-CN, `ipsi` en ES-CE y ES-ML, `vat` en el resto (una región de otro
   país, también). Lo llevan lo que no tiene regla de la que sacarlo: la línea de factura con tipo tecleado
   (el territorio del negocio hoy), la línea de venta sin su regla (`_charged_kind` de Facturación: el
@@ -695,7 +695,7 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   Ninguna otra app lo republica con una operación propia. En la SPA, `useTaxKind()` y `useTaxName()` de `frontend/composables/useTaxName.ts` lo leen
   con una sola suscripción por pestaña y dan la familia y su nombre corto («IVA», «IGIC», «IPSI»,
   `tax.common.taxName.*`); `taxNameKey(familia)` nombra cualquier otra (la que declararon las ventas de un
-  periodo). En el servidor, `schemas.TAX_KIND_NAMES` da el mismo nombre corto a un mensaje («Falta configurar
+  periodo). En el servidor, `schemas.jurisdiction.TAX_KIND_NAMES` da el mismo nombre corto a un mensaje («Falta configurar
   su IGIC.», el 409 `sale.tax_category_missing` de Ventas). Todo rol que vende o factura tiene `tax.view`.
 - **Solape**: crear, reactivar, poner fecha de fin y el lote bloquean la fila de la categoría
   (`select_for_update`) antes de comprobar; dos escrituras a la vez sobre la misma categoría se ponen
@@ -721,18 +721,18 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   de alias acepta Origen y la de categoría, `is_system` (solo por la API). `expose_api`: `tax.category.list`/`get`, `tax.rule.list`, `tax.alias.list`/`resolve`, `tax.rule.end` y
   `tax.rule.activate`.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en las de
-  reglas, que deciden lo que se cobra y se declara, y en el lote) y cada campo de `schemas.py` su
+  reglas, que deciden lo que se cobra y se declara, y en el lote) y cada campo de `schemas/` su
   `description` (el JSON Schema de la herramienta). La tarjeta de confirmación nombra cada dato por el
   `verbose_name` del modelo; el que ningún modelo nombra (`tax_category_key`) lleva un `title` en inglés con
   `gettext_noop` y su español en el catálogo de Impuestos, la palabra de las pantallas («Categoría»). Lo
   vigila `tests/test_integration_assistant.py`, que recorre todas las escrituras `tax.*` del registro.
   Cada herramienta dice además sus `asks`, las frases en `en` y `es` con que una persona la pide
-  (`live.E020`: Impuestos está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1094; `tests/test_services.py` y
-  `tests/test_queries.py` exigen la clave). Sin ellas, desactivar, reactivar o poner fecha de fin a una
-  regla desde el chat (TAX-F07 y TAX-F08) queda fuera de las 40 herramientas que ofrece un turno y el
+  (`live.E020`: Impuestos está en `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1094; `tests/test_services_declarations.py` y
+  `tests/test_queries_declarations.py` exigen la clave). Sin ellas, desactivar, reactivar o poner fecha de fin a una
+  regla desde el chat (TAX-F07 y TAX-F08) queda fuera de las herramientas que ofrece un turno y el
   asistente manda a la pantalla o busca una automatización. `tests/test_assistant_asks.py` mide con las
   frases reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-tax-2026-11-08.json` y la del
-  empleado), nunca con los propios `asks`: cada una trae su herramienta entre las 20 primeras, y lo que el
+  empleado), nunca con los propios `asks`: cada una trae su herramienta entre las 15 que ofrece el turno, y lo que el
   empleado no puede hacer (las escrituras, `tax.manage`) ni se le ofrece. Además, una frase propia por
   herramienta (`OWN_WORDS`, ni ask ni sonda) que solo llega entre las diez primeras por sus `asks`: cambiar
   las de cualquier herramienta lo ve un test. live lee «activar» y «desactivar» como las acciones `activate` y
@@ -743,8 +743,13 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   Sin sinónimos propios
   (`assistant_synonyms`): «desactiva» ya lo lee el grupo de Personal (hub#1103), y una palabra suelta
   para «termina» o «activa» arrastraría las tareas terminadas o las reglas «activas» de una lista.
+  Como una regla no se edita (TAX-F04 y TAX-F07), `tax.rule.create` dice además que pone y cambia
+  (`does`: `set` y `update`): «ponle el IVA a la comida para llevar» o «sube el IVA de los libros al 10 %»
+  la ofrecen, y la búsqueda de herramientas la encuentra por «poner el IVA de una categoría»
+  (`tests/test_assistant_rate_rule.py`). Con una palabra propia para «regla» en «el IVA de…» subiría la regla de
+  descuento de Tarifas, que también es una regla.
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#678): nombra la regla que una escritura señala por su id
-  con la marca `refers` de `schemas.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna
+  con la marca `refers` de `schemas/references.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna
   (`ai=INTERNAL`, sin API ni consulta viva): solo nombra la regla en la tarjeta; el modelo encuentra las reglas en
   su lista. Su `label` dice la categoría (su nombre en el idioma de quien pregunta), la etiqueta de un componente, el
   país por su nombre (y la región por su código, como la columna Región) y el tipo como lo escribe ese idioma
@@ -753,6 +758,12 @@ el empleado: lee los impuestos en cada venta y en cada factura, y no cambia nada
   (el alta de un componente), que ya sale «Regla raíz» por el `verbose_name` de `TaxRule.parent`. Una regla
   desactivada se sigue nombrando (para reactivarla). Sin persona detrás, sin `tax.view`, con un id de otro negocio o
   de una regla que no existe, queda fuera, nunca su id (`tests/test_assistant_card_records.py`).
+- **La categoría fiscal en la tarjeta**: toda escritura de cualquier app que toma una la marca con `A_TAX_CATEGORY`
+  (`schemas/references.py`), leída con `tax.category.get` por su clave, su nombre o un alias. Su `label` es el nombre en
+  el idioma de quien lee y el tipo de hoy en la jurisdicción del negocio (`current_rates`, como las Secciones de
+  Ventas), escrito con `base.business.percent_text`, el mismo con el que se escribe el de una regla; solo esa lectura lo
+  calcula. Las escrituras de reglas usan `A_RULE_CATEGORY`, que dice el nombre solo: el tipo del país del negocio junto
+  al de una regla de otro país se leería como el nuevo (`tests/test_assistant_card_category.py`).
 - **Países en la tarjeta**: `country_code` es una lista cerrada (los 249 códigos ISO 3166-1) que ningún campo del
   modelo etiqueta; `choices.py` la declara (`TaxConfig.choices`) con el nombre de cada país en el idioma de quien
   lee (CLDR por `base.business.country_name`, el mismo que enseña el selector de País de la pantalla con

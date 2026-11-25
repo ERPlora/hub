@@ -32,7 +32,7 @@ from base.tenancy.tests.test_offboarding import (
     one_sale,
     run_pass,
 )
-from control.models import HubDump
+from control.models.dumps import HubDump
 
 # The fixtures these tests share with the copies and the drop of a business that left.
 moto_s3, aws_test_credentials, dumps_bucket = s3.moto_s3, s3.aws_test_credentials, s3.dumps_bucket
@@ -594,10 +594,10 @@ def test_a_worker_that_stops_during_the_archive_marks_nothing(business, dumps_bu
 #: these apps has to say which side it is on, or the archive would miss it without anyone noticing. Settings, numbering
 #: counters and the AEAT's queue are no document; the business's own certificate is a secret and never leaves its
 #: database; ``AeatRecord`` is only the last photo of what the AEAT holds; an open order (``sale.Order``) is no sale
-#: yet; and a customer's card, consents and health notes are the customer's, not the purchase's.
+#: yet; a log of emails is none; and a customer's card, consents and health notes are the customer's, not the purchase's.
 NOT_ARCHIVED = {
     "sale": {"Department", "Order", "OrderLine", "PaymentMethod", "QuickNote", "SaleCounter", "Settings", "VoucherSession"},
-    "invoice": set(),
+    "invoice": {"InvoiceEmail"},
     "verifactu": {"AeatRecord", "Config", "OwnCertificate", "SendControl"},
     "payment": {"PaymentCounter"},
     "cash_register": {"SessionCounter", "Settings"},

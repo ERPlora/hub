@@ -8,12 +8,22 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import NotFound
-from live.operations import AI, operation
+from live.operations import AI, INTERNAL, operation
 
 from base import access
-from base.models import SessionOwner, TrustedDevice
+from base.models.sessions import SessionOwner
+from base.models.access import TrustedDevice
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
-from base.schemas.devices import DeviceByIdIn, DeviceCurrentIn, DeviceCurrentOut, DeviceListIn, DeviceListOut, DeviceOut
+from base.schemas.devices import (
+    DeviceByIdIn,
+    DeviceCurrentIn,
+    DeviceCurrentOut,
+    DeviceListIn,
+    DeviceListOut,
+    DeviceOut,
+    DevicePruneIn,
+    DeviceUnusedOut,
+)
 
 
 def device_of(request: HttpRequest | None, *, for_update: bool = False) -> TrustedDevice | None:
@@ -147,3 +157,22 @@ def unused_devices(here: TrustedDevice | None):
     """The devices «Remove the unused» removes: nobody entered on them in 30 days, never the one in hand."""
     old = TrustedDevice.objects.filter(last_entry_at__lt=timezone.now() - access.UNUSED_AFTER)
     return old.exclude(pk=here.pk) if here is not None else old
+
+
+@operation(
+    "base.device.unused",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=DevicePruneIn,
+    output=DeviceUnusedOut,
+    ai=INTERNAL,  # What «Remove the unused» will remove, on its assistant card.
+)
+def device_unused(ctx: OperationContext, data: DevicePruneIn) -> dict[str, Any]:
+    """The devices «Remove the unused» would remove now; with none, there is nothing to confirm."""
+    ids = list(unused_devices(device_of(ctx.request)).order_by("-last_entry_at").values_list("pk", flat=True))
+    if not ids:
+        raise NotFound(
+            gettext("No device has gone 30 days without being used, so there is nothing to remove."),
+            code="base.no_unused_devices",
+        )
+    return {"count": len(ids), "devices": ids}

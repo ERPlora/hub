@@ -54,7 +54,7 @@ def test_spanish_texts_of_the_workbook():
         config = apps.get_app_config("modifier")
         assert str(config.verbose_name) == "Suplementos"
         assert str(config.navigation[0].label) == "Suplementos"
-        assert str(queries.GROUP_NOT_FOUND) == "Este grupo no existe."
+        assert str(queries.reads.GROUP_NOT_FOUND) == "Este grupo no existe."
         assert (
             str(selection.OPTION_NOT_OFFERED)
             == "Esta opción no se ofrece con este producto."
@@ -77,14 +77,14 @@ def test_spanish_texts_of_the_workbook():
         assert str(selection.PRICED_BY_MEASURE) % {"product": "Jamón"} == (
             "«Jamón» se vende a peso o por medida: no admite una opción con suplemento."
         )
-        assert str(services.GROUP_NAME_TAKEN) == "Ya hay un grupo con ese nombre."
+        assert str(services.writes.GROUP_NAME_TAKEN) == "Ya hay un grupo con ese nombre."
         assert (
-            str(services.TOO_MANY_DEFAULTS)
+            str(services.defaults.TOO_MANY_DEFAULTS)
             == "Este grupo tiene más opciones por defecto que su máximo."
         )
-        assert str(services.LINK_EXISTS) == "Este grupo ya se aplica ahí."
-        assert str(services.OPTION_LEFT) % {"option": "Alioli", "why": "x"} == "volvió sin su opción «Alioli»: x"
-        assert str(services.DEFAULT_KEPT) % {"chosen": "Ketchup"} == (
+        assert str(services.writes.LINK_EXISTS) == "Este grupo ya se aplica ahí."
+        assert str(services.recovery.OPTION_LEFT) % {"option": "Alioli", "why": "x"} == "volvió sin su opción «Alioli»: x"
+        assert str(services.recovery.DEFAULT_KEPT) % {"chosen": "Ketchup"} == (
             "volvió sin venir elegida por defecto: su grupo ya viene con «Ketchup»"
         )
         # What Recoveries counts apart of a separate copy (BASE-F114, MODIFIER-F10).
@@ -94,12 +94,12 @@ def test_spanish_texts_of_the_workbook():
             "Grupos de suplementos de categorías",
             "Grupos de suplementos de productos",
         ]
-        assert str(services.OWN_LINE_NOT_POSITIVE) == (
+        assert str(services.writes.OWN_LINE_NOT_POSITIVE) == (
             "Una opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser "
             "mayor que cero."
         )
         assert (
-            str(schemas.MAX_BELOW_MIN)
+            str(schemas.groups.MAX_BELOW_MIN)
             == "El máximo no puede ser menor que el mínimo (0 = sin techo)."
         )
 
@@ -116,7 +116,7 @@ def test_spanish_says_modifiers_own_words_not_an_earlier_apps():
         "ModifierOption.kitchen_name": ModifierOption._meta.get_field(
             "kitchen_name"
         ).verbose_name,
-        "TAX_CATEGORY_UNKNOWN": services.TAX_CATEGORY_UNKNOWN,
+        "TAX_CATEGORY_UNKNOWN": services.options.TAX_CATEGORY_UNKNOWN,
     }
     with translation.override("es"):
         said = {name: str(text) for name, text in texts.items()}

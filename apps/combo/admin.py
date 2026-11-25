@@ -2,7 +2,7 @@
 
 The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no business rule
 beyond the database's (a menu eaten in with its tax category, a course's ceiling, a product once per course): the
-screens and the assistant go through services.py.
+screens and the assistant go through the writes of ``services``.
 """
 
 from django.contrib import admin

@@ -96,19 +96,40 @@ export interface Box {
   height: number;
 }
 
-/** The title's text, centred on its bar (Ionic's ios title), within 4 px; returns both boxes. */
-export async function expectTitleCentred(page: Page, label: string): Promise<{ title: Box; toolbar: Box }> {
-  const text = await topbar(page)
+/** The title on the bar of the screen on view: its box, its words inside it and whether the bar cuts them with «…». */
+function titleOnTheBar(page: Page): Promise<{ box: Box; words: Box; cut: boolean }> {
+  return topbar(page)
     .locator('ion-title')
     .evaluate((el) => {
       const inner = el.shadowRoot?.querySelector('.toolbar-title') ?? el;
-      const range = document.createRange();
-      range.selectNodeContents(inner);
-      const box = (range.getClientRects().length ? range : inner).getBoundingClientRect();
-      return { x: box.x, y: box.y, width: box.width, height: box.height };
+      const around = (node: Node): Box => {
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        const { x, y, width, height } = (range.getClientRects().length ? range : inner).getBoundingClientRect();
+        return { x, y, width, height };
+      };
+      return { box: around(inner), words: around(el), cut: inner.scrollWidth > inner.clientWidth };
     });
+}
+
+const centre = (box: Box): number => box.x + box.width / 2;
+
+/** The title's text, centred on its bar (Ionic's ios title), within 4 px; returns both boxes. */
+export async function expectTitleCentred(page: Page, label: string): Promise<{ title: Box; toolbar: Box }> {
+  const { box: title } = await titleOnTheBar(page);
   const toolbar = (await topbar(page).locator('ion-toolbar').boundingBox())!;
-  const centre = (box: Box) => box.x + box.width / 2;
-  expect(Math.abs(centre(text) - centre(toolbar)), `${label}: the title is centred`).toBeLessThanOrEqual(4);
-  return { title: text, toolbar };
+  expect(Math.abs(centre(title) - centre(toolbar)), `${label}: the title is centred`).toBeLessThanOrEqual(4);
+  return { title, toolbar };
+}
+
+/** On a phone, the title's words whole and as centred as the buttons let them: on the centre of its bar, or right beside
+ *  «⋮», the first of them, once the help and the bell grown into a pill take the room they need. */
+export async function expectTitleWhole(page: Page, label: string): Promise<void> {
+  const { words, cut } = await titleOnTheBar(page);
+  const toolbar = (await topbar(page).locator('ion-toolbar').boundingBox())!;
+  const gap = (await topbarMore(page).boundingBox())!.x - (words.x + words.width);
+  expect(cut, `${label}: the title is whole`).toBe(false);
+  expect(gap, `${label}: the title ends before the buttons`).toBeGreaterThanOrEqual(0);
+  const asCentred = Math.abs(centre(words) - centre(toolbar)) <= 4 || gap <= 8;
+  expect(asCentred, `${label}: the title is as centred as the buttons let it (${Math.round(gap)} px from them)`).toBe(true);
 }

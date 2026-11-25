@@ -23,7 +23,7 @@ from apps.inventory.schemas.products import (
 )
 from apps.inventory.schemas.stock import LowStockListIn, LowStockPage
 from base import images
-from base.queries.catalog_images import business_language, image_library
+from base.queries.catalog_images import image_suggestion, titled_search
 from base.ordering import list_order_for
 
 #: Products that cannot be sold for lack of a live tax category.
@@ -128,8 +128,7 @@ def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "Propose images of ERPlora's shared image library for a product's photo («ponle foto al café "
-        "con leche»), the product named by its id, SKU or name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
-        "never sets one: show them, and set the one the person picks with inventory.product.set_image.",
+        "con leche»), the product named by its id, SKU or name: " + image_suggestion("inventory.product.set_image"),
         "asks": {
             "en": (
                 "which library images could fit the latte?",
@@ -143,15 +142,12 @@ def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     },
 )
 def suggest_image(ctx: OperationContext, data: ProductImageSuggestIn) -> dict:
-    """INVENTORY-F30: the library searched by the product's name in either of its languages, titled in the business's
-    (the one its products are named in)."""
+    """INVENTORY-F30: the library searched by the product's name in either of its languages, titled in the person's."""
     product = find_product(data.id, data.product)
-    language = business_language(ctx)
-    found = image_library(ctx).search(product.name, language)
     return {
         "product_id": product.id,
         "query": product.name,
-        "rows": [image.row(language) for image in found[: data.limit]],
+        "rows": titled_search(ctx, product.name)[: data.limit],
     }
 
 
@@ -187,6 +183,8 @@ def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
         products = products.filter(
             Q(name__icontains=params.search) | Q(sku__icontains=params.search)
         )
+    if params.show_on_website is not None:
+        products = products.filter(show_on_website=params.show_on_website)
     return _page(products.order_by("name", "id"), params, partial(_sale_row, urls=images.Urls(ctx.scope)))
 
 
@@ -198,7 +196,9 @@ def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
     output=LowStockPage,
     expose_api=True,
     ai={
-        "description": "List the active articles with stock control at or under their low-stock threshold, the one with less first.",
+        "description": "List the active articles with stock control at or under their low-stock threshold, the one with "
+        "less first. A balance at zero or below does not take an article off the till: the till still offers it, and "
+        "only one marked sold out (is_sold_out) is not offered.",
         "asks": {
             "en": (
                 "what is running low?",
@@ -234,6 +234,7 @@ def list_low_stock(ctx: OperationContext, params: LowStockListIn) -> dict:
         "sku",
         "stock",
         "low_stock_threshold",
+        "is_sold_out",
         "unit",
         "price_quantity",
         "pricing_unit",
@@ -308,7 +309,6 @@ def _product_row(product: Product, urls: images.Urls) -> dict:
     """What the till reads of the product (``_sale_row``) and what only the back office does."""
     fields = (
         "ean13",
-        "description",
         "stock",
         "low_stock_threshold",
         "track_stock",
@@ -328,6 +328,7 @@ def _sale_row(product: Product, urls: images.Urls) -> dict:
     fields = (
         "id",
         "name",
+        "description",
         "sku",
         "product_type",
         "price",
@@ -337,6 +338,7 @@ def _sale_row(product: Product, urls: images.Urls) -> dict:
         "price_quantity",
         "pricing_unit",
         "allergens",
+        "show_on_website",
     )
     return {
         **{field: getattr(product, field) for field in fields},

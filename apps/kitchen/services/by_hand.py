@@ -10,12 +10,13 @@ from apps.kitchen import events
 from apps.kitchen.models import ACTOR_MAX_LENGTH, Destination, LogAction, Ticket, TicketItem
 from apps.kitchen.queries.reads import business_day
 from apps.kitchen.queries.routing import routing
-from apps.kitchen.schemas import TicketCreateIn, TicketOut
+from apps.kitchen.schemas.tickets import TicketCreateIn, TicketOut
 from apps.kitchen.services.catalog import find_product
 from apps.kitchen.services.paper import _print_round
 from apps.kitchen.services.settling import begin, out
 from apps.kitchen.services.writes import _ticket_event, actor, take_number, write_log
-from apps.sale.queries.people import person_label
+from base.assistant import card_order
+from base.queries.people import actor_name
 
 
 @operation(
@@ -39,6 +40,7 @@ from apps.sale.queries.people import person_label
         "description": "Make a kitchen ticket by hand, with no check (a staff meal, a dish to remake): its type, "
         "where it goes, notes and its dishes (products of the catalogue by name, or free text), each to its station.",
         "risk": "normal",
+        "summary": card_order.said_first("label", "items"),
     },
 )
 def create_ticket(ctx: OperationContext, data: TicketCreateIn) -> dict:
@@ -53,7 +55,7 @@ def create_ticket(ctx: OperationContext, data: TicketCreateIn) -> dict:
         label=data.label,
         order_type=data.order_type or settings.default_order_type,
         notes=data.notes,
-        waiter=person_label(ctx.actor)[:ACTOR_MAX_LENGTH],
+        waiter=actor_name(ctx.actor)[:ACTOR_MAX_LENGTH],
         received_at=now,
         created_by=actor(ctx),
     )

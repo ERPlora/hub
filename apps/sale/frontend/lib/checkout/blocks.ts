@@ -18,7 +18,9 @@ export type ChargeBlock =
   | { kind: 'cashLimit'; limit: number }
   | { kind: 'remaining'; amount: number }
   | { kind: 'tenderedMissing' }
-  | { kind: 'tenderedShort' };
+  | { kind: 'tenderedShort' }
+  /** A step another app adds to the charge cannot be charged as it stands: its own words (lib/checkout/steps.ts). */
+  | { kind: 'step'; message: string };
 
 export interface BlockState {
   /** The till settings' «Require a customer on every sale». */

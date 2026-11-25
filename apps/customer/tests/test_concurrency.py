@@ -36,23 +36,17 @@ from apps.customer.models import (
     OrderLink,
     Purchase,
 )
-from apps.customer.schemas import (
-    ConsentGrantIn,
-    CustomerPatchIn,
-    EraseIn,
-    GroupRefIn,
-    HealthGrantIn,
-    HealthIn,
-    MergeIn,
-    NoteIn,
-    OrderLinkIn,
-    PurchaseRecordIn,
-    PurchaseRefundIn,
-    PurchaseVoidIn,
-    SetGroupsIn,
-    SetTagsIn,
-)
-from apps.customer.queries import CUSTOMER_UNAVAILABLE_CODE
+from apps.customer.schemas.activity import NoteIn
+from apps.customer.schemas.cards import CustomerPatchIn
+from apps.customer.schemas.consent import ConsentGrantIn
+from apps.customer.schemas.erasing import EraseIn
+from apps.customer.schemas.fields import GroupRefIn
+from apps.customer.schemas.health import HealthGrantIn, HealthIn
+from apps.customer.schemas.memberships import SetGroupsIn, SetTagsIn
+from apps.customer.schemas.merging import MergeIn
+from apps.customer.schemas.orders import OrderLinkIn
+from apps.customer.schemas.purchases import PurchaseRecordIn, PurchaseRefundIn, PurchaseVoidIn
+from apps.customer.queries.reads import CUSTOMER_UNAVAILABLE_CODE
 from apps.sale.tests.test_concurrency import delete_page_while_held, in_turn, locks
 from base.tenancy.context import current_alias
 from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, meanwhile

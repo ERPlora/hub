@@ -1,11 +1,11 @@
 // What a manager holds in Customers, an employee does with a manager's PIN on the spot (BASE-F84; the old customers
 // module's rule «what the manager has, another profile may do with a manager's approval (PIN)»): the employee asks to
-// merge a duplicate card (CUSTOMER-F13), «An approval is needed» opens over the screen, the owner approves it with their PIN on the employee's own device and it is done once. Screenshots of the
-// dialog over the card in the three viewports. The owner's PIN exists only while this file runs, after the employee
-// has entered (a PIN in hub `a` turns every browser's way in into the PIN pad: base-access.spec.ts), and the
-// approvals it records go with it, as everything else this file creates (`afterAll`).
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+// merge a duplicate card (CUSTOMER-F13), «An approval is needed» opens over the screen, the owner approves it with their
+// PIN on the employee's own device and it is done once. Screenshots of the dialog over the card in the three viewports.
+// The owner's PIN and the approvals go with the file (approval-helpers.ts), as everything else it creates (`afterAll`).
+import { expect, test } from '@playwright/test';
 
+import { approvalDialog, forgetThePinAndTheApprovals, ownerApproves, ownerChoosesPin, type Side } from './approval-helpers';
 import {
   cardOf,
   cleanUp,
@@ -14,28 +14,17 @@ import {
   FLOW_VIEWPORTS,
   spanishMobile,
 } from './customer-helpers';
-import { A, api, capture, EMPLOYEE, login, OWNER, psql, shown, testid, usernamesOf } from './helpers';
+import { A, capture, EMPLOYEE, login, shown, testid } from './helpers';
 import { toastSaying } from './toast-helpers';
-
-const OWNER_PIN = '2468';
 
 test.describe.configure({ mode: 'serial' });
 
-let owner: { context: BrowserContext; page: Page };
-let employee: { context: BrowserContext; page: Page };
-
-/** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
-const accountsOf = (email: string): string => usernamesOf(email);
-
-/** No PIN of the owner's left behind, in any of their accounts, and no approval of a Customers action. */
-function forgetThePinAndTheApprovals(): void {
-  psql(`UPDATE base_credential SET pin_hash = '', pin_set_at = NULL WHERE username IN (${accountsOf(OWNER.email)})`);
-  psql(`DELETE FROM base_approval WHERE requested_by IN (${accountsOf(EMPLOYEE.email)}) AND operation LIKE 'customer.%'`);
-}
+let owner: Side;
+let employee: Side;
 
 test.beforeAll(async ({ browser }) => {
   // What a run that failed left: with the owner's PIN still set, the way in to hub `a` asks for a PIN.
-  forgetThePinAndTheApprovals();
+  forgetThePinAndTheApprovals('customer');
   const context = await browser.newContext({ baseURL: A });
   owner = { context, page: await context.newPage() };
   await login(owner.page, A, '/customer/customers');
@@ -43,28 +32,16 @@ test.beforeAll(async ({ browser }) => {
   const shop = await browser.newContext({ baseURL: A });
   employee = { context: shop, page: await shop.newPage() };
   await login(employee.page, A, '/customer/customers', EMPLOYEE);
-  // Only now the owner chooses a PIN («My profile»): who may approve, on the employee's device.
-  const pin = await api<{ set: boolean }>(context, A, 'POST', '/me/pin', { pin: OWNER_PIN });
-  expect(pin.status, JSON.stringify(pin.data)).toBe(200);
+  // Only now: a PIN of the business's turns the next way in into the PIN pad.
+  await ownerChoosesPin(context);
 });
 
 test.afterAll(async () => {
-  forgetThePinAndTheApprovals();
+  forgetThePinAndTheApprovals('customer');
   cleanUp();
   await employee?.context.close();
   await owner?.context.close();
 });
-
-/** «An approval is needed», over the screen that asked. */
-const approval = (page: Page) => page.locator('ion-modal').filter({ has: page.getByTestId('approval-action') });
-
-/** The owner approves on the employee's device: their face (when there is a choice) and their PIN. */
-async function ownerApproves(page: Page): Promise<void> {
-  const dialog = approval(page);
-  const faces = dialog.getByTestId('pin-face');
-  if (await faces.count()) await faces.first().click();
-  for (const digit of OWNER_PIN) await dialog.getByTestId(`pinpad-key-${digit}`).click();
-}
 
 for (const viewport of FLOW_VIEWPORTS) {
   // flow: CUSTOMER-F13
@@ -79,7 +56,7 @@ for (const viewport of FLOW_VIEWPORTS) {
     await panel.locator('[data-testid=customer-picker-search] input').fill(duplicate.name);
     await panel.locator(`[data-testid=customer-picker-result-${duplicate.id}]`).click();
     await panel.locator('[data-testid=customer-merge-submit]').click();
-    const dialog = approval(page);
+    const dialog = approvalDialog(page);
     await expect(dialog).toBeVisible();
     await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Merge two customer cards|Se aprueba: Fusionar dos fichas de cliente)$/);
     // The PIN pad (or the faces to choose from) painted; `capture` waits for the sheet to stop moving.

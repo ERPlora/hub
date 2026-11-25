@@ -44,6 +44,11 @@ def missing(response, code: str = NOT_FOUND) -> bool:
     return response.status_code == 404 and response.json()["error"]["code"] == code
 
 
+def reaches_the_printer(response) -> bool:
+    """Found and asked of Printing: in a business with no system printer, the only refusal is that none takes it."""
+    return response.status_code == 409 and response.json()["error"]["code"] == "invoice.no_printer"
+
+
 @pytest.fixture
 def people(make_user, issuer, product):
     """Ana and Bea, two employees, and Marta, the manager, of a business that invoices: each on their own device."""
@@ -111,10 +116,12 @@ class TestAnEmployeeReachesOnlyTheirOwnInvoices:
     def test_nor_its_document_nor_its_paper(self, people, invoices):
         ana, theirs = people["ana"][1], invoices["bea"]["ticket"]
         assert missing(get(ana, "/invoice/invoices/document", invoice_id=theirs["id"]))
+        assert missing(get(ana, "/invoice/invoices/pdf", invoice_id=theirs["id"]))
         assert missing(post(ana, "/invoice/invoices/print", {"invoice_id": theirs["id"]}))
         own = invoices["ana"]["ticket"]
         assert get(ana, "/invoice/invoices/document", invoice_id=own["id"]).json()["number"] == own["number"]
-        assert post(ana, "/invoice/invoices/print", {"invoice_id": own["id"]}).status_code == 200
+        assert get(ana, "/invoice/invoices/pdf", invoice_id=own["id"]).json()["filename"] == f"{own['number']}.pdf"
+        assert reaches_the_printer(post(ana, "/invoice/invoices/print", {"invoice_id": own["id"]}))
 
     def test_nor_the_invoice_of_someone_elses_sale(self, people, invoices):
         ana = people["ana"][1]
@@ -208,7 +215,7 @@ class TestWhoSeesEveryone:
         everyone = {invoices[name][kind]["number"] for name in ("ana", "bea") for kind in ("ticket", "manual")}
         assert listed(marta) == everyone
         assert get(marta, "/invoice/invoices/detail", invoice_id=invoices["bea"]["manual"]["id"]).status_code == 200
-        assert post(marta, "/invoice/invoices/print", {"invoice_id": invoices["bea"]["ticket"]["id"]}).status_code == 200
+        assert reaches_the_printer(post(marta, "/invoice/invoices/print", {"invoice_id": invoices["bea"]["ticket"]["id"]}))
         assert ticket_of(marta, invoices["bea"]["sale"])["id"] == invoices["bea"]["ticket"]["id"]
 
     def test_the_owner_the_administrator_and_the_manager_hold_it_the_employee_does_not(self):

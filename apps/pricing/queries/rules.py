@@ -7,7 +7,8 @@ from live.operations import operation
 
 from apps.pricing.queries.reads import _page, find_rule
 from apps.pricing.queries.rows import _rules, _status, rule_row
-from apps.pricing.schemas import Page, RuleListIn, RuleOut, RuleRefIn
+from apps.pricing.schemas.fields import Page
+from apps.pricing.schemas.rules import RuleListIn, RuleOut, RuleRefIn
 from base import operations as platform
 from base.ordering import list_order
 
@@ -32,9 +33,10 @@ from base.ordering import list_order
                 "¿qué se rebaja solo y para quién?",
             ),
         },
-        "description": "List the automatic discount rules (the active ones by default): type and value (a percent, "
-        "an amount per unit, buy X get Y, tiers by quantity), what each applies to, its customer group, minimum "
-        "quantity, dates and priority. Search by code or name."
+        "description": "List the automatic discount rules, the discount a product or a category gets by itself on "
+        "every sale (the coffee discount), the active ones by default: type and value (a percent, an amount per unit, "
+        "buy X get Y, tiers by quantity), what each applies to, its customer group, minimum quantity, dates and "
+        "priority. Search by code or name."
     },
 )
 def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:

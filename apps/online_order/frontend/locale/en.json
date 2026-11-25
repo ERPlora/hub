@@ -1,0 +1,49 @@
+{
+  "online_order": {
+    "qrCodes": {
+      "title": "QR codes",
+      "columns": {
+        "number": "Table",
+        "zone": "Zone",
+        "url": "Address",
+        "issuedAt": "Generated"
+      },
+      "noZone": "No zone",
+      "noCode": "No QR yet",
+      "entity": {
+        "one": "table",
+        "many": "tables"
+      },
+      "empty": "No tables yet",
+      "emptyMessage": "Add the tables of your room in Tables: each one gets its own QR.",
+      "goToTables": "Go to Tables",
+      "loadError": "The tables could not be loaded.",
+      "retry": "Retry",
+      "reconnecting": "Reconnecting…",
+      "print": "Print sheet",
+      "missing": "{count} table has no QR yet, so it is not on the sheet. | {count} tables have no QR yet, so they are not on the sheet.",
+      "generateMissing": "Generate the missing QR codes",
+      "generatedMissing": "{count} table has its QR. | {count} tables have their QR.",
+      "actions": {
+        "generate": "Generate QR",
+        "regenerate": "Regenerate QR",
+        "print": "Print QR"
+      },
+      "regenerate": {
+        "title": "Regenerate the QR of table {table}?",
+        "message": "The QR printed for this table stops working at once. Print the new one and swap it on the table.",
+        "confirm": "Regenerate QR"
+      },
+      "generated": "Table {table} has its QR.",
+      "regenerated": "Table {table} has a new QR. Print it and swap the old one.",
+      "failed": "The QR could not be generated.",
+      "printFailed": "The sheet could not be printed."
+    },
+    "sheet": {
+      "title": "QR codes of the tables",
+      "scan": "Scan to order",
+      "table": "Table {number}",
+      "alt": "QR code of table {table}"
+    }
+  }
+}

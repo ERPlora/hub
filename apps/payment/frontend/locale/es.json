@@ -4,7 +4,6 @@
     "tabs": {
       "label": "Secciones de Pagos"
     },
-    "loading": "Cargando…",
     "noResults": "Sin resultados",
     "noResultsMessage": "Nada coincide con la búsqueda o los filtros.",
     "noPermission": "No tienes permiso",
@@ -60,7 +59,6 @@
       "form": {
         "title": "Nuevo pago",
         "method": "Método",
-        "methodPlaceholder": "Método…",
         "date": "Fecha",
         "amount": "Importe",
         "amountIn": "Importe ({currency})",

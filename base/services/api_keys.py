@@ -5,18 +5,20 @@
 import datetime as dt
 from uuid import UUID
 
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 from django.http import HttpRequest
 from django.utils import timezone
 from django.utils.translation import gettext
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.operations import AI, atomic, operation
 from live.outbox import record_event
 
-from base import api_keys, events, queries
-from base.models import ApiKey, ApiSettings
-from base.permissions import ADMINISTER_HUB
+from base import api_actions, api_keys, events, queries
+from base.models.api_keys import ApiKey, ApiSettings
+from base.permissions import ADMINISTER_HUB, access_for
+from base.queries.ownership import see_all_permissions
 from base.sensitive import DATA_PERMISSIONS
 from base.schemas.api_keys import (
     ApiDocSettingsIn,
@@ -28,23 +30,26 @@ from base.schemas.api_keys import (
     ApiKeyTokenOut,
 )
 from base.services.devices import _actor_label, too_many_message
+from base.services.sessions import acting_hub_user
 from base.throttle import client_key
 
 
 def _checked_scopes(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
-    """What a key per app may do on each app, of those this business has that publish it; nothing for the others."""
-    if data.mode != ApiKey.Mode.PER_APP:
-        return {}
-    offered = {app["id"]: app for app in queries.api_keys.api_apps(ctx)}
-    scopes = {app: sorted(set(kinds)) for app, kinds in data.scopes.items() if kinds}
+    """What the key may do, per app or on every app: of what the apps this business has publish, and never more than
+    who makes it may do (``queries.api_keys.grantable``)."""
+    scopes = api_actions.normalised(data.scopes)
     if not scopes:
         message = gettext("Choose at least one app and what the key may do on it.")
         raise InvalidPayload(message, code="base.api_key_scopes_required", fields={"scopes": message})
-    for app, kinds in scopes.items():
-        found = offered.get(app)
-        if found is None or any(not found[kind] for kind in kinds):
-            message = gettext("That app does not publish what the key would do on it.")
-            raise InvalidPayload(message, code="base.api_key_scope_unknown", fields={"scopes": message})
+    published = {app["id"]: app["actions"] for app in queries.api_keys.api_apps(ctx)}
+    published[api_actions.EVERY_APP] = list(api_actions.ACTIONS)
+    if any(not set(actions) <= set(published.get(app, ())) for app, actions in scopes.items()):
+        message = gettext("That app does not publish what the key would do on it.")
+        raise InvalidPayload(message, code="base.api_key_scope_unknown", fields={"scopes": message})
+    grantable = queries.api_keys.grantable(ctx)
+    if any(not set(actions) <= set(grantable.get(app, ())) for app, actions in scopes.items()):
+        message = gettext("A key may not do more than you may do yourself.")
+        raise PermissionDenied(message, code="base.api_key_beyond_maker", fields={"scopes": message})
     return scopes
 
 
@@ -63,7 +68,8 @@ def _new_token_for(key: ApiKey) -> str:
     output=ApiKeyTokenOut,
     ai={
         "description": "Not an assistant tool (its token is a secret shown once, never in a chat): makes an API key "
-        "for another system, with a name, its requests a minute and what it may do.",
+        "for another system, with a name, its requests a minute and what it may do (read, create, update or delete, "
+        "on every app or app by app), never more than who makes it may do.",
         "risk": "high",
     },
 )
@@ -75,14 +81,14 @@ def api_key_create(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
         raise InvalidPayload(message, code="base.api_key_name_required", fields={"name": message})
     key = ApiKey(
         name=name,
-        mode=data.mode,
         scopes=_checked_scopes(ctx, data),
         rate_per_minute=data.rate_per_minute,
         created_by=_actor_label(ctx),
+        owner=acting_hub_user(ctx),
     )
     token = _new_token_for(key)
     key.save()
-    record_event(ctx, events.API_KEY_CREATED, {"id": str(key.id), "mode": key.mode})
+    record_event(ctx, events.API_KEY_CREATED, {"id": str(key.id), "scopes": key.scopes})
     return {"key": queries.api_keys.api_key_out(key), "token": token}
 
 
@@ -161,8 +167,8 @@ def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyC
     """The caller of ``token`` on the published operation ``op``, in the request's hub (``base.api_keys.KeyDoor``).
 
     ``None`` (the session's door goes on) without a hub, or for a token nobody issued here (counted against the
-    address); 429 once the address tried too many, or the key passed its pace; 403 when the key may not do this on this
-    app."""
+    address); 429 once the address tried too many, or the key passed its pace; 403 when whoever made the key is no
+    longer in the business, or the key may not do this on this app."""
     hub = getattr(request, "hub", None)
     if hub is None:
         return None
@@ -174,11 +180,12 @@ def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyC
             code="base.too_many_api_key_tries",
             status=429,
         )
-    key = ApiKey.objects.filter(token_digest=api_keys.digest(token), revoked_at=None).first()
+    key = ApiKey.objects.select_related("owner").filter(token_digest=api_keys.digest(token), revoked_at=None).first()
     if key is None:
         api_keys.KEY_ADDRESS_LIMIT.failed(hub.slug, address)
         return None
-    if not api_keys.allows(key.mode, key.scopes, op.app_label, api_keys.kind_of(op)):
+    held = _held_by_its_maker(key, hub)
+    if not api_actions.allows(key.scopes, op.app_label, api_actions.action_of(op)):
         raise PermissionDenied(
             gettext("This API key may not do that on this app."), code="base.api_key_scope"
         )
@@ -191,8 +198,30 @@ def authenticate_api_key(request: HttpRequest, token: str, op) -> "api_keys.KeyC
     now = timezone.now()
     if key.last_used_at is None or now - key.last_used_at >= API_KEY_LAST_USE_EVERY:
         ApiKey.objects.filter(pk=key.pk).update(last_used_at=now)
-    granted = (frozenset({op.permission}) if op.permission else frozenset()) | DATA_PERMISSIONS
-    return api_keys.KeyCaller(key_id=str(key.pk), name=key.name, prefix=key.prefix, permissions=granted)
+    wanted = (frozenset({op.permission}) if op.permission else frozenset()) | DATA_PERMISSIONS
+    return api_keys.KeyCaller(
+        key_id=str(key.pk),
+        name=key.name,
+        prefix=key.prefix,
+        permissions=wanted if held is None else (wanted | see_all_permissions()) & held,
+        owner=key.owner.username if key.owner else "",
+    )
+
+
+def _held_by_its_maker(key: ApiKey, hub) -> frozenset[str] | None:
+    """What whoever made ``key`` holds on ``hub`` today, its ceiling; 403 when they hold nothing there any more (out
+    of the business, or their account closed). ``None`` for a key made before its maker was recorded: it holds what
+    it did, and reads everyone's, until the next photo gives it to the owner (``base.hub_user.sync``)."""
+    if key.owner is None:
+        return None
+    maker = get_user_model().objects.filter(username=key.owner.username).first()
+    held = access_for(maker, Scope("host", hub.slug))
+    if not held:
+        raise PermissionDenied(
+            gettext("Whoever made this API key is no longer in the business. Make a new one."),
+            code="base.api_key_owner_gone",
+        )
+    return held
 
 
 @operation(

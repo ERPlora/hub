@@ -2,9 +2,9 @@
 
 The platform reads the copy (``base.tenancy.recovery``) through a direct, read-only connection: the copy is no
 business, so it has no alias and the ORM never reaches it. Appointments answers it (``recoverable_from_copy`` on its
-config) with its own read, by SQL over its models' names (``queries.appointments_in_copy``): each appointment of the
+config) with its own read, by SQL over its models' names (``appointments_in_copy``): each appointment of the
 copy still to come and still booked (pending or confirmed, not charged), with what its create takes and the card of its
-customer there. Then, in the business, which of those it lacks (``queries.appointments_not_in_business``): one it holds
+customer there. Then, in the business, which of those it lacks (``appointments_not_in_business``): one it holds
 (whatever became of it since) is not lacking, nor one booked again (the same customer at the same moment). Each lacking
 one names the business's card of its customer (Customers' rule, ``card_in_business``) and the business's service of
 each of its services (Services' rule, ``services_in_business``, hub#1341), and is created by
@@ -19,9 +19,17 @@ from django.apps import apps
 from django.db import connections
 from django.utils import timezone
 
-from apps.appointment import queries
 from apps.appointment.models import Appointment, Recurring, RecurringService
-from apps.appointment.schemas import AppointmentCreateIn, RecurringCreateIn
+from apps.appointment.queries.recovery import (
+    appointments_deleted_in_business,
+    appointments_in_copy,
+    appointments_not_in_business,
+    series_deleted_in_business,
+    series_in_copy,
+    series_not_in_business,
+)
+from apps.appointment.schemas.booking import AppointmentCreateIn
+from apps.appointment.schemas.series import RecurringCreateIn
 from apps.appointment.tests.conftest import MONDAY, at, make_appointment, make_customer, make_series, make_service
 from apps.service import queries as service_queries
 from apps.service.models import Service
@@ -70,7 +78,7 @@ def test_the_copy_gives_each_appointment_still_to_come_and_booked_with_what_its_
     make_appointment(lucia, ana, [cut], at(MONDAY, "14:00"), charged_at=now)
     make_appointment(lucia, ana, [cut], at(MONDAY, "15:00"), sale_id=uuid.uuid7())
 
-    read = queries.appointments_in_copy(direct())
+    read = appointments_in_copy(direct())
 
     # Every service of the copy (Services' own read), each appointment's or not: what Services matches the
     # business's by, never a part of them (``services_in_business``).
@@ -109,7 +117,7 @@ def test_a_customer_whose_card_the_copy_no_longer_has_live_is_named_as_the_appoi
     gone.deleted_at = timezone.now()
     gone.save()
 
-    [read] = queries.appointments_in_copy(direct())
+    [read] = appointments_in_copy(direct())
 
     assert read["id"] == booked.pk
     assert read["customer_card"] == {
@@ -125,7 +133,7 @@ def test_a_copy_without_the_apps_table_gives_nothing():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE appointment_appointment CASCADE")
 
-    assert queries.appointments_in_copy(direct()) == []
+    assert appointments_in_copy(direct()) == []
 
 
 def an_appointment_of_the_copy(
@@ -166,7 +174,7 @@ def test_the_business_lacks_what_it_does_not_hold_at_all_nor_booked_again(salon)
         gone,
     ]
 
-    lacking = queries.appointments_not_in_business(records)
+    lacking = appointments_not_in_business(records)
 
     assert [record["id"] for record in lacking] == [gone["id"]]
 
@@ -190,7 +198,7 @@ def test_the_business_holds_deleted_what_it_deleted_and_did_not_book_again(salon
     ]
     gone = an_appointment_of_the_copy(card(lucia), salon, at(MONDAY, "13:00"))
 
-    assert queries.appointments_deleted_in_business([gone, *records]) == [records[-1]]
+    assert appointments_deleted_in_business([gone, *records]) == [records[-1]]
 
 
 def test_what_others_booked_since_never_holds_a_deleted_one_back(salon):
@@ -209,7 +217,7 @@ def test_what_others_booked_since_never_holds_a_deleted_one_back(salon):
     make_appointment(lucia, salon.bea, [salon.cut], at(MONDAY, "16:00"), recurring=other, occurrence_date=MONDAY)
     records = [an_appointment_of_the_copy(card(lucia), salon, one.start, one.pk) for one in (alone, occurrence)]
 
-    assert queries.appointments_deleted_in_business(records) == records
+    assert appointments_deleted_in_business(records) == records
 
 
 def test_a_deleted_one_is_the_same_by_its_id_whatever_the_copy_says_of_its_time(salon):
@@ -220,8 +228,8 @@ def test_a_deleted_one_is_the_same_by_its_id_whatever_the_copy_says_of_its_time(
     make_appointment(lucia, salon.bea, [salon.colour], at(MONDAY, "09:00"))
     record = an_appointment_of_the_copy(card(lucia), salon, at(MONDAY, "09:00"), moved.pk)
 
-    assert queries.appointments_deleted_in_business([record]) == [record]
-    assert queries.appointments_not_in_business([record]) == []
+    assert appointments_deleted_in_business([record]) == [record]
+    assert appointments_not_in_business([record]) == []
 
 
 def test_each_lacking_one_names_the_businesss_card_of_its_customer_and_is_what_its_create_takes(salon):
@@ -238,7 +246,7 @@ def test_each_lacking_one_names_the_businesss_card_of_its_customer_and_is_what_i
     ]
     records[0] |= {"notes": "Bring the reference", "internal_notes": "Formula 7.1", "source": "whatsapp"}
 
-    lacking = queries.appointments_not_in_business(records)
+    lacking = appointments_not_in_business(records)
 
     assert [record["customer_id"] for record in lacking] == [marta.pk, sara.pk]
     first = lacking[0]
@@ -269,7 +277,7 @@ def test_one_booked_again_for_the_card_its_customer_is_now_is_not_lacking(salon)
     marta = make_customer("Marta Ruiz", phone="+34600555666", email="marta@example.com")
     make_appointment(marta, salon.ana, [salon.cut], at(MONDAY, "10:00"))
 
-    assert queries.appointments_not_in_business([an_appointment_of_the_copy(card(old), salon, at(MONDAY, "10:00"))]) == []
+    assert appointments_not_in_business([an_appointment_of_the_copy(card(old), salon, at(MONDAY, "10:00"))]) == []
 
 
 def lost(*services) -> None:
@@ -282,7 +290,7 @@ def lost(*services) -> None:
 def comes_back_with(salon, copy: list[dict]) -> list[dict]:
     """The services a cut booked in the copy comes back with (``appointments_not_in_business``), ``copy`` being the
     copy's services (``services_in_copy``)."""
-    [lacking] = queries.appointments_not_in_business(
+    [lacking] = appointments_not_in_business(
         [an_appointment_of_the_copy(card(salon.lucia), salon, at(MONDAY, "10:00"), services_in_copy=copy)]
     )
     return lacking["services"]
@@ -332,8 +340,8 @@ def test_a_service_the_copy_had_too_is_never_taken_for_the_lost_one_of_the_same_
 def test_a_copy_with_no_appointment_to_come_lacks_none():
     """The platform asks what is lacking even when the copy gave nothing (``base.tenancy.recovery._give_back``): with no
     appointment there is no list of the copy's services to match, and none is lacking."""
-    assert queries.appointments_not_in_business([]) == []
-    assert queries.appointments_deleted_in_business([]) == []
+    assert appointments_not_in_business([]) == []
+    assert appointments_deleted_in_business([]) == []
 
 
 def test_the_app_declares_what_it_gives_back_its_appointments_first_then_its_series():
@@ -343,17 +351,17 @@ def test_the_app_declares_what_it_gives_back_its_appointments_first_then_its_ser
 
     declared = [(one.read, one.missing, one.create, one.deleted, one.restore) for one in (appointments, series)]
     assert declared[0] == (
-        queries.appointments_in_copy,
-        queries.appointments_not_in_business,
+        appointments_in_copy,
+        appointments_not_in_business,
         "appointment.appointment.create",
-        queries.appointments_deleted_in_business,
+        appointments_deleted_in_business,
         "appointment.appointment.restore",
     )
     assert declared[1] == (
-        queries.series_in_copy,
-        queries.series_not_in_business,
+        series_in_copy,
+        series_not_in_business,
         "appointment.recurring.create",
-        queries.series_deleted_in_business,
+        series_deleted_in_business,
         "appointment.recurring.restore",
     )
     assert [str(one.label) for one in (appointments, series)] == ["Appointments", "Repeating appointments"]
@@ -383,7 +391,7 @@ def test_the_copy_gives_each_series_still_booking_with_what_its_create_takes(sal
     Recurring.objects.filter(pk=make_series(salon).pk).update(staff=None, staff_name="")
     make_series(salon, start_date=MONDAY - dt.timedelta(weeks=8), end_date=timezone.localdate() - dt.timedelta(days=1))
 
-    read = queries.series_in_copy(direct())
+    read = series_in_copy(direct())
 
     services = service_queries.recovery.services_in_copy(direct())
     assert all(one.pop("services_in_copy") == services for one in read)
@@ -424,7 +432,7 @@ def test_a_series_whose_customer_the_copy_no_longer_has_live_is_named_as_the_ser
     gone.deleted_at = timezone.now()
     gone.save()
 
-    [read] = queries.series_in_copy(direct())
+    [read] = series_in_copy(direct())
 
     assert read["customer_card"] == {"id": gone.pk, "name": "Sara Gil", "phone": "", "email": ""}
 
@@ -434,7 +442,7 @@ def test_a_copy_without_the_series_table_gives_none():
         # Undone with the test's transaction.
         cursor.execute("DROP TABLE appointment_recurring CASCADE")
 
-    assert queries.series_in_copy(direct()) == []
+    assert series_in_copy(direct()) == []
 
 
 def a_series_of_the_copy(customer_card: dict, salon, series_id=None, **rule) -> dict:
@@ -478,7 +486,7 @@ def test_the_business_holds_deleted_the_series_it_deleted_and_did_not_make_again
     records = [a_series_of_the_copy(card(lucia), salon, one.pk) for one in (live, made_again, deleted, alone)]
     gone = a_series_of_the_copy(card(lucia), salon)
 
-    assert queries.series_deleted_in_business([gone, *records]) == records[2:]
+    assert series_deleted_in_business([gone, *records]) == records[2:]
 
 
 def test_the_business_lacks_the_series_it_does_not_hold_at_all_nor_made_again(salon):
@@ -495,7 +503,7 @@ def test_the_business_lacks_the_series_it_does_not_hold_at_all_nor_made_again(sa
         gone,
     ]
 
-    assert [one["id"] for one in queries.series_not_in_business(records)] == [gone["id"]]
+    assert [one["id"] for one in series_not_in_business(records)] == [gone["id"]]
 
 
 def test_each_lacking_series_names_the_businesss_card_and_services_and_is_what_its_create_takes(salon):
@@ -511,7 +519,7 @@ def test_each_lacking_series_names_the_businesss_card_and_services_and_is_what_i
         max_occurrences=4, services_in_copy=copy,
     )
 
-    [lacking] = queries.series_not_in_business([record])
+    [lacking] = series_not_in_business([record])
 
     assert lacking == {
         "id": record["id"],
@@ -536,8 +544,8 @@ def test_each_lacking_series_names_the_businesss_card_and_services_and_is_what_i
 
 
 def test_a_copy_with_no_series_lacks_none():
-    assert queries.series_not_in_business([]) == []
-    assert queries.series_deleted_in_business([]) == []
+    assert series_not_in_business([]) == []
+    assert series_deleted_in_business([]) == []
 
 
 # ── End to end: the business's own database and its copy (hub#1341) ─────────────────────────────────────────────────

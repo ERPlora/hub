@@ -16,9 +16,9 @@ from live.errors import Conflict, NotFound
 from live.meta import Category, module_configs
 from live.operations import AI, INTERNAL, operation
 
-from base import activation, business, entitlement, home
-from base.auth import SAAS_PANEL_PATH, saas_url
-from base.models import AppActivation, Hub
+from base import activation, app_switch, business, entitlement, home, saas_store
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.permissions import VIEW_HOME
 from base.schemas.apps import AppListIn, AppListOut, AppRefIn, AppRefOut
 
@@ -69,7 +69,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     cache every process shares (``base.cache``)."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     demo = bool(hub and hub.is_demo)
-    configs = home.shown_modules(demo_hub=demo)
+    configs = home.shown_modules.shown_modules(demo_hub=demo)
     shown = {config.label for config in configs}
     blocked = entitlement.blocked_apps(ctx.scope)
     rights = entitlement.entitlements(None if hub is None or hub.is_demo else hub.state, now=timezone.now())
@@ -108,7 +108,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                 {
                     "id": config.label,
                     "name": str(config.verbose_name),
-                    "icon": home.shell_icon(config),
+                    "icon": home.shown_modules.shell_icon(config),
                     "category": config.category,
                     "category_label": str(Category(config.category).label),
                     "summary": str(config.summary),
@@ -122,13 +122,16 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                         label for label in activation.required_by(config.label, current, graph) if label in shown
                     ],
                     "refusal": refusal(config.label),
-                    "mandatory": home.mandatory_in(config, country),
+                    "along_said": app_switch.switch_said(
+                        config.label, current, graph, kept, language=ctx.language
+                    ),
+                    "mandatory": home.mandatory_apps.mandatory_in(config, country),
                 }
                 for config in configs
             ],
             "country_name": business.country_name(business.country_or_market(country), ctx.language),
-            "store_url": saas_url(f"{SAAS_PANEL_PATH}/store/modules?business={hub.id}") if hub is not None else "",
-            "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if hub is not None and not demo else "",
+            "store_url": saas_store.apps_url(hub.slug, hub.id) if hub is not None else "",
+            "plan_url": saas_store.plans_url(hub.slug, hub.id) if hub is not None and not demo else "",
             "max_apps": app_limit(hub),
             "enabled": activation.chosen_on(current, among=shown),
         }
@@ -151,7 +154,7 @@ def find_app(said: str, *, demo: bool, language: str) -> Any:
     beside it); else the only one with a word of its name that starts so («booking»). 404 when none (the platform is no
     app); 409 ``base.app_ambiguous`` naming them, in ``language``, when several (``reserva``): the person says which,
     as the apps' ``find_*`` of a table or a zone do."""
-    configs = home.shown_modules(demo_hub=demo)
+    configs = home.shown_modules.shown_modules(demo_hub=demo)
     plain = _plain(said)
     found = [config for config in configs if config.label == said.strip()]
     if not found and plain:
@@ -184,8 +187,9 @@ def find_app(said: str, *, demo: bool, language: str) -> Any:
         description=(
             "Says which of this business's apps a name names, as the person says it (e.g. «Reservas»), or an id: its "
             "id, its name and whether it is on, off, blocked (a paid app without its right), creating (being set up, "
-            "on in a moment) or failed (it could not be set up: base.app.retry). A name that fits several apps is "
-            "refused naming them: ask the person which one."
+            "on in a moment) or failed (it could not be set up: base.app.retry). mandatory=true: the business's country "
+            "requires it, so once on it can't be turned off. A name that fits several apps is refused naming them: ask "
+            "the person which one."
         ),
         asks={
             "en": ("is the reservations app on?", "what state is the website app in?", "do I have the kitchen app?"),
@@ -198,14 +202,21 @@ def find_app(said: str, *, demo: bool, language: str) -> Any:
     ),
 )
 def app_get(ctx: OperationContext, data: AppRefIn) -> dict:
-    """Which app ``data.app`` names (``find_app``), with its state as the Apps screen says it: what the assistant's card
-    of ``base.app.enable`` and ``base.app.disable`` names it by (``refers``), never by its id (hub#539)."""
+    """Which app ``data.app`` names (``find_app``), with its state and whether the business's country requires it as the
+    Apps screen says them: what the assistant's card of ``base.app.enable`` and ``base.app.disable`` names it by
+    (``refers``), never by its id."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     config = find_app(data.app, demo=bool(hub and hub.is_demo), language=ctx.language)
     row = activation.states_of(ctx.scope)[config.label]
     state = "blocked" if config.label in entitlement.blocked_apps(ctx.scope) else row.state if row.wanted else "off"
     with translation.override(ctx.language):
-        return {"id": config.label, "name": str(config.verbose_name), "state": state}
+        return {
+            "id": config.label,
+            "name": str(config.verbose_name),
+            "summary": str(config.summary),
+            "state": state,
+            "mandatory": home.mandatory_apps.mandatory_in(config, hub.country if hub else ""),
+        }
 
 
 def app_limit(hub: Hub | None) -> int | None:

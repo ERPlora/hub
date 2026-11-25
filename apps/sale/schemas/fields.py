@@ -19,7 +19,7 @@ MAX_CENTS = 9_999_999_999_999
 #: Lines of one check, legs of one charge, lines of one refund.
 MAX_LINES = 200
 MAX_PAYMENTS = 10
-#: Options of Modifiers one line may carry (Modifiers' own ceiling, ``modifier.schemas.MAX_PICKS``).
+#: Options of Modifiers one line may carry (Modifiers' own ceiling, ``modifier.schemas.till.MAX_PICKS``).
 MAX_OPTIONS = 100
 
 SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
@@ -31,6 +31,7 @@ SAY_WHICH_DEPARTMENT = _(
 )
 SAY_WHICH_SALE = _("Say which sale: its id or its number.")
 SAY_WHICH_METHOD = _("Say which payment method: its id, its name or its type.")
+SAY_WHAT_IS_ADDED = _("Say what the amount added to this payment is (a tip, for instance).")
 SAY_WHICH_DEPARTMENT_ROW = _("Say which section: its id or its name.")
 SAY_WHICH_QUICK_NOTE = _("Say which quick note: its id or its text.")
 ONE_SOURCE = _(
@@ -64,6 +65,8 @@ A_CHECK_LINE = names("sale.record.get", by="line_id")
 A_SALE_LINE = names("sale.record.get", by="sale_line_id")
 A_TENDER = names("sale.record.get", by="payment_id")
 A_PRODUCT = names("sale.record.get", by="product_id")
+#: A product said in words is found as the write finds it; the card says the words when several fit or none does.
+A_PRODUCT_SAID = names("sale.record.get", by="product", as_said=True, unless=("product_id",))
 A_SERVICE = names("sale.record.get", by="service_id")
 A_MENU = names("sale.record.get", by="combo_id")
 A_DISH = names("sale.record.get", by="dish_id")

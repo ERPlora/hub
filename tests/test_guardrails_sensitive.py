@@ -14,7 +14,7 @@ that may open its operation. Here:
 """
 
 import inspect
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any, Literal, get_args, get_origin
 
 import pytest
@@ -23,6 +23,8 @@ from live.sensitive import marked_fields, required_permission
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 
+from apps.staff.models import Member
+from base.queries.ownership import Owned
 from base.sensitive import COSTS, CUSTOMER_CONTACT
 
 #: The words of a field's name that say it carries a cost or someone's contact details or pay. A name matches when one
@@ -43,6 +45,9 @@ BUSINESS_OWN = "the business's own"
 CALLERS_OWN = "the caller's own"
 #: Pay that only reaches whoever holds ``staff.view_compensation``: every operation answering it requires it.
 COMPENSATION_ONLY = "compensation only"
+#: Pay a person reads only on their own line, and everyone's only with ``staff.view_compensation``: every operation
+#: answering it reads its rows through a declaration of whose they are (``Owned``) whose «see all» is that permission.
+OWN_LINE = "the caller's own line"
 #: Still reaches every role that opens its operation: its app marks it with its data permission (hub#2048).
 NOT_MARKED_YET = "not marked yet"
 
@@ -51,32 +56,18 @@ COMPENSATION = "staff.view_compensation"
 #: Every unmarked field of an answer whose name says it is sensitive: ``<module>.<Schema>.<field>`` → why. Closed on
 #: purpose: a new one gets its mark, or comes here with a reason a reviewer can weigh.
 UNMARKED: dict[str, str] = {
-    "apps.appointment.schemas.AppointmentOut.customer_email": NOT_MARKED_YET,
-    "apps.appointment.schemas.AppointmentOut.customer_phone": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.CartDetailOut.customer_email": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.CartOut.customer_email": NOT_MARKED_YET,
     "apps.cart_checkout.schemas.OrderOut.customer_email": NOT_MARKED_YET,
     "apps.inventory.schemas.stock.SummaryOut.products_without_cost": ABOUT_THE_DATA,
-    "apps.online_booking.schemas.BookingOut.customer_email": NOT_MARKED_YET,
-    "apps.online_booking.schemas.BookingOut.customer_phone": NOT_MARKED_YET,
-    "apps.online_booking.schemas.BookingRow.customer_email": NOT_MARKED_YET,
-    "apps.online_booking.schemas.BookingRow.customer_phone": NOT_MARKED_YET,
     "apps.online_booking.schemas.PageOut.require_email": ABOUT_THE_DATA,
     "apps.online_booking.schemas.SettingsOut.require_email": ABOUT_THE_DATA,
-    "apps.reservation.schemas.ReservationDetailOut.guest_email": NOT_MARKED_YET,
-    "apps.reservation.schemas.ReservationDetailOut.guest_phone": NOT_MARKED_YET,
-    "apps.reservation.schemas.ReservationOut.guest_email": NOT_MARKED_YET,
-    "apps.reservation.schemas.ReservationOut.guest_phone": NOT_MARKED_YET,
-    "apps.reservation.schemas.SettingsOut.require_email": ABOUT_THE_DATA,
-    "apps.reservation.schemas.SettingsOut.require_phone": ABOUT_THE_DATA,
-    "apps.reservation.schemas.WaitlistDetailOut.guest_email": NOT_MARKED_YET,
-    "apps.reservation.schemas.WaitlistDetailOut.guest_phone": NOT_MARKED_YET,
-    "apps.reservation.schemas.WaitlistOut.guest_email": NOT_MARKED_YET,
-    "apps.reservation.schemas.WaitlistOut.guest_phone": NOT_MARKED_YET,
+    "apps.reservation.schemas.settings.SettingsOut.require_email": ABOUT_THE_DATA,
+    "apps.reservation.schemas.settings.SettingsOut.require_phone": ABOUT_THE_DATA,
     "apps.staff.schemas.commissions.CommissionOut.commission_rate": COMPENSATION_ONLY,
-    "apps.staff.schemas.commissions.CommissionReportOut.total_commission": COMPENSATION_ONLY,
-    "apps.staff.schemas.commissions.CommissionReportRow.commission": COMPENSATION_ONLY,
-    "apps.staff.schemas.commissions.CommissionReportRow.commission_rate": COMPENSATION_ONLY,
+    "apps.staff.schemas.commissions.CommissionReportOut.total_commission": OWN_LINE,
+    "apps.staff.schemas.commissions.CommissionReportRow.commission": OWN_LINE,
+    "apps.staff.schemas.commissions.CommissionReportRow.commission_rate": OWN_LINE,
     "apps.staff.schemas.members.CompensationOut.commission_rate": COMPENSATION_ONLY,
     "apps.staff.schemas.members.CompensationOut.hourly_rate": COMPENSATION_ONLY,
     "apps.staff.schemas.members.MemberMineOut.commission_rate": CALLERS_OWN,
@@ -87,12 +78,7 @@ UNMARKED: dict[str, str] = {
     "apps.website.schemas.ContactSection.phone": BUSINESS_OWN,
     "apps.whatsapp_inbox.schemas.channel.ChannelConnectOut.phone_number": BUSINESS_OWN,
     "apps.whatsapp_inbox.schemas.channel.ChannelOut.phone_number": BUSINESS_OWN,
-    "apps.whatsapp_inbox.schemas.conversations.ByPhoneOut.phone": NOT_MARKED_YET,
     "apps.whatsapp_inbox.schemas.conversations.ByPhoneOut.phone_is_international": ABOUT_THE_DATA,
-    "apps.whatsapp_inbox.schemas.conversations.ConversationDetailOut.phone": NOT_MARKED_YET,
-    "apps.whatsapp_inbox.schemas.conversations.ConversationOut.phone": NOT_MARKED_YET,
-    "apps.whatsapp_inbox.schemas.erasing.ClaimErasureOut.phone": NOT_MARKED_YET,
-    "apps.whatsapp_inbox.schemas.messages.MessageGetOut.phone": NOT_MARKED_YET,
     "apps.whatsapp_inbox.schemas.templates.TemplateButtonOut.phone_number": BUSINESS_OWN,
     "base.schemas.profile.ProfileOut.contact_email": CALLERS_OWN,
 }
@@ -194,7 +180,7 @@ def test_what_the_list_names_still_exists_and_is_still_unmarked():
 
 
 def test_every_reason_is_one_of_the_known_ones():
-    known = {ABOUT_THE_DATA, BUSINESS_OWN, CALLERS_OWN, COMPENSATION_ONLY, NOT_MARKED_YET}
+    known = {ABOUT_THE_DATA, BUSINESS_OWN, CALLERS_OWN, COMPENSATION_ONLY, NOT_MARKED_YET, OWN_LINE}
     assert {name: reason for name, reason in UNMARKED.items() if reason not in known} == {}
 
 
@@ -202,6 +188,24 @@ def test_pay_listed_as_compensation_only_is_answered_only_to_who_may_see_it():
     found = unmarked_sensitive(registry.values())
     answered_by = {name for field, reason in UNMARKED.items() if reason == COMPENSATION_ONLY for name in found[field]}
     assert {name: registry[name].permission for name in answered_by if registry[name].permission != COMPENSATION} == {}
+
+
+def reads_lines_of_the_pay(fn: Callable) -> bool:
+    """Whether ``fn`` reads its rows through a declaration of its module (``Owned``) whose «see all» is the pay."""
+    source = inspect.getsource(fn)
+    declared = [
+        name
+        for name, value in vars(inspect.getmodule(fn)).items()
+        if isinstance(value, Owned) and value.all_permission == COMPENSATION
+    ]
+    return any(f"{name}.counted(" in source or f"{name}.visible(" in source for name in declared)
+
+
+def test_pay_listed_as_ones_own_line_is_read_through_a_declaration_of_the_pay():
+    found = unmarked_sensitive(registry.values())
+    answered_by = {name for field, reason in UNMARKED.items() if reason == OWN_LINE for name in found[field]}
+    assert answered_by  # positive control: the commission lines are answered
+    assert sorted(name for name in answered_by if not reads_lines_of_the_pay(registry[name].fn)) == []
 
 
 def test_a_callers_own_field_is_answered_only_by_an_operation_of_their_own_record():
@@ -234,7 +238,7 @@ UNMARKED_FIGURES: dict[str, str] = {
     "sale.sale.last_7_days": COUNTED,
     "sale.sale.stats": COUNTED,
     "sale.sale.today": COUNTED,
-    "staff.commission.report": COMPENSATION_ONLY,
+    "staff.commission.report": COUNTED,
 }
 
 
@@ -375,6 +379,29 @@ def test_the_sensitive_words_match_whole_parts_of_a_name(name):
 @pytest.mark.parametrize("name", ["costume", "emails_sent_count_x", "telephone", "commissioning", "is_gift", "gift_reason"])
 def test_and_only_whole_parts(name):
     assert not sensitive_name(name)
+
+
+#: Planted declarations: one of the pay, and one whose «see all» is reading the team.
+PAY_LINES = Owned(Member, all_permission=COMPENSATION, mine=lambda person: None)
+TEAM_LINES = Owned(Member, all_permission="staff.view", mine=lambda person: None)
+
+
+def lines_through_the_pay(ctx):
+    return PAY_LINES.counted(ctx)
+
+
+def lines_through_reading_the_team(ctx):
+    return TEAM_LINES.visible(ctx)
+
+
+def every_line(ctx):
+    return Member.objects.all()
+
+
+def test_a_read_of_ones_own_line_is_told_from_one_that_skips_the_declaration_of_the_pay():
+    assert reads_lines_of_the_pay(lines_through_the_pay)
+    assert not reads_lines_of_the_pay(lines_through_reading_the_team)
+    assert not reads_lines_of_the_pay(every_line)
 
 
 def test_filtering_or_sorting_by_a_marked_field_without_its_mark_is_caught():

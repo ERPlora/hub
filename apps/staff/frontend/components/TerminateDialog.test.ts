@@ -4,11 +4,12 @@
 // in the dialog.
 import { describe, expect, it } from 'vitest';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { MemberOut } from '../operations';
 import { click, ionValue, mountStaff, settle } from '../__tests__/mount-staff';
 import TerminateDialog from './TerminateDialog.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; type?: string; disabled?: boolean; color?: string; errorText?: string };
+type Control = HTMLElement & { label?: string; value?: unknown; readonly?: boolean; disabled?: boolean; color?: string; errorText?: string };
 
 const MEMBER = { id: 'm1', full_name: 'Ana López' } as MemberOut;
 
@@ -28,13 +29,15 @@ describe('TerminateDialog (STAFF-F06)', () => {
     const s = await setup();
     expect(s.inDoc('staff-member-terminate')?.getAttribute('aria-label')).toBe('Terminate member');
     expect(s.inDoc('staff-member-terminate-message')?.textContent).toContain('Terminate Ana López?');
-    expect([s.date().label, s.date().type, s.reason().label]).toEqual(['Last day (today if empty)', 'date', 'Reason (optional)']);
+    expect([s.date().label, s.date().readonly, s.reason().label]).toEqual(['Last day (today if empty)', true, 'Reason (optional)']);
     expect([s.confirm().textContent?.trim(), s.confirm().disabled, s.confirm().color]).toEqual(['Terminate', false, 'danger']);
   });
 
-  it('sends staff.member.terminate without a day when none is given (today, on the server), then closes', async () => {
+  it('sends staff.member.terminate without a day when none is given or it is cleared (today, on the server), then closes', async () => {
     const s = await setup();
     s.answer(200, { id: 'm1', termination_date: '2026-10-14' });
+    await pick(s.date(), '2026-10-31');
+    await pick(s.date(), '');
     await ionValue(s.reason(), 'Moves abroad', 'ionInput');
     await click(s.confirm());
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/staff/members/terminate', query: {}, body: { id: 'm1', reason: 'Moves abroad' } }]);
@@ -44,7 +47,8 @@ describe('TerminateDialog (STAFF-F06)', () => {
   it('sends the last day when one is given', async () => {
     const s = await setup();
     s.answer(200, { id: 'm1', termination_date: '2026-10-31' });
-    await ionValue(s.date(), '2026-10-31', 'ionInput');
+    await pick(s.date(), '2026-10-31');
+    expect(s.date().value).toBe('10/31/2026');
     await click(s.confirm());
     expect(s.sent()[0].body).toEqual({ id: 'm1', termination_date: '2026-10-31', reason: '' });
   });

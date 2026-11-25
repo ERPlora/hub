@@ -1,5 +1,5 @@
-// Types of base/schemas/access.py for the SDK (`useLive`, `useCommand`, `client.api.call`), written by
-// hand: keep them in step with it and with `frontend/generated/operations.json`.
+// Types of base/schemas/access.py and base/schemas/support_access.py for the SDK (`useLive`, `useCommand`,
+// `client.api.call`), written by hand: keep them in step with them and with `frontend/generated/operations.json`.
 
 type NoInput = Record<string, never>;
 
@@ -38,9 +38,32 @@ export interface Grantors {
   grantors: { name: string }[];
 }
 
+/** `base.SessionAccessOut`: a key of the session's permissions, which changes exactly when they do. */
+export interface SessionAccess {
+  key: string;
+}
+
+/** `base.SupportVisitOut`: one time a person of ERPlora's support came into the business. */
+export interface SupportVisit {
+  person: string;
+  entered_at: string;
+}
+
+/** `base.SupportAccessOut`: whether ERPlora's support may come into the business, and who of support came in. */
+export interface SupportAccess {
+  enabled: boolean;
+  can_change: boolean;
+  /** Empty if nobody has changed it. */
+  updated_by: string;
+  updated_at: string | null;
+  /** The most recent first. */
+  visits: SupportVisit[];
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.access.grantors': { input: NoInput; output: Grantors };
+    'base.session.access': { input: NoInput; output: SessionAccess };
     'base.access.door': { input: NoInput; output: AccessDoor };
     'base.access.faces': { input: NoInput; output: AccessDoor };
     'base.access.settings': { input: NoInput; output: AccessSettings };
@@ -48,5 +71,7 @@ declare module '@erplora/ui/sdk' {
       input: Partial<Pick<AccessSettings, 'pin_policy' | 'pin_inactivity_minutes' | 'pin_length'>>;
       output: AccessSettings;
     };
+    'base.support_access.get': { input: NoInput; output: SupportAccess };
+    'base.support_access.update': { input: { enabled: boolean }; output: SupportAccess };
   }
 }

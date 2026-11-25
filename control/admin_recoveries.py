@@ -9,7 +9,7 @@ from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext, 
 from base import admin as base_admin
 from base.tenancy.recovery import recoverable_apps
 from control.admin_shared import copy_said, utc
-from control.models import CopyRecovery
+from control.models.copies import CopyRecovery
 
 
 def recoverable_names(labels) -> str:

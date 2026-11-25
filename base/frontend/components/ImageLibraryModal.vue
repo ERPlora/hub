@@ -4,7 +4,7 @@
 // (`base.catalog_image.search`) by title and synonyms, in Spanish or English, never by file name; under two letters
 // it lists the whole library (or sector) by title. The sector tabs narrow it («All» first, then `folders` and the
 // rest in the library's order); 60 at a time with «Load more». Each image shows with its title under it, in the
-// business's language. Loading, empty and error («Retry») states; an answer that arrives after a newer search is
+// person's language. Loading, empty and error («Retry») states; an answer that arrives after a newer search is
 // dropped. A tap on an image emits `pick` and closes; «Upload photo» emits `upload` (the field opens the device's
 // picker) and closes too. Hooks (`testid`): the root, `-search`, `-folders`, `-folder-<key>`, `-loading`, `-empty`,
 // `-error`, `-retry`, `-image-<folder>-<name>`, `-count`, `-more`, `-upload`, `-close`.

@@ -12,7 +12,7 @@ from live.outbox import record_event
 
 from apps.table import events
 from apps.table.models import BOX, Hold, Table, TableSession, Zone
-from apps.table.queries import find_table, find_zone
+from apps.table.queries.lookups import find_table, find_zone
 from apps.table.queries.floor import live_sessions, table_out
 from apps.table.schemas import DeletedOut, TableBulkIn, TableIn, TableMoveIn, TablePatchIn, TableRefIn
 from apps.table.schemas.floor import TableOut, TablesOut

@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:fdcb415bacc7ae6ed135e5f34b1ebd639ad6649a3067c310908515cf3b44ce57 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:4779a11c230f -->
 
 Modifiers keeps the choices that go with a dish: the doneness of the meat, an extra of cheese, the size or "no onion".
 They are arranged in groups that say how many options must be chosen, and each option carries its supplement (more,
@@ -8,6 +7,7 @@ less or free) and its allergens. A group applies to products or to whole categor
 charges the supplement and sends it to the kitchen.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:d72eebed727f -->
 
 Modifiers is the catalogue of the choices that go with a dish: the "doneness of the meat", the
 "extra cheese", the size, "no onion". It is arranged in **groups**:
@@ -35,6 +35,7 @@ It is not a product variant (an option carries no stock or cost and does not tak
 menu at a closed price (that is Menus).
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:c8251fcd57ec -->
 
 Checked against the market sweep of the current module (20/08/2026) and against the round of this port
 (15/10/2026, skill `market-decision`); this is adopted, nothing more:
@@ -53,6 +54,7 @@ Checked against the market sweep of the current module (20/08/2026) and against 
   another way; the extra price is set by the catalogue.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:ff8567323c85 -->
 
 - Modifiers needs **Inventory** (the products and categories a group is linked to) and **Taxes** (the
   own tax category of an option). Turning Modifiers on turns both on.
@@ -74,8 +76,10 @@ Initial setup, step by step:
    option (MODIFIER-F06).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Modifiers
+<!-- from WORKBOOK.md sha256:4ca55683e01c -->
 Here are the modifier groups, each one with its choice rule (optional or required, how many options at most and
 whether one can be repeated), how many options it has and to how many products and categories it applies. With "New
 group" you create one and, on its row, you change or delete it. Tap a group to open its sheet: there you add its
@@ -83,6 +87,7 @@ options, with their supplement and their allergens, and in "Applies to" you link
 that carry it. A group without options or that applies to nothing does not show at the till.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:c80cd269b407 -->
 Menu **Modifiers** (a single entry). At the top, the title "Modifiers". Below, the table of groups
 with the "Search…" box (it searches by name and by kitchen ticket name): **Name** (sorted and
 filtered), **On the kitchen ticket** (the kitchen name; empty, the commercial one), **Choice** (sorted
@@ -95,6 +100,7 @@ Whoever can manage sees **"New group"** and, on each row, **Edit** and **Delete*
 the group's sheet, for everyone.
 
 #### Group sheet
+<!-- from WORKBOOK.md sha256:f07f1c93a2cf -->
 Title "Group — {name}" and its rule. Two sections:
 
 - **Options**: each one with its name, its kitchen ticket name (if different), its supplement in the
@@ -110,6 +116,7 @@ Title "Group — {name}" and its rule. Two sections:
 20 at a time, with "Load more".
 
 #### Forms
+<!-- from WORKBOOK.md sha256:15f71065496a -->
 - **Group** ("New group" / "Editing group — {name}"): Name, "Kitchen ticket name", "Minimum (1 or more
   = required)", "Maximum (0 = no ceiling)", "An option can be chosen more than once" and Order.
 - **Option** ("New option" / "Editing option — {name}"): Name, "Kitchen ticket name",
@@ -120,6 +127,7 @@ Title "Group — {name}" and its rule. Two sections:
 - **Delete** group or option and **Stop applying**: they ask for confirmation saying what goes with it.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:bc591aa9b217 -->
 
 | State | What the person sees |
 |---|---|
@@ -131,12 +139,14 @@ Title "Group — {name}" and its rule. Two sections:
 | No permission | What they cannot do does not appear; if they arrive through another door, "You do not have permission". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:16ae8dbf9376 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05); a supplement rewritten by itself in the business's currency is no change.
 
 ## Flows
+<!-- from WORKBOOK.md sha256:18e3fa39f86a -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -154,6 +164,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a supple
 | MODIFIER-F12 | Add the options' allergens to the dish's | done |
 
 ### MODIFIER-F01 Look up and search the groups
+<!-- from WORKBOOK.md sha256:5d9d93d12c16 -->
 Status: done
 Actor: owner, administrator, manager (an employee does not open Add-ons: by its address, "No access" (BASE-F118))
 Screen: Modifiers
@@ -169,8 +180,9 @@ If it fails: the table's notice with "Retry"; without groups, "No modifier group
 Involved: none
 
 ### MODIFIER-F02 Create a group
+<!-- from WORKBOOK.md sha256:d7b3742a3628 -->
 Status: done
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Modifiers
 Steps:
 1. Tap "New group".
@@ -182,7 +194,10 @@ Steps:
    not 0, it cannot be below the minimum), whether an option can be repeated and the Order in which it
    shows at the till.
 5. Tap "Create": the form closes and the group shows in the table. It does not show at the till yet:
-   its options and where it applies are missing, and they are set in its sheet.
+   its options and where it applies are missing, and they are set in its sheet. When the assistant
+   creates it, it says so and offers to add its options and to apply it to the dishes or the categories
+   itself; on screen, both are done on the group's sheet, in Modifiers, never on the form of a product of
+   Inventory.
 In: what the person types.
 Out: the group (announces: group created). It creates no options or links.
 If it fails: an empty name or one of more than 255 characters, a minimum or maximum outside 0–50 or a
@@ -192,6 +207,7 @@ another one says the same. What was typed stays.
 Involved: none
 
 ### MODIFIER-F03 Change or delete a group
+<!-- from WORKBOOK.md sha256:2c17554d973b -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Modifiers
@@ -212,6 +228,7 @@ card comes up.
 Involved: SALE-F11, BASE-F97
 
 ### MODIFIER-F04 Add, change or remove the options of a group
+<!-- from WORKBOOK.md sha256:0d8c6814598e -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Modifiers (group sheet)
@@ -219,7 +236,9 @@ Steps:
 1. Open the group and, in Options, tap "Add option".
 2. Type the Name (unique within the group) and, if needed, the kitchen ticket name.
 3. Type the Supplement in the business's currency, its country's, with its decimals (the yen has none):
-   positive charges more, negative is a discount, empty or 0 is free.
+   positive charges more, negative is a discount, empty or 0 is free. Through the assistant, an option asked
+   for without its supplement ("in Extras I want an Extra cheese") draws no card: it first asks how much it
+   charges, and it is free only if the person says so.
 4. Only if the option is taxed differently from the dish, choose its own tax category; empty, it
    inherits the dish's.
 5. Tick "Chosen by default" if the till must bring it already ticked. In a group of maximum 1, ticking
@@ -248,6 +267,7 @@ was said, nothing is touched and the new card comes up.
 Involved: SALE-F11, BASE-F97
 
 ### MODIFIER-F05 Link a group to products or categories, and unlink it
+<!-- from WORKBOOK.md sha256:88d38e692693 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Modifiers (group sheet)
@@ -270,6 +290,7 @@ removed by itself a few seconds after the deletion.
 Involved: INVENTORY-F01, INVENTORY-F06, MODIFIER-F09, BASE-F97
 
 ### MODIFIER-F06 Choose the options when selling an item
+<!-- from WORKBOOK.md sha256:a434c94747ae -->
 Status: done
 Actor: employee, manager
 Screen: Sales: Sell
@@ -297,6 +318,7 @@ again." and nothing goes in.
 Involved: SALE-F11, SALE-F42
 
 ### MODIFIER-F07 Charge the supplement: price and VAT
+<!-- from WORKBOOK.md sha256:867ace544c95 -->
 Status: done
 Actor: system
 Screen: none
@@ -325,6 +347,7 @@ measure: an option with a supplement cannot go with it.". The line does not go i
 Involved: SALE-F11
 
 ### MODIFIER-F08 Have the supplement show on the kitchen ticket
+<!-- from WORKBOOK.md sha256:cce3f0aa7225 -->
 Status: done
 Actor: system
 Screen: none
@@ -341,6 +364,7 @@ If it fails: nothing that is not F07: if the pricing fails, the line does not go
 Involved: KITCHEN-F07, SALE-F20
 
 ### MODIFIER-F09 Unlink the groups of a product or a category that is deleted
+<!-- from WORKBOOK.md sha256:092e298ae08a -->
 Status: done
 Actor: system
 Screen: none
@@ -357,6 +381,7 @@ links of another. If ERPlora's staff later recover the product from a separate c
 Involved: INVENTORY-F04, INVENTORY-F07, INVENTORY-F34, MODIFIER-F10
 
 ### MODIFIER-F10 Recover the modifier groups, and those of a product or of a category, from a separate copy
+<!-- from WORKBOOK.md sha256:7815ea5843ae -->
 Status: done
 Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
 Screen: none of Modifiers: in the Hubs admin, Separate copies › "Recover into the business…", with **Modifier groups,
@@ -424,6 +449,7 @@ brought it back or an earlier one.
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F07, INVENTORY-F34, MODIFIER-F05, MODIFIER-F09
 
 ### MODIFIER-F11 Declare an option's allergens
+<!-- from WORKBOOK.md sha256:6e740cf3551c -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Modifiers (group sheet)
@@ -452,6 +478,7 @@ the form.
 Involved: MODIFIER-F04, MODIFIER-F10, MODIFIER-F12, INVENTORY-F35
 
 ### MODIFIER-F12 Add the options' allergens to the dish's
+<!-- from WORKBOOK.md sha256:11b32ed9b11b -->
 Status: done
 Actor: employee, manager
 Screen: Sales: Sell
@@ -480,6 +507,7 @@ is allergic, their allergy is marked on the line.
 Involved: MODIFIER-F06, MODIFIER-F07, MODIFIER-F11, SALE-F11, SALE-F40, SALE-F41, KITCHEN-F32
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:0362fe6c68c9 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's
 own session) and the API, with the same rules and the same permissions. Designed for voice: a group is
@@ -511,6 +539,7 @@ another category, the card does not show that name, which the action does not us
 (hub#1291).
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:53d03be57be0 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -527,6 +556,7 @@ another category, the card does not show that name, which the action does not us
 The groups, a group, the options, the links and the groups of a product can be followed live.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:7634829c35df -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -540,6 +570,7 @@ The groups, a group, the options, the links and the groups of a product can be f
 | Unlinks a group from a product or a category | manage | F05 | `modifier.link.detach` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:06cf2cbc8992 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -548,6 +579,7 @@ The groups, a group, the options, the links and the groups of a product can be f
 | Link made or removed | F05, F09, F10 | The group and the product or the category | `modifier.link.attached`, `.detached` |
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:2e023f7d8846 -->
 
 | Notice | From | What it does | Service |
 |---|---|---|---|
@@ -555,6 +587,7 @@ The groups, a group, the options, the links and the groups of a product can be f
 | Category deleted (`inventory.category.deleted`) | Inventory | Unlinks the groups of that category (F09) | `modifier.link.drop_category` |
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:07f20a66c009 -->
 
 - **Inventory** (requirement): its products and categories, which each link points at, and the
   categories of each product, to know which groups it carries at the till.
@@ -563,6 +596,7 @@ The groups, a group, the options, the links and the groups of a product can be f
   their options, and which links to categories and products it gives back (F10).
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:e1b072f48f43 -->
 
 | App | What for | Service |
 |---|---|---|
@@ -570,6 +604,7 @@ The groups, a group, the options, the links and the groups of a product can be f
 | Kitchen | Does not read Modifiers: it receives from Sales the frozen options of each line (KITCHEN-F07; "Contract with Kitchen") | — |
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:bb08ddc42b93 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

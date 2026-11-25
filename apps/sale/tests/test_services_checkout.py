@@ -165,6 +165,8 @@ def test_the_sale_event_carries_what_inventory_and_customer_read(catalog, custom
             "tendered": 1000,
             "change": 758,
             "reference": "",
+            "extra": 0,
+            "extra_label": "",
         }
     ]
     coffee, water = payload["items"]
@@ -273,6 +275,40 @@ def test_payments_must_add_up_to_the_total(catalog):
             ],
         )
     assert refusal.value.code == "sale.payments_do_not_match_total"
+
+
+@pytest.mark.parametrize(
+    "payments",
+    [
+        [{"method": "card"}, {"method": "cash"}],
+        [{"method": "card", "amount": 1800}, {"method": "cash"}],
+    ],
+)
+def test_only_one_tender_pays_what_the_others_leave_and_never_nothing(catalog, payments):
+    with pytest.raises(Conflict) as refusal:
+        complete(lines=[{"product": "STK"}], payments=payments)
+    assert refusal.value.code == "sale.payments_do_not_match_total"
+
+
+def test_an_added_amount_is_refused_while_no_app_adds_a_step_to_the_charge(catalog):
+    # What another app adds to a tender (a tip) is only taken when an active app adds a step to the charge, which
+    # records it too (SALE-F39): else the drawer and the receipt would hold money nobody accounts for.
+    legs = (
+        {"method": "cash", "tendered": 2500, "extra": 200, "extra_label": "Tip"},
+        {"method": "card", "extra": 300, "extra_label": "Tip"},
+    )
+    split = [{"method": "card", "amount": 1000}, {**legs[0], "tendered": 1000}]
+    for payments in ([legs[0]], [legs[1]], split):
+        with pytest.raises(Conflict) as refusal:
+            complete(lines=[{"product": "STK"}], payments=payments)
+        assert refusal.value.code == "sale.added_amount_not_accepted"
+    assert Sale.objects.count() == 0 and not SaleCounter.objects.filter(last__gt=0).exists()
+    with translation.override("es"), pytest.raises(Conflict) as refusal:
+        complete(ctx_for(language="es"), lines=[{"product": "STK"}], payments=[legs[1]])
+    assert refusal.value.message == (
+        "Este negocio no tiene ninguna app que añada algo al cobro, como una propina: cobra solo la venta."
+    )
+    assert complete(lines=[{"product": "STK"}], payments=[{"method": "card"}]).total == 1800
 
 
 def test_short_cash_is_refused(catalog):
@@ -546,7 +582,7 @@ def test_a_customer_named_aloud_must_be_one(catalog, customer):
 # ── An open check ───────────────────────────────────────────────────────────────────────────────
 
 
-def test_charging_a_whole_check_closes_it(catalog):
+def test_charging_a_whole_check_closes_it(catalog, without_kitchen):
     order = open_order({"product": "COF", "quantity": "2"}, {"product": "WAT"})
     OutboxEvent.objects.all().delete()
     sale = complete(
@@ -584,7 +620,7 @@ def test_a_check_is_charged_at_its_own_discounts(catalog):
     )
 
 
-def test_paying_part_of_a_check_leaves_the_rest_open(catalog):
+def test_paying_part_of_a_check_leaves_the_rest_open(catalog, without_kitchen):
     order = open_order({"product": "STK"}, {"product": "WAT"})
     steak, water = order.lines
     OutboxEvent.objects.all().delete()

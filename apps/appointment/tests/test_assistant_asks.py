@@ -19,7 +19,7 @@ from apps.invoice.tests.conftest import catalog_of  # noqa: F401 (a fixture: the
 from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import TOP, assert_offered_or_found, assert_offered_with_room, comparable
 from base.tests.test_assistant_asks import offered_place, place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import by_group_test, english_coverage_test, english_words_test, own_words_test
 
@@ -146,14 +146,27 @@ def test_the_reported_appointment_request_offers_its_existing_operation(catalog_
     assert_offered_with_room(catalog_of(Membership.Role.OWNER, "es"), name, phrase, room=REPORTED_TOP)
 
 
+#: The task the model searches for when a probe brings its tool past the places of a turn.
+SEARCHED = {"appointment.settings.get": "ver los ajustes de las citas"}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_appointments_offers_its_tool_without_being_one_of_its_asks(catalog_of, probe):
     """The owner's thirty-five phrases of layer 2, the ones the model answered right too: a tool of Appointments that a
-    new ask elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees
-    it."""
+    new ask elsewhere pushes out of the ones a turn offers, or past them out of what the search of its task finds
+    (``SEARCHED``), fails here before the real-model QA sees it."""
     assert (probe["app"], probe["role"], probe["language"]) == ("appointment", "owner", "es")
-    assert_offered_with_room(catalog_of(Membership.Role.OWNER, probe["language"]), probe["tool"], probe["phrase"])
+    tools = catalog_of(Membership.Role.OWNER, probe["language"])
+    assert_offered_or_found(tools, probe["tool"], probe["phrase"], SEARCHED.get(probe["tool"]))
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("task", ["ver los ajustes de las citas", "configuración de citas"])
+def test_the_search_finds_the_booking_rules_by_the_appointments_settings(catalog_of, task):
+    """What a turn leaves out the model searches for in a few words: «los ajustes de las citas» are its booking rules."""
+    found = assistant.relevance.found(catalog_of(Membership.Role.OWNER, "es"), task, "es")
+    assert "appointment.settings.get" in [op.name for op in found], [op.name for op in found]
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)

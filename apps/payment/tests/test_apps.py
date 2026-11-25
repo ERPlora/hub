@@ -1,7 +1,11 @@
 """The payment app declares its module metadata, its menu, its permissions and what each role gets."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "payment.view_payment",
@@ -32,6 +36,17 @@ HIGH_RISK = {
     "payment.payment.mark_sent",
     "payment.payment.mark_completed",
     "payment.payment.cancel",
+}
+#: Recording a payment puts first on its card whom it pays, the invoice and how much (hub#2292).
+WITH_A_SUMMARY = {"payment.payment.create"}
+#: The read that only checks what a write names before its card: no tool, no route.
+CARD_ONLY = {"payment.payment.check"}
+#: The read each write checks the method it names with, before its card (hub#2290).
+CHECKS = {
+    **dict.fromkeys(
+        ("payment.method.update", "payment.method.deactivate", "payment.method.activate"), "payment.method.get"
+    ),
+    "payment.payment.create": "payment.payment.check",
 }
 
 
@@ -73,7 +88,7 @@ def test_payment_is_in_the_store_but_in_no_template():
 
 
 def test_permissions_are_the_workbook_ones():
-    assert payment().permissions == PERMISSIONS
+    assert list(payment().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -107,15 +122,20 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: every operation
     # says what it does, its risk and what a person types to ask for it (its asks, live.E020: payment
     # is listed in LIVE_ASSISTANT_ASKS_REQUIRED, hub#1090).
-    from live.operations import MIN_ASKS, registry
+    from live.operations import INTERNAL, MIN_ASKS, registry
 
     operations = {
         name: op for name, op in registry.items() if name.startswith("payment.")
     }
-    assert set(operations) == COMMANDS | QUERIES
+    assert set(operations) == COMMANDS | QUERIES | CARD_ONLY
     for name, op in operations.items():
         assert op.kind == ("command" if name in COMMANDS else "query"), name
-        assert set(op.ai) == {"description", "risk", "asks"}, name
+        if name in CARD_ONLY:
+            assert op.ai is INTERNAL and op.expose_api is False, name
+            continue
+        declared = {*(("summary",) if name in WITH_A_SUMMARY else ()), *(("check",) if name in CHECKS else ())}
+        assert set(op.ai) == {"description", "risk", "asks", *declared}, name
+        assert op.ai.get("check") == CHECKS.get(name), name
         assert {
             language: len(op.ai["asks"].get(language, ())) >= MIN_ASKS
             for language in ("en", "es")
@@ -136,5 +156,19 @@ def test_every_input_field_says_what_it_is():
             assert info.description, f"{name}: {field}"
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert payment().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert payment().help.videos == {"es": "GLFTc6kYTk8", "en": "ajeaqIejNK0"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("PAYMENT-F01", "PAYMENT-F08"), "OK2ZK8gru1U", "SfCZrov4jeA"),
+    (("PAYMENT-F02", "PAYMENT-F03", "PAYMENT-F04"), "yorr2RF1IT0", "hZyk-TWJJ9g"),
+    (("PAYMENT-F05",), "zIv0o81BH58", "MMZbN9sJ6Eo"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("payment", language) == help_videos.by_task(TASK_VIDEOS, language)

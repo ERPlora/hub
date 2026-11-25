@@ -104,7 +104,7 @@ def test_pricing_has_the_store_metadata_and_belongs_to_both_verticals():
 
 
 def test_permissions():
-    assert pricing_app().permissions == PERMISSIONS
+    assert list(pricing_app().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():

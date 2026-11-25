@@ -28,6 +28,10 @@ hasta que se atiende, se cobra o se anula.
   termina, las mueve, las anula y las cobra. Las citas de los compañeros no las ve.
 - El **responsable** ve y gestiona la agenda de todo el equipo, y bloquea tiempo.
 - El **propietario** y el **administrador**: además borran citas y cambian los ajustes de reserva.
+- El **teléfono y el email de la clienta** de una cita solo los ve quien tiene el permiso de dato «Ver el
+  contacto de los clientes» (BASE-F119), que hoy tienen los cuatro roles. Quien no lo tiene ve la cita y el
+  nombre de la clienta, sin su teléfono ni su email, en ninguna pantalla, API, agenda en vivo ni respuesta del
+  asistente, y no nombra a una clienta por su teléfono o su email: esas palabras solo le casan con un nombre.
 - La **clienta** reserva, mueve y cancela sola cuando el negocio lo permite (por WhatsApp o por la
   reserva online, a través de la API), siempre con las reglas de antelación del negocio.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace todo lo anterior:
@@ -121,14 +125,14 @@ profesional**, además, **Día · Semana**.
 - Botón **Añadir cita** → **Nueva cita**: Cliente (buscador «Buscar por nombre, teléfono, email…»; si no está,
   **+ Nuevo cliente** la crea con nombre y teléfono sin salir), Servicios (uno o varios, en orden),
   Profesional (solo los que hacen todos esos servicios), Día, Hora (con las **Horas libres** como
-  botones), Min. (la suma de las duraciones, cambiable), Notas para la clienta y Notas internas. Min.
-  y el **Total** salen con la duración y el precio propios del profesional elegido para cada servicio
-  (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que la cita reserva. Los
-  importes van en la moneda del negocio, la de su país, con sus decimales (BASE-F50: «65,00 zł» en un negocio de
+  botones), «Duración (min)» (la suma de las duraciones, cambiable), Notas para la clienta y Notas
+  internas. «Duración (min)» y el **Total** salen con la duración y el precio propios del profesional
+  elegido para cada servicio (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que
+  la cita reserva. Los importes van en la moneda del negocio, la de su país, con sus decimales (BASE-F50: «65,00 zł» en un negocio de
   Polonia; «—» mientras el negocio no contesta, nunca en euros ni con decimales supuestos) y salen agrupados desde cuatro
   cifras («1.234,56 €»; en inglés, «€1,234.56»).
   Avisos: «Esta cita empieza en el pasado. Se guardará a esa hora.» y el profesional que no hace un servicio.
-- **Editar** → **Editar la cita**: Día, Hora, Min., Servicios, Profesional, las notas y **Guardar
+- **Editar** → **Editar la cita**: Día, Hora, «Duración (min)», Servicios, Profesional, las notas y **Guardar
   cambios**; debajo, el historial. La clienta no se cambia.
 - Diálogos: **Cita solapada** (**Reservar igual** / **Elegir otra hora**), **Editar cita periódica**
   (**Solo esta cita** / **Esta y todas las siguientes**), **Cancelar la cita** (motivo opcional) y
@@ -139,7 +143,7 @@ Tercer segmento de la Agenda. Tabla: Cliente, Servicio, Profesional, Repetición
 semana · lunes · 11:00»), Empieza, Termina («Sin fin», «Tras {n} citas» o la fecha) y **Activa**
 (interruptor). Por fila: **Editar serie**, **Reservar citas** y **Borrar** (pide confirmación). El
 botón de añadir abre **Nueva cita periódica** (Cliente, Servicios, Profesional, Repetición, Día de la
-semana, Empieza el, Hora, Min., «Termina el (opcional)», «Número de citas (opcional)») con **Crear
+semana, Empieza el, Hora, «Duración (min)», «Termina el (opcional)», «Número de citas (opcional)») con **Crear
 cita periódica**; editar abre **Editar cita periódica** con «Desde» y **Guardar de esta cita en
 adelante**; el buscador es «Buscar cliente o servicio…». Tras reservar sale solo lo que ha pasado: «{n}
 citas reservadas» y, si alguna no cupo, «{n} no se han podido reservar» con cada fecha y su motivo (si ya
@@ -232,15 +236,17 @@ Actor: empleado (para sí), responsable, asistente
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Añadir cita**, o en «Por profesional» toca un hueco libre (rellena profesional y hora).
-2. Elige la clienta (se busca por nombre, teléfono o email; si no está, **+ Nuevo cliente** la crea con
-   nombre y teléfono), uno o varios servicios y el profesional. Con servicios elegidos solo salen los
+2. Elige la clienta (se busca por nombre, teléfono o email, y por teléfono o email solo quien ve el contacto de
+   los clientes; si no está, **+ Nuevo cliente** la crea con nombre y teléfono), uno o varios servicios y el profesional. Con servicios elegidos solo salen los
    profesionales **Activos y Reservables que los hacen todos**; si un servicio no tiene a nadie
-   asignado, para ese servicio vale todo el equipo reservable. «Min.» se rellena con la suma de las
+   asignado, para ese servicio vale todo el equipo reservable. «Duración (min)» se rellena con la suma de las
    duraciones (la propia del profesional si la tiene, si no la del catálogo).
-3. Escribe el día y toca una de las **Horas libres** (o escribe otra hora).
+3. Elige el día y toca una de las **Horas libres** (o elige otra hora).
 4. Pulsa **Añadir cita**. Si el negocio permite solapes y esa hora choca con otra cita del
    profesional, responde a «Cita solapada».
 5. La cita aparece como **Confirmada** con su número (por ejemplo, APT-20261116-0001).
+6. Por el asistente, la tarjeta de confirmación pone delante la clienta, el día y la hora y el servicio; después,
+   la profesional.
 Entra: la ficha de la clienta (Clientes), los servicios con su precio y duración (Servicios), el
 profesional y quién hace qué (Personal y Servicios), el horario del negocio (Horarios) y el turno y las
 ausencias del profesional (Personal).
@@ -255,8 +261,8 @@ volver a guardar. Desde el mostrador ni la antelación mínima ni una hora ya pa
 hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Un empleado
 solo reserva para sí; una automatización a la que se permite reservar, con cualquier profesional. Dos personas
 que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.
-Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F114
-(el personal de ERPlora recupera desde una copia aparte las citas que el negocio ya no tiene, cada una por esta misma
+Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11, BASE-F119,
+BASE-F114 (el personal de ERPlora recupera desde una copia aparte las citas que el negocio ya no tiene, cada una por esta misma
 reserva; una borrada vuelve la misma, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 Ver qué horas quedan libres
@@ -278,9 +284,9 @@ Pasos:
    dice solo a quien puede ver esa agenda (a un empleado, de un compañero, solo «ya tiene una cita»).
 Entra: el horario del negocio, el turno y las ausencias, los bloqueos, las citas y los ajustes.
 Sale: la lista de horas; no guarda nada.
-Si falla: «No se han podido cargar las horas libres. Puedes escribir una hora igualmente.» con
-**Reintentar**; la hora escrita se juzga al guardar. Sin horas: «No quedan horas libres ese día para este
-profesional. Puedes escribir una hora igualmente.».
+Si falla: «No se han podido cargar las horas libres. Puedes elegir una hora igualmente.» con
+**Reintentar**; la hora elegida se juzga al guardar. Sin horas: «No quedan horas libres ese día para este
+profesional. Puedes elegir una hora igualmente.».
 Implicados: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirmar una cita pendiente
@@ -306,7 +312,7 @@ Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Editar** (o toca la cita en «Por profesional»): se abre «Editar la cita».
-2. Cambia Día, Hora, Min., Servicios o Profesional y pulsa **Guardar cambios**. Si la cita es de una
+2. Cambia Día, Hora, «Duración (min)», Servicios o Profesional y pulsa **Guardar cambios**. Si la cita es de una
    serie, elige **Solo esta cita** o **Esta y todas las siguientes**. Desde el
    mostrador se puede llevar a una hora ya pasada (para apuntar lo que ya ocurrió).
 3. Atajo: en «Por profesional» arrástrala a otra hora, otro día u otra fila. Arrastrando no se lleva a
@@ -409,16 +415,17 @@ Actor: empleado (las suyas), responsable
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Historial** en la fila (en cualquier estado) o abre la ficha de la cita.
-2. Cada cambio con su hora en el reloj del negocio, quién lo hizo («Lo pidió la clienta» si fue ella; «Lo
-   hizo la plataforma» si no fue una persona: el sistema, una automatización o una recuperación desde una copia
-   aparte; una API key, por su nombre) y qué cambió (de qué profesional o servicio a cuál, y la nueva hora). Una
+2. Cada cambio con su hora en el reloj del negocio, quién lo hizo (una persona del equipo, por su nombre o, si
+   su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el correo entero; «Lo pidió la clienta» si
+   fue ella; «Lo hizo la plataforma» si no fue una persona: el sistema, una automatización o una recuperación desde
+   una copia aparte; una API key, por su nombre) y qué cambió (de qué profesional o servicio a cuál, y la nueva hora). Una
    cita borrada que el personal de ERPlora devolvió desde una copia aparte conserva sus líneas y suma «Borrada» y
    «Recuperada».
 3. Es solo de lectura: un único botón, **Cerrar**.
 Entra: una cita en cualquier estado.
 Sale: nada (solo lee).
 Si falla: «No se pudo cargar el historial de la cita.»
-Implicados: APPOINTMENT-F11, BASE-F114
+Implicados: APPOINTMENT-F11, BASE-F114, BASE-F119
 
 ### APPOINTMENT-F11 Borrar una cita
 Estado: hecho
@@ -454,6 +461,8 @@ Pasos:
    los minutos y, si quieres, «Termina el (opcional)» o «Número de citas (opcional)».
 3. Pulsa **Crear cita periódica**: se crea la serie y se reservan sus citas hasta la antelación máxima de
    los ajustes.
+4. Por el asistente, la tarjeta de confirmación pone delante la clienta, cuándo se repite (el primer día, la hora y
+   cada cuánto) y el servicio; después, la profesional.
 Entra: la clienta, los servicios y el profesional (Clientes, Servicios y Personal) y los ajustes de
 Citas.
 Sale: la serie activa, sus citas y el aviso `appointment.recurring.created`.
@@ -505,6 +514,8 @@ Pasos:
 5. El aviso dice solo lo que ha pasado: cuántas citas se mueven, con quién y con qué servicios van ahora,
    cuántas fechas nuevas se reservan, cuántas se cancelan y cuáles se quedan a su hora, con su fecha;
    si no ha hecho falta cambiar ninguna, «Guardado: no ha hecho falta cambiar ninguna cita.».
+6. Por el asistente, la tarjeta de confirmación pone delante la serie, desde cuándo y lo que cambia de cuándo se
+   repite, y después la profesional y los servicios nuevos.
 Entra: una serie y la fecha desde la que cambia.
 Sale: la serie partida en dos (la vieja termina el día antes) o, si el cambio empieza en su primera
 fecha, la misma serie editada; el aviso `appointment.recurring.updated`.
@@ -543,6 +554,8 @@ Pasos:
 2. Desde ese momento nadie puede reservar en esa franja; sin profesional, bloquea todo el negocio. Un
    bloqueo de día entero cubre esos días enteros, en la reserva y en las horas libres.
 3. La rejilla de «Por profesional» lo pinta rayado en su fila (o en todas, si es del negocio).
+4. Por el asistente, la tarjeta de confirmación pone delante de quién es el bloqueo (si es de una persona), su
+   inicio y su fin como un periodo («26 nov 2026, 14:00–15:00») y qué es.
 Entra: el profesional (Personal), si el bloqueo es suyo.
 Sale: `appointment.blocked_time.created` / `appointment.blocked_time.deleted`.
 Si falla: «El final no puede ser anterior al inicio.»; quitar uno que ya no está, «Ese bloqueo no existe en
@@ -559,9 +572,12 @@ Pasos:
    línea **de servicio** por cada servicio de la cita (como si se tocara en «Servicios» del TPV),
    con el profesional que lo hizo y **al precio con que se reservó** (el propio de la
    profesional incluido), aunque el catálogo haya cambiado desde entonces, y lleva a **Venta** con esa
-   cuenta en pantalla.
+   cuenta en pantalla. La cuenta ya lleva **asignada a la clienta** de la cita, como si se hubiera
+   elegido en «Asignar cliente».
 3. En el TPV se añaden productos o descuentos, un servicio se
-   puede pagar con un **bono** de la clienta y se cobra como cualquier venta.
+   puede pagar con un **bono** de la clienta y se cobra como cualquier venta: la venta es de la clienta y
+   la compra suma en su ficha. Si en el TPV se le quita o se cambia la clienta, volver con
+   **Ir a la cuenta** la deja como la dejó el TPV.
 4. Una cita tiene **una sola cuenta**: mientras sigue abierta, el botón se llama **Ir a la cuenta** y
    vuelve a ella (nunca abre otra, aunque se pulse a la vez en dos dispositivos); si se anula la cuenta
    en el TPV, **Cobrar** abre una nueva. Con la cuenta abierta, la cita no se cancela, ni se marca como
@@ -576,8 +592,10 @@ Si falla: «Una cita cancelada o no presentada no se cobra.»; ya cobrada, tambi
 cobrar y el aviso aún no ha llegado, «Esta cita ya está cobrada.»; un servicio sin categoría fiscal, el aviso de que
 hay que ponérsela en Servicios antes de cobrar; con Venta apagada, «El TPV (Venta) no está activo en este
 negocio: la cita no se puede cobrar allí.»; un servicio que ya no se ofrece o un precio que no es el de la cita, la
-frase de Venta; sin permiso de vender, el aviso de Venta.
-Implicados: SALE-F26, SALE-F27, SALE-F30, SALE-F38
+frase de Venta; sin permiso de vender, el aviso de Venta. Si la ficha de la clienta ya no está disponible
+(eliminada, unida a otra o con los datos borrados) o quien cobra no tiene permiso para asignar clientes, la
+cuenta se abre igual, sin cliente, y el TPV sigue ofreciendo «Asignar cliente».
+Implicados: SALE-F26, SALE-F27, SALE-F30, SALE-F38, CUSTOMER-F19, CUSTOMER-F20
 
 ### APPOINTMENT-F18 Cita que reserva la clienta
 Estado: hecho
@@ -625,10 +643,13 @@ Pasos:
 1. Abre la ficha en **Clientes**.
 2. Al final, el bloque **Historial de visitas** enseña sus 10 últimas citas, la más reciente primero,
    con el día y la hora, los servicios, el profesional, el estado y las notas (la interna primero).
-Entra: las citas de la clienta que quien mira puede ver.
+Entra: las citas de la clienta que quien mira puede ver. Por la API o el asistente la clienta se nombra por su
+nombre (entero o una parte, con tildes o sin ellas, como la encuentra la lista de Clientes: «Lucía», «Lucia
+Fernandez»), su teléfono o su email; por teléfono o email, solo quien ve el contacto de los clientes (BASE-F119).
+Si encajan varias clientas, la respuesta dice cuáles para elegir.
 Sale: nada (solo lee). Una automatización lo lee sin notas ni motivos.
 Si falla: «No se pudo cargar el historial de visitas.» · vacío: «Este cliente aún no tiene citas.»
-Implicados: CUSTOMER-F24
+Implicados: CUSTOMER-F24, BASE-F119
 
 ### APPOINTMENT-F21 Reservar varias citas de golpe (bono o curso)
 Estado: hecho
@@ -651,12 +672,14 @@ Pasos:
    está en una cita pendiente o confirmada sin cobrar; las notas de cualquier otra se cambian por el asistente.
 2. Solo cambia lo que se envía. El teléfono se guarda en formato internacional, con el prefijo del país;
    uno que no es un número válido se rechaza y no se guarda nada.
+3. Quien no ve el contacto de los clientes recibe la cita sin el teléfono ni el email de la clienta; cambiar las
+   notas los deja como estaban.
 Entra: una cita.
 Sale: `appointment.appointment.updated` (sin línea de historial si solo cambian notas o contacto).
 Si falla: el teléfono no válido se rechaza sin guardar nada («Ese teléfono no es un número válido del país del
 negocio. Revísalo o escríbelo con su prefijo internacional (por ejemplo +44…).»); una cita que no existe, «Esa cita
 no existe en este negocio.».
-Implicados: CUSTOMER-F11
+Implicados: CUSTOMER-F11, BASE-F119
 
 ### APPOINTMENT-F23 Unir las citas al fusionar dos fichas de clienta
 Estado: hecho
@@ -761,16 +784,17 @@ Implicados: ninguno
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
 habla) y la API, con las mismas reglas y los mismos permisos. Una cita se nombra por su id o por su
-número (`APT-…`); una clienta, por su id, su nombre, su teléfono o su email; un servicio y un
-profesional, por su id o su nombre; una hora, como fecha y hora de pared del negocio («2026-10-15
-10:00»). Si un nombre vale para varios, se dice cuáles y se pide que elija.
+número (`APT-…`); una clienta, por su id, su nombre, su teléfono o su email (por teléfono o email, solo
+quien ve el contacto de los clientes); un servicio y un profesional, por su id o su nombre; una hora, como fecha
+y hora de pared del negocio («2026-10-15 10:00»). Si un nombre vale para varios, se dice cuáles y se pide que
+elija.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las citas de un rango de días, por profesional, estado, clienta o búsqueda, en páginas (hasta 100) | ver citas (todas o las suyas) | F01–F11, F27 | `appointment.appointment.list` |
-| Una cita completa | ver citas | F04, F10 | `appointment.appointment.get` |
+| Una cita completa (el teléfono y el email de la clienta, solo a quien ve el contacto de los clientes) | ver citas | F04, F10, F22 | `appointment.appointment.get` |
 | El historial de una cita | ver citas | F10 | `appointment.appointment.history` |
 | Las últimas citas de una clienta, con notas | ver citas | F20 | `appointment.appointment.list_for_customer` |
 | Cuántas citas próximas usan un servicio | ver citas | F26 | `appointment.appointment.count_active_for_service` |
@@ -867,6 +891,7 @@ la devuelve sin abrir otra (Venta, por su parte, devuelve la cuenta abierta de u
 | Ver disponibilidad y bloqueos | sí | sí | sí | sí | `appointment.view_schedule` |
 | Bloquear tiempo | sí | sí | sí | no | `appointment.manage_schedule` |
 | Ajustes | sí | sí | no | no | `appointment.manage_settings` |
+| Ver el teléfono y el email de la clienta (permiso de dato de la plataforma, BASE-F119) | sí | sí | sí | sí | `base.view_customer_contact` |
 
 «Sus propias» citas son las de la ficha de Personal vinculada a su cuenta; un empleado sin ficha
 vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ninguna ficha de Personal: no hay
@@ -876,14 +901,14 @@ agenda tuya que enseñar.».
 
 - **Recuperar desde una copia aparte** (BASE-F114, hub#1284): `apps.py` responde a la plataforma
   (`recoverable_from_copy`, `base.tenancy.recovery`) con las citas de la copia que aún no han llegado y siguen
-  reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.appointments_in_copy`, por SQL sobre los
+  reservadas (pendientes o confirmadas, ni borradas ni cobradas; `queries.recovery.appointments_in_copy`, por SQL sobre los
   nombres de los modelos: la copia no es un negocio y no tiene alias). La que el negocio aún guarda borrada vuelve la
-  misma por `appointment.appointment.restore` (`queries.appointments_deleted_in_business`, por su id, salvo que se
+  misma por `appointment.appointment.restore` (`queries.recovery.appointments_deleted_in_business`, por su id, salvo que se
   volviera a reservar: otra viva de su clienta a su hora, o de su serie en su fecha, según lo que el negocio guarda de
   ella y no lo que dice la copia; hub#1326). La restauración bloquea primero su serie (como toda escritura: una pasada
   de la serie no reserva esa fecha a la vez) y juzga, si sigue reservada, como una reserva: ficha viva, servicios y
   profesional reservables y la hora libre, con las reglas de una automatización. La que el negocio no tiene
-  (`queries.appointments_not_in_business`: ni la misma, viva o borrada, ni otra de la misma clienta a la misma hora) se
+  (`queries.recovery.appointments_not_in_business`: ni la misma, viva o borrada, ni otra de la misma clienta a la misma hora) se
   crea por `appointment.appointment.create`. La clienta se casa por la regla de
   Clientes (`customer.queries.card_in_business`: la misma ficha, aquella en la que se unió o la que se volvió a crear;
   la plataforma recupera las apps en el orden de sus `requires`, así que Clientes va antes). Cada servicio, por la regla
@@ -898,8 +923,8 @@ agenda tuya que enseñar.».
   series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
   negocio y su copia) y `base/tenancy/tests/test_recovery_appointments.py`.
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
-  `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries.py`,
-  `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
+  `schemas/` (un módulo por tema), `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries/`
+  (un módulo por tema), `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`
   (con las apps reales, sin dobles) y `test_concurrency.py` (hilos).
 - **`requires = ["customer", "service", "staff", "schedule"]`** (choca con el ejemplo de la skill
@@ -908,7 +933,7 @@ agenda tuya que enseñar.».
   `staff.Member`; `AppointmentService.service` y `RecurringService.service` → `service.Service`. Los
   nombres se resuelven con `find_customer`, `find_service` y `resolve_member` de esas apps. La venta es
   un identificador opaco (`sale_id`): Venta no es requisito.
-- **Disponibilidad = Horarios ∩ Personal ∩ citas**: `queries.py` lee `schedule.hours.for_range` y
+- **Disponibilidad = Horarios ∩ Personal ∩ citas**: `queries/agenda.py` lee `schedule.hours.for_range` y
   `staff.availability.for_member` (sus operaciones, con un contexto de lectura que añade `schedule.view`
   y `staff.view` a quien reserva: reservar no exige permisos de esas apps), los bloqueos y las citas, y
   `engine.py` decide. Orden de los motivos (el primero gana): `invalid_start`, `in_past`, `too_soon`,
@@ -921,13 +946,21 @@ agenda tuya que enseñar.».
   una clienta, los avisos, la campana, los carriles, las series y Reservas online leen por `APPOINTMENTS.visible(ctx)`
   o `SERIES.visible(ctx)`, y las órdenes buscan la cita o la serie igual (`find_appointment`, `find_series`): la de
   otro profesional da el mismo 404 (`appointment.appointment_not_found`, `appointment.recurring_not_found`) que una
-  que no existe. Quien no es una persona no tiene «suyas»: lee todas las que abre su permiso (una llave de API
-  abierta sobre la lista de citas antes leía la agenda vacía). Que una hora está ocupada no abre ninguna cita: a quien
+  que no existe. Una llave de API lee como quien la creó (BASE-F125). Quien no tiene a nadie detrás (una
+  automatización, la plataforma) no tiene «suyas»: lee todas las que abre su permiso. Que una hora está ocupada no
+  abre ninguna cita: a quien
   comprueba una hora se le dice de quién es solo si ve esa agenda, la suya o con `view_appointment`, y a quien no es
   una persona, solo con `view_appointment` (`sees_whose`). `tests/test_guardrails_ownership.py` prohíbe
   `Appointment.objects` y `Recurring.objects` en los paquetes `queries` fuera de su lista cerrada, cada una con su
   motivo (lo que una orden acaba de escribir, las reglas de la agenda, las cuentas y la recuperación desde una copia).
   Tests: `tests/test_queries_ownership.py`, por la ruta real.
+- **El contacto de la clienta** (BASE-F119): `customer_phone` y `customer_email` de `AppointmentOut` son los
+  campos `PHONE` y `EMAIL` de `apps/customer/schemas/contact.py`, con la marca `CUSTOMER_CONTACT`: live los da nulos a
+  quien no tiene `base.view_customer_contact`, en todas las puertas y en toda orden que responde una cita (también las
+  de un lote). La cita los sigue guardando: editar las notas no los toca. Nombrar a la clienta por su teléfono o su
+  email lo resuelve `find_customer` de Clientes, que sin el permiso solo casa un nombre; la lista de citas no busca ni
+  ordena por ellos. Quien no es una persona los recibe vacíos aunque tenga el permiso (`for_caller`). Tests:
+  `tests/test_customer_contact.py`, por la ruta real y con una persona de verdad (la empleada, con su ficha).
 - **«Las suyas» de quien no es una persona**:
   `may_book_for` y `may_change` piden `add_appointment`/`change_appointment`, o `add_own_appointment`/
   `change_own_appointment` sobre una cita de la ficha propia (`is_own`, con la misma regla que las lecturas). Quien no
@@ -947,14 +980,14 @@ agenda tuya que enseñar.».
   `appointment.appointment.get` y su `label` (clienta, día, hora y profesional, sin los que falten), y el título
   «Cita»; quien no puede leerla no ve el dato. Vale para la tarjeta del chat y para «Esperan tu respuesta».
 - **Cómo se nombra cada dato en una tarjeta** (hub#637): un dato que ningún modelo de Citas nombra lleva su `title`
-  en `schemas.py`, con su `es` en `locale/`: «Reservar aunque se solape» (`confirm_overlap`), «Fechas y horas»
+  en `schemas/`, con su `es` en `locale/`: «Reservar aunque se solape» (`confirm_overlap`), «Fechas y horas»
   (`starts`), «Lo pide la clienta» (`on_behalf_of_customer`), «Se aplica desde» (`from_date` al editar una serie),
   «Reservar desde» y «Reservar hasta» (al reservar sus citas) y «Ficha duplicada» (`absorbed_id`), nunca el título que
   pydantic inventa («Confirm Overlap»). `tests/test_integration_assistant.py` barre todas las escrituras, también las
   reacciones, y `tests/test_i18n.py` comprueba que la tarjeta dice estos nombres, cada uno con español propio de Citas
   y no el de otra app.
 - **Cómo se nombra el resto en una tarjeta** (BASE-F97, hub#635): cada id de una escritura de Citas lleva su marca
-  `refers` de `schemas.py`, leída como quien pregunta y con su permiso; el trinquete de
+  `refers` de `schemas/fields.py`, leída como quien pregunta y con su permiso; el trinquete de
   `base/tests/test_assistant_card_values_references.py` deja Citas a 0. El profesional (`staff_id` de reservar varias, editar,
   bloquear y crear o editar una serie; `A_MEMBER`) por su nombre con `staff.member.detail` (`staff.view`); cada cita
   de `bulk_delete` (`ids`, título «Citas») con `AN_APPOINTMENT`, y la tarjeta dice cuántas aunque no pueda nombrar
@@ -985,7 +1018,7 @@ agenda tuya que enseñar.».
   Horarios. Las antelaciones mínimas, para reservar y para cancelar, se cuentan en **horas
   reales**, no en horas del reloj: el día del cambio de hora, 24 h de antelación acaban a otra hora de
   pared (a las 10:00 de la víspera del día de 23 h, la primera hora que las respeta son las 11:00; en la
-  del día de 25 h, las 09:00), y `queries.now()` da el instante en UTC para que la suma sea de tiempo real.
+  del día de 25 h, las 09:00), y `queries.business.now()` da el instante en UTC para que la suma sea de tiempo real.
   La **duración** de una cita también cuenta tiempo real (`engine.ends_at`, en crear, lote, mover, series, horas
   libres y `availability.check`): 60 minutos son 60 minutos también la noche del cambio de hora, y lo que cambia
   es la hora de pared en que acaba (el 25/10/2026, las 01:37 + 90 min acaban a las 02:07 de la segunda vuelta; el

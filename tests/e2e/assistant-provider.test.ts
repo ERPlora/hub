@@ -17,16 +17,20 @@ import {
   GREETING,
   LANGUAGES,
   languageOf,
+  LINK_ANSWER,
   NO_REASON,
   NOT_DONE,
   type Provider,
+  READS_MISSING,
+  READS_SAID,
   rectifyPreview,
   SLOW_ANSWER,
   startProvider,
   STEPS_SAID,
 } from './assistant-provider';
 
-type Frame = { choices: { delta: { content?: string; tool_calls?: { function: { name?: string; arguments?: string } }[] }; finish_reason: string | null }[] };
+type Piece = { index?: number; id?: string; function: { name?: string; arguments?: string } };
+type Frame = { choices: { delta: { content?: string; tool_calls?: Piece[] }; finish_reason: string | null }[] };
 
 const textOf = (frames: unknown[]) =>
   (frames as Frame[]).flatMap((frame) => frame.choices.map((choice) => choice.delta.content ?? '')).join('');
@@ -34,6 +38,17 @@ const finish = (frames: unknown[]) => (frames as Frame[]).flatMap((frame) => fra
 const toolOf = (frames: unknown[]) => {
   const pieces = (frames as Frame[]).flatMap((frame) => frame.choices.flatMap((c) => c.delta.tool_calls ?? []));
   return { name: pieces.map((p) => p.function.name ?? '').join(''), arguments: pieces.map((p) => p.function.arguments ?? '').join('') };
+};
+/** Each tool asked for in one answer, by its index: its id, its name and its arguments, put together from its fragments. */
+const callsOf = (frames: unknown[]) => {
+  const calls: { id: string; name: string; arguments: string }[] = [];
+  for (const piece of (frames as Frame[]).flatMap((frame) => frame.choices.flatMap((c) => c.delta.tool_calls ?? []))) {
+    const call = (calls[piece.index ?? 0] ??= { id: '', name: '', arguments: '' });
+    call.id += piece.id ?? '';
+    call.name += piece.function.name ?? '';
+    call.arguments += piece.function.arguments ?? '';
+  }
+  return calls;
 };
 const user = (content: string) => ({ role: 'user', content });
 
@@ -48,24 +63,24 @@ const requested = (name: string) => ({ role: 'assistant', content: '', tool_call
 const NOT_CONFIRMED = { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed", "message": "Not confirmed."}}' };
 const SUMMARY = {
   number: 'S-1',
-  closing_balance: 25000,
-  expected_balance: 23000,
-  difference: 2000,
+  closing_balance: '250.00 EUR',
+  expected_balance: '230.00 EUR',
+  difference: '20.00 EUR',
   expected_hidden: false,
   pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
 };
 const PREVIEW = {
-  original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: 12100, remaining: 12100 },
+  original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: '121.00 EUR', remaining: '121.00 EUR' },
   invoice_type: 'R1',
   reason: 'el precio estaba mal',
   series_code: 'RECT',
   next_number: 'RECT-2026-000001',
   issue_date: '2026-10-27',
   whole: true,
-  base_amount: -10000,
-  tax_amount: -2100,
-  total_amount: -12100,
-  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: -12100 }],
+  base_amount: '-100.00 EUR',
+  tax_amount: '-21.00 EUR',
+  total_amount: '-121.00 EUR',
+  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: '-121.00 EUR' }],
 };
 
 describe('answerTo', () => {
@@ -79,6 +94,7 @@ describe('answerTo', () => {
   it('the format, the claim and a slow answer by their markers', () => {
     expect(textOf(answerTo([user('E2E-FORMAT')]).frames)).toBe(FORMAT_ANSWER.en);
     expect(textOf(answerTo([user('E2E-CLAIM')]).frames)).toBe(CLAIM_ANSWER.en);
+    expect(textOf(answerTo([user('E2E-LINK')]).frames)).toBe(LINK_ANSWER.en);
     expect(answerTo([user('E2E-SLOW')]).delayMs).toBeGreaterThan(0);
     expect(answerTo([user('E2E-DOWN')]).status).toBe(500);
   });
@@ -139,6 +155,22 @@ describe('answerTo', () => {
     expect(textOf(answerTo(written).frames)).toBe(DONE.en);
   });
 
+  it('two reads in one answer (E2E-READS): each with its index and its own id; then, each result back by its call, what both say', () => {
+    const question = user('E2E-READS');
+    const asked = answerTo([question]);
+    const [listed, counted] = callsOf(asked.frames);
+    expect([listed.name, listed.arguments, counted.name, counted.arguments]).toEqual(['demo__item__list', '{}', 'demo__item__open_count', '{}']);
+    expect(listed.id && counted.id && listed.id !== counted.id).toBeTruthy();
+    expect(finish(asked.frames)).toEqual(['tool_calls']);
+    const both = { role: 'assistant', content: '', tool_calls: [{ id: 'r1', function: { name: 'demo__item__list' } }, { id: 'r2', function: { name: 'demo__item__open_count' } }] };
+    const rows = { role: 'tool', tool_call_id: 'r1', content: '{"rows": [{}, {}, {}]}' };
+    const open = { role: 'tool', tool_call_id: 'r2', content: '{"count": 1}' };
+    expect(textOf(answerTo([question, both, rows, open]).frames)).toBe(READS_SAID.en(3, 1));
+    expect(textOf(answerTo([IN.es, question, both, rows, open]).frames)).toBe(READS_SAID.es(3, 1));
+    // A result that answers another call is a read that did not come back.
+    expect(textOf(answerTo([question, both, rows, { ...open, tool_call_id: 'r1' }]).frames)).toBe(READS_MISSING.en);
+  });
+
   it('a chain that speaks in every round (BASE-F101): its words before the read, before the write, then the outcome', () => {
     const question = user('E2E-STEPS Mesa 7');
     const asked = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
@@ -162,9 +194,9 @@ describe('answerTo', () => {
     });
     const summary = {
       number: 'S-261024-0001',
-      closing_balance: 25000,
-      expected_balance: 23000,
-      difference: 2000,
+      closing_balance: '250.00 EUR',
+      expected_balance: '230.00 EUR',
+      difference: '20.00 EUR',
       expected_hidden: false,
       pending: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
     };
@@ -191,11 +223,11 @@ describe('answerTo', () => {
   });
 
   it('the close summary as the model says it in Spanish: the expected and the difference only when they came, and what is pending', () => {
-    const base = { number: 'S-1', closing_balance: 25000, pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
-    expect(closeCashSummary({ ...base, expected_balance: 23000, difference: 2000, expected_hidden: false }, 'es')).toBe(
+    const base = { number: 'S-1', closing_balance: '250.00 EUR', pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
+    expect(closeCashSummary({ ...base, expected_balance: '230.00 EUR', difference: '20.00 EUR', expected_hidden: false }, 'es')).toBe(
       'Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Esperado: 230.00 €\n- Diferencia: +20.00 €',
     );
-    expect(closeCashSummary({ ...base, expected_balance: 23000, difference: -500, expected_hidden: false }, 'es')).toContain('- Diferencia: -5.00 €');
+    expect(closeCashSummary({ ...base, expected_balance: '230.00 EUR', difference: '-5.00 EUR', expected_hidden: false }, 'es')).toContain('- Diferencia: -5.00 €');
     const blind = closeCashSummary({ ...base, expected_balance: null, difference: null, expected_hidden: true }, 'es');
     expect(blind).toBe('Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Arqueo ciego: el cierre lo comparará al confirmar.');
     const pending = closeCashSummary(
@@ -263,7 +295,7 @@ describe('answerTo', () => {
         '- Total: -121.00 €',
       ].join('\n'),
     );
-    const left = rectifyPreview({ ...whole, invoice_type: 'R5', whole: false, original: { ...whole.original, customer_name: '', remaining: 11100 }, total_amount: -11100 }, 'es');
+    const left = rectifyPreview({ ...whole, invoice_type: 'R5', whole: false, original: { ...whole.original, customer_name: '', remaining: '111.00 EUR' }, total_amount: '-111.00 EUR' }, 'es');
     expect(left).toContain('Vas a rectificar la factura **F-1** del 26/10/2026 con esta rectificativa:');
     expect(left).toContain('- Tipo: R5');
     expect(left).toContain('- Rectifica lo que queda: 111.00 € de 121.00 €');
@@ -284,7 +316,7 @@ describe('answerTo — in the language of the request (hub#1025)', () => {
   });
 
   it('each of its texts is its own in each language, never the other one’s', () => {
-    for (const said of [GREETING, DONE, NOT_DONE, CANNOT_RECTIFY, NO_REASON, SLOW_ANSWER, FORMAT_ANSWER, CLAIM_ANSWER]) expect(said.en).not.toBe(said.es);
+    for (const said of [GREETING, DONE, NOT_DONE, CANNOT_RECTIFY, NO_REASON, SLOW_ANSWER, FORMAT_ANSWER, CLAIM_ANSWER, LINK_ANSWER]) expect(said.en).not.toBe(said.es);
     expect(STEPS_SAID.en).not.toEqual(STEPS_SAID.es);
     // What the specs read after a write: the Spanish ones as they always did, the English ones in English.
     expect([DONE.es, NOT_DONE.es, DONE.en, NOT_DONE.en]).toEqual(['Hecho.', 'No lo he hecho.', 'Done.', 'I have not done it.']);
@@ -356,7 +388,7 @@ describe('answerTo — in the language of the request (hub#1025)', () => {
         '- Total: -121.00 €',
       ].join('\n'),
     );
-    const left = rectifyPreview({ ...PREVIEW, whole: false, original: { ...PREVIEW.original, customer_name: '', remaining: 11100 } }, 'en');
+    const left = rectifyPreview({ ...PREVIEW, whole: false, original: { ...PREVIEW.original, customer_name: '', remaining: '111.00 EUR' } }, 'en');
     expect(left).toContain('You are about to rectify invoice **F-1** of 26/10/2026 with this rectifying invoice:');
     expect(left).toContain('- Rectifies what is left: 111.00 € of 121.00 €');
   });

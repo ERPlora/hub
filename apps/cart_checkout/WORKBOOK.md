@@ -181,7 +181,10 @@ Pasos:
 1. Pide al asistente añadir un producto a un carrito, diciendo el carrito (su sesión, o el email o el
    nombre del cliente), la referencia y el nombre del producto, la cantidad y el precio por unidad.
 2. Confirma la tarjeta del asistente, que dice el carrito por su sesión (por ejemplo, sess_a1b2c3) o por
-   el cliente dicho, nunca por su código interno.
+   el cliente dicho, nunca por su código interno; después, la línea (el producto, la cantidad como se
+   escribe en el idioma de la persona y el precio por unidad en la moneda del carrito) y la referencia
+   («Pedro · Bravas (ración) · 4 · 6,00 € · BRAVAS»). Si el carrito no se encuentra o lo dicho vale para
+   varios, la tarjeta no da el precio en ninguna moneda: la acción lo rechaza al confirmar.
 3. La línea queda guardada y los totales del carrito (ítems e importe) se recalculan.
 Entra: el carrito; referencia y nombre del producto (texto libre: no se comprueban contra el
 catálogo), SKU y atributos de variante (talla, color…) opcionales, cantidad mayor que cero y como mucho
@@ -359,11 +362,13 @@ Pasos:
    por su número.
 Entra: permiso «ver carritos» (el empleado lo tiene).
 Sale: listas de 50 filas (hasta 100 por petición). Cantidades con sus decimales, importes en la unidad
-menor de la moneda de la fila (los céntimos; el yen no tiene) con la moneda y sus decimales.
+menor de la moneda de la fila (los céntimos; el yen no tiene) con la moneda y sus decimales. Quien creó o
+cambió por última vez un carrito o un pedido sale por su nombre o, si su cuenta no tiene, por lo que va antes de
+la @ de su correo, nunca el correo entero, también en los de antes.
 Si falla: error de carga con «Reintentar»; sin permiso, «No tienes permiso»; un importe de Total que no
 se puede leer, lo que diría el campo de importe («Esto no es un importe. Escribe una cifra, por ejemplo
 12,50.», o las dos lecturas de «1.250») debajo de su caja, sin filtrar.
-Implicados: ninguno
+Implicados: BASE-F119
 
 ### CART_CHECKOUT-F13 Avisar a otras apps de lo que ocurre
 Estado: hecho
@@ -476,6 +481,11 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 
 - Modelos (`models.py`, PK UUIDv7): `Cart`, `CartItem`, `Order` y `OrderCounter` (último número por
   día). Importes en céntimos (`BigIntegerField`); cantidades `Decimal` con tres decimales, como `sale` e `inventory`.
+- **Quién actúa** (`created_by` y `updated_by` de carritos, líneas y pedidos) se guarda como lo lee un compañero:
+  `_actor` (`services.py`) nombra con `actor_name` de `base.queries.people`, la misma pieza que Caja, Mesas y Cocina:
+  el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega
+  a quien ve el contacto del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
+  `0004_actors_without_address`, en la base de datos de cada negocio.
 - **Borrar un carrito es lógico** (`deleted_at`): sus pedidos siguen apuntándole. La sesión es única
   solo entre carritos no borrados (restricción parcial de la base). Las líneas quitadas se borran de
   verdad.
@@ -525,7 +535,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   (`tests/e2e/qa/probes/owner-es-cart_checkout-2026-11-08.json`), nunca con los propios `asks`: cada una
   ofrece su herramienta, la de cambiar la cantidad antes que la ficha de producto, la de vaciar una cesta
   que sigue activa antes que borrarla o quitarle una línea y, con las que cambian o quitan una línea, una
-  lectura del carrito que da su id; el empleado solo recibe las seis lecturas.
+  lectura del carrito que da su id (la de cambiar la cantidad, por la búsqueda de las líneas de un carrito); el empleado solo recibe las seis lecturas.
 - Datos personales (CART_CHECKOUT-F14): `cart_checkout.customer.erase` vacía email, nombre, notas y
   motivo de abandono de los carritos con ese email (también los borrados) y email, direcciones, notas y
   motivo de fallo de sus pedidos, en una transacción con las filas bloqueadas; su aviso lleva los números,

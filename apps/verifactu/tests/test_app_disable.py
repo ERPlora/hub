@@ -20,7 +20,7 @@ from live.operations import get
 from apps.verifactu.models import Record
 from apps.verifactu.tests.conftest import HUB_DB, A, business_in, ctx_for, run
 from base import activation
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy import context
 from base.tenancy.tests import hubs
 

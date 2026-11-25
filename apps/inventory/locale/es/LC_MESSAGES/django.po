@@ -184,6 +184,9 @@ msgstr "activo"
 msgid "sold out"
 msgstr "agotado"
 
+msgid "show on website"
+msgstr "mostrar en la página web"
+
 msgid "product"
 msgstr "producto"
 
@@ -400,6 +403,10 @@ msgstr "SKU duplicado en el fichero"
 msgid "Unit of measure not recognized: %(text)s"
 msgstr "Unidad de medida no reconocida: %(text)s"
 
+#, python-format
+msgid "Product type not recognized: %(text)s"
+msgstr "Tipo de producto no reconocido: %(text)s"
+
 msgid "Quantity is not a number"
 msgstr "Cantidad no numérica"
 
@@ -459,6 +466,9 @@ msgstr "Categoría"
 msgid "Sold out"
 msgstr "Agotado"
 
+msgid "Show on website"
+msgstr "Mostrar en la página web"
+
 msgid "Initial stock"
 msgstr "Stock inicial"
 
@@ -485,3 +495,42 @@ msgstr "Imagen"
 #: apps.py:112
 msgid "Settings"
 msgstr "Ajustes"
+
+msgid "View products"
+msgstr "Ver productos"
+
+msgid "View categories"
+msgstr "Ver categorías"
+
+msgid "View stock and its movements"
+msgstr "Ver el stock y sus movimientos"
+
+msgid "Add products"
+msgstr "Dar de alta productos"
+
+msgid "Change products"
+msgstr "Cambiar productos"
+
+msgid "Delete products"
+msgstr "Eliminar productos"
+
+msgid "Create categories"
+msgstr "Crear categorías"
+
+msgid "Change categories"
+msgstr "Cambiar categorías"
+
+msgid "Delete categories"
+msgstr "Eliminar categorías"
+
+msgid "Import products"
+msgstr "Importar productos"
+
+msgid "Export products"
+msgstr "Exportar productos"
+
+msgid "Move stock: receive, count and write off"
+msgstr "Mover stock: recibir, contar y dar de baja"
+
+msgid "Change the settings"
+msgstr "Cambiar los ajustes"

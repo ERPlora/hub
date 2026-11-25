@@ -14,7 +14,9 @@ from apps.sale.queries.rows import held
 from apps.sale.schemas.lines import OpenLineFields
 from apps.sale.schemas.settings import DepartmentListIn, DepartmentPage, QuickNoteListIn, QuickNotePage
 from apps.tax.models import TaxCategory
-from apps.tax.queries import business_jurisdiction, business_today, category_by_reference, current_rates
+from apps.tax.queries.jurisdiction import business_jurisdiction, business_today
+from apps.tax.queries.naming import category_by_reference
+from apps.tax.queries.resolution import current_rates
 from base.ordering import list_order
 
 DEPARTMENT_NOT_FOUND = _(

@@ -33,13 +33,13 @@ class ScheduleConfig(LiveAppConfig):
     # A hair salon books inside its opening hours; a restaurant shows and keeps its own.
     verticals = ["hair_salon", "restaurant"]
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = [
-        "schedule.view",
-        "schedule.add",
-        "schedule.change",
-        "schedule.delete",
-        "schedule.manage_settings",
-    ]
+    permissions = {
+        "schedule.view": _("View the week, special days, changes and whether it is open"),
+        "schedule.add": _("Add special days and temporary changes"),
+        "schedule.change": _("Set and confirm the week, and correct special days and changes"),
+        "schedule.delete": _("Delete special days and temporary changes"),
+        "schedule.manage_settings": _("Change the settings"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["schedule.*"],
@@ -69,7 +69,8 @@ class ScheduleConfig(LiveAppConfig):
     ]
     # The Home's step «Confirm your opening hours», order 101 and recommended, done once a person confirmed the
     # default week or saved a day of it (the settings' ``hours_confirmed``), for whoever changes the hours, leading to
-    # the week. Refreshed on the only event that sets it.
+    # the week. Refreshed on the only event that sets it. Its texts name no day or hour: they stay on the list once the
+    # week is the business's own, and the assistant read the default week in them as the week the business has.
     setup = [
         SetupStep(
             key="hours",
@@ -77,9 +78,8 @@ class ScheduleConfig(LiveAppConfig):
             configured_when=[SetupCheck(field="hours_confirmed", truthy=True)],
             title=_("Confirm your opening hours"),
             description=_(
-                "We set up a default week for you (Monday to Friday, 09:00–18:00). If it matches your business, "
-                "confirm it in one tap; if not, edit the days that differ — bookings outside your opening hours are "
-                "refused."
+                "Check that the week's hours are your business's: if they are, confirm them in one tap; if not, edit "
+                "the days that differ — bookings outside your opening hours are refused."
             ),
             icon="ion:time-outline",
             route="/schedule/hours",
@@ -89,4 +89,13 @@ class ScheduleConfig(LiveAppConfig):
             refresh_on=[WEEK_UPDATED],
         )
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "50id_wAk79k", "en": "JXIPtMHdgpk"},
+        flow_videos={
+            "SCHEDULE-F02": {"es": ["v58AKat9mNQ"], "en": ["U78Ugos-G1A"]},
+            "SCHEDULE-F04": {"es": ["CPWUbFbBxA8"], "en": ["Orajt5aK6rU"]},
+            "SCHEDULE-F05": {"es": ["-ULk0OHUpfk"], "en": ["RxKp9XMuNQM"]},
+            "SCHEDULE-F06": {"es": ["CPWUbFbBxA8"], "en": ["Orajt5aK6rU"]},
+            "SCHEDULE-F13": {"es": ["CPWUbFbBxA8"], "en": ["Orajt5aK6rU"]},
+        },
+    )

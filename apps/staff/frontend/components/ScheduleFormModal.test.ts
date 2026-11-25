@@ -8,11 +8,12 @@
 // without working days on top of the week, a date under its field.
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import type { ScheduleOut, SettingsOut } from '../operations';
 import { click, ionChecked, ionValue, mountStaff, settle } from '../__tests__/mount-staff';
 import ScheduleFormModal from './ScheduleFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; type?: string; placeholder?: string; errorText?: string };
+type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; readonly?: boolean; required?: boolean; placeholder?: string; errorText?: string };
 
 const SUMMER: ScheduleOut = {
   id: 's1',
@@ -38,8 +39,10 @@ async function setup(schedule: ScheduleOut | null = null, locale: 'en' | 'es' = 
   await settle();
   const field = (name: string) => m.inDoc(`staff-schedule-form-${name}`) as Control;
   const day = (weekday: number, part: string) => m.inDoc(`staff-schedule-form-day-${weekday}-${part}`) as Control;
+  /** What an hour of a day holds (`HH:MM`); `null` when the day shows no such field. */
+  const hour = (weekday: number, part: string) => (day(weekday, part) ? picked(day(weekday, part)) : null);
   const save = () => m.inDoc('staff-schedule-form-submit') as Control;
-  return { ...m, field, day, save };
+  return { ...m, field, day, hour, save };
 }
 
 describe('ScheduleFormModal: New (STAFF-F13)', () => {
@@ -47,20 +50,20 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
     const s = await setup();
     expect(s.params('staff.settings.get')).toEqual([{}]);
     expect(s.inDoc('staff-schedule-form')?.getAttribute('aria-label')).toBe('New');
-    expect([s.field('name').label, s.field('name').placeholder, s.field('effective_from').type, s.field('effective_until').label, s.field('is_default').checked]).toEqual([
+    expect([s.field('name').label, s.field('name').placeholder, s.field('effective_from').readonly, s.field('effective_until').label, s.field('is_default').checked]).toEqual([
       'Schedule',
       'Schedule name',
-      'date',
+      true,
       'Effective until',
       true,
     ]);
     const week = [0, 1, 2, 3, 4, 5, 6].map((d) => [
       s.day(d, 'working').textContent?.trim(),
       s.day(d, 'working').checked,
-      s.day(d, 'start')?.value ?? null,
-      s.day(d, 'end')?.value ?? null,
-      s.day(d, 'break_start')?.value ?? null,
-      s.day(d, 'break_end')?.value ?? null,
+      s.hour(d, 'start'),
+      s.hour(d, 'end'),
+      s.hour(d, 'break_start'),
+      s.hour(d, 'break_end'),
     ]);
     expect(week).toEqual([
       ['Monday', true, '09:00', '18:00', '13:00', '14:00'],
@@ -72,15 +75,17 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
       ['Sunday', false, null, null, null, null],
     ]);
     expect(s.day(5, 'off').textContent?.trim()).toBe('Off');
-    expect([s.day(0, 'start').type, s.day(0, 'break_start').label]).toEqual(['time', 'Break start']);
+    expect([s.day(0, 'start').readonly, s.day(0, 'break_start').label]).toEqual([true, 'Break start']);
+    // A working day needs its start and end; its break may be cleared.
+    expect(['start', 'end', 'break_start', 'break_end'].map((part) => s.day(0, part).required)).toEqual([true, true, false, false]);
     expect(s.save().textContent?.trim()).toBe('Create schedule');
   });
 
   it('proposes the business’s working day from Staff › Settings, its break in the middle of the day, and sends it', async () => {
     const s = await setup(null, 'en', true, EARLY);
-    const monday = ['start', 'end', 'break_start', 'break_end'].map((part) => s.day(0, part).value);
+    const monday = ['start', 'end', 'break_start', 'break_end'].map((part) => s.hour(0, part));
     expect(monday).toEqual(['08:00', '16:00', '11:45', '12:15']);
-    expect([1, 2, 3, 4].map((d) => s.day(d, 'start').value)).toEqual(['08:00', '08:00', '08:00', '08:00']);
+    expect([1, 2, 3, 4].map((d) => s.hour(d, 'start'))).toEqual(['08:00', '08:00', '08:00', '08:00']);
     s.answer(201, SUMMER);
     await click(s.save());
     const sent = (s.sent()[0].body as { days: unknown[] }).days;
@@ -99,10 +104,10 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
     s.answer(201, SUMMER);
     await ionValue(s.field('name'), 'Winter', 'ionInput');
     await ionChecked(s.day(1, 'working'), false);
-    await ionValue(s.day(0, 'break_start'), '13:00', 'ionInput');
-    await ionValue(s.day(0, 'break_end'), '14:00', 'ionInput');
+    await pick(s.day(0, 'break_start'), '13:00');
+    await pick(s.day(0, 'break_end'), '14:00');
     await ionChecked(s.day(5, 'working'), true);
-    await ionValue(s.day(5, 'end'), '14:00', 'ionInput');
+    await pick(s.day(5, 'end'), '14:00');
     await click(s.save());
     const day = (weekday: number, end = '18:00', pause: [string | null, string | null] = [null, null]) => ({
       weekday,
@@ -160,7 +165,7 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
 
     it.each([
       ['ticking a day', (s: Awaited<ReturnType<typeof refusedWeek>>) => ionChecked(s.day(6, 'working'), true)],
-      ['typing a working day’s start', (s: Awaited<ReturnType<typeof refusedWeek>>) => ionValue(s.day(1, 'start'), '08:30', 'ionInput')],
+      ['picking a working day’s start', (s: Awaited<ReturnType<typeof refusedWeek>>) => pick(s.day(1, 'start'), '08:30')],
     ])('%s', async (_, change) => {
       const s = await refusedWeek();
       expect(s.inDoc('staff-schedule-form-week-error')?.textContent).toContain(NO_DAYS);
@@ -201,9 +206,9 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
     }
 
     it.each([
-      ['typing the refused hour', (s: Awaited<ReturnType<typeof refusedDays>>) => typeIn(s.day(2, 'end'), '19:00')],
-      ['typing another of its hours', (s: Awaited<ReturnType<typeof refusedDays>>) => typeIn(s.day(2, 'start'), '08:00')],
-      ['typing its break', (s: Awaited<ReturnType<typeof refusedDays>>) => typeIn(s.day(2, 'break_end'), '14:30')],
+      ['picking the refused hour', (s: Awaited<ReturnType<typeof refusedDays>>) => pick(s.day(2, 'end'), '19:00')],
+      ['picking another of its hours', (s: Awaited<ReturnType<typeof refusedDays>>) => pick(s.day(2, 'start'), '08:00')],
+      ['picking its break', (s: Awaited<ReturnType<typeof refusedDays>>) => pick(s.day(2, 'break_end'), '14:30')],
       ['unticking it', (s: Awaited<ReturnType<typeof refusedDays>>) => ionChecked(s.day(2, 'working'), false)],
     ])('%s', async (_, change) => {
       const s = await refusedDays();
@@ -216,7 +221,7 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
     it('a change to another day, or to a field off the week, leaves it', async () => {
       const s = await refusedDays();
       await ionChecked(s.day(0, 'working'), true);
-      await typeIn(s.day(4, 'end'), '17:00');
+      await pick(s.day(4, 'end'), '17:00');
       await typeIn(s.field('name'), 'Winter');
       expect([reason(s, 0), reason(s, 2), reason(s, 3), reason(s, 4)]).toEqual([null, ORDER, PAIR, null]);
     });
@@ -224,13 +229,13 @@ describe('ScheduleFormModal: New (STAFF-F13)', () => {
     it('a day refused for two things says the first, and a change to it takes the day’s line away whole', async () => {
       const s = await refusedDays({ 'days.1.break_end': INSIDE, 'days.1.end_time': ORDER });
       expect(reason(s, 2)).toBe(INSIDE);
-      await typeIn(s.day(2, 'break_start'), '13:30');
+      await pick(s.day(2, 'break_start'), '13:30');
       expect(reason(s, 2)).toBeNull();
     });
 
     it('a new try names the days by what it sends', async () => {
       const s = await refusedDays();
-      await typeIn(s.day(2, 'end'), '19:00');
+      await pick(s.day(2, 'end'), '19:00');
       // Tuesday left out too: Wednesday is now the first day sent.
       await ionChecked(s.day(1, 'working'), false);
       s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { 'days.0.end_time': ORDER } } });
@@ -244,7 +249,7 @@ describe('ScheduleFormModal: Edit · {name} (STAFF-F14)', () => {
   it('fills the schedule and its week, and replaces the week with staff.schedule.update', async () => {
     const s = await setup(SUMMER);
     expect(s.inDoc('staff-schedule-form')?.getAttribute('aria-label')).toBe('Edit · Summer');
-    expect([s.field('name').value, s.field('effective_from').value, s.field('is_default').checked, s.day(1, 'start').value, s.day(0, 'working').checked]).toEqual([
+    expect([s.field('name').value, picked(s.field('effective_from')), s.field('is_default').checked, s.hour(1, 'start'), s.day(0, 'working').checked]).toEqual([
       'Summer',
       '2026-06-01',
       false,
@@ -253,7 +258,7 @@ describe('ScheduleFormModal: Edit · {name} (STAFF-F14)', () => {
     ]);
     expect(s.save().textContent?.trim()).toBe('Save');
     s.answer(200, SUMMER);
-    await ionValue(s.field('effective_until'), '', 'ionInput');
+    await pick(s.field('effective_until'), '');
     await click(s.save());
     expect(s.sent()[0]).toEqual({
       method: 'POST',

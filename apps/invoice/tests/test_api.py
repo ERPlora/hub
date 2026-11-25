@@ -16,10 +16,14 @@ from config.api import api
 
 ROUTES = {
     ("GET", "/invoice/invoices", "invoice.invoice.list"),
+    ("GET", "/invoice/invoices/export", "invoice.invoice.export"),
     ("GET", "/invoice/invoices/detail", "invoice.invoice.get"),
     ("GET", "/invoice/invoices/by_source", "invoice.invoice.by_source"),
     ("GET", "/invoice/invoices/document", "invoice.invoice.document"),
+    ("GET", "/invoice/invoices/pdf", "invoice.invoice.pdf"),
     ("POST", "/invoice/invoices/print", "invoice.invoice.print"),
+    ("GET", "/invoice/emails", "invoice.email.list"),
+    ("POST", "/invoice/emails/send", "invoice.email.send"),
     ("GET", "/invoice/invoices/line_defaults", "invoice.invoice.line_defaults"),
     ("POST", "/invoice/invoices", "invoice.invoice.create"),
     ("POST", "/invoice/invoices/from_sale", "invoice.invoice.create_from_sale"),

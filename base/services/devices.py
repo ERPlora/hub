@@ -16,7 +16,9 @@ from live.outbox import record_event
 
 from base import access, events, queries
 from base.session_host import session_host
-from base.models import AccessSettings, Credential, Membership, SessionOwner, TrustedDevice
+from base.models.access import AccessSettings, Credential, TrustedDevice
+from base.models import Membership
+from base.models.sessions import SessionOwner
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.devices import (
     DeviceByIdIn,
@@ -151,7 +153,7 @@ def badge_owner(slug: str, raw: str):
     if credential is None:
         return None, digest
     membership = (
-        Membership.objects.filter(host=slug, user__username=credential.username, user__is_active=True)
+        Membership.objects.team(slug).filter(user__username=credential.username)
         .select_related("user")
         .first()
     )
@@ -263,6 +265,8 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
             "device.list identifies the device, use this to close its access; listing alone changes nothing."
         ),
         risk="high",
+        # Two devices without a name read the same («Chrome · Linux»): their last use tells them apart.
+        preview={"operation": "base.device.detail", "fields": ["last_entry_at"]},
         asks={
             "en": (
                 "we lost the terrace tablet, remove it",
@@ -297,6 +301,7 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     ai=AI(
         description="Removes at once the devices of the hub nobody used in 30 days, never the one in hand.",
         risk="high",
+        preview={"operation": "base.device.unused", "fields": ["count", "devices"]},
         asks={
             "en": (
                 "clean out the devices nobody has used in 30 days",

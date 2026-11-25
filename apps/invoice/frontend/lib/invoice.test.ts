@@ -10,8 +10,9 @@ import {
   isSimplified,
   missingTaxId,
   rateHeader,
+  shownStatus,
   SOURCE_CODES,
-  STATUS_CODES,
+  STATUS_FILTERS,
   statusTone,
   taxRows,
   TYPE_CODES,
@@ -51,14 +52,22 @@ describe('rateHeader', () => {
 describe('the closed lists the server knows', () => {
   it('names every type, status and source', () => {
     expect(TYPE_CODES).toEqual(['F1', 'F2', 'F3', 'R1', 'R2', 'R3', 'R4', 'R5']);
-    expect(STATUS_CODES).toEqual(['issued', 'paid', 'cancelled']);
+    expect(STATUS_FILTERS).toEqual(['issued', 'overdue', 'paid', 'cancelled']);
     expect(SOURCE_CODES).toEqual(['sale', 'manual', 'substitution', 'rectification', 'refund', 'void']);
   });
 });
 
 describe('statusTone', () => {
-  it('issued in progress, paid done, cancelled blocked', () => {
-    expect([statusTone('issued'), statusTone('paid'), statusTone('cancelled')]).toEqual(['info', 'success', 'danger']);
+  it('issued in progress, overdue needs attention, paid done, cancelled blocked', () => {
+    expect(STATUS_FILTERS.map(statusTone)).toEqual(['info', 'warning', 'success', 'danger']);
+  });
+});
+
+describe('shownStatus', () => {
+  it('an overdue invoice says so instead of issued; any other, its status', () => {
+    expect(shownStatus({ status: 'issued', overdue: true })).toBe('overdue');
+    expect(shownStatus({ status: 'issued', overdue: false })).toBe('issued');
+    expect(shownStatus({ status: 'paid', overdue: false })).toBe('paid');
   });
 });
 

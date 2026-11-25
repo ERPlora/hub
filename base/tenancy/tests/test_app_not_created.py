@@ -29,7 +29,10 @@ from base import activation, relay
 from base.services import relay_runs
 from base.activation import ON
 from base.middleware import HubDatabaseMiddleware
-from base.models import AppActivation, EventDelivery, HubUser, TaskSchedule
+from base.models.activation import AppActivation
+from base.models.relay import EventDelivery
+from base.models import HubUser
+from base.models.scheduler import TaskSchedule
 from base.tenancy import migrator, offboarding
 from base.tenancy.context import AppNotCreated, use_hub
 from base.tenancy.router import TenantRouter
@@ -44,7 +47,7 @@ from base.tests.test_worker_activations import (  # noqa: F401 (fixtures)
     run_pass,
     turn_on,
 )
-from control.models import Hub
+from control.models.hubs import Hub
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
@@ -55,8 +58,8 @@ router = TenantRouter()
 def two_businesses(business):  # noqa: F811
     """A, with Printing's tables, and B, with the platform's alone: rows as the migrator left them."""
     with_it, without_it = business("with-printing"), business("without-printing")
-    migrator.ensure_schema(with_it, add=[APP])
-    migrator.ensure_schema(without_it)
+    migrator.schema.ensure_schema(with_it, add=[APP])
+    migrator.schema.ensure_schema(without_it)
     return fresh(with_it), fresh(without_it)
 
 
@@ -191,7 +194,7 @@ def test_an_app_just_created_is_served_to_a_context_that_held_the_business_from_
     with use_hub(held):
         assert_refused()
 
-    migrator.ensure_schema(fresh(without_it), add=[APP])
+    migrator.schema.ensure_schema(fresh(without_it), add=[APP])
 
     assert APP not in held.schema_apps
     with use_hub(held):
@@ -213,7 +216,7 @@ def test_forgetting_a_business_s_apps_forgets_what_it_has_created_too(two_busine
 
 def test_turned_on_the_worker_makes_its_tables_and_its_models_answer(business):  # noqa: F811
     hub = business("turned-on")
-    migrator.ensure_schema(hub)
+    migrator.schema.ensure_schema(hub)
     held = fresh(hub)
     with use_hub(held):
         assert_refused()
@@ -236,7 +239,7 @@ def test_the_migrator_makes_tables_and_runs_their_migrations_from_inside_the_bus
 
     with use_hub(without_it):
         assert_refused(TaxCategory)
-        migrator.ensure_schema(without_it, add=["tax"])
+        migrator.schema.ensure_schema(without_it, add=["tax"])
 
         assert TaxCategory.objects.count() > 0
 
@@ -266,7 +269,7 @@ def test_a_hub_s_object_on_its_alias_is_refused_and_one_on_the_migrator_s_alias_
 
 
 def test_a_business_the_migrator_never_confirmed_is_not_refused_and_costs_no_call(two_businesses, monkeypatch):
-    """``schema_apps`` empty (never confirmed: ``migrator.is_behind``) says nothing of what its database has: the next
+    """``schema_apps`` empty (never confirmed: ``migrator.hubs_pass.is_behind``) says nothing of what its database has: the next
     ``migrate_hubs`` confirms it; meanwhile a business with its tables is not refused them, nor pays for asking."""
     with_it, _ = two_businesses
     Hub.objects.filter(pk=with_it.pk).update(schema_apps={})
@@ -282,7 +285,7 @@ def test_a_business_the_migrator_never_confirmed_is_not_refused_and_costs_no_cal
 def test_a_row_read_again_that_was_never_confirmed_is_not_refused_either(two_businesses):
     with_it, _ = two_businesses
     held = fresh(with_it)
-    held.schema_apps = {label: "0001_initial" for label in migrator.platform_apps()}
+    held.schema_apps = {label: "0001_initial" for label in migrator.app_sets.platform_apps()}
     Hub.objects.filter(pk=with_it.pk).update(schema_apps={})
 
     with use_hub(held):
@@ -357,7 +360,7 @@ def test_at_a_business_s_baja_an_app_it_lacks_has_no_documents_to_keep(two_busin
 
 
 def platform_only() -> dict[str, str]:
-    return {label: "0001_initial" for label in migrator.platform_apps()}
+    return {label: "0001_initial" for label in migrator.app_sets.platform_apps()}
 
 
 def admin_on(client, hub) -> None:

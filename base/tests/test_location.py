@@ -24,7 +24,7 @@ from live.live_registry import live_registry
 from live.operations import atomic, get
 
 from base.admin import LocationAdmin
-from base.models import DEFAULT_LOCATION_NAME, Location
+from base.models.locations import DEFAULT_LOCATION_NAME, Location
 from base.schemas.business import LocationListIn
 from base.tenancy import context, inventory
 from base.tenancy.tests.business import A, HOST, HUB_DB, in_business_a

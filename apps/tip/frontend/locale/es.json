@@ -1,0 +1,15 @@
+{
+  "tip": {
+    "step": {
+      "title": "Propina",
+      "label": "Propina",
+      "none": "Sin propina",
+      "custom": "Otra cantidad",
+      "amount": "Importe de la propina",
+      "loading": "Cargando las propinas…",
+      "retry": "Reintentar",
+      "invalid": "Escribe la propina como un importe.",
+      "notSaved": "La venta está cobrada, pero la propina no se ha guardado."
+    }
+  }
+}

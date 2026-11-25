@@ -13,10 +13,11 @@ from live.errors import Conflict
 from live.operations import AI, registry
 
 from apps.customer.models import Customer
-from apps.customer.schemas import MergeIn
+from apps.customer.schemas.merging import MergeIn
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import assert_its_asks_bring, offered_to
+from base.tests.test_assistant_asks import assert_its_asks_bring, assert_its_words_name, assert_offered_or_found
+from base.tests.test_assistant_asks import offered_to
 from base.tests.test_assistant_asks import english_words_test, said_in_spanish_too_test
 
 from .conftest import HUB_DB, ctx_for, in_hubs
@@ -218,3 +219,103 @@ def test_a_merge_whose_survivor_fits_two_cards_leaves_it_out_of_the_card_and_mer
     assert excinfo.value.code == "customer.customer_ambiguous"
     duplicate.refresh_from_db()
     assert duplicate.merged_into_id is None
+
+
+LINK = "customer.order.link"
+#: A customer put on an open check, in the owner's words, with the search the model makes for it when the turn does not
+#: offer the link: the Spanish one and its search are the QA's (hub#2325), which got «I can't do that».
+CHECK_SAID_TO_BE_A_CUSTOMERS = [
+    ("es", "La cuenta de la mesa 4 es de Lucía QA, ponla a su nombre.", "assign customer to an open check of a table"),
+    ("en", "set the customer on table 4's check to Lucía", "assign the customer of an open check"),
+]
+#: What the model searches for when the turn lacks the link, found with room to spare (``WITH_ROOM``): «assign» is the
+#: till's own word («Assign customer»).
+SEARCHES_FOR_A_CUSTOMER_ON_A_CHECK = [
+    ("es", "assign customer to an open check of a table"),
+    ("en", "assign customer to an open check of a table"),
+    ("en", "assign the customer of an open check"),
+    ("es", "asignar un cliente a la cuenta de una mesa"),
+    ("es", "asignar cliente a una cuenta abierta"),
+]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "phrase", "search"), CHECK_SAID_TO_BE_A_CUSTOMERS)
+def test_a_check_said_to_be_a_customers_reaches_the_link(catalog_of, language, phrase, search):
+    assert_offered_or_found(catalog_of(Membership.Role.OWNER, language), LINK, phrase, search, language)
+
+
+@HUB_DB
+def test_the_turn_itself_offers_the_link_for_a_customer_set_on_a_check(catalog_of):
+    """The English words need no search; the QA's Spanish ones bring the link past the places of a turn, and the search
+    the model made for them finds it."""
+    language, phrase, _ = CHECK_SAID_TO_BE_A_CUSTOMERS[1]
+    offered = offered_to(catalog_of(Membership.Role.OWNER, language), phrase, language)
+    assert LINK in offered, offered
+
+
+@HUB_DB
+def test_the_qas_words_keep_offering_the_write_that_names_the_check(catalog_of):
+    """«ponla a su nombre» may also mean the check's own name: the words that bring the link take no place from it."""
+    language, phrase, _ = CHECK_SAID_TO_BE_A_CUSTOMERS[0]
+    offered = offered_to(catalog_of(Membership.Role.OWNER, language), phrase, language)
+    assert offered[len(assistant.relevance.ALWAYS)] == "sale.order.set_label", offered
+
+
+def test_the_link_tells_the_model_it_puts_the_check_in_the_customers_name():
+    """With the write that names the check offered beside it, what tells the model which one «ponla a su nombre» asks for
+    is the link's description."""
+    assert "in the customer's name" in shared.description(registry[LINK])
+
+
+@HUB_DB
+@pytest.mark.parametrize(("language", "search"), SEARCHES_FOR_A_CUSTOMER_ON_A_CHECK)
+def test_searching_for_a_customer_on_a_check_finds_the_link(catalog_of, language, search):
+    found = [op.name for op in assistant.relevance.found(catalog_of(Membership.Role.OWNER, language), search, language)]
+    assert LINK in found[:WITH_ROOM], found
+
+
+#: Opening a new check in a customer's name: the open comes first, as before the words of a customer put on a check.
+NEW_CHECK_IN_A_CUSTOMERS_NAME = [
+    ("es", "abre una cuenta nueva a nombre de Lucía QA en la mesa 5"),
+    ("en", "open a new check for a customer"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize(("language", "phrase"), NEW_CHECK_IN_A_CUSTOMERS_NAME)
+def test_opening_a_new_check_in_a_customers_name_still_offers_the_open_first(catalog_of, language, phrase):
+    tools = catalog_of(Membership.Role.OWNER, language)
+    assert offered_to(tools, phrase, language)[len(assistant.relevance.ALWAYS)] == "sale.order.open"
+    assert assistant.relevance.found(tools, phrase, language)[0].name == "sale.order.open"
+
+
+def test_customers_words_name_a_customer_put_on_a_check():
+    assert_its_words_name(
+        "customer",
+        [
+            ("ponla a su nombre", "link"),
+            ("pon la cuenta a su nombre", "link"),
+            ("asignar cliente a una cuenta abierta", "link"),
+            ("asigna cliente a la cuenta", "link"),
+            ("asignar un cliente a la cuenta", "link"),
+            ("asigna un cliente a esta cuenta", "link"),
+            ("asignar el cliente de la cuenta", "link"),
+            ("asigna el cliente a la mesa 4", "link"),
+            ("poner un cliente en una cuenta abierta", "link"),
+            ("pon un cliente en esta cuenta", "link"),
+            ("poner el cliente en la cuenta", "link"),
+            ("pon el cliente en la cuenta de la mesa 4", "link"),
+            ("enlaza a Ana con la cuenta", "link"),
+            ("enlazar un cliente con la cuenta", "link"),
+            ("assign customer to this check", "link"),
+            ("assign a customer to the check", "link"),
+            ("assign the customer of this check", "link"),
+            ("set the customer of this tab", "link"),
+            ("set a customer on the check", "link"),
+            ("set customer on open check", "link"),
+            ("the check is in her name", "link"),
+            ("put the tab in his name", "link"),
+            ("put this check in their name", "link"),
+        ],
+    )

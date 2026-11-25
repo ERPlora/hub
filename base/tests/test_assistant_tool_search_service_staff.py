@@ -1,9 +1,9 @@
 """Phrases about the till, the kitchen, the reservations, the clock-ins, the services and the customer cards that the
 assistant once left without the tool they asked for, or offered it far down.
 
-Each one reaches its tool now: either among the forty tools a turn offers for the phrase's own words, or once the model
-searches the person's whole catalogue for the task (``base.assistant.find_tools``) and the next step offers what it
-found.
+Each one reaches its tool now: either among the fifteen tools a turn offers for the phrase's own words, or once the
+model searches the person's whole catalogue for the task (``base.assistant.find_tools``) and the next step offers what
+it found.
 """
 
 import pytest
@@ -29,17 +29,9 @@ CLOCK_IN = "attendance.record.clock_in"
 CLOCK_OUT = "attendance.record.clock_out"
 UNASSIGN = "service.assignment.remove"
 
-#: The tools a phrase's own words already bring into the forty a turn offers.
+#: The tools a phrase's own words already bring into the fifteen a turn offers.
 OFFERED = [
-    pytest.param("es", "no me deja cerrar la caja sin contar, ni abrirla puedo", (OPEN, CLOSE), id="live-108-open"),
-    pytest.param("es", "intento cerrar la caja sin contar, ni abrirla puedo", (OPEN,), id="live-108-trying"),
-    pytest.param(
-        "es",
-        "la impresora imprime sin logo ni cambiar el formato me deja",
-        ("printing.settings.update",),
-        id="live-108-printer",
-    ),
-    pytest.param("es", "la app se abre sin datos ni cerrar la sesión me deja", (CLOSE,), id="live-108-app"),
+    pytest.param("es", "no me deja cerrar la caja sin contar, ni abrirla puedo", (CLOSE,), id="live-108-open"),
     pytest.param("es", "cierra la caja sin dar de baja a Ana", (CLOSE,), id="live-111"),
     pytest.param("es", "anota su correo nuevo en la ficha de Marta", (CUSTOMER,), id="live-112"),
     pytest.param("es", "anota en la ficha de Marta su correo nuevo", (CUSTOMER,), id="live-112-card-first"),
@@ -55,9 +47,22 @@ OFFERED = [
 
 #: What a phrase's own words leave out, and the task the model searches for then, in English and in Spanish.
 CLOSE_THE_TILL = ("close the cash register", "cerrar la caja")
+OPEN_THE_TILL = ("open the cash register", "abrir la caja")
 CLOCK_SOMEONE_IN = ("clock in an employee", "fichar la entrada de un empleado")
 TAKE_OFF_A_SERVICE = ("remove a professional from a service", "quitar a una profesional de un servicio")
 SEARCHED = [
+    pytest.param("es", "no me deja cerrar la caja sin contar, ni abrirla puedo", OPEN_THE_TILL, OPEN, id="live-108-open"),
+    pytest.param("es", "intento cerrar la caja sin contar, ni abrirla puedo", OPEN_THE_TILL, OPEN, id="live-108-trying"),
+    pytest.param(
+        "es",
+        "la impresora imprime sin logo ni cambiar el formato me deja",
+        ("change the printing settings", "cambiar los ajustes de impresión"),
+        "printing.settings.update",
+        id="live-108-printer",
+    ),
+    pytest.param(
+        "es", "la app se abre sin datos ni cerrar la sesión me deja", CLOSE_THE_TILL, CLOSE, id="live-108-app"
+    ),
     pytest.param(
         "es",
         "la caja muestra un descuadre sin cobrar ninguna mesa, ni cerrarla me deja",

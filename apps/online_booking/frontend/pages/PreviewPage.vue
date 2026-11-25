@@ -5,7 +5,7 @@
 // paints it. It is the public booking page itself when that page gives it base's public door (`PUBLIC_DOOR`: the
 // calls, the money and the customer's words); without it, the team's preview on the dev server (routes.ts; WORKBOOK
 // «Vista previa de la reserva»), through the session.
-import { EmptyState, InlineFeedback, useRefusal } from '@erplora/ui/components';
+import { DateField, EmptyState, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
@@ -16,6 +16,7 @@ import { formatMoney, useBusinessMoney } from '../../../appointment/frontend/lib
 import BookingResult from '../components/BookingResult.vue';
 import PublicBookingHeader from '../components/PublicBookingHeader.vue';
 import PublicBookingSubmit from '../components/PublicBookingSubmit.vue';
+import { useCancelByLink } from '../composables/useCancelByLink';
 import { useLocale, useT } from '../composables/useT';
 import { PUBLIC_DOOR } from '../lib/door';
 import type {
@@ -166,18 +167,22 @@ const seen = ref<PublicBookingOut | null>(null);
 const linkError = ref<ApiError | null>(null);
 const linkPending = ref(false);
 
-async function byLink(op: 'online_booking.public.booking' | 'online_booking.public.cancel'): Promise<void> {
+async function see(): Promise<void> {
   if (!booked.value) return;
   linkPending.value = true;
   linkError.value = null;
   try {
-    seen.value = await api.call(op, { token: booked.value.token });
+    seen.value = await api.call('online_booking.public.booking', { token: booked.value.token });
   } catch (failure) {
     linkError.value = asError(failure);
   } finally {
     linkPending.value = false;
   }
 }
+
+const { pending: cancelling, error: cancelError, cancel } = useCancelByLink(api, () => booked.value?.token ?? '', (booking) => {
+  seen.value = booking;
+});
 
 function again(): void {
   booked.value = null;
@@ -289,15 +294,11 @@ const text = (value: unknown): string => (value === null || value === undefined 
               </ion-select-option>
             </ion-select>
 
-            <ion-input
-              data-testid="ob-preview-day"
-              type="date"
-              :value="day"
+            <DateField
+              v-model="day"
+              testid="ob-preview-day"
               :label="$t('online_booking.preview.day')"
-              label-placement="floating"
-              fill="outline"
-              mode="md"
-              @ion-change="day = text($event.detail.value); changed('start')"
+              @update:model-value="changed('start')"
             />
 
             <template v-if="chosen.length && day">
@@ -420,9 +421,12 @@ const text = (value: unknown): string => (value === null || value === undefined 
           :booked="booked"
           :link="bookedLink"
           :seen="seen"
-          :pending="linkPending"
+          :pending="linkPending || cancelling"
           :error="linkError?.message ?? ''"
-          @action="byLink"
+          :token="booked.token"
+          :cancel-error="cancelError"
+          @view="see"
+          @cancel="cancel"
           @again="again"
         />
       </section>

@@ -5,9 +5,11 @@
 // Customer, Customer tax ID, Address, Issuer, Source, Sale, Rectifies / Replaces / Replaced by / Rectifying
 // invoices (each opens), Paid on and Notes (a rectifying invoice's note says what it rectifies and why, in
 // the reader's language); the lines, the breakdown and the totals; «Mark as paid», «Rectify» and «Full
-// invoice» where they apply and for whoever may, a refusal said right above them. «Print / PDF» asks the
+// invoice» where they apply and for whoever may, a refusal said right above them. «Download PDF» saves the
+// server's PDF of its A4. «Send by email» mails it, and the page says to whom and when each email went, and why the
+// last one did not (`invoice.email.list`, live). «Print / PDF» asks the
 // printing queue first (`invoice.invoice.print`, PRINTING-F08): queued for the system printer, a toast names
-// it; not queued (Printing off, no system printer) or the queue out of reach, the device prints the A4 paper (the
+// it; refused (Printing off, no system printer) or the queue out of reach, the device prints the A4 paper (the
 // browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why), and a document of a
 // sale is a copy: its original was the till's paper. With VeriFactu on and its records
 // readable, it follows the invoice's record too (`verifactu.record.by_invoice`, VERIFACTU-F19, by name: Invoicing
@@ -15,13 +17,15 @@
 // paper, which waits for it and is never printed without it (a record it cannot read prints nothing). It follows
 // `invoice.invoice.get` live: a payment or a rectification made elsewhere shows by itself.
 import { formatDateTime, InlineFeedback, StatusPill } from '@erplora/ui/components';
-import { useCommand, useLive } from '@erplora/ui/sdk';
+import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import FiscalRecordFollower, { type FiscalRecordState } from '../../../sale/frontend/components/document/FiscalRecordFollower.vue';
+import ExportButton from '../../../../base/frontend/components/ExportButton.vue';
+import { base64ToBlob } from '../../../../base/frontend/lib/data';
 import { printRefusal, withReason } from '../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../../sale/frontend/lib/print';
 import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
@@ -29,17 +33,21 @@ import InvoicePaper from '../components/InvoicePaper.vue';
 import InvoiceTotals from '../components/InvoiceTotals.vue';
 import PageNotices from '../components/PageNotices.vue';
 import RectifyModal from '../components/RectifyModal.vue';
+import SendEmailModal from '../components/SendEmailModal.vue';
 import SubstituteModal from '../components/SubstituteModal.vue';
 import VerifactuReceipt from '../components/VerifactuReceipt.vue';
 import { useMarkPaid } from '../composables/useMarkPaid';
 import { useLocale, useT } from '../composables/useT';
+import { emailLine, lastFailure } from '../lib/emails';
 import { formatDate, moneyOf } from '../lib/format';
-import { documentNote, missingTaxId, statusTone } from '../lib/invoice';
+import { documentNote, missingTaxId, shownStatus, statusTone } from '../lib/invoice';
 import type { InvoiceLinkOut, InvoiceOut } from '../operations';
+import '../operations/emails';
 
 const props = defineProps<{ id: string }>();
 
 const router = useRouter();
+const client = useLiveClient();
 const session = useSession();
 const canAdd = computed(() => session.can('invoice.add_invoice'));
 const canRectify = computed(() => session.can('invoice.rectify_invoice'));
@@ -59,7 +67,7 @@ const loadError = computed(() => {
 const fields = computed(() => {
   const doc = invoice.value;
   if (!doc) return [];
-  const issuer = doc.issuer_tax_id ? `${doc.issuer_name} (${doc.issuer_tax_id})` : doc.issuer_name;
+  const issuer = doc.issuer_vat_number ? `${doc.issuer_name} (${doc.issuer_vat_number})` : doc.issuer_name;
   const rows: { key: string; label: string; value: string }[] = [
     { key: 'type', label: t('invoice.detail.fields.type'), value: t(`invoice.typeNames.${doc.invoice_type}`) },
     { key: 'series', label: t('invoice.detail.fields.series'), value: doc.series_code },
@@ -68,6 +76,7 @@ const fields = computed(() => {
   if (doc.operation_date && doc.operation_date !== doc.issue_date) {
     rows.push({ key: 'operation-date', label: t('invoice.detail.fields.operationDate'), value: formatDate(doc.operation_date, locale.value) });
   }
+  if (doc.due_date) rows.push({ key: 'due-date', label: t('invoice.detail.fields.dueDate'), value: formatDate(doc.due_date, locale.value) });
   rows.push(
     { key: 'customer', label: t('invoice.detail.fields.customer'), value: doc.customer_name || '—' },
     { key: 'customer-tax-id', label: t('invoice.detail.fields.customerTaxId'), value: doc.customer_tax_id || '—' },
@@ -89,6 +98,14 @@ const links = computed(() => {
   if (doc.rectifications.length) out.push({ key: 'rectifications', label: t('invoice.detail.fields.rectifications'), items: doc.rectifications });
   return out;
 });
+
+const { data: mail } = useLive('invoice.email.list', () => ({ invoice_id: props.id }));
+const emails = computed(() => mail.value?.emails ?? []);
+const emailed = computed(() =>
+  emails.value.map((email) => ({ id: email.id, text: emailLine(email, t, (moment) => formatDateTime(moment, locale.value)) })),
+);
+/** The last email, when it did not leave: it stays said until another leaves. */
+const unsent = computed(() => lastFailure(emails.value));
 
 const note = computed(() => (invoice.value ? documentNote(invoice.value, t) : ''));
 
@@ -116,6 +133,7 @@ function go(link: InvoiceLinkOut): void {
 // ── Actions ──────────────────────────────────────────────────────────────────────────────────────
 const paid = useMarkPaid();
 const rectifyOpen = shallowRef(false);
+const emailOpen = shallowRef(false);
 const substituteOpen = shallowRef(false);
 const paper = shallowRef<{ $el: HTMLElement } | null>(null);
 
@@ -148,13 +166,18 @@ async function print(): Promise<void> {
 async function queued(): Promise<boolean> {
   try {
     const sent = await queue.run({ invoice_id: props.id, duplicate: duplicate.value });
-    if (!sent.queued) return false;
-    toastSuccess(t('invoice.detail.queued', { printer: sent.printer ?? '' }));
+    toastSuccess(t('invoice.detail.queued', { printer: sent.printer }));
     return true;
   } catch {
-    // The queue could not be asked: the screen's paper still prints.
+    // No printer took it, or the queue could not be asked: the screen's paper still prints.
     return false;
   }
+}
+
+/** The PDF of its A4, as the server prints it (INVOICE-F25). */
+async function pdfFile(): Promise<{ filename: string; blob: Blob }> {
+  const file = await client.api.call('invoice.invoice.pdf', { invoice_id: props.id, duplicate: duplicate.value });
+  return { filename: file.filename, blob: base64ToBlob(file.content_base64, file.content_type) };
 }
 
 function onSubstituted(full: InvoiceOut): void {
@@ -202,8 +225,8 @@ function onSubstituted(full: InvoiceOut): void {
           </h2>
           <StatusPill
             data-testid="invoice-detail-status"
-            :tone="statusTone(invoice.status)"
-            :label="$t(`invoice.status.${invoice.status}`)"
+            :tone="statusTone(shownStatus(invoice))"
+            :label="$t(`invoice.status.${shownStatus(invoice)}`)"
           />
         </div>
         <div class="invoice-detail__header-actions">
@@ -217,6 +240,26 @@ function onSubstituted(full: InvoiceOut): void {
               name="ion:download-outline"
             />
             {{ $t('invoice.detail.print') }}
+          </ion-button>
+          <ExportButton
+            testid="invoice-detail-pdf"
+            regular
+            :label="$t('invoice.detail.pdf.button')"
+            :pending-label="$t('invoice.detail.pdf.pending')"
+            :failed="(reason: string) => $t('invoice.detail.pdf.failed', { reason })"
+            :load="pdfFile"
+          />
+          <ion-button
+            v-if="canAdd"
+            fill="outline"
+            data-testid="invoice-detail-email"
+            @click="emailOpen = true"
+          >
+            <HubIcon
+              slot="start"
+              name="ion:mail-outline"
+            />
+            {{ $t('invoice.detail.emailButton') }}
           </ion-button>
           <ion-button
             fill="outline"
@@ -235,6 +278,15 @@ function onSubstituted(full: InvoiceOut): void {
         data-testid="invoice-missing-tax-id"
       >
         {{ $t('invoice.detail.missingTaxId') }}
+      </InlineFeedback>
+
+      <InlineFeedback
+        v-if="unsent"
+        tone="danger"
+        data-testid="invoice-detail-email-failed"
+        :heading="$t('invoice.email.unsent')"
+      >
+        {{ unsent.reason }}
       </InlineFeedback>
 
       <section class="invoice-detail__card">
@@ -274,6 +326,21 @@ function onSubstituted(full: InvoiceOut): void {
             <dt>{{ $t('invoice.detail.fields.notes') }}</dt>
             <dd data-testid="invoice-detail-notes">
               {{ note }}
+            </dd>
+          </div>
+        </dl>
+        <dl
+          v-if="emailed.length"
+          class="invoice-detail__grid"
+        >
+          <div>
+            <dt>{{ $t('invoice.detail.fields.emailed') }}</dt>
+            <dd
+              v-for="line in emailed"
+              :key="line.id"
+              data-testid="invoice-detail-emailed"
+            >
+              {{ line.text }}
             </dd>
           </div>
         </dl>
@@ -343,6 +410,12 @@ function onSubstituted(full: InvoiceOut): void {
       v-model:open="rectifyOpen"
       :invoice="invoice ?? null"
     />
+    <SendEmailModal
+      v-if="canAdd"
+      v-model:open="emailOpen"
+      :invoice="invoice ?? null"
+      :proposed="mail?.customer_email ?? ''"
+    />
     <SubstituteModal
       v-if="canAdd"
       v-model:open="substituteOpen"
@@ -375,8 +448,11 @@ function onSubstituted(full: InvoiceOut): void {
 }
 .invoice-detail__header-actions {
   display: flex;
-  flex: none;
+  flex-wrap: wrap;
+  flex: 0 1 auto;
   gap: 0.5rem;
+  align-items: center;
+  justify-content: flex-end;
   margin-inline-start: auto;
 }
 .invoice-detail__header-actions ion-button,

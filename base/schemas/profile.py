@@ -2,8 +2,11 @@
 
 from typing import Literal
 
+from django.utils.translation import gettext_lazy as _
 from ninja import Schema
-from pydantic import Field
+from pydantic import Field, model_validator
+
+NOTHING_TO_CHANGE = _("Nothing to change.")
 
 
 class ProfileIn(Schema):
@@ -31,10 +34,18 @@ class ProfileUpdateIn(Schema):
 
 
 class PreferencesIn(Schema):
-    language: Literal["", "es", "en"]
-    theme_mode: Literal["", "system", "light", "dark"]
-    palette: Literal["", "erplora", "terracotta", "corporate", "minimal", "forest", "ocean", "violet"]
-    ui_scale: Literal[80, 90, 100, 110, 120]
+    """Only the fields sent change (an empty one: the business's); at least one."""
+
+    language: Literal["", "es", "en"] | None = None
+    theme_mode: Literal["", "system", "light", "dark"] | None = None
+    palette: Literal["", "erplora", "terracotta", "corporate", "minimal", "forest", "ocean", "violet"] | None = None
+    ui_scale: Literal[80, 90, 100, 110, 120] | None = None
+
+    @model_validator(mode="after")
+    def _something(self):
+        if not self.model_dump(exclude_none=True):
+            raise ValueError(str(NOTHING_TO_CHANGE))
+        return self
 
 
 class PreferencesOut(Schema):

@@ -21,6 +21,7 @@ from pydantic import ValidationError
 from apps.customer.tax_ids import ID_TYPES
 from apps.sale.models import ForeignIdType, OrderLine, QuickNote
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
+from apps.tax.models import TaxCategory
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -80,6 +81,22 @@ def test_a_section_is_said_by_its_name_and_titled_as_its_screen(language, title)
     for write in ("sale.department.delete", "sale.department.update"):
         field = fields_of(write, {"id": str(section.id)}, language)["id"]
         assert (field["value"], field["label"]) == ("Fruit", title)
+
+
+@HUB_DB
+@pytest.mark.parametrize(
+    ("language", "vat"), [("en", "Product — generic · 21%"), ("es", "Producto — general · 21\xa0%")]
+)
+def test_a_new_section_says_the_tax_category_it_charges_at_and_its_rate_as_its_screen(language, vat):
+    """«Varios» at the general rate: its category by the name the Taxes screens give it, never «product.generic», with
+    the rate the Sections screen gives it; the yes is for that category (its id among the records the card read)."""
+    found: list = []
+    arguments = {"name": "Varios", "tax_category_key": "product.generic", "sort_order": 0}
+    card = assistant.cards.card(get("sale.department.create"), arguments, language, ctx_for(language=language), found=found)
+    assert {field["name"]: field["value"] for field in card["fields"]}["tax_category_key"] == vat
+    assert str(TaxCategory.objects.get(key="product.generic").id) in {str(one) for one in found}
+    section = run("sale.department.create", arguments, ctx_for(language=language))
+    assert vat.startswith(f"{section.tax_category_name} · {section.tax_rate_pct.normalize()}")
 
 
 @HUB_DB
@@ -158,7 +175,7 @@ def test_a_charge_says_the_payment_method_in_the_persons_language(shampoo, langu
         {"idempotency_key": KEY, "lines": [{"product_id": str(shampoo.id)}], "payments": [{"method_id": str(cash.id)}]},
         language,
     )
-    assert said["payments"] == [{"method_id": method}]
+    assert said["payments"] == [{"method": method, "amount": {"kind": "money", "value": 1210}}]
 
 
 @HUB_DB
@@ -426,3 +443,12 @@ def test_every_kind_of_document_a_charge_takes_has_its_word():
         "",
         *ID_TYPES,
     ]
+
+
+@HUB_DB
+def test_the_lines_of_a_sale_are_said_by_their_product_and_who_serves_it(shampoo):
+    """A line with two records the card names is said by both and its quantity, never «1 item»."""
+    bea = setup("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz"})
+    lines = [{"product_id": str(shampoo.id), "staff_id": str(bea.id), "quantity": "2"}]
+    said = fields_of("sale.sale.complete", {"idempotency_key": KEY, "lines": lines})["lines"]
+    assert (said["value"], said.get(NAMED)) == ([{"product_id": "Shampoo", "staff_id": "Bea Ruiz", "quantity": "2"}], True)

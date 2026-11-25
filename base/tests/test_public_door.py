@@ -31,7 +31,7 @@ from apps.online_booking.tests.conftest import (
 from base import activation
 from base.image_catalog import catalog_image
 from base.media import media
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.public_door import call, open_page
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, A, B, in_business_a

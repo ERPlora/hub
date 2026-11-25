@@ -15,16 +15,21 @@ import {
 } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
-import { IonButton, IonCheckbox, IonInput } from '@ionic/vue';
+import { IonButton, IonCheckbox, IonInput, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
+import { ACTIONS, askedScopes, EVERY_APP, modeOf } from '../lib/api-key-scopes';
 import { useBaseI18n } from '../lib/i18n';
 import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
-import type { ApiKeyInput, ApiKeyMode, ApiKeyRow, ApiKind } from '../operations/api_keys';
+import type { ApiAction, ApiKeyRow, ApiKeyScopes } from '../operations/api_keys';
 import FieldGroup from './FieldGroup.vue';
 
-const MODES: readonly ApiKeyMode[] = ['full', 'read', 'write', 'per_app'];
-const KINDS: readonly ApiKind[] = ['read', 'write'];
+interface KeyForm {
+  name: string;
+  where: 'all' | 'apps';
+  ticked: ApiKeyScopes;
+}
+
 const COPIED_MS = 2000;
 
 const { t, locale } = useBaseI18n();
@@ -35,23 +40,29 @@ const revoke = useCommand('base.api_key.revoke');
 
 const rows = computed<ApiKeyRow[]>(() => data.value?.keys ?? []);
 const apps = computed(() => data.value?.apps ?? []);
+const grantable = computed<ApiKeyScopes>(() => data.value?.grantable ?? {});
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 const when = (value: string | null) => (value ? formatDateTime(value, locale.value) : t('base.apiKeys.never'));
 const appName = (id: string) => apps.value.find((app) => app.id === id)?.name ?? id;
 
-/** «Online shop R/W · Taxes R»: what a key per app may do on each app. */
+/** «Full access», or «All apps R/C · Taxes U»: what a key may do on every app and app by app. */
 function scopesText(row: ApiKeyRow): string {
-  if (row.mode !== 'per_app') return t(`base.apiKeys.modes.${row.mode}`);
+  const mode = modeOf(row.scopes);
+  if (mode) return t(`base.apiKeys.modes.${mode}`);
   return Object.entries(row.scopes)
-    .map(([app, kinds]) => `${appName(app)} ${kinds.map((kind) => t(`base.apiKeys.short.${kind}`)).join('/')}`)
+    .map(([app, actions]) => {
+      const where = app === EVERY_APP ? t('base.apiKeys.allApps') : appName(app);
+      return `${where} ${actions.map((action) => t(`base.apiKeys.short.${action}`)).join('/')}`;
+    })
     .join(' · ');
 }
 
 const columns = computed<DataTableColumn<ApiKeyRow>[]>(() => [
   { key: 'name', label: t('base.apiKeys.columns.name'), width: 'minmax(10rem,2fr)' },
   { key: 'prefix', label: t('base.apiKeys.columns.token'), format: (value) => `${value as string}…`, width: '13rem', sortable: false },
-  { key: 'mode', label: t('base.apiKeys.columns.permissions'), cell: 'scopes', sortValue: scopesText, width: 'minmax(10rem,2fr)' },
+  { key: 'scopes', label: t('base.apiKeys.columns.permissions'), cell: 'scopes', sortValue: scopesText, width: 'minmax(10rem,2fr)' },
   { key: 'revoked_at', label: t('base.apiKeys.columns.state'), cell: 'state', width: '8rem' },
+  { key: 'created_by', label: t('base.apiKeys.columns.createdBy'), format: (value) => (value as string) || '—', width: 'minmax(8rem,1fr)' },
   { key: 'created_at', label: t('base.apiKeys.columns.created'), format: (value) => when(value as string), width: '11rem' },
   { key: 'last_used_at', label: t('base.apiKeys.columns.lastUsed'), format: (value) => when(value as string | null), width: '11rem' },
   { key: 'rate_per_minute', label: t('base.apiKeys.columns.limit'), format: (value) => `${value as number}/min`, align: 'right', width: '7rem' },
@@ -68,6 +79,7 @@ const ERRORS: Readonly<Record<string, string>> = Object.freeze({
   'base.api_key_not_found': 'base.apiKeys.errors.gone',
   'base.api_key_scopes_required': 'base.apiKeys.errors.scopesRequired',
   'base.api_key_scope_unknown': 'base.apiKeys.errors.scopeUnknown',
+  'base.api_key_beyond_maker': 'base.apiKeys.errors.beyondMaker',
   permission_denied: 'base.apiKeys.errors.denied',
 });
 
@@ -84,48 +96,52 @@ function failure(reason: unknown, fallback: string): FormModalError {
 // ── «New API key» ──
 const creating = ref(false);
 const createError = ref<FormModalError | null>(null);
-const form = ref<ApiKeyInput>({ name: '', rate_per_minute: 60, mode: 'per_app', scopes: {} });
+const form = ref<KeyForm>({ name: '', where: 'apps', ticked: {} });
 const rateText = ref('60');
 
 function startCreating(): void {
-  form.value = { name: '', rate_per_minute: 60, mode: 'per_app', scopes: {} };
+  form.value = { name: '', where: 'apps', ticked: {} };
   rateText.value = '60';
   createError.value = null;
   creating.value = true;
 }
 
 const rateValid = computed(() => /^\d+$/.test(rateText.value) && Number(rateText.value) >= 1 && Number(rateText.value) <= 10000);
-const anyScope = computed(() => Object.values(form.value.scopes).some((kinds) => kinds.length > 0));
-const canCreate = computed(
-  () => form.value.name.trim() !== '' && rateValid.value && (form.value.mode !== 'per_app' || anyScope.value),
+const everyApp = computed(() => form.value.where === 'all' && grantable.value[EVERY_APP] !== undefined);
+/** A row of boxes per app who asks may give something on, or a single one for every app. */
+const boxRows = computed(() =>
+  everyApp.value ? [{ id: EVERY_APP, name: t('base.apiKeys.allApps') }] : apps.value.filter((app) => grantable.value[app.id] !== undefined),
 );
+const asked = computed(() => askedScopes(form.value.ticked, grantable.value, everyApp.value));
+const canCreate = computed(() => form.value.name.trim() !== '' && rateValid.value && Object.keys(asked.value).length > 0);
 
-function ticked(app: string, kind: ApiKind): boolean {
-  return form.value.scopes[app]?.includes(kind) ?? false;
+function choose(where: unknown): void {
+  form.value = { ...form.value, where: where === 'all' ? 'all' : 'apps' };
 }
 
-function tick(app: string, kind: ApiKind, on: boolean): void {
-  const kinds = new Set(form.value.scopes[app] ?? []);
-  if (on) kinds.add(kind);
-  else kinds.delete(kind);
-  form.value = { ...form.value, scopes: { ...form.value.scopes, [app]: KINDS.filter((each) => kinds.has(each)) } };
+function ticked(app: string, action: ApiAction): boolean {
+  return form.value.ticked[app]?.includes(action) ?? false;
+}
+
+function tick(app: string, action: ApiAction, on: boolean): void {
+  const given = ACTIONS.filter((each) => (each === action ? on : ticked(app, each)));
+  form.value = { ...form.value, ticked: { ...form.value.ticked, [app]: given } };
 }
 
 /** The apps with a box ticked: a box ticked and unticked again is no change. */
-const tickedScopes = () => Object.fromEntries(Object.entries(form.value.scopes).filter(([, kinds]) => kinds.length > 0));
+const tickedScopes = () => Object.fromEntries(Object.entries(form.value.ticked).filter(([, given]) => given.length > 0));
 
 const canDismiss = useUnsavedFormOnOpen(
   'api-key-form',
-  () => ({ name: form.value.name, rate: rateText.value, mode: form.value.mode, scopes: tickedScopes() }),
+  () => ({ name: form.value.name, rate: rateText.value, where: form.value.where, scopes: tickedScopes() }),
   creating,
 );
 
 async function submitCreate(): Promise<void> {
   if (!canCreate.value || create.pending.value) return;
   createError.value = null;
-  const scopes = form.value.mode === 'per_app' ? tickedScopes() : {};
   try {
-    const answer = await create.run({ ...form.value, name: form.value.name.trim(), rate_per_minute: Number(rateText.value), scopes });
+    const answer = await create.run({ name: form.value.name.trim(), rate_per_minute: Number(rateText.value), scopes: asked.value });
     creating.value = false;
     showToken(answer.token);
   } catch (reason) {
@@ -293,37 +309,38 @@ async function confirmRevoke(): Promise<void> {
           :max="10000"
           @ion-input="rateText = String($event.detail.value ?? '')"
         />
-        <FieldGroup class="api-key-modes">
+        <FieldGroup class="api-key-scopes">
           <legend>{{ t('base.apiKeys.form.mode') }}</legend>
-          <div
-            role="radiogroup"
-            class="api-key-modes__options"
+          <ion-segment
+            v-if="grantable[EVERY_APP]"
+            data-testid="api-key-form-where"
+            :value="form.where"
+            :aria-label="t('base.apiKeys.form.mode')"
+            @ion-change="choose($event.detail.value)"
           >
-            <button
-              v-for="mode in MODES"
-              :key="mode"
-              type="button"
-              role="radio"
-              class="api-key-mode"
-              :class="{ 'api-key-mode--on': form.mode === mode }"
-              :aria-checked="form.mode === mode"
-              :data-testid="`api-key-form-mode-${mode}`"
-              @click="form = { ...form, mode }"
+            <ion-segment-button
+              value="all"
+              data-testid="api-key-form-where-all"
             >
-              {{ t(`base.apiKeys.modes.${mode}`) }}
-            </button>
-          </div>
+              <ion-label>{{ t('base.apiKeys.allApps') }}</ion-label>
+            </ion-segment-button>
+            <ion-segment-button
+              value="apps"
+              data-testid="api-key-form-where-apps"
+            >
+              <ion-label>{{ t('base.apiKeys.form.chooseApps') }}</ion-label>
+            </ion-segment-button>
+          </ion-segment>
           <p class="api-keys-hint">
-            {{ form.mode === 'per_app' ? t('base.apiKeys.form.perAppHint') : t('base.apiKeys.form.generalHint') }}
+            {{ t(everyApp ? 'base.apiKeys.form.allAppsHint' : 'base.apiKeys.form.perAppHint') }}
           </p>
         </FieldGroup>
         <div
-          v-if="form.mode === 'per_app'"
           class="api-key-apps"
           data-testid="api-key-form-apps"
         >
           <p
-            v-if="apps.length === 0"
+            v-if="boxRows.length === 0"
             class="api-keys-hint"
           >
             {{ t('base.apiKeys.form.noApps') }}
@@ -335,32 +352,33 @@ async function confirmRevoke(): Promise<void> {
                   {{ t('base.apiKeys.form.app') }}
                 </th>
                 <th
-                  v-for="kind in KINDS"
-                  :key="kind"
+                  v-for="action in ACTIONS"
+                  :key="action"
                   scope="col"
+                  class="ion-text-center"
                 >
-                  {{ t(`base.apiKeys.kinds.${kind}`) }}
+                  {{ t(`base.apiKeys.actions.${action}`) }}
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="app in apps"
-                :key="app.id"
+                v-for="row in boxRows"
+                :key="row.id"
               >
                 <th scope="row">
-                  {{ app.name }}
+                  {{ row.name }}
                 </th>
                 <td
-                  v-for="kind in KINDS"
-                  :key="kind"
+                  v-for="action in ACTIONS"
+                  :key="action"
                 >
                   <ion-checkbox
-                    v-if="app[kind]"
-                    :data-testid="`api-key-form-${app.id}-${kind}`"
-                    :checked="ticked(app.id, kind)"
-                    :aria-label="`${app.name} · ${t(`base.apiKeys.kinds.${kind}`)}`"
-                    @ion-change="tick(app.id, kind, Boolean($event.detail.checked))"
+                    v-if="grantable[row.id]?.includes(action)"
+                    :data-testid="`api-key-form-${row.id}-${action}`"
+                    :checked="ticked(row.id, action)"
+                    :aria-label="`${row.name} · ${t(`base.apiKeys.actions.${action}`)}`"
+                    @ion-change="tick(row.id, action, Boolean($event.detail.checked))"
                   />
                   <span v-else>—</span>
                 </td>
@@ -471,7 +489,8 @@ async function confirmRevoke(): Promise<void> {
 }
 
 .api-keys-intro,
-.api-keys-hint {
+.api-keys-hint,
+.api-key-apps thead th {
   margin: 0;
   color: var(--ion-color-medium-shade, #555);
   font-size: 0.875rem;
@@ -493,37 +512,14 @@ async function confirmRevoke(): Promise<void> {
   gap: 12px;
 }
 
-.api-key-modes {
+.api-key-scopes {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.api-key-modes legend {
+.api-key-scopes legend {
   margin-bottom: 6px;
-  font-weight: 600;
-}
-
-.api-key-modes__options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.api-key-mode {
-  padding: 6px 12px;
-  border: 1px solid var(--ep-border-color, var(--ion-color-light-shade, #d7d8da));
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-
-.api-key-mode--on {
-  border-color: var(--ion-color-primary);
-  background: color-mix(in oklab, var(--ion-color-primary) 12%, transparent);
-  color: var(--ion-color-primary);
   font-weight: 600;
 }
 
@@ -540,7 +536,7 @@ async function confirmRevoke(): Promise<void> {
 }
 
 .api-key-apps td {
-  width: 6rem;
+  width: 3.5rem;
   text-align: center;
 }
 

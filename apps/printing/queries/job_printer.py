@@ -12,9 +12,10 @@ import uuid
 from django.db.models import Case, IntegerField, QuerySet, Value, When
 from django.db.models.functions import Lower
 
-# The package's own helpers: it imports this module first, so they are read when a job is queued.
-from apps.printing import queries
 from apps.printing.models import PrintDevice, Printer, PrintJob, Settings, Usage
+
+from .printers import first_held
+from .settings import DEFAULT_FIELDS
 
 #: Receipt paper before the computer's printer, the order a job of a function finds its printer in.
 _SYSTEM_LAST = Case(When(kind=Printer.Kind.SYSTEM, then=Value(1)), default=Value(0), output_field=IntegerField())
@@ -36,9 +37,9 @@ def job_printer(usage: str, paper: str, settings: Settings, device: str | None =
     """The printer a job of ``usage`` on ``paper`` goes to, asked for from the till with the key ``device`` (none: the
     business's printer). It is held until the job that names it is saved: a deletion waits for it, and one deleted
     before is passed over."""
-    chosen_id = getattr(settings, f"{queries.DEFAULT_FIELDS[usage]}_id")
+    chosen_id = getattr(settings, f"{DEFAULT_FIELDS[usage]}_id")
     if device is not None and usage == Usage.RECEIPT and paper == PrintJob.Format.RECEIPT:
-        own = queries.first_held(_own_receipt_printers(device, chosen_id))
+        own = first_held(_own_receipt_printers(device, chosen_id))
         if own is not None:
             return own
     printers = Printer.objects.filter(is_active=True)
@@ -46,8 +47,8 @@ def job_printer(usage: str, paper: str, settings: Settings, device: str | None =
         printers = printers.filter(kind=Printer.Kind.SYSTEM)
     else:
         printers = printers.exclude(kind=Printer.Kind.SYSTEM)
-    chosen = queries.first_held(printers.filter(pk=chosen_id)) if chosen_id else None
-    return chosen or queries.first_held(printers.filter(usage=usage).order_by(Lower("name"), "id"))
+    chosen = first_held(printers.filter(pk=chosen_id)) if chosen_id else None
+    return chosen or first_held(printers.filter(usage=usage).order_by(Lower("name"), "id"))
 
 
 def active_printers() -> dict[str, list[Printer]]:

@@ -26,16 +26,13 @@ from PIL import Image as PILImage
 
 from apps.service import events
 from apps.service.models import Service
-from apps.service.schemas import (
-    ServiceForSaleIn,
+from apps.service.schemas.catalog import ServiceForSaleIn, ServiceIn, ServiceListIn, ServiceOut
+from apps.service.schemas.fields import ServiceRefIn
+from apps.service.schemas.service_images import (
     ServiceImageIn,
     ServiceImageSuggestIn,
     ServiceImageSuggestOut,
     ServiceImageUploadIn,
-    ServiceIn,
-    ServiceListIn,
-    ServiceOut,
-    ServiceRefIn,
 )
 from apps.tax.models import TaxCategory
 from base.models import Hub
@@ -263,14 +260,17 @@ def test_a_file_that_is_no_photo_is_refused(hub_files):  # noqa: F811
 # ── service.service.suggest_image ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_it_suggests_the_librarys_images_for_its_name_and_sets_none(image_library):  # noqa: F811
+@pytest.mark.parametrize(("person", "business", "title"), [("es", "en", "Corte de señora"), ("en", "es", "Women's haircut")])
+def test_it_suggests_the_librarys_images_for_its_name_titled_in_the_persons_language_and_sets_none(
+    image_library, person, business, title  # noqa: F811
+):
     created = service("Corte de señora")
-    Hub.objects.filter(slug=A.key).update(language="es")
+    Hub.objects.filter(slug=A.key).update(language=business)
 
-    found = run("service.service.suggest_image", ServiceImageSuggestIn(id=created.id), "hub_employee")
+    found = run("service.service.suggest_image", ServiceImageSuggestIn(id=created.id), "hub_employee", language=person)
 
     assert (found.query, [row.reference for row in found.rows]) == ("Corte de señora", [CUT])
-    assert found.rows[0].title == "Corte de señora"
+    assert found.rows[0].title == title
     assert Service.objects.get().image == ""
 
 

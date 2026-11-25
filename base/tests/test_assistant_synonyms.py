@@ -9,7 +9,7 @@ import pytest
 from django.apps import apps
 from django.core import checks
 from live import assistant as shared
-from live.meta import all_live_app_configs
+from live.meta import all_live_app_configs, module_configs
 from live.operations import registry
 
 from base import assistant
@@ -131,11 +131,14 @@ def test_an_app_out_of_the_store_says_its_words_only_where_its_tools_are_offered
 
 def test_the_words_of_an_app_in_the_store_count_in_every_turn(demo):
     """A listed app's words also name what other apps share: Appointments' «bloqueo» is a reservation's blocked date
-    too, so a turn without any of its tools still reads them."""
+    too, so a turn without any of its tools still reads them; those of an app out of the store (the reference app, and
+    any other not listed yet) do not."""
     reservations = tools_of("reservation")
     assert reservations and not any(op.app_label == "appointment" for op in reservations.values())
     counted = assistant.relevance.ranking(reservations)["synonyms"]
-    assert set(counted) == set(assistant.relevance.synonyms()) - set(said_by(demo))
+    unlisted = [config for config in module_configs() if not config.listed]
+    assert demo in unlisted
+    assert set(counted) == set(assistant.relevance.synonyms()) - {group for config in unlisted for group in said_by(config)}
     assert any(stems_of("blocked") <= concept for concept in concepts("¿qué bloqueos hay en Navidad?", counted))
 
 
@@ -144,7 +147,7 @@ def test_a_turn_ranks_with_the_words_that_count_for_its_tools():
     name, phrase = ELEMENT_REQUESTS[0]
     turn = [op.name for op in assistant.relevance.relevant(tools, [phrase], "es")]
     ranked = [op.name for op in shared.relevant(tools, [phrase], "es", **assistant.relevance.ranking(tools))]
-    assert turn == [*ranked[: shared.MAX_TOOLS - 1], assistant.relevance.FIND_TOOLS]
+    assert turn == [*ranked[: assistant.relevance.PLACES], assistant.relevance.FIND_TOOLS]
     every = {**assistant.relevance.ranking(tools), "synonyms": assistant.relevance.synonyms()}
     assert turn != [op.name for op in shared.relevant(tools, [phrase], "es", **every)]  # positive control
 
@@ -163,7 +166,7 @@ def test_an_element_in_a_customers_words_brings_their_tool_and_not_demos_items(o
     """With Demo's words, these came 30th and 18th: «elemento» brought a cart's items and a price list's first."""
     every = assistant.relevance.synonyms()
     assert offered_place(owner_tools, name, phrase) <= 10
-    assert offered_place(owner_tools, name, phrase, synonyms=every) > 10
+    assert name not in offered_to(owner_tools, phrase, synonyms=every)[:10]
 
 
 def synonym_errors() -> list:
@@ -283,7 +286,7 @@ def test_the_probe_that_asks_for_an_app_back_in_the_menu_brings_turning_it_on_am
     assert probe_phrases()[comparable(APP_BACK_IN_THE_MENU_PROBE)] == "qa20261108.owner.es.base.app.enable"
     assert offered_place(tools, "base.app.enable", APP_BACK_IN_THE_MENU_PROBE) <= TOP
     without = without_base_groups(tools)
-    assert offered_place(tools, "base.app.enable", APP_BACK_IN_THE_MENU_PROBE, synonyms=without) > TOP
+    assert "base.app.enable" not in offered_to(tools, APP_BACK_IN_THE_MENU_PROBE, synonyms=without)[:TOP]
 
 
 @pytest.mark.parametrize(

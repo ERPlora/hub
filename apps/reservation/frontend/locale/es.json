@@ -4,6 +4,7 @@
     "loading": "Cargando…",
     "noPermission": "No tienes permiso",
     "erasedCustomer": "Cliente borrado",
+    "searchGuest": "Buscar cliente…",
     "yes": "Sí",
     "no": "No",
     "retry": "Reintentar",
@@ -92,8 +93,8 @@
       "failed": "No se ha podido cambiar la reserva"
     },
     "outcome": {
-      "seated": "{guest} está sentado en la mesa {table}: su cuenta está abierta en Ventas.",
-      "seatedNoTable": "{guest} está sentado."
+      "seated": "Reserva de {guest} sentada en la mesa {table}: su cuenta está abierta en Ventas.",
+      "seatedNoTable": "Reserva de {guest} sentada."
     },
     "cancel": {
       "title": "¿Cancelar la reserva?",
@@ -238,7 +239,8 @@
         "from": "Desde",
         "to": "Hasta",
         "max": "Máx",
-        "maxCovers": "Máx comensales (opcional)",
+        "maxCovers": "Máx comensales",
+        "optional": "Opcional",
         "submit": "Crear franja"
       },
       "blockedForm": {

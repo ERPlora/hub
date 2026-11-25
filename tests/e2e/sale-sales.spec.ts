@@ -9,10 +9,12 @@
 // What this file creates is deleted after it (`afterAll`).
 import { expect, type Page, test } from '@playwright/test';
 
+import { pickDay } from './date-time-fields';
 import { A, api, capture, login, saveSessionForTheSweep, shot, shown, signedInSpanish, untilStill } from './helpers';
 import { rowAction } from './service-helpers';
 import { cleanInventory, createProduct, pick } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
+import { refundAll } from './sale-approval-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, shots, stamp } from './sale-helpers';
 
 const SKU = `E2E-SAL-${stamp()}`;
@@ -183,12 +185,7 @@ test('SALE-F31: the owner refunds a sale in full by its card', async ({ page, co
   await search(page, card.number);
   await expect(row(page, card)).toBeVisible();
   await rowAction(page, 'sales-table', card.id, 'refund');
-  const modal = page.locator('ion-modal[data-testid=sale-refund]');
-  await expect(modal).toBeVisible();
-  await expect(modal.locator(`[data-testid=refund-tender-${card.payments[0].id}]`)).toBeVisible();
-  await modal.locator('[data-testid=refund-propose-all]').click();
-  await modal.locator('[data-testid=refund-reason] textarea, [data-testid=refund-reason] input').first().fill('e2e returned');
-  await modal.locator('[data-testid=refund-confirm]').click();
+  const modal = await refundAll(page, card);
   await expect(modal).toBeHidden();
   await expect
     .poll(async () => (await (await context.request.get(`${A}/api/sale/sales/detail?sale_id=${card.id}`)).json()).status)
@@ -243,8 +240,8 @@ test('Sales filter by total in euros and by payment behind the funnel, with its 
   await panel.locator('[data-testid=sales-table-filters-clear]').click();
 
   // From the 14th to the 1st: said under «to», the funnel turns red, nothing is filtered and the period rules.
-  await panel.locator('[data-testid=sales-table-filter-date_from] input').fill('2026-10-14');
-  await panel.locator('[data-testid=sales-table-filter-date_to] input').fill('2026-10-01');
+  await pickDay(page, panel.locator('[data-testid=sales-table-filter-date_from]'), '2026-10-14');
+  await pickDay(page, panel.locator('[data-testid=sales-table-filter-date_to]'), '2026-10-01');
   await panel.locator('[data-testid=sales-table-filters-apply]').click();
   await expect(toggle).toHaveAttribute('data-invalid', 'true');
   await expect(row(page, cash)).toBeVisible();

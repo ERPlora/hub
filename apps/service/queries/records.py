@@ -9,7 +9,7 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
 
-from apps.service.schemas import RecordRefIn
+from apps.service.schemas.fields import RecordRefIn
 from base.operations import call
 from base.schemas.assistant import RecordNameOut
 
@@ -58,7 +58,8 @@ RECORD_NAMES = {
 
 
 # Not an assistant tool: what names, on the card of a write of Services, a record of Sales or Appointments, which
-# Services does not require (``schemas.A_SALE``, ``A_SALE_LINE``, ``AN_APPOINTMENT``, ``A_CHECK_LINE``, ``A_RETURN``).
+# Services does not require (``schemas.fields.A_SALE``, ``A_SALE_LINE``, ``AN_APPOINTMENT``, ``A_CHECK_LINE``,
+# ``A_RETURN``).
 @operation(
     "service.record.get",
     kind="query",

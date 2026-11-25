@@ -15,7 +15,8 @@ from django.db import connections as django_connections
 from live.models import OutboxEvent
 
 from apps.demo.models import Item
-from base.models import Membership, TaskSchedule
+from base.models import Membership
+from base.models.scheduler import TaskSchedule
 from base.tenancy import connections, context, names
 from base.tenancy.context import HubContextMissing
 from base.tenancy.inventory import UnclassifiedModel

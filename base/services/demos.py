@@ -36,7 +36,7 @@ from base.services.provisioning import _control_transaction
 from base.services.sessions import InactiveUser, MODEL_BACKEND, ensure_hub_user
 from base.tenancy import names as database_names
 from base.tenancy.connections import control_name
-from control.models import HubDue
+from control.models.hubs import HubDue
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +315,7 @@ def purge_demo_data(hub: Hub) -> None:
     """Delete what the demo ``hub`` wrote: its whole database, ``DROP DATABASE … WITH (FORCE)`` on its cluster
     (``base.tenancy.ops``), outside any transaction, and only its own ``<control>_demo_<hex>`` (a row that names another
     database, or no demo, is refused and loses nothing); it is never emptied nor reused. Then its files, its prefix in
-    the store and no other (:func:`base.files.delete_hub_files`).
+    the store and no other (:func:`base.files.delete_hub.delete_hub_files`).
 
     A demo made before demos got their own database (``db_name`` empty) kept its rows in a database every hub shared,
     where nothing tells them from anyone else's: only its files are deleted. A database already
@@ -331,17 +331,17 @@ def purge_demo_data(hub: Hub) -> None:
         )
     if hub.db_name:
         ops.drop_database(hub.db_name, cluster=hub.cluster)
-    files.delete_hub_files(storages["hub_files"], hub.id)
+    files.delete_hub.delete_hub_files(storages["hub_files"], hub.id)
 
 
 def reap_demos(now: dt.datetime | None = None) -> int:
     """Purge every demo that ended by ``now`` (its time ran out, or it was expired by hand); return how many.
 
-    The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``) and ``manage.py demo_expire``'s. Every demo
-    that ended is marked ``expired`` and due (``hub_due``) first, then dropped and purged under its lease
-    (``base.tenancy.provision.drop``: its database and its files, then ``base.demo.purge`` in its own transaction). One
-    that fails, or whose lease the worker holds (it was still being made), is logged or left, and the others are purged;
-    the worker takes it again as due. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
+    The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``). Every demo that ended is marked ``expired``
+    and due (``hub_due``) first, then dropped and purged under its lease (``base.tenancy.provision.drop``: its
+    database and its files, then ``base.demo.purge`` in its own transaction). One that fails, or whose lease the
+    worker holds (it was still being made), is logged or left, and the others are purged; the worker takes it again
+    as due. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
     """
     from base.tenancy import provision
 

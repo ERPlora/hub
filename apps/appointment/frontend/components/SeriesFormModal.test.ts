@@ -1,18 +1,19 @@
 // APPOINTMENT-F12, F14: «New repeating appointment» asks for Customer, Services, Professional, Repeats,
-// Day of the week (weekly and fortnightly only), Starts on, Time, Min., «Ends on (optional)» and «Number of
-// appointments (optional)», and «Create repeating appointment» creates it and books its window. «Edit
+// Day of the week (weekly and fortnightly only), Starts on, Time, «Duration (min)», «Ends on (optional)» and
+// «Number of appointments (optional)», and «Create repeating appointment» creates it and books its window. «Edit
 // repeating appointment» applies from a date on, says how many booked appointments it reaches and how
 // many charged ones it leaves alone, and «Save from this occurrence on» sends only what changed.
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import type { RecurringOut } from '../operations';
 import { click, ionValue, mountAppointment, page, settle } from '../__tests__/mount-appointment';
 import SeriesFormModal from './SeriesFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; disabled?: boolean; readonly?: boolean; required?: boolean };
 
 const SERIES: RecurringOut = {
   id: 'r1',
@@ -85,14 +86,15 @@ describe('SeriesFormModal: New repeating appointment', () => {
       'Day of the week',
       'Starts on',
     ]);
+    expect([s.field('time').label, s.field('minutes').label]).toEqual(['Time', 'Duration (min)']);
     expect([s.field('end_date').label, s.field('max_occurrences').label]).toEqual([
       'Ends on (optional)',
       'Number of appointments (optional)',
     ]);
     await s.pickWhoAndWhat();
     await ionValue(s.field('weekday'), 2);
-    await ionValue(s.field('start_date'), '2026-10-19', 'ionInput');
-    await ionValue(s.field('time'), '11:00', 'ionInput');
+    await pick(s.field('start_date'), '2026-10-19');
+    await pick(s.field('time'), '11:00');
     await ionValue(s.field('max_occurrences'), '6', 'ionInput');
     expect(s.field('minutes').value).toBe('30');
     s.answer(201, OUTCOME);
@@ -118,6 +120,19 @@ describe('SeriesFormModal: New repeating appointment', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
+  // The days and the time are the app's own pickers (never the device's), shown as read; only «Ends on» can be cleared.
+  it('the days and the time are the app’s pickers, shown as read', async () => {
+    const s = await setup();
+    const fields = ['start_date', 'time', 'end_date'].map((name) => s.field(name));
+    expect(fields.map((field) => [field.readonly, field.required])).toEqual([[true, true], [true, true], [true, false]]);
+    await pick(s.field('start_date'), '2026-10-19');
+    await pick(s.field('time'), '16:00');
+    await pick(s.field('end_date'), '2026-12-21');
+    expect(fields.map((field) => field.value)).toEqual(['10/19/2026', expect.stringMatching(/^04:00\sPM$/), '12/21/2026']);
+    await pick(s.field('end_date'), '');
+    expect(picked(s.field('end_date'))).toBe('');
+  });
+
   it('an employee’s series is for herself only: the professional is her own record, fixed', async () => {
     const s = await setup({ ownStaff: { id: 's1', name: 'Ana López' } });
     expect(s.combo('series-form-staff').props('modelValue')).toEqual({ id: 's1', label: 'Ana López' });
@@ -135,13 +150,13 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
   it('applies from a date, says what it reaches, and sends only what changed', async () => {
     const s = await setup({ series: SERIES, fromDate: '2026-11-02' });
     expect(s.inDoc('series-form')?.getAttribute('aria-label')).toBe('Edit repeating appointment');
-    expect(s.field('from_date').value).toBe('2026-11-02');
+    expect(picked(s.field('from_date'))).toBe('2026-11-02');
     expect(s.params('appointment.recurring.get')).toEqual([{ id: 'r1', from_date: '2026-11-02' }]);
     await s.live();
     await s.result('appointment.recurring.get', { ...SERIES, next_date: '2026-10-19', upcoming: 5, charged: 1 });
     expect(s.find('series-form-scope').text()).toContain('it reaches 5 booked appointments; 1 already charged will not be touched');
     expect(s.submit().textContent).toContain('Save from this occurrence on');
-    await ionValue(s.field('time'), '12:30', 'ionInput');
+    await pick(s.field('time'), '12:30');
     s.answer(200, { recurring: SERIES, moved: 4, cancelled: 0, locked: 1, skipped: [], booked: 0 });
     await click(s.submit());
     expect(s.sent().filter((call) => call.method === 'POST')).toEqual([
@@ -169,7 +184,8 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ series: SERIES }, 'es');
     expect(s.inDoc('series-form')?.getAttribute('aria-label')).toBe('Editar cita periódica');
-    expect(s.field('from_date').label).toBe('Desde');
+    expect([s.field('from_date').label, s.field('from_date').readonly, s.field('from_date').required]).toEqual(['Desde', true, false]);
+    expect(s.field('minutes').label).toBe('Duración (min)');
   });
 });
 
@@ -181,8 +197,8 @@ describe('SeriesFormModal: fields refused with the same words (hub#888)', () => 
     itTellsTheCorrectedFieldApart(['services', 'staff', 'start_date', 'time', 'duration_minutes', 'end_date', 'max_occurrences'], async (locale, refusal) => {
       const s = await setup({}, locale);
       await s.pickWhoAndWhat();
-      await ionValue(s.field('start_date'), '2026-10-19', 'ionInput');
-      await ionValue(s.field('time'), '11:00', 'ionInput');
+      await pick(s.field('start_date'), '2026-10-19');
+      await pick(s.field('time'), '11:00');
       s.answer(422, refusal);
       return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.submit()), settle };
     }, 'end_date');
@@ -191,7 +207,7 @@ describe('SeriesFormModal: fields refused with the same words (hub#888)', () => 
   describe('a series edited from a date', () => {
     itTellsTheCorrectedFieldApart(['from_date', 'time'], async (locale, refusal) => {
       const s = await setup({ series: SERIES, fromDate: '2026-11-02' }, locale);
-      await ionValue(s.field('time'), '12:30', 'ionInput');
+      await pick(s.field('time'), '12:30');
       s.answer(422, refusal);
       return { field: s.field, send: () => click(s.submit()), settle };
     });
@@ -204,8 +220,8 @@ describe('SeriesFormModal: Android Back with unsaved changes (hub#1020, BASE-F05
     const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
     await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('series-form'),
-      change: () => ionValue(s.field('time'), '11:00', 'ionInput'),
-      restore: () => ionValue(s.field('time'), '', 'ionInput'),
+      change: () => pick(s.field('end_date'), '2026-12-21'),
+      restore: () => pick(s.field('end_date'), ''),
     });
   });
 });

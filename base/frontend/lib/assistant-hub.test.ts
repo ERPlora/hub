@@ -23,6 +23,7 @@ import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { SetupItem, SetupStatus } from '../operations/home';
 import { approvalPass, withApproval } from './approval';
+import { BLUEPRINT_FILE, MAX_FILE_BYTES } from './data';
 import {
   actionKey,
   HUB_ASSISTANT,
@@ -172,6 +173,21 @@ describe("«Read aloud» in the server's voice", () => {
   });
 });
 
+describe('HUB_ASSISTANT: the files its tools take whole', () => {
+  it("a copy of a business (.blueprint.zip), with Settings › Data › Import's limit and its words when one is larger", () => {
+    // The same file Import's own picker offers.
+    expect(BLUEPRINT_FILE).toEqual({ extension: '.zip', mime: 'application/zip' });
+    expect(HUB_ASSISTANT.toolFiles).toEqual([{ ...BLUEPRINT_FILE, maxBytes: MAX_FILE_BYTES, tooLargeKey: 'base.data.import.fileTooBig' }]);
+    expect(MAX_FILE_BYTES).toBe(20 * 1024 * 1024);
+    expect(said(en)('base.data.import.fileTooBig')).toBe('The file could not be read: the file is larger than 20 MB.');
+    expect(said(es)('base.data.import.fileTooBig')).toBe('No se pudo leer el fichero: el fichero pasa de 20 MB.');
+  });
+
+  it('each attached photo comes to the turn with its name, so the assistant can keep it in Files', () => {
+    expect(HUB_ASSISTANT.imageNames).toBe(true);
+  });
+});
+
 describe('HUB_ASSISTANT: who', () => {
   it('whoever sees the Home uses the assistant', () => {
     expect(HUB_ASSISTANT.canUse!(session(EMPLOYEE.permissions))).toBe(true);
@@ -302,6 +318,9 @@ describe("the verb of a write (base's catalogue)", () => {
     expect(verb('cash_register.movement.add')).toEqual(['Registrar movimiento', 'Register movement']);
     // Adding a line to a cart is adding: its action's verb.
     expect(verb('cart_checkout.item.add')).toEqual(['Añadir', 'Add']);
+    // VeriFactu's live test, as the buttons of its Settings say it, never «Ejecutar» or «Crear» (hub#2183).
+    expect(verb('verifactu.diagnostic.run')).toEqual(['Probar la conexión', 'Test the connection']);
+    expect(verb('verifactu.test_invoice.create')).toEqual(['Crear factura de prueba', 'Create test invoice']);
   });
 
   it('an operation the catalogue does not name goes by its action, a word of JavaScript’s included', () => {

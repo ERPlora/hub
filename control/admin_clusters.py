@@ -18,9 +18,9 @@ from django.utils.translation import gettext_lazy, ngettext, pgettext, pgettext_
 from live.errors import OperationError
 
 from control.admin_shared import SizedChangeList, is_platform_admin, saved_by, sizes_of, staff_context
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 from control.schemas import ClusterIdIn, ClusterIn, ClusterUpdateIn
-from control.services import CLUSTER_FIELDS, cluster_close, cluster_create, cluster_delete, cluster_update
+from control.services.clusters import CLUSTER_FIELDS, cluster_close, cluster_create, cluster_delete, cluster_update
 
 
 def no_limit() -> str:

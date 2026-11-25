@@ -15,17 +15,17 @@ from apps.service.queries.catalog import find_service, load_service
 from apps.service.queries.categories import find_category
 from apps.service.queries.reads import held_rows
 from apps.service.queries.settings import current_settings
-from apps.service.schemas import (
+from apps.service.schemas.catalog import (
     PRICE_RANGE_UPSIDE_DOWN,
     ServiceBulkIn,
     ServiceIn,
     ServiceOut,
     ServicePatchIn,
-    ServiceRefIn,
     ServicesOut,
 )
+from apps.service.schemas.fields import ServiceRefIn
 from apps.service.services.writes import TAX_UNKNOWN, _actor, _apply, _changes, _refuse, _tax_category
-from apps.tax.queries import held_categories
+from apps.tax.queries.categories import held_categories
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 

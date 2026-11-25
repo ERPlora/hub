@@ -42,7 +42,10 @@ class ModifierConfig(LiveAppConfig):
     assistant_synonyms = (
         ("predeterminada", "predeterminado", "predeterminadas", "predeterminados", "default"),
     )
-    permissions = ["modifier.view", "modifier.manage"]
+    permissions = {
+        "modifier.view": _("View modifier groups and their options"),
+        "modifier.manage": _("Create, change and delete groups and options, and attach them to products"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The cashier is an
     # employee: it reads the groups of a product and has its picks valued.
     role_permissions = {
@@ -80,29 +83,29 @@ class ModifierConfig(LiveAppConfig):
             Recoverable(
                 label=_("Modifier groups"),
                 reads_since="0001_initial",
-                read=queries.groups_in_copy,
-                missing=queries.groups_not_in_business,
+                read=queries.recovery.groups_in_copy,
+                missing=queries.recovery.groups_not_in_business,
                 create="modifier.group.recover",
             ),
             Recoverable(
                 label=_("Modifier options"),
                 reads_since="0001_initial",
-                read=queries.options_in_copy,
-                missing=queries.options_not_in_business,
+                read=queries.recovery.options_in_copy,
+                missing=queries.recovery.options_not_in_business,
                 create="modifier.option.recover",
             ),
             Recoverable(
                 label=_("Modifier groups of categories"),
                 reads_since="0001_initial",
-                read=queries.category_links_in_copy,
-                missing=queries.category_links_not_in_business,
+                read=queries.recovery.category_links_in_copy,
+                missing=queries.recovery.category_links_not_in_business,
                 create="modifier.link.attach",
             ),
             Recoverable(
                 label=_("Modifier groups of products"),
                 reads_since="0001_initial",
-                read=queries.links_in_copy,
-                missing=queries.links_not_in_business,
+                read=queries.recovery.links_in_copy,
+                missing=queries.recovery.links_not_in_business,
                 create="modifier.link.attach",
             )
         ]

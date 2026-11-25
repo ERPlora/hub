@@ -1,7 +1,7 @@
 """Django admin of the task app: full CRUD on every model, for the platform's staff.
 
 The Hub admin has full CRUD over all of a hub's tables. A raw admin write records no event and checks no business rule
-(no number, no completion date): the actions that need one call the operations of services.py. A task's or a project's
+(no number, no completion date): the actions that need one call the operations of services/. A task's or a project's
 «Delete» locks it first (``lock_tasks``, ``lock_projects``), as the operations that delete them and every write that
 names them do: it waits for the one under way and then takes what that write added.
 """
@@ -10,7 +10,7 @@ from django.contrib import admin
 from live.operations import atomic
 
 from apps.task.models import Comment, Project, Task, TaskCounter
-from apps.task.services import lock_projects, lock_tasks
+from apps.task.services.writes import lock_projects, lock_tasks
 
 
 @admin.register(Project)

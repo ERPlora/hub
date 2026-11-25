@@ -27,6 +27,22 @@ export async function flowShots(page: Page, key: string, ready: (page: Page) => 
   await page.setViewportSize(restore);
 }
 
+/** The sizes the fleet checks a screen at: desktop, tablet and a low phone. */
+const FLEET_SIZES = [
+  { width: 1440, height: 900 },
+  { width: 820, height: 1180 },
+  { width: 375, height: 667 },
+] as const;
+
+/** Screenshots `<key>-<width>x<height>` at the fleet's sizes, each once `ready` says what it shows is there. */
+export async function fleetShots(page: Page, key: string, ready: (page: Page) => Promise<void>): Promise<void> {
+  for (const size of FLEET_SIZES) {
+    await page.setViewportSize(size);
+    await ready(page);
+    await capture(page, `${key}-${size.width}x${size.height}`);
+  }
+}
+
 interface Claimed {
   job: { id: string; attempts: number } | null;
 }
@@ -58,4 +74,17 @@ export function forgetDevices(like: string, { ids = [], names = [] }: { ids?: re
   psql(`update printing_printjob set print_device_id = null where print_device_id in (select id from printing_printdevice where ${where})`);
   psql(`delete from printing_printdevice_printers where printdevice_id in (select id from printing_printdevice where ${where})`);
   psql(`delete from printing_printdevice where ${where}`);
+}
+
+/** Switches off every printer of the business that is on, for a run where nothing may be queued (the device prints);
+ *  returns them, for `printersBackOn` after it. */
+export function printersOff(): string[] {
+  const on = psql("select string_agg(id::text, ',') from printing_printer where is_active").split(',').filter(Boolean);
+  if (on.length) psql(`update printing_printer set is_active = false where id in (${on.map((id) => `'${id}'`).join(',')})`);
+  return on;
+}
+
+/** Switches back on the printers `printersOff` switched off. */
+export function printersBackOn(ids: readonly string[]): void {
+  if (ids.length) psql(`update printing_printer set is_active = true where id in (${ids.map((id) => `'${id}'`).join(',')})`);
 }

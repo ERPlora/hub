@@ -239,7 +239,7 @@ cierra sin preguntar (BASE-F05).
 | PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | hecho |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
-| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | parcial — la tarjeta aún no dice si la impresora responde ahora (hub#573) |
+| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | hecho |
 | PRINTING-F22 | Sacar el tique y abrir el cajón en la caja que cobra | común | hecho |
 
 ### PRINTING-F01 Ver cómo va la impresión
@@ -534,20 +534,22 @@ Pasos:
 2. «Reintentar» lo devuelve a la cola con los intentos a cero, hacia la impresora que toque ahora:
    «Devuelto a la cola: lo imprimirá el próximo dispositivo que se conecte.».
 3. «Cancelar» pide un motivo (opcional) y lo retira: «Trabajo cancelado. No se imprimirá.». Queda en
-   la cola con quién, cuándo y por qué.
+   la cola con quién (por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el
+   correo entero), cuándo y por qué.
 Entra: el trabajo y, al cancelar, el motivo.
 Sale: el trabajo en cola otra vez o cancelado (avisa: `printing.job.retried`, `printing.job.cancelled`); nadie
 lo borra a mano: la cola lo olvida 30 días después de acabar (PRINTING-F20).
 Si falla: «Solo vuelve a la cola un trabajo pendiente o fallido, o uno enviado que no contestó; este está
 …», «Un trabajo que se está imprimiendo o ya se imprimió no se cancela; este está …». Sin permiso no se
 ven los botones.
-Implicados: PRINTING-F01
+Implicados: PRINTING-F01, BASE-F119
 
 ### PRINTING-F15 Ir al texto del tique, que se escribe en Ventas
 Estado: hecho — el encabezado y el pie del tique viven en los ajustes de Ventas, y la nota de Ajustes lleva
 allí
 Actor: administrador
 Pantalla: Ajustes
+Operaciones: ninguna
 Pasos:
 1. Abre **Impresión → Ajustes**.
 2. La nota del encabezado y el pie lleva, con «Abrir los ajustes del tique», a los ajustes de Ventas,
@@ -688,29 +690,34 @@ plazo.
 Implicados: PRINTING-F01, PRINTING-F14
 
 ### PRINTING-F21 Ver en Sistema quién imprime y dónde bajar la app de ERPlora
-Estado: parcial — la tarjeta aún no dice si la impresora responde ahora («Impresora lista», «Impresora sin conectar»
-o «No hemos podido comprobar la impresora»): Impresión ya tiene esa lectura, la misma que da a la fila de salud del
-Inicio, pero la tarjeta todavía no la usa (hub#573)
-Actor: propietario, administrador, responsable, empleado
+Estado: hecho
+Actor: propietario, administrador
 Pantalla: Sistema · Uso y plan
 Pasos:
 1. Con Impresión encendida en el negocio, **Sistema → Uso y plan** tiene, debajo de lo que usa el negocio, la
    tarjeta **Tu impresora**: «Los tiques, las comandas y las etiquetas los imprime la app de ERPlora del dispositivo
-   que está junto a la impresora.». La ve cualquiera que vea Impresión, también quien no puede ver el uso del negocio.
+   que está junto a la impresora.». La ve quien abre Sistema, el propietario y el administrador (BASE-F39).
    Con Impresión apagada no hay tarjeta: un negocio que no imprime no ve nada de esto.
-2. «Configurar la impresión» abre **Impresión → Impresoras** (PRINTING-F01).
-3. En un navegador, debajo, «Descargar la app de ERPlora» con «La app de ERPlora es la que habla con tus impresoras,
+2. Debajo, si la impresora de tiques responde ahora, con la misma lectura y los mismos colores que la fila del Inicio
+   (BASE-F02): «Impresora lista — Los tiques salen solos al cobrar.», en verde; «Impresora sin conectar — El
+   dispositivo que imprime los tiques no responde: enciéndelo y abre en él la app de ERPlora.» o «Impresora sin
+   configurar — Todavía no hay ningún dispositivo dado de alta que imprima los tiques.», en ámbar. Mientras lo
+   comprueba, una línea gris.
+3. «Configurar la impresión» abre **Impresión → Impresoras** (PRINTING-F01).
+4. En un navegador, debajo, «Descargar la app de ERPlora» con «La app de ERPlora es la que habla con tus impresoras,
    el cajón y los escáneres. Elige tu sistema para continuar.» y un botón por sistema: **Windows** (el destacado),
    **Linux** y **Android**. No hay macOS: erplora.com no publica ninguno.
-4. Cada botón abre, fuera del hub, la descarga que sirve erplora.com en ese momento: la tienda si su ficha está
+5. Cada botón abre, fuera del hub, la descarga que sirve erplora.com en ese momento: la tienda si su ficha está
    publicada o el último instalador; Android, siempre Google Play (PUBLIC-F24 de erplora.com).
-5. Con la app instalada, la da de alta para imprimir desde ese dispositivo (PRINTING-F18). Dentro de la app no hay
+6. Con la app instalada, la da de alta para imprimir desde ese dispositivo (PRINTING-F18). Dentro de la app no hay
    bloque de descarga: sería la app ofreciéndose a sí misma.
-Entra: si Impresión está encendida en el negocio, los permisos de la persona y las direcciones de erplora.com.
+Entra: si Impresión está encendida en el negocio, los permisos de la persona, si la estación de tiques ha dado señales
+y las direcciones de erplora.com.
 Sale: nada guardado.
 Si falla: si no se puede leer qué tarjetas tocan, no sale ninguna (nunca la de una app apagada) y el resto de la
-pestaña dice lo suyo; sin las direcciones de erplora.com no salen los botones de descarga (nunca un botón que no
-lleva a ningún sitio).
+pestaña dice lo suyo; si no se puede comprobar la impresora, «No hemos podido comprobar la impresora — No sabemos si
+está conectada; no afecta a nada más.», en gris y nunca como lista; sin las direcciones de erplora.com no salen los
+botones de descarga (nunca un botón que no lleva a ningún sitio).
 Implicados: BASE-F02, BASE-F39, PRINTING-F18
 
 ### PRINTING-F22 Sacar el tique y abrir el cajón en la caja que cobra
@@ -764,7 +771,7 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | El estado de una impresora (por id o nombre) | ver | F19 | `printing.printer.status` |
 | La cola, del más reciente al más antiguo, con búsqueda por documento, filtros (estado, función, impresora) y páginas | ver | F01, F14 | `printing.job.list` |
 | Un trabajo de la cola por id o por el número de su documento (el más reciente), con su título como lo pone la cola | ver | F14, F16 | `printing.job.get` |
-| El resumen de la cola por función, con la impresora por la que sale cada una, cuántos trabajos no puede sacar ningún dispositivo dado de alta y cuántos llevan un minuto sin dispositivo encendido | ver | F01 | `printing.job.summary` |
+| El resumen de la cola por función, con la impresora por la que sale cada una, cuántos trabajos no puede sacar ningún dispositivo dado de alta y cuántos llevan un minuto sin dispositivo encendido | ver | F01, F22 | `printing.job.summary` |
 | Si una función tiene un dispositivo dado de alta que la imprime, encendido o no (el paso del Inicio), y cuántos de sus trabajos llevan un minuto o más en cola sin un dispositivo encendido que los saque (la campana) | ver | F01 | `printing.device.coverage` |
 | Si la estación de una función responde ahora: lista (un dispositivo dado de alta que la imprime ha dado señales en los últimos 90 s), sin conectar (dado de alta, pero callado) o sin configurar (ninguno); para la fila de salud del Inicio y la tarjeta «Tu impresora» | ver | F21 | `printing.device.health` |
 
@@ -776,11 +783,11 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Da de alta una impresora | ajustes | F03 | `printing.printer.create` |
 | Cambia una impresora, o la desactiva y activa | ajustes | F04 | `printing.printer.update` |
 | Encola la hoja de prueba de una impresora | imprimir | F05 | `printing.printer.test` |
-| Encola un documento (idempotente por su clave) | imprimir | F07–F13, F16, F17 | `printing.job.create` |
+| Encola un documento (idempotente por su clave) | imprimir | F07–F13, F16, F17, F22 | `printing.job.create` |
 | Da de alta el dispositivo desde el que se pide, con su nombre y sus impresoras | ajustes | F18 | `printing.device.register` |
 | Cambia el nombre o las impresoras de un dispositivo | ajustes | F18 | `printing.device.update` |
 | Retira un dispositivo: ya no imprime | ajustes | F18 | `printing.device.retire` |
-| Apunta que el dispositivo dado de alta con un identificador está ahí (para el canal del dispositivo, al conectarse y en cada latido; sin ruta, sin asistente y sin aviso) | imprimir | F01, F18 | `printing.device.seen` |
+| Apunta que el dispositivo dado de alta con un identificador está ahí (para el canal del dispositivo, al conectarse y en cada latido; sin ruta, sin asistente y sin aviso) | imprimir | F18 | `printing.device.seen` |
 | Da al dispositivo dado de alta el siguiente trabajo de sus impresoras | imprimir | F18 | `printing.job.claim` |
 | Confirma un trabajo impreso | imprimir | F18 | `printing.job.complete` |
 | Avisa de que un trabajo no salió | imprimir | F18 | `printing.job.fail` |
@@ -943,8 +950,8 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `UNDRAINED_ALERT_SECONDS`) o más que ningún dispositivo con `last_seen_at` en los últimos `SEEN_WITHIN` (90 s,
    `HOST_TTL_SECONDS`) puede sacar; `configured` (el paso del Inicio) y `unattended` del resumen siguen mirando solo
    el alta. Como esa cifra cambia sin evento, `bell_refresh_every = {"stalled_<función>": 30}` (`base.E007`): la
-   campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries.py`,
-   `tests/test_services.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
+   campana la vuelve a leer cada 30 s, el `POLL_MS` de `print-alert.ts`. Tests: `tests/test_queries_waiting.py`,
+   `tests/test_services_devices.py`, `tests/test_presence.py` (por el socket de verdad, con un empleado) y
    `tests/test_integration_home.py`.
 7. **El cliente del canal en el dispositivo**.
    `frontend/components/PrintHost.vue` es la pieza de fondo de Impresión: una ruta de
@@ -963,10 +970,11 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
 
 **La tarjeta de Sistema** (hub#683, PRINTING-F21). `PrintingConfig.system_cards` declara «printer», que pinta
 `frontend/components/SystemPrinterCard.vue`, con `printing.view_settings` (`base.E015`); `base.system.cards` la lista
-solo con Impresión encendida y `SystemAppCards.vue` de `base` la monta bajo «Uso y plan». No lee nada de Impresión: las
+solo con Impresión encendida y `SystemAppCards.vue` de `base` la monta bajo «Uso y plan». Las
 descargas salen de `hub-home.app_downloads` (`base/spa.py`) por `useAppDownloads` de `base`, solo en un navegador, y
-cada botón sale por `openExternalLink`. La lectura de si la estación de tiques responde ya existe
-(`printing.device.health`, abajo); la tarjeta aún no la enseña (hub#573). Tests: `tests/test_apps.py`,
+cada botón sale por `openExternalLink`. La tarjeta pide una vez, al montarse, `printing.device.health` de los tiques
+(abajo) y pinta su estado con `HEALTH_PILLS` de `base/frontend/lib/home-health.ts`, la misma tabla de colores que la
+fila del Inicio; si la lectura falla, `unknown`. Tests: `tests/test_apps.py`,
 `tests/test_integration_home.py` y `frontend/components/SystemPrinterCard.test.ts`.
 
 **La fila de salud del Inicio** (hub#573, BASE-F02). `printing.device.health` (`queries/health.py`, con su esquema en
@@ -974,7 +982,7 @@ cada botón sale por `openExternalLink`. La lectura de si la estación de tiques
 llega a una impresora activa suya en papel de tique ha dado señales en los últimos `SEEN_WITHIN` (90 s), `no_signal`
 si lo hay pero ninguno ha dado señales y `not_configured` si no hay ninguno. «Dado de alta» es el `configured` de
 `printing.device.coverage` y «ha dado señales», lo que la campana llama un dispositivo que está: las tres lecturas usan
-las mismas reglas. `SEEN_WITHIN` vive en `queries/health.py`. `PrintingConfig.health` la declara con los tiques, para
+las mismas reglas. `SEEN_WITHIN` vive en `queries/device_reads.py`. `PrintingConfig.health` la declara con los tiques, para
 quien ve Impresión (`printing.view_settings`), con «Configurar la impresión» hacia `/printing/printers` (`base.E021`).
 Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
 
@@ -995,8 +1003,8 @@ Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
   `modifiers` y su nota en `notes`), `usage` `kitchen` o `bar` o la impresora de la estación, en un savepoint
   de su transacción (KITCHEN-F08, F09).
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `documents.py` (el
-  vocabulario y las comprobaciones del documento), `queries.py`, `services.py`, `events.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `documents.py` (el
+  vocabulario y las comprobaciones del documento), `queries/`, `services/`, `events.py`,
   `live.py`, `api.py`, `admin.py`, `templates/printing/`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `tests/test_integration_sale.py` (una venta real de Ventas
   encolada por nombre) y `tests/test_integration_kitchen.py` (la comanda y la reimpresión reales de
@@ -1056,7 +1064,7 @@ Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
 - **Administrador de Django con CRUD completo**, solo en `hubs.erplora.com`; ids y
   fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Asistente**: cada operación declara `ai` con sus `asks` (frases en `en` y `es`, `live.E020`: Impresión está en
-  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1086) y cada campo de `schemas.py` su `description`; la
+  `LIVE_ASSISTANT_ASKS_REQUIRED`, hub#1086) y cada campo de `schemas/` su `description`; la
   impresora se nombra por su nombre y el trabajo por su número de documento. La tarjeta de
   confirmación nombra cada dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo:
   «Trabajo» para `job_id`, «Dispositivo», «Intento», «Error de impresión», «Referencia») o, si no lo tiene,

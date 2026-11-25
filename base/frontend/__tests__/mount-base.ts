@@ -6,7 +6,7 @@ import { assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { type BaseWrapper } from '@vue/test-utils';
 import { vi } from 'vitest';
 import { type Component, type Ref } from 'vue';
-import { createMemoryHistory, createRouter, type RouteLocationRaw, type Router, type RouteRecordRaw } from 'vue-router';
+import { createMemoryHistory, createRouter, type RouteLocationRaw, type RouteMeta, type Router, type RouteRecordRaw } from 'vue-router';
 
 import { type ApiCall, type ApiHandler, flush } from '../../../packages/ui/src/sdk/__tests__/live-harness';
 import type { AppHelp } from '../operations-help';
@@ -56,12 +56,20 @@ export { business, POLISH } from './business';
 type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
 
 /** The installed app's bridge, from the copy it is (`device_context`'s `distribution`: `direct`, `play`, `msstore`);
- *  its `invoke`, to look at. `leaveInstalledApp` takes it away and forgets the copy (`managementOffered`). */
-export function installedApp(distribution: string) {
-  const invoke = vi.fn(async (command: string) => (command === 'device_context' ? { id: 'd1', distribution } : undefined));
+ *  its `invoke`, to look at. `answers` answers other commands (one that throws is the app's refusal).
+ *  `leaveInstalledApp` takes it away and forgets the copy (`managementOffered`). */
+export function installedApp(distribution: string, answers: Record<string, () => unknown> = {}) {
+  const invoke = vi.fn(async (command: string) => {
+    if (command in answers) return answers[command]();
+    return command === 'device_context' ? { id: 'd1', distribution } : undefined;
+  });
   (window as TauriWindow).__TAURI__ = { core: { invoke } };
   return invoke;
 }
+
+/** An Ionic control's state (`checked`, `value`, `disabled`), a property of its element, not an attribute. */
+export const ionProp = (wrapper: { get: (s: string) => { element: Element } }, testid: string, name: string): unknown =>
+  (wrapper.get(`[data-testid="${testid}"]`).element as unknown as Record<string, unknown>)[name];
 
 export function leaveInstalledApp(): void {
   delete (window as TauriWindow).__TAURI__;
@@ -160,6 +168,8 @@ export interface MountOptions {
   routes?: string[];
   /** The app id the shell puts in those routes' metadata. */
   app?: string;
+  /** The metadata those routes declare themselves. */
+  meta?: RouteMeta;
   stubs?: Record<string, Component | boolean>;
   sidebar?: ShellSidebar;
   /** What the fake API answers, set before mounting (a component may ask on mount). */
@@ -183,7 +193,7 @@ export async function mountBase(component: Component, options: MountOptions = {}
   const known: RouteRecordRaw[] = (options.routes ?? []).map((path) => ({
     path,
     component: BLANK,
-    meta: options.app ? { app: options.app } : {},
+    meta: { ...(options.app ? { app: options.app } : {}), ...options.meta },
   }));
   const router = createRouter({
     history: createMemoryHistory(),

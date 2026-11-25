@@ -30,10 +30,14 @@ from base import access, queries
 from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import PLATFORM_ADMIN, PLATFORM_SUPPORT, RedeemedUser
 from base.session_host import PLATFORM_SESSION_HOST, session_host
-from base.models import Hub, HubUser, Membership, SessionOwner, TrustedDevice
+from base.models import Hub, HubUser, Membership
+from base.models.api_keys import ApiKey
+from base.models.sessions import SessionOwner
+from base.models.access import TrustedDevice
+from base.permissions import is_a_person
 from base.registry import internal_only
 from base.schemas.sessions import HubUserSyncIn, HubUserSyncOut, SessionRevokeIn, SessionRevokeOut
-from control.models import HubVisit
+from control.models.usage import HubVisit
 
 
 MODEL_BACKEND = "django.contrib.auth.backends.ModelBackend"
@@ -109,7 +113,8 @@ def _note_the_owner(
 ) -> None:
     """Note whose and where the new session is (``SessionOwner``), so ``base.session.revoke`` finds it by index, and
     on which device and with which credential it was opened; and, on a hub, that its person came in today
-    (``control.HubVisit``, its nightly use and who is active now).
+    (``control.HubVisit``, its nightly use and who is active now), unless they are ERPlora's support, who is none of
+    the business's people.
 
     ``login`` gives the session a new key and saves it, unless it flushed another user's session first: then it has
     no key until it is saved, which happens here, in the login's transaction.
@@ -126,7 +131,7 @@ def _note_the_owner(
             "credential": credential,
         },
     )
-    if host and host != PLATFORM_SESSION_HOST:
+    if host and host != PLATFORM_SESSION_HOST and credential != SessionOwner.Credential.SUPPORT:
         # Who came into the business today (its nightly use, ``base.usage``): once a day, whatever the logins; what they
         # do next keeps ``last_seen_at`` going (``base.meter``).
         now = timezone.now()
@@ -225,14 +230,19 @@ def _end_other_devices(slug: str, device: TrustedDevice) -> None:
     """Keep within the devices the business's plan covers (``plan.max_devices`` of the SaaS's photo; 0 or none, no
     cap): an entry on ``device`` ends the live sessions on this host of every other device past the
     ``max_devices - 1`` most recently entered, and marks those devices so their next way in says why. A session with
-    no device (from before the rule) never counts as a kept one. Their tabs wake after the COMMIT and leave."""
+    no device (from before the rule) never counts as a kept one; ERPlora's support's is no device of the business and
+    stays. Their tabs wake after the COMMIT and leave."""
     hub = Hub.objects.filter(slug=slug).first()
     plan = (hub.state or {}).get("plan") if hub is not None and isinstance(hub.state, dict) else None
     cap = plan.get("max_devices") if isinstance(plan, dict) else None
     if not isinstance(cap, int) or cap < 1:
         return
     now = timezone.now()
-    others = SessionOwner.objects.filter(host=slug, session__expire_date__gt=now).exclude(device_id=device.pk)
+    others = (
+        SessionOwner.objects.filter(host=slug, session__expire_date__gt=now)
+        .exclude(device_id=device.pk)
+        .exclude(credential=SessionOwner.Credential.SUPPORT)
+    )
     latest = (
         others.exclude(device_id=None).values("device_id").annotate(opened=Max("created_at")).order_by("-opened")
     )
@@ -291,7 +301,7 @@ def ensure_hub_user(user) -> HubUser:
 def acting_hub_user(ctx: OperationContext) -> HubUser | None:
     """The ``HubUser`` of the person behind ``ctx``, made if missing, for what a write signs; ``None`` for the
     platform, an API key or nobody (no person)."""
-    if not queries.people.is_a_person(ctx.actor):
+    if not is_a_person(ctx.actor):
         return None
     return ensure_hub_user(ctx.actor)
 
@@ -325,7 +335,16 @@ def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
     gone = HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True).exclude(
         username__in=listed
     )
+    _keys_without_a_maker_to_the_owner(data.members)
     return {"made": made, "updated": updated, "left": gone.update(is_active=False)}
+
+
+def _keys_without_a_maker_to_the_owner(members: list) -> None:
+    """The API keys made before a key recorded its maker go to the owner the photo names, the only one who says who
+    that is. They were the owner's or an administrator's, who held everything, so what they may do does not change."""
+    owner = next((member for member in members if member.role == Membership.Role.OWNER), None)
+    if owner is not None:
+        ApiKey.objects.filter(owner=None).update(owner=HubUser.objects.get(username=username_for(str(owner.user_id))))
 
 
 def _sync_hub_users(hub: Hub, members: list, left: list[str]) -> None:
@@ -352,8 +371,8 @@ def session_revoke(ctx: OperationContext, data: SessionRevokeIn) -> dict:
     """End the Hub's sessions of the SaaS account ``data.user_id``: those on the business ``data.hub_id`` or, without
     it, every one of them, the Hub admin's included (as OIDC's back-channel logout).
 
-    The SaaS sends it after the COMMIT that removed the person from a business, changed their role or handed the
-    business over (with the business), or after a password change, «sign out everywhere» or deleting the account
+    The SaaS sends it after the COMMIT that removed the person from a business or handed the business over (with
+    the business), or after a password change, «sign out everywhere» or deleting the account
     (without it). The sessions are found through ``SessionOwner``, never by decoding the table's. Idempotent: what
     already ended counts nothing; a business the registry does not know ends nothing and answers as one without
     sessions. The hosts whose sessions ended wake after the COMMIT (:func:`_end_sessions`).
@@ -382,14 +401,15 @@ def _end_sessions(owners) -> int:
 def _apply_members(hub: Hub, members: list) -> list[str]:
     """Make the memberships of ``hub`` say what the photo's ``members`` say (HUBS-F26, F27 and F28 of the SaaS).
 
-    A person whose role changed has it now and a person no longer listed loses their membership; either way their
-    sessions on this business end (:func:`_end_sessions`), so the next thing they do runs with the permissions of
-    the photo, not of their login. Nobody is created: a person the Hub has not seen yet takes their role when they
-    first enter (:func:`open_session_from_saas`). Only the copies of SaaS accounts are the photo's (``saas:<id>``):
-    a demo's owner is not. Returns the SaaS accounts that left the business (their memberships gone).
+    A person whose role changed has it now and keeps their sessions: the business's open apps wake after the COMMIT
+    (:func:`_wake_open_apps`) and every request and live re-run reads the permissions of the new role. A person no
+    longer listed loses their membership and their sessions on this business end (:func:`_end_sessions`). Nobody is
+    created: a person the Hub has not seen yet takes their role when they first enter (:func:`open_session_from_saas`).
+    Only the copies of SaaS accounts are the photo's (``saas:<id>``): a demo's owner is not. Returns the SaaS accounts
+    that left the business (their memberships gone).
     """
     wanted = {str(member.user_id): member.role for member in members}
-    changed = []
+    changed_role = False
     left = []
     memberships = (
         Membership.objects.select_for_update(of=("self",))
@@ -405,19 +425,19 @@ def _apply_members(hub: Hub, members: list) -> list[str]:
         elif role != membership.role:
             membership.role = role
             membership.save(update_fields=["role"])
-        else:
-            continue
-        changed.append(saas_user_id)
-    if changed:
+            changed_role = True
+    if left:
         # A session that noted no host (from before the rule) is valid on every host, this business's too.
-        _end_sessions(SessionOwner.objects.filter(saas_user_id__in=changed, host__in=[hub.slug, ""]))
+        _end_sessions(SessionOwner.objects.filter(saas_user_id__in=left, host__in=[hub.slug, ""]))
+    if changed_role:
+        transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
     return left
 
 
 def _wake_open_apps(slug: str) -> None:
-    """The business of ``slug`` just stopped serving the app (suspended, cancelled), or some of its sessions ended:
-    every open live stream and print socket of its host re-runs now («*», everything may have changed), hears the host
-    gate and its session again (``base.operations.HubContextBuilder.refresh``) and ends if they no longer hold,
-    instead of waiting for the hub's next write or the safety re-run (BILLING-F16 of the SaaS, step 4: the devices with
-    the app open leave for the Hub's page)."""
+    """The business of ``slug`` just stopped serving the app (suspended, cancelled), some of its sessions ended, or
+    somebody's role in it changed: every open live stream and print socket of its host re-runs now («*», everything
+    may have changed), hears the host gate and its session again (``base.operations.HubContextBuilder.refresh``) and
+    ends if they no longer hold, instead of waiting for the hub's next write or the safety re-run (BILLING-F16 of the
+    SaaS, step 4: the devices with the app open leave for the Hub's page)."""
     notify(Scope("host", slug), [ALL_EVENTS])

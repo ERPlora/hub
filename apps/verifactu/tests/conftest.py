@@ -14,6 +14,7 @@ Every test that uses the database works as production does: inside the business 
 import base64
 import datetime as dt
 import re
+import socket
 from pathlib import Path
 
 import pytest
@@ -168,7 +169,7 @@ def invoice_does_not_seal(monkeypatch):
     its record, which only a direct call or the reaction to its notice seals. The rest of Invoicing is real."""
     from live.operations import UnknownOperation
 
-    from apps.invoice import services as invoicing
+    from apps.invoice.services import issuing as invoicing
 
     real = invoicing.get_operation
 
@@ -185,7 +186,7 @@ def at_emission(monkeypatch):
     """``at_emission(change)``: when Invoicing's emission asks VeriFactu for the record, the invoice's row is first
     changed behind Invoicing's back with ``change(row)`` (in the emission's transaction, outside VeriFactu's
     savepoint), so VeriFactu's real operation sees a document it must refuse right at the emission."""
-    from apps.invoice import services as invoicing
+    from apps.invoice.services import issuing as invoicing
     from apps.invoice.models import Invoice
 
     real = invoicing.get_operation
@@ -242,6 +243,17 @@ def db_dsn(django_db_setup):
 @pytest.fixture
 def issuer(db):
     return run("invoice.issuer.update", ISSUER)
+
+
+@pytest.fixture
+def offline(monkeypatch):
+    """Nothing may leave the machine: a connection opened from Python fails the test (the database's is not)."""
+
+    def refuse(*args, **kwargs):
+        raise AssertionError(f"a test opened a connection: {args!r}")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
 
 
 #: Half a minute before minute 23, when VeriFactu's certificate check falls due.

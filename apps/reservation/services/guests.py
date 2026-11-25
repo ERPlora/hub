@@ -9,8 +9,8 @@ from live.errors import InvalidPayload
 
 from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
-from apps.customer.queries import business_country, find_customer
-from apps.customer.services import PHONE_INVALID
+from apps.customer.queries.reads import business_country, find_customer
+from apps.customer.services.writes import PHONE_INVALID
 from apps.reservation.services.other_apps import call_app, card_keeper
 
 

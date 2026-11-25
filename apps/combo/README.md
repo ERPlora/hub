@@ -39,7 +39,7 @@ factura; Ventas la cobra, Inventario baja el stock de cada plato y Cocina recibe
 | `requires` | `["inventory", "tax"]`: las elecciones son FK a `inventory.Product` y el menú «en el local», a `tax.TaxCategory`. No admite servicios de Servicios (los packs de peluquería son sus bonos) |
 | Quién la usa | Ventas la llama por nombre (`combo.combo.resolve`, y la hoja del TPV lee `combo.combo.for_sale` en vivo) sin requerirla; Cocina e Inventario no la llaman: leen los componentes que Ventas pone en sus avisos |
 | Pantallas | `/combo/menus` (lista) y `/combo/menus/:id` (constructor); la hoja del TPV es de Ventas |
-| Operaciones | 7 consultas (`queries.py`) y 17 acciones (`services.py`), todas con `ai=`; 19 rutas en `/api/combo/…` (sin ruta: `combo.option.drop_product`, `combo.combo.recover` y `combo.group.recover`, de la plataforma, y `combo.group.get` y `combo.option.get`) |
+| Operaciones | 9 consultas (`queries/`) y 18 acciones (`services/`), todas con `ai=`; 20 rutas en `/api/combo/…` (sin ruta: `combo.option.drop_product`, `combo.combo.recover` y `combo.group.recover`, de la plataforma, y `combo.group.get`, `combo.option.get`, `combo.option.check` y `combo.option.bulk_check`) |
 | Eventos | 11, `combo.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `inventory.product.deleted` (`combo.option.drop_product`), por el relay del outbox |
 | Migraciones | `0001_initial` (depende de `inventory 0001` y `tax 0005`) y `0002_combo_image` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |

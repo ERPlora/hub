@@ -50,12 +50,24 @@ Cents = Annotated[int, Field(ge=0, le=MAX_CENTS, json_schema_extra={"money": Tru
 Quantity = Annotated[Decimal, Field(max_digits=15, decimal_places=3)]
 #: How a person names a product (its SKU or name) or a category (its name or slug).
 Said = _text(200, 1)
-ProductSearch = Annotated[str | None, Field(max_length=200, description="Part of the name or the SKU.")]
+#: A product has one name, in the language it was written in: the model looks it up with what the person said.
+IN_THEIR_WORDS = "in the person's own words, never translated"
+PRODUCT_SAID = (
+    f"The product's SKU or name, when its id is not known (e.g. said aloud), first {IN_THEIR_WORDS}: a product has "
+    "one name, in the language it was written in. Only if none matches may it be written in another language "
+    "(«Draught beer» for «caña»): then say which one you took."
+)
+ProductSearch = Annotated[
+    str | None, Field(max_length=200, description=f"Part of the name or the SKU, {IN_THEIR_WORDS}.")
+]
 
 # The assistant's card names the record a write acts on by these reads (base/assistant/cards.py ``REFERS``), run as whoever
 # asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
 A_PRODUCT = assistant.names("inventory.product.get")
 A_CATEGORY = assistant.names("inventory.category.get")
+# A product or a category said in the person's words: the card names the one the write's own search finds.
+A_PRODUCT_SAID = assistant.names("inventory.product.get", by="product", as_said=True)
+A_CATEGORY_SAID = assistant.names("inventory.category.get", by="category", as_said=True)
 
 
 # Pages: every list is paginated, limit ≤ 100.
@@ -83,8 +95,7 @@ class Page(Schema, Generic[T]):
 class ProductRefIn(Schema):
     id: UUID | None = Field(None, title=T_PRODUCT, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
-        None,
-        description="The product's SKU or name, when its id is not known (e.g. said aloud).",
+        None, description=PRODUCT_SAID, json_schema_extra=assistant.unless_given(A_PRODUCT_SAID, "id")
     )
 
     @model_validator(mode="after")
@@ -97,7 +108,9 @@ class ProductRefIn(Schema):
 class CategoryRefIn(Schema):
     id: UUID | None = Field(None, title=T_CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
-        None, description="The category's name or slug, when its id is not known."
+        None,
+        description="The category's name or slug, when its id is not known.",
+        json_schema_extra=assistant.unless_given(A_CATEGORY_SAID, "id"),
     )
 
     @model_validator(mode="after")
@@ -112,8 +125,7 @@ class _ProductLineRef(Schema):
 
     product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
-        None,
-        description="The product's SKU or name, when its id is not known (e.g. said aloud).",
+        None, description=PRODUCT_SAID, json_schema_extra=assistant.unless_given(A_PRODUCT_SAID, "product_id")
     )
 
     @model_validator(mode="after")

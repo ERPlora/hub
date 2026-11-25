@@ -37,7 +37,8 @@ from base.tenancy.tests.s3 import (  # noqa: F401
     objects,
     spy_on_the_purge,
 )
-from control.models import Cluster, Hub, HubDue, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Cluster, Hub, HubDue
 
 
 def databases() -> set[str]:
@@ -263,7 +264,9 @@ def test_a_business_with_fiscal_documents_stays_cancelled_with_its_database_and_
 #: The apps with nothing a tax inspector asks for, each one looked at: a new app has to say which side it is on, or the
 #: drop of a business would take its documents away without anyone noticing. ``kitchen.Ticket`` comes from a sale, which
 #: is the document; a price in ``service``, ``pricing`` or ``combo`` is a list price, no money that moved;
-#: ``inventory.StockMovement`` counts goods, not what was paid for them.
+#: ``inventory.StockMovement`` counts goods, not what was paid for them; a table's code in ``online_order`` opens a
+#: page; a ``tip.Tip`` is no sale and carries no fiscal record (the cash it brings into the drawer is Cash register's
+#: movement, which is kept).
 NO_FISCAL_DOCUMENTS = {
     "appointment",
     "attendance",
@@ -274,6 +277,7 @@ NO_FISCAL_DOCUMENTS = {
     "kitchen",
     "modifier",
     "online_booking",
+    "online_order",
     "pricing",
     "printing",
     "reservation",
@@ -283,6 +287,7 @@ NO_FISCAL_DOCUMENTS = {
     "table",
     "task",
     "tax",
+    "tip",
     "website",
     "whatsapp_inbox",
 }
@@ -948,7 +953,7 @@ def test_a_tombstone_does_not_keep_its_cluster_from_being_deleted(business):
         Hub.objects.filter(pk=hub.pk).update(cluster=cluster)
 
         services.offboarding.hub_purge(internal(), HubGetIn(id=hub.pk))
-        control_services.cluster_delete(internal(), ClusterIdIn(id=cluster.pk))
+        control_services.clusters.cluster_delete(internal(), ClusterIdIn(id=cluster.pk))
 
         assert not Cluster.objects.filter(pk=cluster.pk).exists()
     finally:

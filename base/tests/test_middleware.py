@@ -12,7 +12,7 @@ import re
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
-from django.urls import clear_script_prefix, reverse, set_script_prefix
+from django.urls import clear_script_prefix, set_script_prefix
 
 from base import health
 from base.tenancy.tests.business import HOST, HUB_DB, A, B
@@ -198,34 +198,6 @@ def prod_domain(settings):
     settings.ALLOWED_HOSTS = PROD_HOSTS
     settings.HUB_BASE_DOMAIN = "erplora.com"
     settings.LIVE = {**settings.LIVE, "hub_slug_min_length": 3}
-
-
-@pytest.mark.usefixtures("prod_domain")
-def test_nobody_can_open_a_screen_of_the_platform_hub_though_its_row_is_ready(client, superuser):
-    """ERPlora's own hub has its row, but its slug is reserved (``live.slugs``): its host is no hub's, before the registry
-    is read, so no page, API call or jump reaches «Usage and plan» there, with a session or with a key. On the platform
-    host the staff only get the admin. Should this ever open, that screen would promise it a plan the SaaS never sends."""
-    from base.models import Hub
-
-    Hub.objects.create(slug="erplora", status="ready", is_platform=True)
-    host = "erplora.erplora.com"
-
-    def closed():
-        assert browse(client, "/system", host).status_code == 404
-        assert browse(client, "/auth/login", host).status_code == 404
-        assert browse(client, "/auth/callback", host).status_code == 404
-        for path in ("/api/system/plan", "/api/live"):
-            for headers in ({}, {"HTTP_AUTHORIZATION": "Bearer erpk_live_any"}):
-                api = client.get(path, HTTP_HOST=host, **headers)
-                assert (api.status_code, api.json()["error"]["code"]) == (404, "not_found")
-
-    closed()
-    client.force_login(superuser)
-    closed()
-
-    for path in ("/system", "/api/system/plan"):
-        page = browse(client, path, "hubs.erplora.com")
-        assert (page.status_code, page["Location"]) == (302, reverse("admin:index"))
 
 
 @pytest.mark.usefixtures("prod_domain")
@@ -510,7 +482,7 @@ class TestTheRegistryGate:
     # A hub moving to another cluster (control.hub.move): closed for the few seconds its database is copied, then back
     # on its new cluster.
     def test_a_hub_moving_to_another_cluster_is_503_under_maintenance_and_asks_to_come_back(self, client, hub):
-        from control.models import Cluster
+        from control.models.hubs import Cluster
 
         hub(moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
         page = browse(client, "/")
@@ -524,7 +496,7 @@ class TestTheRegistryGate:
 
     # A hub put back as it was at a moment (hub#1198; control.hub.restore): closed while its copy is restored.
     def test_a_hub_being_restored_is_503_under_maintenance_and_asks_to_come_back(self, client, hub):
-        from control.models import Cluster
+        from control.models.hubs import Cluster
 
         hub(restoring_from=Cluster.objects.create(name="restore", host="writer-restore.example", is_open=False))
         page = browse(client, "/")
@@ -534,7 +506,7 @@ class TestTheRegistryGate:
         assert (api.status_code, api.json()["error"]["code"]) == (503, "base.hub_maintenance")
 
     def test_a_hub_under_maintenance_says_so_in_spanish(self, client, hub):
-        from control.models import Cluster
+        from control.models.hubs import Cluster
 
         hub(moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
         page = client.get("/", HTTP_HOST=HOST, HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE="es")

@@ -30,7 +30,7 @@ never stops the worker.
 After the visits, the apps the hubs turned on whose tables they lack (``_activations``, also with ``databases_only``):
 the hubs rung (``hub_due`` come and free: ``base.app.enable`` rings after its COMMIT, a retry at its time, the sweep),
 for ``ACTIVATION_PASS_SECONDS`` at most: in each one, what is due (``creating``, or ``failed`` past its next try) gets
-its tables from ``base.tenancy.migrator.ensure_schema(hub, add=…)`` under the hub's schema lock, and
+its tables from ``base.tenancy.migrator.schema.ensure_schema(hub, add=…)`` under the hub's schema lock, and
 ``base.app.activation_settle`` turns it on (its event, its live notice) or ``failed`` with why, and moves the hub's ring
 to the next of its apps to set up (or ends it); a schema held elsewhere puts it off 30 s, and a request of a newer code
 than this worker's (``AppActivation.target``, or the app or what it needs already at a migration this code does not
@@ -85,7 +85,7 @@ from base.tenancy.context import use_control
 from base.worker_activations import _activations
 from base.worker_data import _data, _moves, _usage
 from control import queries as control_queries
-from control.models import Hub
+from control.models.hubs import Hub
 
 logger = logging.getLogger(__name__)
 
@@ -140,13 +140,13 @@ def run(
     return 0
 
 
-def _register(stop: threading.Event, wait: Callable[[float], object]) -> catalog.RegisterResult | int:
+def _register(stop: threading.Event, wait: Callable[[float], object]) -> catalog.register_apps.RegisterResult | int:
     """Register the apps, waiting while the SaaS has not migrated ``shared``; the exit code when it ends first."""
     delay = RETRY_FIRST_SECONDS
     while True:
         try:
-            return catalog.register_apps()
-        except catalog.SharedSchemaNotReady as error:
+            return catalog.register_apps.register_apps()
+        except catalog.errors.SharedSchemaNotReady as error:
             logger.warning("worker: shared schema not migrated yet; retrying in %d s (%s).", delay, error)
         except Exception:
             logger.exception("worker: register_apps failed; the worker stops (no release without its apps).")

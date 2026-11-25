@@ -37,7 +37,10 @@ class ComboConfig(LiveAppConfig):
     assistant_synonyms = (
         ("opcion", "opciones", "eleccion", "elecciones", "option", "options", "choice", "choices"),
     )
-    permissions = ["combo.view", "combo.manage"]
+    permissions = {
+        "combo.view": _("View menus and price a menu line"),
+        "combo.manage": _("Create, change, sort and retire menus, their courses and choices"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["combo.*"],
@@ -67,29 +70,29 @@ class ComboConfig(LiveAppConfig):
         added again by ``combo.group.recover``; then each choice of a product that the business no longer offers in its
         course, offered again by ``combo.option.create``, the menu builder's own, each counted apart. It goes after
         Inventory, so a deleted product is back before its choices."""
-        from apps.combo import queries  # the models are not loaded yet when this module is
+        from apps.combo.queries import recovery  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
         return [
             Recoverable(
                 label=_("Menus"),
                 reads_since="0002_combo_image",
-                read=queries.combos_in_copy,
-                missing=queries.combos_not_in_business,
+                read=recovery.combos_in_copy,
+                missing=recovery.combos_not_in_business,
                 create="combo.combo.recover",
             ),
             Recoverable(
                 label=_("Menu courses"),
                 reads_since="0001_initial",
-                read=queries.groups_in_copy,
-                missing=queries.groups_not_in_business,
+                read=recovery.groups_in_copy,
+                missing=recovery.groups_not_in_business,
                 create="combo.group.recover",
             ),
             Recoverable(
                 label=_("Menu choices of products"),
                 reads_since="0001_initial",
-                read=queries.options_in_copy,
-                missing=queries.options_not_in_business,
+                read=recovery.options_in_copy,
+                missing=recovery.options_not_in_business,
                 create="combo.option.create",
             ),
         ]

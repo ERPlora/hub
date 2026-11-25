@@ -11,26 +11,13 @@ from ninja import Query, Router
 from ninja.decorators import decorate_view
 
 from apps.combo import queries, services
-from apps.combo.schemas import (
-    ComboImageIn,
-    ComboImageSuggestIn,
-    ComboImageUploadIn,
-    ComboIn,
-    ComboListIn,
-    ComboPatchIn,
-    ComboRefIn,
-    ForSaleIn,
-    GroupIn,
-    GroupPatchIn,
-    GroupRefIn,
-    GroupReorderIn,
-    OptionBulkIn,
-    OptionIn,
-    OptionPatchIn,
-    OptionRefIn,
-    OptionReorderIn,
-    ResolveIn,
-)
+from apps.combo.schemas.choices import OptionBulkIn, OptionIn, OptionPatchIn, OptionReorderIn
+from apps.combo.schemas.courses import GroupIn, GroupPatchIn, GroupReorderIn
+from apps.combo.schemas.images import ComboImageIn, ComboImageSuggestIn, ComboImageUploadIn
+from apps.combo.schemas.menus import ComboIn, ComboListIn, ComboPatchIn
+from apps.combo.schemas.references import ComboRefIn, GroupRefIn, OptionRefIn
+from apps.combo.schemas.till import ForSaleIn, ResolveIn
+from apps.combo.schemas.on_sale import ComboOnSaleIn
 from base.request_body import accept_body_up_to
 
 router = Router(tags=["combo"])
@@ -44,37 +31,42 @@ MAX_PHOTO_BODY = 2_900_000
 
 @bind(router, "combo.combo.list", "/combo/combos")
 async def combo_list(request, params: Query[ComboListIn]):
-    return await run_operation(request, queries.list_combos, params)
+    return await run_operation(request, queries.menus.list_combos, params)
 
 
 @bind(router, "combo.combo.get", "/combo/combos/detail")
 async def combo_get(request, params: Query[ComboRefIn]):
-    return await run_operation(request, queries.get_combo, params)
+    return await run_operation(request, queries.menus.get_combo, params)
 
 
 @bind(router, "combo.combo.for_sale", "/combo/combos/for_sale")
 async def combo_for_sale(request, params: Query[ForSaleIn]):
-    return await run_operation(request, queries.list_for_sale, params)
+    return await run_operation(request, queries.till.list_for_sale, params)
 
 
 @bind(router, "combo.combo.resolve", "/combo/combos/resolve")
 async def combo_resolve(request, params: Query[ResolveIn]):
-    return await run_operation(request, queries.resolve, params)
+    return await run_operation(request, queries.lines.resolve, params)
 
 
 @bind(router, "combo.combo.create", "/combo/combos", status=201)
 async def combo_create(request, data: ComboIn):
-    return await run_operation(request, services.create_combo, data)
+    return await run_operation(request, services.menus.create_combo, data)
 
 
 @bind(router, "combo.combo.update", "/combo/combos/update")
 async def combo_update(request, data: ComboPatchIn):
-    return await run_operation(request, services.update_combo, data)
+    return await run_operation(request, services.menus.update_combo, data)
 
 
 @bind(router, "combo.combo.delete", "/combo/combos/delete")
 async def combo_delete(request, data: ComboRefIn):
-    return await run_operation(request, services.delete_combo, data)
+    return await run_operation(request, services.menus.delete_combo, data)
+
+
+@bind(router, "combo.combo.set_active", "/combo/combos/set_active")
+async def combo_set_active(request, data: ComboOnSaleIn):
+    return await run_operation(request, services.on_sale.set_active, data)
 
 
 # Courses
@@ -82,22 +74,22 @@ async def combo_delete(request, data: ComboRefIn):
 
 @bind(router, "combo.group.create", "/combo/groups", status=201)
 async def group_create(request, data: GroupIn):
-    return await run_operation(request, services.create_group, data)
+    return await run_operation(request, services.courses.create_group, data)
 
 
 @bind(router, "combo.group.update", "/combo/groups/update")
 async def group_update(request, data: GroupPatchIn):
-    return await run_operation(request, services.update_group, data)
+    return await run_operation(request, services.courses.update_group, data)
 
 
 @bind(router, "combo.group.delete", "/combo/groups/delete")
 async def group_delete(request, data: GroupRefIn):
-    return await run_operation(request, services.delete_group, data)
+    return await run_operation(request, services.courses.delete_group, data)
 
 
 @bind(router, "combo.group.reorder", "/combo/groups/reorder")
 async def group_reorder(request, data: GroupReorderIn):
-    return await run_operation(request, services.reorder_groups, data)
+    return await run_operation(request, services.courses.reorder_groups, data)
 
 
 # Choices
@@ -105,27 +97,27 @@ async def group_reorder(request, data: GroupReorderIn):
 
 @bind(router, "combo.option.create", "/combo/options", status=201)
 async def option_create(request, data: OptionIn):
-    return await run_operation(request, services.create_option, data)
+    return await run_operation(request, services.choices.create_option, data)
 
 
 @bind(router, "combo.option.bulk_create", "/combo/options/bulk_create", status=201)
 async def option_bulk_create(request, data: OptionBulkIn):
-    return await run_operation(request, services.bulk_create_options, data)
+    return await run_operation(request, services.choices.bulk_create_options, data)
 
 
 @bind(router, "combo.option.update", "/combo/options/update")
 async def option_update(request, data: OptionPatchIn):
-    return await run_operation(request, services.update_option, data)
+    return await run_operation(request, services.choices.update_option, data)
 
 
 @bind(router, "combo.option.delete", "/combo/options/delete")
 async def option_delete(request, data: OptionRefIn):
-    return await run_operation(request, services.delete_option, data)
+    return await run_operation(request, services.choices.delete_option, data)
 
 
 @bind(router, "combo.option.reorder", "/combo/options/reorder")
 async def option_reorder(request, data: OptionReorderIn):
-    return await run_operation(request, services.reorder_options, data)
+    return await run_operation(request, services.choices.reorder_options, data)
 
 
 # The menu's image (COMBO-F14, base.images)
@@ -133,15 +125,15 @@ async def option_reorder(request, data: OptionReorderIn):
 
 @bind(router, "combo.combo.set_image", "/combo/combos/image")
 async def combo_image_set(request, data: ComboImageIn):
-    return await run_operation(request, services.set_image, data)
+    return await run_operation(request, services.menus.set_image, data)
 
 
 @bind(router, "combo.combo.upload_image", "/combo/combos/image/upload")
 @decorate_view(accept_body_up_to(MAX_PHOTO_BODY))
 async def combo_image_upload(request, data: ComboImageUploadIn):
-    return await run_operation(request, services.upload_image, data)
+    return await run_operation(request, services.menus.upload_image, data)
 
 
 @bind(router, "combo.combo.suggest_image", "/combo/combos/image/suggest")
 async def combo_image_suggest(request, params: Query[ComboImageSuggestIn]):
-    return await run_operation(request, queries.suggest_image, params)
+    return await run_operation(request, queries.images.suggest_image, params)

@@ -25,15 +25,17 @@ from base.tests.test_assistant_asks import assert_offered_with_room
 from base.tests.test_assistant_asks import assert_reported_are_owner_probes, offered_place, offered_to, without_its_asks
 from base.tests.test_assistant_asks import english_words_test, own_words_test, said_in_spanish_too_test
 
-#: Invoicing's assistant tools: its reads (invoices, their A4 page and what a sale or a refund has, a manual line's
+#: Invoicing's assistant tools: its reads (invoices, their A4 page, its PDF, its emails and what a sale or a refund has, a manual line's
 #: rate, the rectification it would issue, the issuer, the numbering and its series) and its writes (issue by hand or
-#: from a sale, replace a ticket, mark paid, print, rectify by hand, from a refund or from a void, the issuer and the
+#: from a sale, replace a ticket, mark paid, print, email, rectify by hand, from a refund or from a void, the issuer and the
 #: series). What only the platform does (the hub of ERPlora's own invoices, the issuer from the account) is
 #: ``INTERNAL``.
 TOOLS = {
     "invoice.invoice.list",
+    "invoice.invoice.export",
     "invoice.invoice.get",
     "invoice.invoice.document",
+    "invoice.invoice.pdf",
     "invoice.invoice.by_source",
     "invoice.invoice.line_defaults",
     "invoice.invoice.rectification_preview",
@@ -50,6 +52,8 @@ TOOLS = {
     "invoice.invoice.substitute",
     "invoice.invoice.mark_paid",
     "invoice.invoice.print",
+    "invoice.email.send",
+    "invoice.email.list",
     "invoice.invoice.rectify",
     "invoice.invoice.rectify_from_refund",
     "invoice.invoice.rectify_from_void",
@@ -57,11 +61,12 @@ TOOLS = {
     "invoice.series.create",
     "invoice.series.update",
 }
-#: What rectifies an invoice or decides how the documents are numbered and who issues them (``invoice.rectify_invoice``,
-#: ``invoice.manage_series``, ``invoice.manage_issuer``; WORKBOOK «Quién puede qué»), none of them a write a manager
-#: approves: an employee's assistant is never offered them, as the screens give an employee no «Rectificar», no series
-#: and no issuer.
+#: What rectifies an invoice, decides how the documents are numbered and who issues them, or downloads everyone's
+#: (``invoice.rectify_invoice``, ``invoice.manage_series``, ``invoice.manage_issuer``, ``invoice.view_all_invoices``;
+#: WORKBOOK «Quién puede qué»), none of them a write a manager approves: an employee's assistant is never offered them,
+#: as the screens give an employee no «Rectificar», no series, no issuer and no «Descargar en Excel».
 NOT_THE_EMPLOYEES = {
+    "invoice.invoice.export",
     "invoice.invoice.rectification_preview",
     "invoice.invoice.rectify",
     "invoice.invoice.rectify_from_refund",
@@ -127,10 +132,14 @@ PAID = (
 OWN_WORDS = [
     ("es", "invoice.invoice.list", "busca lo que le hemos emitido a Talleres Mercedes"),
     ("en", "invoice.invoice.list", "anything still pending from Talleres Mercedes?"),
+    ("es", "invoice.invoice.export", "mándale a la asesoría un Excel con lo emitido en marzo"),
+    ("en", "invoice.invoice.export", "my accountant needs a spreadsheet of the March billing"),
     ("es", "invoice.invoice.get", "quiero ver por dentro la FACT-2025-000412"),
     ("en", "invoice.invoice.get", "read me FACT-2025-000412 from top to bottom"),
     ("es", "invoice.invoice.document", "¿cómo se ve en hoja lo que le dimos a Talleres Mercedes?"),
     ("en", "invoice.invoice.document", "how does the sheet we handed to Talleres Mercedes look?"),
+    ("es", "invoice.invoice.pdf", "quiero guardar la de Talleres Mercedes"),
+    ("en", "invoice.invoice.pdf", "let me save the Talleres Mercedes one and keep it"),
     ("es", "invoice.invoice.by_source", "lo que vendimos esta mañana en la 20261111-0007, ¿con qué papel quedó?"),
     ("en", "invoice.invoice.by_source", "this morning's 20261111-0007: which paper did it end up with?"),
     ("es", "invoice.invoice.line_defaults", "si meto a mano una línea de unas gafas, ¿qué porcentaje le sale?"),
@@ -179,6 +188,10 @@ OWN_WORDS = [
     ("en", "invoice.invoice.mark_paid", "Talleres Gómez settled what they owed us yesterday"),
     ("es", "invoice.invoice.print", "saca en papel la FACT-2025-000412"),
     ("en", "invoice.invoice.print", "FACT-2025-000412 on paper for the binder, please"),
+    ("es", "invoice.email.send", "hazle llegar a Talleres Mercedes la FACT-2025-000412 a su email"),
+    ("en", "invoice.email.send", "Talleres Mercedes want theirs dropped into their inbox"),
+    ("es", "invoice.email.list", "el correo de Talleres Mercedes, ¿ha fallado o les llegó?"),
+    ("en", "invoice.email.list", "what we mailed Talleres Mercedes yesterday, did it bounce?"),
     ("es", "invoice.invoice.rectify", "la de Talleres Mercedes tiene un error en el importe: hazle su negativo"),
     ("en", "invoice.invoice.rectify", "the Talleres Mercedes one has the wrong amount: fix it with an R1"),
     (
@@ -202,7 +215,7 @@ OWN_WORDS = [
 ]
 
 
-def test_invoice_offers_its_twenty_five_tools():
+def test_invoice_offers_its_twenty_nine_tools():
     """Invoicing's assistant tools (``AI``, never ``INTERNAL``): a silent drop of a tool fails."""
     tools = {name for name, op in registry.items() if op.app_label == "invoice" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)

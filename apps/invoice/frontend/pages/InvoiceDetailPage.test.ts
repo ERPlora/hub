@@ -8,15 +8,13 @@
 import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountInvoice, OWNER } from '../__tests__/mount-invoice';
+import { INVOICE, OP, setup } from '../__tests__/invoice-detail';
+import { click, EMPLOYEE, errorFrame, flush, type MountOptions, OWNER } from '../__tests__/mount-invoice';
 import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
 import InvoicePaper from '../components/InvoicePaper.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import SubstituteModal from '../components/SubstituteModal.vue';
 import { PrintRefused } from '../../../../base/frontend/lib/print-paper';
-import { plain } from '../lib/format';
-import type { InvoiceOut } from '../operations';
-import InvoiceDetailPage from './InvoiceDetailPage.vue';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), print: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -29,67 +27,8 @@ beforeEach(() => {
   mocks.print.mockReset();
 });
 
-const OP = 'invoice.invoice.get';
-
-const INVOICE: InvoiceOut = {
-  id: 'i1',
-  number: 'FACT-2026-000001',
-  invoice_type: 'F1',
-  series_code: 'FACT',
-  year: 2026,
-  issue_date: '2026-10-14',
-  issued_at: '2026-10-14T10:00:00Z',
-  customer_name: 'Talleres Pérez SL',
-  customer_tax_id: 'B12345674',
-  base_amount: 1000,
-  tax_amount: 210,
-  total_amount: 1210,
-  currency: 'EUR',
-  currency_decimals: 2,
-  status: 'issued',
-  source_type: 'manual',
-  rectifies_id: null,
-  rectifies_number: '',
-  substituted: false,
-  can_mark_paid: true,
-  can_rectify: true,
-  can_substitute: false,
-  series_id: 's1',
-  sequence: 1,
-  operation_date: '2026-10-13',
-  issuer_name: 'Peluquería Ana SL',
-  issuer_tax_id: 'B12345674',
-  issuer_vat_number: 'B12345674',
-  issuer_address: 'Calle Mayor 1',
-  issuer_country: 'ES',
-  customer_id: null,
-  customer_address: 'Calle Luna 3',
-  customer_country: '',
-  customer_id_type: '',
-  description: '',
-  notes: 'Thanks',
-  tax_breakdown: [{ tax: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate: '21.00', surcharge_rate: '0.00', base: 1000, quota: 210, surcharge_quota: 0 }],
-  rectification_kind: '',
-  sale_id: null,
-  sale_number: '',
-  refund_id: null,
-  rectifies: null,
-  substitutes: null,
-  substituted_by: null,
-  rectifications: [],
-  remaining: 1210,
-  paid_at: null,
-  created_by: 'ana',
-  lines: [{ id: 'l1', position: 1, description: 'Course', quantity: '1.000', unit_price: '1000.00', discount_amount: 0, tax_rate: '21.00', surcharge_rate: '0.00', tax_category_key: '', base_amount: 1000, tax_amount: 210, total_amount: 1210, product_id: null }],
-};
-
-async function setup(options: MountOptions = {}) {
-  const m = await mountInvoice(InvoiceDetailPage, { props: { id: 'i1' }, path: '/invoice/invoices/i1', ...options });
-  const call = await m.live();
-  const show = (invoice: unknown) => m.result(OP, invoice);
-  const field = (name: string) => plain(m.find(`invoice-detail-${name}`).text());
-  return { ...m, call, show, field };
-}
+/** What `invoice.invoice.print` answers when no system printer takes the page: the screen prints its own paper. */
+const NO_PRINTER = { error: { code: 'invoice.no_printer', message: 'No system printer takes this invoice.' } };
 
 describe('InvoiceDetailPage: what it shows', () => {
   it('follows invoice.invoice.get for its id, with a spinner until it arrives', async () => {
@@ -127,6 +66,32 @@ describe('InvoiceDetailPage: what it shows', () => {
     // The rate is named by the tax the invoice declares (its breakdown): VAT here.
     expect(s.wrapper.findComponent(InvoiceLinesTable).props('taxes')).toEqual(['vat']);
     expect(s.find('invoice-missing-tax-id').exists()).toBe(false);
+  });
+
+  it('says when it falls due, if it does, and «Overdue» instead of «Issued» once it has passed', async () => {
+    const s = await setup();
+    await s.show(INVOICE);
+    expect(s.find('invoice-detail-due-date').exists()).toBe(false);
+    await s.show({ ...INVOICE, due_date: '2026-11-13', overdue: true });
+    expect([s.field('due-date'), s.field('status')]).toEqual(['11/13/2026', 'Overdue']);
+    expect(s.find('invoice-detail-status').attributes('data-tone')).toBe('warning');
+    expect(s.find('invoice-detail-due-date').element.previousElementSibling?.textContent).toBe('Due date');
+  });
+
+  it.each([
+    ['en', 'Paid'],
+    ['es', 'Pagada'],
+  ] as const)('one erplora.com issued says it comes from there, already paid, with nothing left to do (%s)', async (locale, paid) => {
+    const s = await setup({ locale });
+    await s.show({ ...INVOICE, source_type: 'platform', status: 'paid', can_mark_paid: false, can_rectify: false });
+    expect([s.field('source'), s.field('status')]).toEqual(['erplora.com', paid]);
+    expect(s.wrapper.find('.invoice-detail__actions').findAll('ion-button')).toHaveLength(0);
+  });
+
+  it('names the issuer with the tax ID its document prints: the EU VAT number of one in the ROI', async () => {
+    const s = await setup();
+    await s.show({ ...INVOICE, issuer_vat_number: 'ESB12345674' });
+    expect(s.field('issuer')).toBe('Peluquería Ana SL (ESB12345674)');
   });
 
   it('names the rate column by the tax the invoice declares: IGIC for a business of the Canary Islands', async () => {
@@ -183,6 +148,7 @@ describe('InvoiceDetailPage: its actions', () => {
     const s = await setup();
     await s.show({ ...INVOICE, source_type: 'sale' });
     expect(s.wrapper.findComponent(InvoicePaper).props()).toMatchObject({ duplicate: true });
+    s.answer(409, NO_PRINTER);
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(mocks.print).toHaveBeenCalledOnce();
@@ -194,6 +160,7 @@ describe('InvoiceDetailPage: its actions', () => {
   it('in the installed app, a print the app refuses says why (hub#455)', async () => {
     const s = await setup();
     await s.show(INVOICE);
+    s.answer(409, NO_PRINTER);
     mocks.print.mockRejectedValueOnce(new PrintRefused('refused', 'print_document_refused'));
     await click(s.find('invoice-detail-print').element);
     await flush();
@@ -203,6 +170,7 @@ describe('InvoiceDetailPage: its actions', () => {
   it('a second press while the app prints waits for it (hub#455)', async () => {
     const s = await setup();
     await s.show(INVOICE);
+    s.answer(409, NO_PRINTER);
     let done = (): void => {};
     mocks.print.mockReturnValueOnce(new Promise<void>((resolve) => (done = resolve)));
     await click(s.find('invoice-detail-print').element);
@@ -220,7 +188,7 @@ describe('InvoiceDetailPage: its actions', () => {
   it('«Print / PDF» asks the printing queue first: queued, a toast names the printer and the screen prints nothing', async () => {
     const s = await setup();
     await s.show({ ...INVOICE, source_type: 'sale' });
-    s.answer(200, { queued: true, job_id: 'j1', printer: 'Office' });
+    s.answer(200, { job_id: 'j1', printer: 'Office' });
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(s.sent()).toEqual([
@@ -230,9 +198,9 @@ describe('InvoiceDetailPage: its actions', () => {
     expect(mocks.print).not.toHaveBeenCalled();
   });
 
-  it('not queued, or the queue out of reach, the browser prints the A4 paper', async () => {
+  it('no printer takes it, or the queue out of reach: the browser prints the A4 paper', async () => {
     const answers = [
-      [200, { queued: false, job_id: null, printer: null }],
+      [409, NO_PRINTER],
       [503, { error: { code: 'unavailable', message: 'down' } }],
     ] as const;
     for (const [status, body] of answers) {
@@ -349,6 +317,7 @@ describe('InvoiceDetailPage: its VeriFactu record (INVOICE-F17, F18; VERIFACTU-F
     await s.result(RECORD_OP, { record: null });
     expect(s.find('invoice-verifactu').exists()).toBe(false);
     expect(s.wrapper.findComponent(InvoicePaper).props('record')).toBeNull();
+    s.answer(409, NO_PRINTER);
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(mocks.print).toHaveBeenCalledOnce();
@@ -373,7 +342,7 @@ describe('InvoiceDetailPage: its VeriFactu record (INVOICE-F17, F18; VERIFACTU-F
     await flush();
     expect(s.find('invoice-verifactu').exists()).toBe(false);
     expect(disabled()).toBe(false);
-    s.answer(200, { queued: false, job_id: null, printer: null });
+    s.answer(409, { error: { code: 'invoice.record_unreadable', message: 'Its VeriFactu record could not be read.' } });
     await click(s.find('invoice-detail-print').element);
     await flush();
     expect(mocks.print).not.toHaveBeenCalled();

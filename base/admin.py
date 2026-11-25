@@ -13,9 +13,12 @@ from django.urls import reverse
 from django.utils.translation import gettext, gettext_lazy, ngettext
 from live.context import OperationContext
 from live.errors import OperationError
-from live.slugs import validate_hub_slug
 
-from base.models import AppActivation, Hub, Location, Membership, TaskSchedule
+from base import platform_hub
+from base.models.activation import AppActivation
+from base.models import Hub, Membership
+from base.models.locations import Location
+from base.models.scheduler import TaskSchedule
 from base.registry import REGISTRY_SCOPE
 from base.schemas.demos import DemoSlugIn
 from base.services.demos import demo_expire
@@ -161,7 +164,7 @@ def open_hub(request: HttpRequest, slug: str) -> HttpResponseRedirect:
     """
     try:
         # A demo (``demo-<8 hex>``) is a hub of the registry too.
-        validate_hub_slug(slug, allow_demo=True)
+        platform_hub.validate_served_slug(slug, allow_demo=True)
     except ValueError as exc:
         raise Http404(f"{slug!r} is no hub's slug ({exc}).") from None
     request.session[ADMIN_HUB_SESSION_KEY] = slug

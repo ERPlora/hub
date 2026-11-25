@@ -113,7 +113,7 @@ Aquí está el libro del día: arriba, la fecha con sus flechas y tres cifras (c
 próxima franja); debajo, las reservas del día por hora, con su cliente, sus comensales, su mesa y su estado. Con
 «Nueva reserva» apuntas una que llega por teléfono o en el local; en cada fila la confirmas, la sientas cuando llega
 el grupo, la completas cuando se va o la cancelas. El buscador encuentra una reserva en todo el libro por nombre,
-teléfono o correo.
+teléfono o correo; por el teléfono y el correo, solo a quien ve el contacto de los clientes.
 
 #### Detalle
 Menú **Reservas → Reservas**. Arriba, la **barra del día**: «Día anterior», la fecha, «Día siguiente» y
@@ -128,7 +128,9 @@ escribió, o «Liberada: nunca se confirmó»; uno largo, acortado con «…»);
 **todo** el libro, también por las cifras del teléfono sin prefijo (resultados por día y hora);
 filtros por hora, comensales, mesa y estado; vista tabla o tarjetas. Acción principal **«Nueva
 reserva»** y, por fila, según su estado: «Confirmar», «Sentar», «Completar», «Cancelar», «No
-presentado», «Editar» y «Borrar» (solo el administrador). Tocar una fila la abre para editarla.
+presentado», «Editar» y «Borrar» (solo el administrador). Tocar una fila la abre para editarla. Quien no ve el
+contacto de los clientes tiene la tabla sin «Teléfono» y el buscador «Buscar cliente…», que solo mira el
+nombre. Nadie ordena la tabla por el teléfono: el orden diría el número a quien no lo ve.
 
 Vacía: «No hay reservas este día», con explicación y «Nueva reserva». Buscando sin resultados:
 «Ninguna reserva coincide con la búsqueda» y «Limpiar filtros». Cargando: «Cargando…» y las cifras en
@@ -140,6 +142,8 @@ nombre o teléfono, con «+ Nuevo cliente»), Nombre, Teléfono, Correo, Fecha, 
 (minutos), Mesa (las libres a esa hora, con su aforo y su zona; las que no caben al grupo, avisadas),
 Origen (Teléfono, En el local), Notas del cliente y Notas internas. Una reserva ya sentada, completada,
 cancelada o no presentada solo cambia sus notas, y lo dice arriba; la cancelada, además, con su motivo entero.
+Quien no ve el contacto de los clientes no ve el Teléfono ni el Correo de la reserva que edita, y guardarla los
+conserva; con una ficha elegida en «Nueva reserva», tampoco: la reserva lleva los de la ficha.
 
 ### Lista de espera
 Aquí apuntas a quien quiere mesa y no cabe, en el orden en que llega, con el día y la hora que prefiere y sus
@@ -148,8 +152,8 @@ comensales. Cuando le llamas, lo marcas «Contactado»; si queda sitio, «Conver
 
 #### Detalle
 Menú **Reservas → Lista de espera**. Tabla, en el orden en que se apuntaron (por día y hora preferida):
-Fecha, Hora pref., Cliente, Teléfono (como en Clientes), Pax, Contactado, Estado (En espera, Convertida);
-buscador y filtros (fecha, contactado, convertida). Acción principal **«Añadir cliente»** (Cliente,
+Fecha, Hora pref., Cliente, Teléfono (como en Clientes, solo a quien ve el contacto de los clientes), Pax, Contactado,
+Estado (En espera, Convertida); buscador y filtros (fecha, contactado, convertida), como en Reservas. Acción principal **«Añadir cliente»** (Cliente,
 Nombre, Teléfono, Fecha, Hora, Pax, Notas → «Añadir a la lista de espera»); por fila «Contactado»,
 «Convertir» y «Quitar». Vacía: «Lista de espera vacía.». Cargando: «Cargando…». Error: el mensaje
 de la tabla con «Reintentar».
@@ -169,8 +173,8 @@ Menú **Reservas → Disponibilidad**. Tres secciones apiladas:
   refresca sola cuando entra, cambia o se cancela una reserva. Vacía: «Sin servicio ese día (sin
   franjas).».
 - **Franjas horarias**: Día, Desde, Hasta, Máx (de reservas), Máx comensales; «Añadir franja» (Día,
-  Desde, Hasta, Máx, Máx comensales (opcional) → «Crear franja») y «Quitar» por fila. Vacía: «Sin
-  franjas horarias.».
+  Desde, Hasta, Máx, Máx comensales —con «Opcional» debajo— → «Crear franja») y «Quitar» por fila.
+  Vacía: «Sin franjas horarias.».
 - **Fechas bloqueadas**: Fecha, Motivo, Horas (Todo el día, o desde–hasta); «Añadir fecha bloqueada»
   (Fecha, Motivo, Todo el día, Desde, Hasta → «Bloquear fecha») y «Quitar». Vacía: «Sin fechas
   bloqueadas.».
@@ -254,7 +258,7 @@ Estado: hecho
 Actor: responsable, asistente
 Pantalla: Disponibilidad (Fechas bloqueadas)
 Pasos:
-1. Pulsa «Añadir fecha bloqueada», escribe la fecha y el motivo (festivo, cierre, evento privado).
+1. Pulsa «Añadir fecha bloqueada», elige la fecha y escribe el motivo (festivo, cierre, evento privado).
 2. Deja «Todo el día» marcado o, para unas horas, quítalo y pon desde y hasta.
 3. Ese día (o esas horas) no se aceptan reservas nuevas; las que ya había se quedan.
 4. Para levantar el bloqueo, «Quitar» en su fila y confirma.
@@ -323,14 +327,16 @@ Pasos:
    duración, el origen y las notas. «Reservar».
 3. La reserva nace Pendiente (o Confirmada, si se confirman solas: entonces retiene su mesa).
 4. Por voz: «reserva para 4 mañana a las 21 a nombre de Ana, en la mesa 5». Antes de apuntarla, la
-   tarjeta del asistente dice para quién, por el nombre de su ficha, el día y la hora («Crear en Reservas:
-   Ana García · 15 oct 2026 · 21:00»), y lleva la mesa con su zona, como la nombra Mesas («5 (Terraza)»: el
-   número se repite entre zonas), nunca por un código.
+   tarjeta del asistente dice primero para quién, por el nombre de su ficha (también si se la nombró por su
+   teléfono) o, sin ficha, por el nombre que se dijo, y una sola vez; después, el día y la hora, antes que el
+   teléfono («Crear en Reservas: Ana García · Fecha: 15 oct 2026 · Hora: 21:00»). Lleva la mesa con su zona, como la nombra
+   Mesas («5 (Terraza)»: el número se repite entre zonas), nunca por un código.
 Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración, origen, notas. El
 teléfono se guarda en formato internacional, como en Clientes (`+34` y las cifras seguidas, sin
 espacios), también el que se teclea con la ficha ya elegida; uno escrito con el prefijo de otro país
 conserva el suyo. Es el número con el que WhatsApp encuentra la conversación del cliente
-(RESERVATION-F19).
+(RESERVATION-F19). Quien no ve el contacto de los clientes (BASE-F119) busca al cliente solo por su nombre y, con la
+ficha elegida, no ve su teléfono ni su correo: la reserva lleva los de la ficha, y la respuesta le llega sin ellos.
 Sale: la reserva, ligada a la ficha del cliente (avisa: `reservation.reservation.created`).
 Si falla: no se guarda nada y lo escrito se queda; el primer motivo que aplica, en este orden: un
 teléfono que no es de su país (el motivo de Clientes, «No es un teléfono válido de su país: revisa las
@@ -350,7 +356,7 @@ Dos reservas a la vez sobre el último hueco o sobre la misma mesa y hora: entra
 motivo (en la franja llena, el personal puede después reservar igualmente; en la mesa, nunca). En la
 ventana, el motivo de un campo (la Mesa incluida) sale debajo de él y se quita en cuanto se corrige ese
 campo, aunque otro diga lo mismo.
-Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25
+Implicados: CUSTOMER-F10, CUSTOMER-F11, SCHEDULE-F02, RESERVATION-F23, TABLE-F25, BASE-F119
 
 ### RESERVATION-F07 Confirmar una reserva
 Estado: hecho
@@ -381,15 +387,16 @@ Pasos:
 3. Una reserva sentada, completada, cancelada o no presentada solo cambia sus notas.
 4. Por voz: «pasa la reserva de Ana a la 7 de la terraza». Antes de cambiarla, la tarjeta del asistente
    dice la reserva por su cliente, su día y su hora y la mesa nueva con su zona, como la nombra Mesas
-   («Cambiar en Reservas: Ana García · 15 oct 2026 · 21:00 · 7 (Terraza)»), nunca por un código.
+   («Cambiar en Reservas: Ana García · 15 oct 2026 · 21:00 · Mesa: 7 (Terraza)»), nunca por un código.
 Entra: los campos cambiados. El teléfono nuevo se guarda en formato internacional, como en el alta; el
-mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio.
+mismo número escrito de otra forma (con espacios o sin el prefijo) no es un cambio. Quien no ve el contacto de los
+clientes (BASE-F119) no ve el teléfono ni el correo y no los cambia: guardar los conserva.
 Sale: la reserva cambiada (avisa: `reservation.reservation.updated`).
 Si falla: los mismos motivos que al tomar una reserva a mano, y el primero, un teléfono que no es de su país: «No es un
 teléfono válido de su país: revisa las cifras o escríbelo con su prefijo internacional (+44…).», en el
 campo Teléfono, y no cambia nada; en otro estado: «Esta reserva ya no se puede cambiar: solo sus
 notas.».
-Implicados: TABLE-F26, RESERVATION-F06, RESERVATION-F18
+Implicados: TABLE-F26, RESERVATION-F06, RESERVATION-F18, BASE-F119
 
 ### RESERVATION-F09 Cancelar una reserva
 Estado: hecho
@@ -668,9 +675,14 @@ se rechaza diciendo cuáles (409 `*_ambiguous`). Cambiar y cancelar se pueden pe
 (`on_behalf_of`, su ficha; hoy, desde WhatsApp): solo su reserva, con sus reglas de cliente y sin tocar la
 mesa, las notas internas ni reservar igualmente (F18).
 
+El teléfono y el correo del cliente de una reserva o de la lista de espera solo salen a quien ve el contacto de los
+clientes (BASE-F119): a cualquier otro le llegan vacíos, la búsqueda y una referencia («la reserva del 600 111 222»)
+solo le casan con el nombre, filtrar por el teléfono se le rechaza como una acción sin permiso (403
+`permission_denied`) y ordenar por él no existe para nadie.
+
 Antes de cambiar nada, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro
 como lo nombran las pantallas de Reservas, nunca por su código: una reserva, por su cliente, su día y su
-hora («Ana García · 15 oct 2026 · 21:00»; sin nombre, por su teléfono; con los datos del cliente borrados,
+hora («Ana García · 15 oct 2026 · 21:00»; sin nombre, por su teléfono a quien lo ve; con los datos del cliente borrados,
 por el día y la hora); una entrada de la lista de espera, igual; una franja, por su día de la semana y sus
 horas («Jueves · 20:00–23:30»); una fecha bloqueada, por su día y, si no es entera, sus horas; el cliente,
 por el nombre de su ficha, y la mesa, con su zona («5 (Terraza)»), como la nombra Mesas.
@@ -683,10 +695,10 @@ sale en la tarjeta.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Las reservas de unos días (o de todo el libro buscando), con filtros, orden y páginas (hasta 100) | ver reservas | F05–F12 | `reservation.reservation.list` |
+| Las reservas de unos días (o de todo el libro buscando), con filtros, orden y páginas (hasta 100) | ver reservas | F05–F12, F17, F18 | `reservation.reservation.list` |
 | Una reserva, con las palabras con que se nombra | ver reservas | F08, F19 | `reservation.reservation.get` |
-| Un día: cubiertos, reservas, bloqueos, horario del negocio y ocupación de cada franja | ver reservas | F05 | `reservation.availability.day` |
-| Las mesas libres para una fecha, hora, duración y grupo | ver reservas | F23 | `reservation.availability.tables` |
+| Un día: cubiertos, reservas, bloqueos, horario del negocio y ocupación de cada franja | ver reservas | F05, F17 | `reservation.availability.day` |
+| Las mesas libres para una fecha, hora, duración y grupo | ver reservas | F17, F23 | `reservation.availability.tables` |
 | Las franjas horarias, con filtros y páginas | ver franjas | F01 | `reservation.time_slot.list` |
 | Una franja, por su id o por su día de la semana y su inicio, con las palabras con que se nombra | ver franjas | F01 | `reservation.time_slot.get` |
 | Las fechas bloqueadas, con filtros y páginas | ver bloqueos | F02 | `reservation.blocked_date.list` |
@@ -707,9 +719,10 @@ los de la reserva tal como se apuntó, en el reloj del negocio, sin correrse por
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Apunta una reserva (`overbook` llena a sabiendas una franja llena, solo el personal) | apuntar reservas | F06 | `reservation.reservation.create` |
-| Cambia una reserva | cambiar reservas | F08 | `reservation.reservation.update` |
-| Confirma, sienta, completa, cancela o marca no presentada | cambiar reservas | F07, F09–F12 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` |
+| Apunta una reserva (`overbook` llena a sabiendas una franja llena, solo el personal) | apuntar reservas | F06, F17 | `reservation.reservation.create` |
+| Cambia una reserva | cambiar reservas | F08, F18 | `reservation.reservation.update` |
+| Confirma, sienta, completa o marca no presentada | cambiar reservas | F07, F10–F12 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.no_show` |
+| Cancela una reserva | cambiar reservas | F09, F18 | `reservation.reservation.cancel` |
 | Borra una reserva | borrar reservas | F20 | `reservation.reservation.delete` |
 | Libera las pendientes vencidas | cambiar reservas | F13 | `reservation.reservation.release_unconfirmed` |
 | Crea o quita una franja | cambiar franjas | F01 | `reservation.time_slot.create`, `.delete` |
@@ -741,10 +754,10 @@ transacción (TABLE-F25–F28).
 
 ### A qué reacciona
 
-| Aviso | De | Qué hace | Servicio |
-|---|---|---|---|
-| `customer.customer.merged` | Clientes | Pasa sus reservas y entradas a la ficha que queda (F21) | `reservation.customer.reassign` |
-| `customer.customer.erased` | Clientes | Borra sus datos personales de reservas y entradas (F22) | `reservation.customer.erase` |
+| Aviso | De | Qué hace | Flujos | Servicio |
+|---|---|---|---|---|
+| `customer.customer.merged` | Clientes | Pasa sus reservas y entradas a la ficha que queda | F21 | `reservation.customer.reassign` |
+| `customer.customer.erased` | Clientes | Borra sus datos personales de reservas y entradas | F22 | `reservation.customer.erase` |
 
 ### Lo que necesita de otras apps
 
@@ -795,8 +808,8 @@ la que solo se le autorizó reservar.
   bloqueados y lista de espera van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
   descendente es la ascendente leída al revés, empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`,
   por lista.
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `engine.py` (la puerta del
-  alta sin base de datos), `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `engine.py` (la puerta del
+  alta sin base de datos), `queries/`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más
   `tests/test_integration_table.py`, `tests/test_integration_customer.py`,
   `tests/test_integration_schedule.py` (las apps reales, sin dobles) y `tests/test_concurrency.py`
@@ -820,6 +833,13 @@ la que solo se le autorizó reservar.
   declara `ai.in_person`: Automatizaciones no lo ofrece ni lo concede (`flow.high_risk`), porque abre la
   cuenta de la mesa con la sesión de quien sienta (`table.add_session` y `sale.add_sale`); el asistente, con
   una persona delante, sienta sin pedir confirmación (`risk: normal`).
+- **El contacto del invitado** (BASE-F119): `guest_phone` y `guest_email` de `ReservationOut` y `WaitlistOut` son los
+  campos `PHONE` y `EMAIL` de `apps/customer/schemas/contact.py`, con la marca `CUSTOMER_CONTACT`, y el filtro
+  `guest_phone` de las dos listas también la lleva. La búsqueda, `find_reservation`, `find_entry` (`_guest_matches`) y
+  la etiqueta de un invitado sin nombre (`_who`) miran el teléfono y el correo solo con `sees_contact` de Clientes. En
+  la interfaz, la columna «Teléfono» de las dos listas sale de `frontend/lib/guestContact.ts`, y el formulario de
+  reserva no enseña ni manda lo que llegó vacío. Un paso de una automatización lleva los permisos de dato de base
+  (FLOW-F12), así que las recetas de WhatsApp siguen leyendo y filtrando por el teléfono.
 - **Modelos**: `Settings` (una fila), `TimeSlot` (día de la semana, desde, hasta, máximo de reservas y
   de comensales; borrado lógico; sin solapes en el mismo día), `BlockedDate` (todo el día o
   desde–hasta; único por fecha y hora de inicio entre los vivos), `Reservation` (cliente, nombre,
@@ -871,7 +891,7 @@ la que solo se le autorizó reservar.
   país `ES`; lo que no es número válido se queda como estaba).
 - **Hora del negocio**: la zona del hub (`base.business.business_zone`). El día y la hora se guardan de
   pared; «ahora» es la hora del negocio. Lo que dura cuenta tiempo real (`engine.Window.of` con la zona,
-  instantes en UTC; en `queries.py`, `window_of` y `starts_at`): la estancia (la mesa que pisa la puerta,
+  instantes en UTC; en `queries/business.py`, `window_of` y `starts_at`): la estancia (la mesa que pisa la puerta,
   las mesas libres de F23, el motivo «La mesa 5 ya tiene una reserva de 21:00 a 23:00.» y el fin de cada
   reserva), la antelación mínima y la ventana de liberación de F13; y una hora pasada se juzga por el
   instante. La noche del cambio de hora el fin de pared se corre: 90 minutos desde las 01:37 del 25/10
@@ -881,13 +901,13 @@ la que solo se le autorizó reservar.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cancelar, no presentado y
   todo borrado; y `asks`, las frases en `en` y `es` con que una persona pide cada herramienta: Reservas está
   en `LIVE_ASSISTANT_ASKS_REQUIRED` y `base/tests/test_assistant_asks.py` exige que cada una traiga su
-  herramienta entre las diez primeras, rol por rol) y cada campo de `schemas.py` su `description`. Ninguna
+  herramienta entre las diez primeras, rol por rol) y cada campo de `schemas/` su `description`. Ninguna
   descripción le dice al modelo que pregunte antes: la tarjeta es la confirmación (BASE-F97), y un «Ask
   first.» hacía que contestara en el chat sin sacarla (hub#1105; lo vigila
   `tests/test_assistant_asks.py`). Cada id que nombra un registro en una
   escritura lleva su marca `refers` (`names` de `base/schemas/assistant.py`; `base.E009` la comprueba al arrancar):
   los de Reservas, la lectura por id de su registro (`reservation.reservation.get`, `.waitlist.get`,
-  `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries.py`,
+  `.time_slot.get`, `.blocked_date.get`), que da su `label` en el idioma de quien la pide (`queries/`,
   `*_label`: día mediano y hora corta de CLDR, como dice la tarjeta una fecha); el cliente
   (`customer_id`, `on_behalf_of`), `customer.customer.detail` por su `name`; la mesa, `table.table.get`
   por su `label`, su número con su zona (`table_label` de Mesas, hub#550).
@@ -921,7 +941,8 @@ la que solo se le autorizó reservar.
   `reservation.customer_mismatch` toda reserva que no sea de esa ficha (también una inexistente o borrada,
   antes que su estado) y `update` rechaza la mesa, las notas internas y `overbook` con 409
   `reservation.staff_only_field`.
-- **Fechas y horas** se escriben con los campos del navegador (`type="date"` y `type="time"`), como en Citas.
+- **Fechas y horas** se eligen con `DateField` y `TimeField` de `@erplora/ui` (el calendario y la rueda de horas de
+  la app, en su idioma y sus colores; nunca el selector del dispositivo), como en Citas.
 
 ### Lo que NO hace, a propósito
 

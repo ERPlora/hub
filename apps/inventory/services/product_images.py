@@ -14,7 +14,7 @@ from apps.inventory.schemas.products import ProductOut
 from apps.inventory.services.writes import _actor, _product_payload
 from base import images
 
-#: Where a product's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
+#: Where a product's own photos are kept under its hub's prefix: the folder ``public_media`` serves (apps.py).
 PHOTOS = "inventory/products/"
 
 
@@ -31,6 +31,7 @@ PHOTOS = "inventory/products/"
         "leche»), named by its id, SKU or name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from "
         "inventory.product.suggest_image or base.catalog_image.search), or empty to show none (its initials).",
         "risk": "normal",
+        "check": "inventory.product.get",
         "asks": {
             "en": (
                 "put an image on the latte",

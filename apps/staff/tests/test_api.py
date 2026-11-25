@@ -117,13 +117,13 @@ def test_anonymous_gets_the_401_envelope(client):
 
 
 @HUB_DB
-def test_an_employee_reads_the_team_but_neither_writes_nor_sees_pay(employee, client):
+def test_an_employee_reads_the_team_and_her_own_commission_but_neither_writes_nor_sees_the_teams_pay(employee, client):
     assert get(client, "/staff/members").status_code == 200
     assert get(client, "/staff/time_off/today").status_code == 200
+    assert get(client, "/staff/commissions/report").status_code == 200
     for response in (
         get(client, "/staff/members/compensation"),
         get(client, "/staff/commissions"),
-        get(client, "/staff/commissions/report"),
         post(client, "/staff/members", {"first_name": "A", "last_name": "B"}),
         post(client, "/staff/roles", {"name": "Stylist"}),
     ):

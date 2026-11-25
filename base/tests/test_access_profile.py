@@ -18,7 +18,9 @@ from django.core.files.storage import storages
 from live.models import OutboxEvent
 from PIL import Image as PILImage
 
-from base.models import Credential, Hub, Membership, Profile
+from base.models.access import Credential
+from base.models import Hub, Membership
+from base.models.profile import Profile
 from base.tenancy.context import use_hub
 from base.tests.test_auth_views import A, HOST, ON_HUB_A
 
@@ -127,6 +129,63 @@ def test_every_interface_scale_is_saved_returned_and_read_back(client, ana, hub_
 )
 def test_a_preference_it_does_not_offer_is_refused(client, ana, body):
     assert post(client, "/me/preferences", body).status_code == 422
+
+
+#: What «My profile» keeps for a person who chose each of their preferences.
+CHOSEN = {"language": "es", "theme_mode": "dark", "palette": "forest", "ui_scale": 120}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"language": "en"},
+        {"theme_mode": "light"},
+        {"palette": "ocean"},
+        {"ui_scale": 90},
+        # Back to the business's is a choice as any other: only the one that is sent.
+        {"language": ""},
+        {"theme_mode": ""},
+        {"palette": ""},
+    ],
+)
+def test_a_preference_that_is_not_sent_stays_as_it_was(client, ana, hub_a, change):
+    assert post(client, "/me/preferences", CHOSEN).status_code == 200
+    response = post(client, "/me/preferences", change)
+    assert response.status_code == 200, response.content
+    with use_hub(hub_a):
+        profile = Profile.objects.get(username="saas:1")
+    expected = {**CHOSEN, **change}
+    assert {name: getattr(profile, name) for name in expected} == expected
+    answer = response.json()
+    assert {name: answer[name] for name in ("theme_mode", "palette", "ui_scale")} == {
+        name: expected[name] for name in ("theme_mode", "palette", "ui_scale")
+    }
+
+
+def test_a_preference_sent_as_null_stays_as_it_was(client, ana):
+    assert post(client, "/me/preferences", CHOSEN).status_code == 200
+    body = {"language": "en", "theme_mode": None, "palette": None, "ui_scale": None}
+    assert post(client, "/me/preferences", body).status_code == 200
+    answer = get(client)
+    assert {name: answer[name] for name in CHOSEN} == {**CHOSEN, "language": "en"}
+
+
+@pytest.mark.parametrize("body", [{}, {"language": None, "ui_scale": None}])
+def test_preferences_that_name_none_are_refused_and_change_nothing(client, ana, hub_a, body):
+    assert post(client, "/me/preferences", CHOSEN).status_code == 200
+    response = post(client, "/me/preferences", body)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_payload"
+    with use_hub(hub_a):
+        assert OutboxEvent.objects.filter(name="base.profile.updated").count() == 1
+    answer = get(client)
+    assert {name: answer[name] for name in CHOSEN} == CHOSEN
+
+
+def test_the_first_preference_of_a_person_leaves_the_others_as_the_business_s(client, ana):
+    assert post(client, "/me/preferences", {"theme_mode": "dark"}).status_code == 200
+    answer = get(client)
+    assert {name: answer[name] for name in CHOSEN} == {"language": "", "theme_mode": "dark", "palette": "", "ui_scale": 100}
 
 
 def test_a_photo_is_kept_in_the_hub_s_files_and_shown_to_its_people_only(client, ana):

@@ -1,6 +1,7 @@
 // How a line of a shift reads (CASH_REGISTER-F11): a sale is named by its document, a void and a refund by
 // theirs, and a line written by hand shows its concept; a factory payment method (Sales keeps «Cash» and
-// «Card» in English) and a line without one read in the reader's language.
+// «Card» in English) and a line without one read in the reader's language. A line another app recorded (Tips,
+// F18) has that app as its type, as the server names it: it is neither cash in nor cash out by hand.
 import type { MethodType, MovementRow } from '../operations';
 
 type Translate = (key: string, named?: Record<string, unknown>) => string;
@@ -23,4 +24,9 @@ export function conceptOf(row: Pick<MovementRow, 'type' | 'description' | 'sale_
 export function methodOf(row: { method_type: MethodType; method_name: string }, t: Translate): string {
   if (!row.method_name || FACTORY_NAMES.has(row.method_name)) return t(`cash_register.methods.${row.method_type}`);
   return row.method_name;
+}
+
+/** The type of a line as the person reads it: the app that recorded it, or its own type. */
+export function typeOf(row: Pick<MovementRow, 'type' | 'app_name'>, t: Translate): string {
+  return row.app_name || t(`cash_register.types.${row.type}`);
 }

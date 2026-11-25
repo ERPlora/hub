@@ -82,6 +82,12 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   - [Lightspeed K](https://k-series-support.lightspeedhq.com/hc/articles/4403006478107) deja elegir los
     campos del ticket.
   - Es lo que promete el propio TPV en «Quién atiende esta cuenta».
+- **La comanda dice la mesa donde está hoy su cuenta**: el KDS nombra la comanda por la mesa de su cuenta
+  ([Toast — lo que enseña la comanda en el KDS](https://doc.toasttab.com/doc/platformguide/adminUnderstandingOrderInfoAppearsKDSTickets.html))
+  y pasar la cuenta a otra mesa le cambia la mesa a la cuenta entera
+  ([Toast — traspasar cuentas](https://support.toasttab.com/en/article/Transferring-Items-Checks-and-Payments)).
+  Así, la comanda en marcha de una cuenta que se pasa a otra mesa, se junta con otra o se vuelve a sentar dice
+  la mesa nueva; la Servida o Cancelada se queda con la que tenía, que es donde fue.
 
 ## Antes de empezar
 
@@ -186,8 +192,9 @@ Busca por el número de la comanda o por palabras de sus notas, y filtra por acc
 #### Detalle
 Menú **Cocina → Historial**, título «Historial de cocina». Tabla de lo que pasó en cocina, lo último
 primero, 50 por página (otro tamaño se elige al pie): Acción, Comanda (el número), Plato, Quién (el
-nombre de la persona o, si no tiene, su correo, o el de la API key; «Sistema» si no lo hizo una persona:
-Cocina sola o una automatización), Notas y Cuándo (fecha y hora del negocio). Buscador «Buscar comanda o
+nombre de la persona o, si no tiene, lo que va antes de la @ de su correo, nunca el correo entero, o el de
+la API key; «Sistema» si no lo hizo una persona: Cocina sola o una automatización), Notas y Cuándo (fecha y
+hora del negocio). Buscador «Buscar comanda o
 notas…» (un trozo del número o palabras de las notas); filtro de acción con las mismas palabras de la columna («Recibida», «Creada», «Lanzada»,
 «Lista», «Plato listo», «Plato recuperado», «Plato anulado», «Servida», «Recuperada», «Cancelada»,
 «Urgente», «Urgencia quitada», «Reimpresa», «Borrada»). Vacía: «Sin actividad reciente en cocina.». Cargando: el esqueleto. Error:
@@ -272,7 +279,9 @@ Pasos:
 3. Pulsa «Crear estación»: el panel se cierra y la estación sale en la tabla, «Activa: Sí», «En
    curso: 0».
 Entra: lo que escribe quien la crea.
-Sale: la estación (avisa: estación creada).
+Sale: la estación (avisa: estación creada). Una estación nueva no recibe nada hasta que se le enrutan
+productos o categorías (KITCHEN-F04): lo que se envía sin enrutar sale en «Sin estación». Pedida al
+asistente, al crearla dice que aún no le llega nada y se ofrece a enrutarle los productos o las categorías.
 Si falla: el rechazo sale dentro del panel; el motivo de un campo, debajo de él, y se quita en cuanto se
 corrige ese campo, aunque otro diga lo mismo. Un nombre que ya tiene otra estación viva se rechaza
 («Ya hay una estación con ese nombre. Elige otro nombre.»); el de una eliminada vuelve a estar libre.
@@ -341,21 +350,29 @@ Pasos:
    que envía Ventas sola llega a Cocina un momento después, sin que nadie haga nada.
 2. Cocina abre una comanda con el número del día (`AAAAMMDD-NNNN`, el día del negocio, en su
    zona horaria), la ronda de la cuenta, la etiqueta de la cuenta («Mesa 4»), el tipo, la prioridad y el
-   camarero.
+   camarero: su nombre o, si su cuenta no tiene, lo que va antes de la @ de su correo, nunca el correo
+   entero (BASE-F119); una comanda guardada antes con el correo también se lee así.
 3. Cada línea que no es un servicio es un plato, en el orden de la cuenta, mandado a su estación
    (KITCHEN-F04); un menú, un plato por cada plato elegido (KITCHEN-F06). Las líneas de servicio no se
    cocinan.
 4. La comanda aparece en la pantalla «Por preparar», suena (KITCHEN-F16), sale en papel
    (KITCHEN-F08) y la app instalada muestra su aviso del sistema, que abre Cocina al tocarlo.
+5. Si después su cuenta se pasa a otra mesa (TABLE-F15), se junta con otra (TABLE-F16) o se vuelve a
+   sentar (TABLE-F24), la comanda en marcha dice el título nuevo de la cuenta («Mesa 9») en la pantalla, en
+   «Comandas» y para el asistente («marca urgente lo de la mesa 9»), sin recargar. Una comanda Servida o
+   Cancelada se queda con el título que tenía.
 Entra: de Ventas, las líneas enviadas de la cuenta (su ronda, su hora de envío, su producto, su
-cantidad, su nota, sus suplementos, su categoría y, si es un menú, sus platos) y, cuando el envío lo hace Cocina, la prioridad, el canal y quién
-envía.
+cantidad, su nota, sus suplementos, su categoría y, si es un menú, sus platos), el título de su cuenta y,
+cuando el envío lo hace Cocina, la prioridad, el canal y quién envía.
 Sale: la comanda «Por preparar» con sus platos y «Recibida» en el Historial, a la hora del envío
 (avisa: comanda recibida).
 Si falla: una ronda de solo servicios no abre comanda. Lo que se envió antes de que existiera Cocina en
 el negocio no aparece. Una misma ronda nunca abre dos comandas, aunque llegue dos veces. Ningún fallo de
-aquí bloquea al camarero.
-Implicados: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18
+aquí bloquea al camarero. Si la cuenta no tiene título, la comanda se queda con lo que dijo el envío
+(«Recoge Ana»); si sus platos acabaron en dos cuentas de títulos distintos (una cuenta dividida y una de las
+dos pasada a otra mesa), se queda con el suyo.
+Implicados: SALE-F20, KITCHEN-F04, KITCHEN-F06, KITCHEN-F07, KITCHEN-F08, KITCHEN-F16, KITCHEN-F18, BASE-F119,
+TABLE-F15, TABLE-F16, TABLE-F24
 
 ### KITCHEN-F06 Un menú del día en la comanda
 Estado: hecho
@@ -679,7 +696,10 @@ Pasos:
    quieres, y añade sus platos (producto del catálogo, cantidad y nota).
 2. «Crear comanda»: el panel se cierra y la comanda sale arriba de la lista (aunque estuvieras en
    otra página, la lista vuelve a la primera) y en la pantalla.
-Entra: el tipo, el destino, las notas y los platos.
+Entra: el tipo, el destino, las notas y los platos. Por el asistente, cada plato va por un producto del
+catálogo, por su nombre o por lo que se cocina, y su tarjeta dice en su línea el destino y los platos, cada uno
+por lo que se dijo, su nota y cuántos («Crear en Cocina: Staff · Platos: Espresso · 2, Café con leche · 1»); el
+tipo y las notas van detrás.
 Sale: una comanda Por preparar, ronda 1, sin cuenta, con el nombre de quien la crea (avisa: comanda
 creada; Historial «Creada»); sus platos van a su estación como los de una ronda.
 Si falla: dentro del panel, y lo escrito se queda. Una comanda sin platos se rechaza («Añade al menos un
@@ -710,8 +730,8 @@ Actor: empleado, responsable, administrador
 Pantalla: Historial
 Pasos:
 1. Abre **Cocina → Historial**: qué pasó, en qué comanda y con qué plato, quién (su nombre o, si no
-   tiene, su correo; «Sistema» si no fue una persona: Cocina sola o una automatización), sus notas y
-   cuándo, lo último primero.
+   tiene, lo que va antes de la @ de su correo, nunca el correo entero; «Sistema» si no fue una persona:
+   Cocina sola o una automatización), sus notas y cuándo, lo último primero.
 2. En «Buscar comanda o notas…», escribe un trozo del número de la comanda o unas palabras de las
    notas; filtra por acción («Recibida», «Cancelada»…).
 3. Al pie, pasa de página o elige cuántas entradas ver (25, 50…).
@@ -721,7 +741,7 @@ quitada, reimpresa y borrada.
 Sale: nada; solo enseña.
 Si falla: si no se puede cargar, «No se pudo cargar el historial» con «Reintentar». Quien no tiene
 permiso de ver el historial lee «No tienes permiso para ver esto.».
-Implicados: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29
+Implicados: KITCHEN-F05, KITCHEN-F11, KITCHEN-F12, KITCHEN-F14, KITCHEN-F21, KITCHEN-F22, KITCHEN-F24, KITCHEN-F29, BASE-F119
 
 ### KITCHEN-F26 Ajustar la pantalla de cocina
 Estado: hecho
@@ -778,7 +798,8 @@ Pasos:
    el Historial como canceladas. Si la ronda salió en papel, sale el vale «ANULADA · Mesa 4» con lo que
    quedaba por hacer (KITCHEN-F22).
 2. Se juntan dos cuentas: las rondas enviadas desde la absorbida pasan a la que queda, como sus
-   platos, en el mismo estado y con su etiqueta; al cobrar la que queda se cierran como las suyas.
+   platos, en el mismo estado y con el título de la que queda (KITCHEN-F05); al cobrar la que queda se
+   cierran como las suyas.
 Entra: de Ventas, la cuenta anulada o las líneas que cambiaron de cuenta.
 Sale: rondas canceladas (avisa: comanda cancelada) o de otra cuenta.
 Si falla: una ronda ya Servida o Cancelada no se toca. Una cuenta sin rondas en marcha no cambia nada
@@ -852,10 +873,10 @@ Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F0
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| El tablero: las comandas en marcha y las listas, por estación, con sus platos, las estaciones que salen en ellas y los contadores | ver comandas | F10, F13, F31 | `kitchen.ticket.board` |
+| El tablero: las comandas en marcha y las listas, por estación, con sus platos, las estaciones que salen en ellas y los contadores | ver comandas | F06, F07, F10, F13, F31, F32 | `kitchen.ticket.board` |
 | Lo que queda por cocinar, sumado por plato y estación | ver comandas | F15 | `kitchen.ticket.all_day` |
-| Las comandas, con búsqueda, filtros y páginas | ver comandas | F21 | `kitchen.ticket.list` |
-| Una comanda por id, número o etiqueta («la mesa 4») | ver comandas | F21 | `kitchen.ticket.get` |
+| Las comandas, con búsqueda, filtros y páginas | ver comandas | F21, F32 | `kitchen.ticket.list` |
+| Una comanda por id, número o etiqueta («la mesa 4») | ver comandas | F21, F32 | `kitchen.ticket.get` |
 | Las comandas de una cuenta de Ventas | ver comandas | F19 | `kitchen.ticket.by_order` |
 | Las comandas nuevas de las últimas 24 horas para el aviso del dispositivo, también las aún no guardadas | ver comandas | F05, F16 | `kitchen.ticket.notices` |
 | Las estaciones, con lo que tienen en curso | ver comandas | F01–F03 | `kitchen.station.list` |
@@ -869,7 +890,7 @@ Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F0
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Envía a cocina lo pendiente de una cuenta (por Ventas) y abre la comanda, normal o urgente | enviar | F18 | `kitchen.ticket.send` |
+| Envía a cocina lo pendiente de una cuenta (por Ventas) y abre la comanda, normal o urgente | enviar | F06, F07, F18, F32 | `kitchen.ticket.send` |
 | Abre la comanda de una ronda ya enviada (la reacción al envío y lo que Ventas llama por nombre) | enviar | F05 | `kitchen.ticket.receive` |
 | Crea una comanda a mano | enviar | F23 | `kitchen.ticket.create` |
 | Lanza, marca lista, recupera una comanda | cambiar comandas | F21 | `kitchen.ticket.start`, `.ready`, `.recall` |
@@ -878,7 +899,8 @@ Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F0
 | Reimprime una comanda | cambiar comandas | F09 | `kitchen.ticket.reprint` |
 | Cancela una comanda (riesgo alto) | cancelar | F22 | `kitchen.ticket.cancel` |
 | Borra una comanda a mano (riesgo alto) | borrar | F24 | `kitchen.ticket.delete` |
-| Marca listos o recupera platos | cambiar comandas | F11, F12 | `kitchen.item.bump`, `kitchen.item.recall` |
+| Marca listos platos | cambiar comandas | F06, F11 | `kitchen.item.bump` |
+| Recupera platos | cambiar comandas | F12 | `kitchen.item.recall` |
 | Crea, cambia y elimina estaciones (eliminar, riesgo alto) | gestionar estaciones | F01–F03 | `kitchen.station.create`, `.update`, `.delete` |
 | Enruta y quita el enrutado | gestionar estaciones | F04 | `kitchen.routing.set`, `kitchen.routing.clear` |
 | Guarda los ajustes | ajustes | F26 | `kitchen.settings.update` |
@@ -912,14 +934,15 @@ hizo Ventas se lee en cada lectura y se asienta en cada escritura**, para el rat
 reacción. Una ronda enviada que
 Cocina aún no tiene se pinta igual (comanda «por recibir», con el número que tendrá) y la primera
 escritura de Cocina la guarda; una cuenta cobrada, anulada o una línea anulada cambian el estado que se
-lee, y la primera escritura lo guarda con su Historial. `live.py` re-ejecuta las consultas con los
-avisos de Ventas (`sale.order.*`).
+lee, y la primera escritura lo guarda con su Historial. Igual el título: una comanda en marcha lee el de la
+cuenta de sus platos (`queries.views.check_title`) y la primera escritura lo guarda. `live.py` re-ejecuta las
+consultas con los avisos de Ventas (`sale.order.*`), también el del cambio de título (`sale.order.relabeled`).
 
 ### Lo que necesita de otras apps
 
 - **Ventas** (requisito): sus cuentas y sus líneas enviadas (`Order`, `OrderLine`: ronda, hora de
-  envío, producto, nombre, cantidad, nota, categoría, anulación y su motivo, estado y hora de cierre de
-  la cuenta, y lo que la línea congeló al pedirse: los suplementos con su nombre de cocina, `modifiers`,
+  envío, producto, nombre, cantidad, nota, categoría, anulación y su motivo, estado, título y hora de cierre
+  de la cuenta, y lo que la línea congeló al pedirse: los suplementos con su nombre de cocina, `modifiers`,
   y el menú con su `kitchen_name` y sus platos, `combo.components`; los alérgenos del producto con los de sus
   suplementos, `allergens`, y en un menú los de cada plato, `combo.components[].allergens`, y la alergia del
   cliente, `allergy`), leídas con sus modelos; el envío,
@@ -941,12 +964,11 @@ avisos de Ventas (`sale.order.*`).
   `kitchen.ticket.send` (`priority: "rush"` si se armó la llama), y sin ella, a `sale.order.fire`; y la
   hoja «Comandas de la cuenta» (KITCHEN-F19, F20): `useLive('kitchen.ticket.by_order', {order_id})` y
   `kitchen.ticket.set_rush`, con los textos y estados de la pantalla de cocina.
-- **A Ventas** (sigue pedido):
-  1. Un aviso propio del cambio de título de una cuenta (p. ej. `sale.order.relabeled`): la pantalla ya
-     no se relanza con `sale.order.changed` (cada línea añadida en cualquier TPV la relanzaba), así que
-     el título nuevo de una ronda por recibir sale en el siguiente aviso de cocina.
-  2. Índices parciales para la lectura de las rondas por recibir: `sale_orderline(fired_at) WHERE
-     fired_at IS NOT NULL` y `sale_order(closed_at)`.
+- **A Ventas** (ya hecho): el aviso propio del cambio de título de una cuenta, `sale.order.relabeled`
+  (solo el id de la cuenta), que relanza la pantalla sin relanzarla con cada línea añadida
+  (`sale.order.changed`).
+- **A Ventas** (sigue pedido): índices parciales para la lectura de las rondas por recibir:
+  `sale_orderline(fired_at) WHERE fired_at IS NOT NULL` y `sale_order(closed_at)`.
 - **A Impresión**: nada nuevo; usa `kitchen_order` tal como está. Cada plato lleva además sus
   suplementos (`modifiers`, una lista) y, si es de un menú, `combo_ref` (la línea del menú) y
   `combo_name` (su cabecera), que la impresora de la app ya pinta (KITCHEN-F06, F07). Un plato con alergia
@@ -982,7 +1004,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
   `0004_item_options_and_menu`, los suplementos y el menú de cada plato; `0005_item_allergy`, la alergia y los
   alérgenos que coinciden de cada plato), `allergy.py` (la alergia de un plato y sus renglones en el papel),
-  `schemas.py`, `queries/` (un módulo por tema),
+  `schemas/`, `queries/` (un módulo por tema),
   `services/` (un módulo por tema), `events.py`, `live.py`, `api.py` (28 rutas: todas las operaciones salvo `receive` y
   `sync`, que son del sistema, y las dos lecturas internas de la tarjeta del asistente), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
   fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
@@ -1026,6 +1048,13 @@ que no tiene ningún papel: solo el sistema (`*`).
   (`queries.state.effective`): F29 (plato anulado), F28 (cuenta anulada) y F27 (cerrada: la Lista desde
   antes del cierre pasa a Servida; la de papel o con la cocina en papel desde antes del cierre, a
   Servida con sus platos).
+- **Quién envió y quién hizo cada cosa** (BASE-F119): la comanda guarda el camarero como texto y el Historial el
+  usuario de quien actúa, que se nombra al leer; los dos salen de `person_label` de Ventas
+  (`apps/sale/queries/people.py`), que da el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo
+  (`without_address` de `base.queries.people`): el correo de un compañero solo llega a quien ve el contacto del
+  equipo, y la comanda en papel la lee cualquiera. Una comanda guardada antes con un correo se lee sin él en la vista
+  de la comanda (`queries/views.py`: tablero, detalle, por cuenta, avisos, vivo y asistente) y en su papel
+  (`services/paper.py`, la reimpresión), para todos: el nombre de quien la envió no es un dato de contacto.
 - **Número del día** por `DayCounter` con `select_for_update` en la transacción; una comanda por
   recibir enseña el que tendrá (el siguiente del contador por orden de envío).
 - **Desde cuándo recibe**: `KitchenSettings.receiving_since` (la hora a la que se crearon sus tablas):
@@ -1061,7 +1090,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   frase por grupo de sinónimos que sin él no llega. Marcar platos «listos» (F11, F12) necesita además que live lea
   «listo» y «listos» como terminado y no como la acción de listar (ERPlora/live#54, en `packages/live`).
 - **Tarjeta de confirmación del asistente** (BASE-F97, hub#671): nombra el registro que una escritura señala por su
-  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: la comanda por su `number` con
+  id con las marcas `refers` de `schemas/fields.py`, leídas como quien pregunta: la comanda por su `number` con
   `kitchen.ticket.get` (`A_TICKET`: el `ticket_id` de `TicketRefIn`, en todas las escrituras de comandas y platos),
   cada plato por su `name` con `kitchen.item.get` (`A_DISH`: cada elemento de `item_ids`; lo busca en su comanda
   guardada y, si aún no lo está, en las rondas por recibir), la estación por su `name` con `kitchen.station.get`
@@ -1118,8 +1147,8 @@ Cocina necesita:
 
 - Iconos deseados, las copias de `useServerTable`/`useLiveList`/`useT`/`useNow` y el selector de color
   (`UI-REQUESTS.md`): no han llegado a `@erplora/ui` y cada uno tiene su sustituto.
-- Lo que sigue pedido a Ventas («Lo que pide a otras apps»): el aviso propio del cambio de título y los
-  índices parciales de las rondas por recibir. Sin ellos no se rompe ningún flujo.
+- Lo que sigue pedido a Ventas («Lo que pide a otras apps»): los índices parciales de las rondas por
+  recibir. Sin ellos no se rompe ningún flujo.
 - Cursos de verdad, retener y lanzar (kitchen#71): fuera del MVP («Referencia adoptada»).
 - Vaciar de golpe las comandas cobradas antes de pasar la cocina a papel (kitchen#158): hoy se sirven a
   mano (KITCHEN-F26, F27). Comportamiento nuevo, después del MVP.

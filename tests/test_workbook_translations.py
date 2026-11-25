@@ -7,7 +7,8 @@ walks the repository, so a module written down before its code has one too.
 
 from pathlib import Path
 
-from base.catalog import WORKBOOK, WORKBOOK_EN, en_header, source_hash, user_part, workbook_configs
+from base.catalog.workbooks import WORKBOOK, WORKBOOK_EN, user_part, workbook_configs
+from base.workbook_sections import current_body, marked
 
 REPO = Path(__file__).resolve().parent.parent
 SPANISH = "# Workbook — Cosas\n\n## Para qué sirve\n\nGuarda cosas.\n\n## Para quien lo mantiene\n\nNotas.\n"
@@ -19,13 +20,12 @@ def spanish_workbooks() -> list[Path]:
 
 
 def translation_problem(spanish: Path) -> str | None:
-    """``missing``, ``out of date`` or ``None`` when ``WORKBOOK.en.md`` heads the hash of the current Spanish part."""
+    """``missing``, ``out of date`` or ``None`` when ``WORKBOOK.en.md`` carries the marks of the current Spanish part."""
     english = spanish.with_name(WORKBOOK_EN)
     if not english.is_file():
         return "missing"
-    expected = en_header(source_hash(user_part(spanish.read_text(encoding="utf-8"))))
-    first_line = english.read_text(encoding="utf-8").partition("\n")[0]
-    return None if first_line == expected else "out of date"
+    source = user_part(spanish.read_text(encoding="utf-8"))
+    return "out of date" if current_body(source, english.read_text(encoding="utf-8")) is None else None
 
 
 def test_a_translation_is_current_only_while_the_spanish_customers_part_is_unchanged(tmp_path):
@@ -33,8 +33,7 @@ def test_a_translation_is_current_only_while_the_spanish_customers_part_is_uncha
     spanish.write_text(SPANISH, encoding="utf-8")
     assert translation_problem(spanish) == "missing"
 
-    header = en_header(source_hash(user_part(SPANISH)))
-    (tmp_path / WORKBOOK_EN).write_text(f"{header}\n\n{ENGLISH_BODY}", encoding="utf-8")
+    (tmp_path / WORKBOOK_EN).write_text(marked(user_part(SPANISH), ENGLISH_BODY), encoding="utf-8")
     assert translation_problem(spanish) is None
 
     spanish.write_text(f"{SPANISH}Más notas para quien lo mantiene.\n", encoding="utf-8")

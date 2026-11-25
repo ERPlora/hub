@@ -8,22 +8,27 @@ Every test with the database runs as production does: inside business A's own da
 import datetime as dt
 import json
 import threading
+import uuid
 
+import httpx
 import pytest
+import respx
 from django.contrib.auth import get_user_model
 from django.db import connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from apps.invoice.tests.conftest import catalog_of
+from apps.whatsapp_inbox.models import Conversation, Message
 from base import catalog, hub_visits, worker
-from base.catalog import RegisterResult
+from base.catalog.register_apps import RegisterResult
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
-from base.tenancy.context import use_hub
+from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
@@ -136,6 +141,71 @@ def card(name: str = "Ana López", phone: str = "600111222", **fields):
     return run("customer.customer.create", {"name": name, "phone": phone, **fields})
 
 
+SAAS = "http://saas.test"
+SEND = f"{SAAS}/internal/whatsapp/send"
+
+
+def events(name: str) -> list[dict]:
+    return [
+        event.payload
+        for event in OutboxEvent.objects.filter(name=name).order_by("created_at", "id")
+    ]
+
+
+def conv() -> Conversation:
+    return Conversation.objects.get(erased_at__isnull=True)
+
+
+def ready(**fields) -> Conversation:
+    """A connected number and a conversation whose customer wrote ten minutes ago."""
+    connect(
+        templates=[
+            template("recordatorio"),
+            template("promo", category="MARKETING", variables=0, body="¡Oferta!"),
+        ]
+    )
+    receive("wamid.IN", **{"sent_at": (NOW - dt.timedelta(minutes=10)).isoformat(), **fields})
+    return conv()
+
+
+def answering(status=200, body=None, delay=None):
+    """erplora.com's sending door: 200 with a new Meta id per message (the first is ``wamid.OUT``)."""
+    if body is not None:
+        return respx.post(SEND).mock(return_value=httpx.Response(status, json=body))
+    sent = iter(range(1, 1000))
+
+    def answer(request):
+        number = next(sent)
+        return httpx.Response(200, json={"wa_message_id": "wamid.OUT" if number == 1 else f"wamid.OUT{number}"})
+
+    return respx.post(SEND).mock(side_effect=answer)
+
+
+def key() -> str:
+    return str(uuid.uuid7())
+
+
+def send(payload, ctx=None):
+    """``message.send`` with a key of its own unless the payload brings one."""
+    return run("whatsapp_inbox.message.send", {"client_message_id": key(), **payload}, ctx)
+
+
+@pytest.fixture
+def delivered(django_capture_on_commit_callbacks):
+    """Run a write and then what it left for after its COMMIT (the delivery to erplora.com)."""
+
+    def run_and_deliver(write):
+        with django_capture_on_commit_callbacks(execute=True, using=current_alias()):
+            out = write()
+        return out
+
+    return run_and_deliver
+
+
+def stored(out) -> Message:
+    return Message.objects.select_related("sent_by").get(pk=out.id)
+
+
 @pytest.fixture(autouse=True)
 def english():
     """Each test starts in English: an earlier request (LocaleMiddleware) may have left another one."""
@@ -166,7 +236,7 @@ def tick(monkeypatch):
     than now (a second by default), without erplora.com's catalogue, as a fresh process (no business served yet, A
     first) whose pass serves every business however slow the machine. The worker closes each business's connection
     after serving it, so a test that ticks is committed (``HUB_DB_COMMITTED``)."""
-    monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: REGISTERED)
     monkeypatch.setattr(hub_visits, "HUB_PASS_SECONDS", 3600)
 
     def run_once(later: dt.timedelta = dt.timedelta(seconds=1)) -> None:

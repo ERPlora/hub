@@ -7,11 +7,11 @@ from django.utils import timezone
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.service.models import Grant, Redemption
 from apps.service.queries.catalog import find_service
 from apps.service.queries.grants import Balance, balance, grants, live_sessions
-from apps.service.schemas import TenderOptionPage, TenderOptionsIn
+from apps.service.schemas.tender import TenderOptionPage, TenderOptionsIn
 
 
 @operation(

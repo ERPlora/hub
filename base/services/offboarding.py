@@ -19,7 +19,8 @@ from live.operations import INTERNAL, operation
 from live.outbox import record_event
 
 from base import events, registry
-from base.models import Hub, Membership, SessionOwner
+from base.models import Hub, Membership
+from base.models.sessions import SessionOwner
 from base.registry import hub_answer, internal_only
 from base.schemas.hub_registry import HubGetIn, HubOut
 from base.services.hub_registry import LEFT_STATUSES, _locked_hub
@@ -35,7 +36,8 @@ from base.services.provisioning import (
 )
 from base.services.reset import _holds
 from base.services.sessions import _end_sessions
-from control.models import HubDue, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import HubDue
 
 #: How long a business that left keeps its database.
 OFFBOARDING_RETENTION = dt.timedelta(days=90)

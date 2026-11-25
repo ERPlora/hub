@@ -238,10 +238,9 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Inicio, Horario
 Pasos:
 1. En el **Inicio**, mientras la semana sea la de por defecto, «Termina de configurar tu negocio» trae
-   «Confirma tu horario» («Hemos puesto un horario por defecto por ti (de lunes a viernes, de 09:00 a
-   18:00). Si coincide con el de tu negocio, confírmalo de un toque; si no, edita los días que cambien:
-   las reservas fuera de tu horario se rechazan.»), «Recomendado», a quien puede cambiar el horario.
-   «Configurar» lleva a **Horario**.
+   «Confirma tu horario» («Revisa que el horario de la semana es el de tu negocio: si lo es, confírmalo
+   de un toque; si no, edita los días que cambien: las reservas fuera de tu horario se rechazan.»),
+   «Recomendado», a quien puede cambiar el horario. «Configurar» lleva a **Horario**.
 2. Con el aviso amarillo «Este es un horario por defecto…» a la vista, comprueba que los días son los de
    tu negocio.
 3. Pulsa **Sí, este es mi horario**; el botón se desactiva mientras trabaja.
@@ -252,10 +251,12 @@ Sale: la semana marcada como confirmada, sin cambiar ni una hora, y un aviso `sc
 entonces la semana rige también las reservas de mesa (SCHEDULE-F12). Confirmar dos veces no cambia nada ni
 avisa. «Confirma tu horario» queda «Hecho» en el Inicio sin recargar; también si en vez de confirmar se
 guarda un día (SCHEDULE-F02), aunque sea como cerrado. Cambiar «Semana empieza», un día especial o un
-cambio temporal no confirma la semana.
+cambio temporal no confirma la semana. El paso hecho sigue en la lista con la misma línea, que no nombra
+ningún día ni ninguna hora: el asistente dice que está hecho y, si se le pregunta qué horario hay, lo lee
+en Horarios (SCHEDULE-F01), nunca del paso (BASE-F12).
 Si falla: arriba de la tabla: «No hay horario semanal que confirmar.» si no hay ningún día guardado (no se llega
 desde la pantalla: el aviso solo sale cuando hay semana).
-Implicados: BASE-F01
+Implicados: BASE-F01, BASE-F12
 
 ### SCHEDULE-F04 Añadir un día especial
 Estado: hecho (servidor y pantalla)
@@ -263,13 +264,15 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
 Pasos:
 1. En **Días especiales**, pulsa **+** (Nuevo día especial).
-2. Escribe la **Fecha** y el **Nombre** (los dos obligatorios).
-3. Deja **Cerrado** (lo que viene) o elige «Abierto (con horario)» y escribe uno o más tramos, igual que
-   al editar un día en **Horario**.
+2. Elige la **Fecha** en el calendario y escribe el **Nombre** (los dos obligatorios).
+3. Deja **Cerrado** (lo que viene) o elige «Abierto (con horario)» y elige las horas de uno o más tramos,
+   igual que al editar un día en **Horario**.
 4. Marca **Se repite cada año** si cae el mismo día y mes todos los años (Navidad); si quieres, **Notas**.
 5. Pulsa **Añadir día**: el formulario se cierra y el día aparece en la lista.
 Entra: fecha (real: el 31 de febrero no vale), nombre (hasta 200), cerrado o tramos, anual y notas (hasta
-1000).
+1000). Por el asistente, la tarjeta dice en su línea el nombre, la fecha y sus horas, o que cierra («Crear en
+Horarios: Nochebuena · Fecha: 24 dic 2027 · Tramos horarios: 10:00 · 14:00»; cerrado, «Cerrado: Sí»): unos tramos
+de un día que queda cerrado no se guardan, y la tarjeta no los dice.
 Sale: el día especial (`schedule.special_day.created`). Gana a todo lo demás ese día (SCHEDULE-F10,
 F11). Un día anual vale **todos los años**, también los anteriores a su fecha; el del 29 de febrero solo
 existe los años bisiestos.
@@ -284,12 +287,14 @@ Actor: propietario, administrador, responsable, asistente
 Pantalla: Días especiales
 Pasos:
 1. En la tabla «Cambios temporales», pulsa **+** (Nuevo cambio temporal).
-2. Escribe **Desde**, **Hasta** y **Motivo** (los tres obligatorios).
-3. Deja **Cerrado** (vacaciones del negocio) o elige «Abierto (con horario)» y escribe los tramos que
-   valen esas fechas (horario de verano).
+2. Elige **Desde** y **Hasta** en el calendario y escribe el **Motivo** (los tres obligatorios).
+3. Deja **Cerrado** (vacaciones del negocio) o elige «Abierto (con horario)» y elige las horas de los
+   tramos que valen esas fechas (horario de verano).
 4. Pulsa **Añadir cambio temporal**.
 Entra: las dos fechas (ambas incluidas), el motivo (hasta 200) y cerrado o tramos: el cambio vale todos
-los días del rango con las mismas horas.
+los días del rango con las mismas horas. Por el asistente, la tarjeta dice en su línea el motivo, sus fechas
+juntas y sus horas, o que cierra («Crear en Horarios: Horario de verano · Cuándo: 1 jul – 31 ago 2027 · Tramos
+horarios: 8:00 · 15:00»).
 Sale: el cambio temporal (`schedule.override.created`). Gana a la semana, pero pierde contra un día
 especial de esa fecha (no se avisa de que lo pisa: la precedencia lo resuelve).
 Si falla: «La fecha de fin no puede ser anterior a la de inicio.» bajo Hasta; «Esas fechas se solapan con
@@ -518,7 +523,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 ## Para quien lo mantiene
 
 - Anatomía completa de una app: `apps.py`, `models.py`, `engine.py` (las reglas, sin base de datos),
-  `schemas.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `schemas/`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero; las páginas en `frontend/`. `UI-REQUESTS.md` lista lo que se pide
   a `@erplora/ui`.
 - Modelos (UUIDv7, sin `hub_id`): `WeekDay` (un día de la semana, lunes = 0, cerrado o no; un día sin
@@ -582,11 +587,11 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   app («día», «hora», «semana» solo donde son la cosa pedida), para no quitar puesto a las herramientas de otras apps.
   Así cerrar por obras, cargar festivos de una vez o corregir un cambio temporal o un día especial desde el chat
   (SCHEDULE-F05, F07 y F13) llegan a su operación y no a los bloqueos de Citas: las frases reales de la QA del asistente
-  (`tests/e2e/qa/probes/owner-es-schedule-2026-11-08.json`) quedan entre las 20 primeras herramientas del turno y por
+  (`tests/e2e/qa/probes/owner-es-schedule-2026-11-08.json`) quedan entre las 15 herramientas que ofrece el turno y por
   delante de todo `appointment.blocked_time.*`, y una frase propia por herramienta solo llega entre las 10 primeras con
   sus `asks` (`tests/test_assistant_asks.py`).
 - La tarjeta de confirmación del asistente (BASE-F97, hub#675) nombra el registro que una escritura señala por su id
-  con las marcas `refers` de `schemas.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
+  con las marcas `refers` de `schemas/fields.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
   `OverrideRefIn`), leídas como quien pregunta: el día especial por su `name` con `schedule.special_day.get` y el
   cambio temporal por su `reason` con `schedule.override.get`, como el diálogo «Eliminar» de las pantallas. Ese `id`
   lleva su título («Día especial», «Cambio temporal»), nunca «Registro». Sin persona detrás, sin `schedule.view`, con
@@ -611,9 +616,8 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 - **La semana de la peluquería** (lunes a viernes 09:30–20:00 con descanso de 14:00 a 16:00, sábado
   09:30–14:00): es de los catálogos de arranque, que no la plantan.
 - **Calendario de festivos del país precargado**: cada día especial lo escribe el negocio o el asistente (SCHEDULE-F07).
-- **Fechas y horas en el orden del idioma del Hub** escritas a mano (`dd/mm/aaaa`, «2:30 pm», «1430»): los
-  campos usan `ion-input type="date|time"` hasta que `@erplora/ui` tenga `TimeField` y `DateField`
-  (`UI-REQUESTS.md`; los piden también Personal, Citas, Asistencia y Reservas online).
+- **Fechas y horas escritas a mano** (`dd/mm/aaaa`, «2:30 pm», «1430»): se eligen en el calendario y la
+  rueda de horas de la app (`DateField` y `TimeField` de `@erplora/ui`), que las enseñan en el idioma del Hub.
 - **«Abrir ajustes del hub»** desde Ajustes: el Hub aún no tiene ajustes de zona horaria a los que ir (la
   zona la manda el SaaS al dar de alta el hub; ver «Zona horaria» en «Para quien lo mantiene»).
 - **El icono de estrella** de la pestaña **Días especiales**: `ion:star-outline` está registrado en `@erplora/ui`

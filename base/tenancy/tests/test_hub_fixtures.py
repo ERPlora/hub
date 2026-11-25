@@ -6,7 +6,7 @@ from live.context import OperationContext, Scope
 from live.operations import get
 
 from base import activation
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.tenancy import migrator
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -38,5 +38,5 @@ def test_an_app_the_database_has_goes_on_at_once(business):
 
 
 def test_its_row_is_not_behind_the_code(business):
-    assert APP in migrator.portable_apps()
-    assert not migrator.is_behind(business)
+    assert APP in migrator.app_sets.portable_apps()
+    assert not migrator.hubs_pass.is_behind(business)

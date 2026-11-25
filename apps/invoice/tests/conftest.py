@@ -18,10 +18,11 @@ from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 from psycopg.conninfo import make_conninfo
+from pydantic import ValidationError
 
 from base import assistant
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
@@ -60,6 +61,10 @@ def ctx_for(
     )
 
 
+def fields(error: ValidationError) -> set[str]:
+    return {".".join(str(part) for part in item["loc"]) for item in error.errors()}
+
+
 def run(name: str, data: dict | None = None, ctx: OperationContext | None = None):
     """Runs the operation ``name`` with ``data`` as its input (validated as a route would)."""
     op = get(name)
@@ -93,6 +98,18 @@ def today():
 
 
 @pytest.fixture
+def at(monkeypatch, in_business_a):
+    """``at((zone, instant))``: business A in ``zone``, its clock stopped at ``instant``."""
+
+    def move(moment):
+        zone, instant = moment
+        monkeypatch.setattr(timezone, "now", lambda: instant)
+        monkeypatch.setattr(in_business_a, "timezone", zone)
+
+    return move
+
+
+@pytest.fixture
 def make_user(db):
     def make(
         username: str = "ana",
@@ -118,7 +135,7 @@ def catalog_of(make_user):
         if role not in users:
             users[role] = make_user(f"asker-{role}", role=role)
         user = users[role]
-        ctx = OperationContext(scope=A, actor=user, permissions=permissions_for(user, A), language=language)
+        ctx = OperationContext(scope=A, actor=user, permissions=access_for(user, A), language=language)
         return assistant.tools.catalog(ctx)
 
     return of
@@ -179,6 +196,25 @@ def charge(db):
         return run("sale.sale.complete", data)
 
     return make
+
+
+@pytest.fixture
+def equivalence_surcharge(db):
+    """The equivalence surcharge of Spain's generic products, 5.2 % beside their 21 % VAT, as Taxes keeps it."""
+    from apps.tax.models import TaxRule
+
+    root = TaxRule.objects.get(category__key="product.generic", country_code="ES", parent__isnull=True)
+    return run(
+        "tax.rule.create",
+        {
+            "country_code": "ES",
+            "tax_category_key": "product.generic",
+            "rate_pct": "5.2",
+            "tax_type": "surcharge",
+            "parent_id": str(root.id),
+            "component_label": "Recargo de equivalencia",
+        },
+    )
 
 
 @pytest.fixture

@@ -41,28 +41,28 @@ class ServiceConfig(LiveAppConfig):
         ("bono", "bonos", "voucher", "vouchers", "pack", "packs", "package", "packages", "grant", "grants"),
         ("asignacion", "asignaciones", "assignment", "assignments"),
     )
-    permissions = [
-        "service.view_service",
-        "service.add_service",
-        "service.change_service",
-        "service.delete_service",
-        "service.view_category",
-        "service.add_category",
-        "service.change_category",
-        "service.delete_category",
-        "service.view_package",
-        "service.add_package",
-        "service.change_package",
-        "service.delete_package",
-        "service.grant_package",
-        "service.redeem_package",
-        "service.view_package_balance",
-        "service.view_orphan_grant",
-        "service.void_grant",
-        "service.adjust_grant",
-        "service.return_session",
-        "service.manage_settings",
-    ]
+    permissions = {
+        "service.view_service": _("View services, settings and assigned professionals"),
+        "service.add_service": _("Add services"),
+        "service.change_service": _("Edit and restore services, and assign professionals"),
+        "service.delete_service": _("Archive services"),
+        "service.view_category": _("View categories"),
+        "service.add_category": _("Create categories"),
+        "service.change_category": _("Edit categories"),
+        "service.delete_category": _("Delete categories"),
+        "service.view_package": _("View packages"),
+        "service.add_package": _("Create packages"),
+        "service.change_package": _("Edit packages"),
+        "service.delete_package": _("Delete packages"),
+        "service.grant_package": _("Give packages to customers"),
+        "service.redeem_package": _("Use sessions of a package"),
+        "service.view_package_balance": _("View sold packages, their balances and movements"),
+        "service.view_orphan_grant": _("View packages without a customer"),
+        "service.void_grant": _("Void sold packages"),
+        "service.adjust_grant": _("Adjust sold packages and tell their sale later"),
+        "service.return_session": _("Give sessions back when a sale is voided or refunded"),
+        "service.manage_settings": _("Change the settings"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The old cashier
     # role is gone: what it had (view, spend sessions, grant vouchers) is the employee's.
     role_permissions = {
@@ -141,7 +141,21 @@ class ServiceConfig(LiveAppConfig):
             permission="service.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "toNEQIwtQDY", "en": "vxEm9WTDpi0"},
+        flow_videos={
+            "SERVICE-F01": {"es": ["LbOhuQ82bpw"], "en": ["RncbXpYLq-I"]},
+            "SERVICE-F02": {"es": ["LbOhuQ82bpw"], "en": ["RncbXpYLq-I"]},
+            "SERVICE-F03": {"es": ["Vr7GaLsXYy0"], "en": ["Ul5ANHNCxTo"]},
+            "SERVICE-F04": {"es": ["LbOhuQ82bpw"], "en": ["RncbXpYLq-I"]},
+            "SERVICE-F07": {"es": ["lSNrQpprRDU"], "en": ["VXDOqc0EWU8"]},
+            "SERVICE-F08": {"es": ["lSNrQpprRDU"], "en": ["VXDOqc0EWU8"]},
+            "SERVICE-F12": {"es": ["oD_kZLu2xYQ"], "en": ["3XPQhS5SNrc"]},
+            "SERVICE-F13": {"es": ["oD_kZLu2xYQ"], "en": ["3XPQhS5SNrc"]},
+            "SERVICE-F31": {"es": ["zX1YGJDGZgs"], "en": ["P2zoniTyTbU"]},
+            "SERVICE-F32": {"es": ["zX1YGJDGZgs"], "en": ["P2zoniTyTbU"]},
+        },
+    )
 
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff

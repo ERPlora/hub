@@ -13,7 +13,7 @@ from base.permissions import OWN_BUSINESS
 from base.registry import internal_only
 from base.schemas.dumps import HubDumpLinkIn, HubDumpLinkOut, HubDumpsIn, HubDumpsOut, InternalDumpsOut
 from base.schemas.hub_registry import HubGetIn
-from control.models import HubDump
+from control.models.dumps import HubDump
 
 
 # ── The copies of the business's data ─────────────────────────────────────────────────────────────────────────────
@@ -34,7 +34,7 @@ def _reset_state(hub: Hub) -> dict | None:
         return None
     return {
         "state": asked["state"],
-        "sections": [{"id": app, "label": blueprint.app_label(app)} for app in asked.get("apps") or []],
+        "sections": [{"id": app, "label": blueprint.datasets.app_label(app)} for app in asked.get("apps") or []],
         "requested_by": asked.get("requested_by") or "",
         "error": asked.get("error") or "",
         "removed": asked.get("removed") or [],

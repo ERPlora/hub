@@ -45,7 +45,7 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
 | Operaciones | 10 consultas (`queries/`) y 9 acciones (`services.py`), todas con `ai=`; 19 rutas en `/api/cash_register/…`, una por operación |
 | Eventos | 7, `cash_register.<entidad>.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
 | Tarea programada | `auto_close_sessions` → `cash_register.session.auto_close`, `*/5 * * * *`, `collapse` (la corre el worker) |
-| Migraciones | `0001_initial` y `0002_auto_close_time_callable_default`; los índices que necesita de Ventas están en `sale/0005_cash_register_indexes` |
+| Migraciones | `0001_initial`, `0002_auto_close_time_callable_default`, `0003_session_people` y `0004_actors_without_address`; los índices que necesita de Ventas están en `sale/0005_cash_register_indexes` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (las líneas se leen y se copian al cerrar, el esperado, la concurrencia, la

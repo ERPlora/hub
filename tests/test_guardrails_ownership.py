@@ -69,105 +69,105 @@ UNSCOPED_READS: dict[tuple[str, str], tuple[str, str]] = {
         "Where the sale lines that fell in no shift start: when the last closed session opened and closed, whoever's "
         "it was, never shown.",
     ),
-    ("apps/table/queries/__init__.py", "sessions_now"): (
+    ("apps/table/queries/sessions.py", "sessions_now"): (
         PART_OF_THE_WORK,
         "What the check of each table of the room charged, to say whether it is paid.",
     ),
-    ("apps/appointment/queries/__init__.py", "load_detail"): (
+    ("apps/appointment/queries/reads.py", "load_detail"): (
         PART_OF_THE_WORK,
         "The appointment a booking or a change of the caller has just written, answered back to them.",
     ),
-    ("apps/appointment/queries/__init__.py", "series_with_lines"): (
+    ("apps/appointment/queries/series.py", "series_with_lines"): (
         PART_OF_THE_WORK,
         "The repeating appointment a write of the caller has just made or changed, answered back to them.",
     ),
-    ("apps/appointment/queries/__init__.py", "load_agenda"): (
+    ("apps/appointment/queries/agenda.py", "load_agenda"): (
         PART_OF_THE_WORK,
         "The professional's busy times the booking rules weigh, so that nobody books over a colleague's appointment.",
     ),
-    ("apps/appointment/queries/__init__.py", "conflicts_of"): (
+    ("apps/appointment/queries/agenda.py", "conflicts_of"): (
         PART_OF_THE_WORK,
         "The appointments a time would overlap, which a booking asks to confirm; checking a free time names them only "
         "to who may see that professional's agenda.",
     ),
-    ("apps/appointment/queries/__init__.py", "count_active_for_service"): (
+    ("apps/appointment/queries/appointments.py", "count_active_for_service"): (
         NO_ROW_READ,
         "How many upcoming appointments carry a service and when the first is: the warning before it is archived.",
     ),
-    ("apps/appointment/queries/__init__.py", "series_reach"): (
+    ("apps/appointment/queries/series.py", "series_reach"): (
         NO_ROW_READ,
         "How many booked appointments an edit of a repeating appointment the caller sees would reach, and how many of "
         "them are charged.",
     ),
-    ("apps/appointment/queries/__init__.py", "appointments_deleted_in_business"): (
+    ("apps/appointment/queries/recovery.py", "appointments_deleted_in_business"): (
         ONLY_THE_SYSTEM,
         "Which appointments of a separate copy the business still holds deleted, asked only by the platform when it "
         "recovers the business.",
     ),
-    ("apps/appointment/queries/__init__.py", "appointments_not_in_business"): (
+    ("apps/appointment/queries/recovery.py", "appointments_not_in_business"): (
         ONLY_THE_SYSTEM,
         "Which appointments of a separate copy the business lacks, asked only by the platform when it recovers the "
         "business.",
     ),
-    ("apps/appointment/queries/__init__.py", "_made_again"): (
+    ("apps/appointment/queries/recovery.py", "_made_again"): (
         ONLY_THE_SYSTEM,
         "Whether a repeating appointment of a separate copy was made again since, asked only by the platform when it "
         "recovers the business.",
     ),
-    ("apps/appointment/queries/__init__.py", "series_deleted_in_business"): (
+    ("apps/appointment/queries/recovery.py", "series_deleted_in_business"): (
         ONLY_THE_SYSTEM,
         "Which repeating appointments of a separate copy the business still holds deleted, asked only by the platform "
         "when it recovers the business.",
     ),
-    ("apps/appointment/queries/__init__.py", "series_not_in_business"): (
+    ("apps/appointment/queries/recovery.py", "series_not_in_business"): (
         ONLY_THE_SYSTEM,
         "Which repeating appointments of a separate copy the business lacks, asked only by the platform when it "
         "recovers the business.",
     ),
-    ("apps/online_booking/queries.py", "load_detail"): (
+    ("apps/online_booking/queries/bookings.py", "load_detail"): (
         PART_OF_THE_WORK,
         "The online booking the caller has just confirmed, completed, marked as not shown or cancelled, answered back "
         "to them.",
     ),
-    ("apps/invoice/queries/__init__.py", "with_links"): (
+    ("apps/invoice/queries/rows.py", "with_links"): (
         NO_ROW_READ,
         "Whether each document of a list the caller sees was replaced by a full invoice.",
     ),
-    ("apps/invoice/queries/__init__.py", "_loaded"): (
+    ("apps/invoice/queries/rows.py", "_loaded"): (
         REACHED_THROUGH,
         "The document the caller opened, read again with the documents it rectifies, replaces or is rectified by, "
         "which its detail names as links.",
     ),
-    ("apps/invoice/queries/__init__.py", "invoice_detail"): (
+    ("apps/invoice/queries/rows.py", "invoice_detail"): (
         REACHED_THROUGH,
         "The full invoice that replaced the ticket the caller opened, which its detail names as a link.",
     ),
-    ("apps/invoice/queries/__init__.py", "document_of_sale"): (
+    ("apps/invoice/queries/rows.py", "document_of_sale"): (
         REACHED_THROUGH,
         "The document of a sale the caller reached through its declaration (by_source looks it up with "
         "visible_sale), and the one Sales' void and refund rectify.",
     ),
-    ("apps/invoice/queries/__init__.py", "series_started"): (
+    ("apps/invoice/queries/series.py", "series_started"): (
         NO_ROW_READ,
         "Whether a series numbered any document, which freezes its prefix, format and next number.",
     ),
-    ("apps/invoice/queries/__init__.py", "list_series"): (
+    ("apps/invoice/queries/series.py", "list_series"): (
         NO_ROW_READ,
         "Whether each listed series numbered any document.",
     ),
-    ("apps/invoice/queries/__init__.py", "rectifiable"): (
+    ("apps/invoice/queries/rectifying.py", "rectifiable"): (
         NO_ROW_READ,
         "Whether a ticket was already replaced by a full invoice, which is then the one to rectify.",
     ),
-    ("apps/invoice/queries/__init__.py", "numbering_gaps"): (
+    ("apps/invoice/queries/numbering.py", "numbering_gaps"): (
         WHOLE_SERIES,
         "The gaps of a series' numbering, which only the whole series can tell.",
     ),
-    ("apps/invoice/queries/__init__.py", "allocations"): (
+    ("apps/invoice/queries/numbering.py", "allocations"): (
         WHOLE_SERIES,
         "The book of numbers handed out in a series, with the type and date of each document.",
     ),
-    ("apps/invoice/queries/__init__.py", "find_platform_invoice"): (
+    ("apps/invoice/queries/platform_invoices.py", "find_platform_invoice"): (
         ONLY_THE_SYSTEM,
         "ERPlora's own invoices on its platform hub, which the SaaS issues and asks about by their reference.",
     ),
@@ -348,7 +348,7 @@ def test_a_planted_read_of_an_appointment_or_a_series_is_caught_with_the_real_de
         "def peek():\n    return Appointment.objects.all()\n\n\n"
         "def peek_series():\n    return Recurring.objects.all()\n"
     )
-    inbox = "apps/online_booking/queries.py"
+    inbox = "apps/online_booking/queries/bookings.py"
     root = tree_with(tmp_path, {"apps/appointment/queries/ownership.py": declared, inbox: peek})
     assert unscoped_reads(root) == {(inbox, "peek"), (inbox, "peek_series")}
 

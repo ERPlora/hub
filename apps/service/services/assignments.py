@@ -14,18 +14,18 @@ from apps.service.models import Assignment
 from apps.service.queries.assignments import ASSIGNMENT_NOT_FOUND, load_assignment
 from apps.service.queries.catalog import find_service
 from apps.service.queries.reads import SYSTEM
-from apps.service.schemas import (
+from apps.service.schemas.assignments import (
     AssignIn,
     AssignmentOut,
     AssignmentPatchIn,
     AssignmentRefIn,
-    DeletedOut,
     MemberReleaseIn,
     ReleasedOut,
 )
+from apps.service.schemas.fields import DeletedOut
 from apps.service.services.writes import _changes
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
 
 
 def _demote_other_primaries(member: Member, keep) -> None:

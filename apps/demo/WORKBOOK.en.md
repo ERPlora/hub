@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:2fe4ae15458b30f9b270d86f4d298056ba8558dd47896bd40c6b10ecbd06ffb8 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:15a0b0a37e89 -->
 
 Demo keeps **items** with a name, a status ("Open" or "Done") and a note, and each item carries a
 list of **lines** (text and quantity). It solves no business problem: it is there to check, on the
@@ -20,6 +19,7 @@ Who uses it:
 - The **employee** only sees the list and the item page.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:704586ae33bd -->
 
 It is the list-and-detail pattern of any back office on the market (Odoo, Shopify, Square Dashboard):
 a paginated list with a search box and a status filter, a detail page with its lines, a form with
@@ -30,6 +30,7 @@ that is deleted elsewhere, or that the person can no longer see, stops showing i
 Odoo's "record that no longer exists".
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:eeb06eba0fbe -->
 
 - You need to sign in with an account that has a role in that business. Demo has no sign-in of its
   own: without a session, it takes you to the ERPlora sign-in, which comes back to the business with
@@ -39,10 +40,12 @@ Odoo's "record that no longer exists".
   open in `a`.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:e8b2d9d62529 -->
 
 Demo opens from **"My apps"**, at the top right, and has two screens and two forms.
 
 ### Demo
+<!-- from WORKBOOK.md sha256:694deadd95d9 -->
 The tab opens the "Items" list: a table with Name, Status ("Open" / "Done"), Lines (how many it has) and
 Updated. A "Search…" box by name (not case-sensitive); the funnel opens "Filters", with the status one
 ("All", "Open", "Done"); 50 per page (it can be changed), from the most recently changed to the oldest,
@@ -53,6 +56,7 @@ opens the item page. Above it, the figures "Open", "Done" and "Lines", only for 
 ![The list of items on a phone, with the figures, the search box, the filters funnel and "New item"](docs/img/items-list.png)
 
 ### Item page
+<!-- from WORKBOOK.md sha256:3016e7c8b6d8 -->
 Name, status, note and the list of lines (text and quantity, in the order they were added). Actions
 for those who can manage: "Edit", "Mark done" (or "Reopen"), "Delete", "Save note" and "Add line"; on a
 phone, the first three open from "More actions" (⋮), at the top right, so that the name is read whole. If
@@ -61,11 +65,13 @@ elsewhere" is shown, with "Reload" to take the other person's. If the item is de
 the person can no longer see it, the page stops showing it and says why.
 
 ### New item and Edit item (forms)
+<!-- from WORKBOOK.md sha256:9116b77e86b4 -->
 Fields Name (required, up to 120 characters), Status and Note. "Save". A value that is not valid is
 shown under its field and nothing is saved. Those who cannot manage see "You do not have permission"
 instead of the form.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:91cd38c12ac0 -->
 
 | State | What the person sees |
 |---|---|
@@ -77,6 +83,7 @@ instead of the form.
 | No permission | What they cannot do does not appear; if they get there another way, "You do not have permission". |
 
 ## Flows
+<!-- from WORKBOOK.md sha256:e2d8df2aae11 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -88,6 +95,7 @@ instead of the form.
 | DEMO-F06 | Try it without permission | done |
 
 ### DEMO-F01 Create an item
+<!-- from WORKBOOK.md sha256:ce294c726685 -->
 Status: done
 Actor: administrator, manager
 Screen: Demo
@@ -103,6 +111,7 @@ field and nothing is saved.
 Involved: none
 
 ### DEMO-F02 Edit an item
+<!-- from WORKBOOK.md sha256:17fcd342b9bb -->
 Status: done
 Actor: administrator, manager
 Screen: Item page
@@ -120,6 +129,7 @@ else deleted it): "This item no longer exists."
 Involved: none
 
 ### DEMO-F03 Delete an item
+<!-- from WORKBOOK.md sha256:3398f56e9886 -->
 Status: done
 Actor: administrator, manager
 Screen: Item page
@@ -134,6 +144,7 @@ If it fails: "This item no longer exists." if someone else deleted it first.
 Involved: none
 
 ### DEMO-F04 Add a line instantly (optimistic and idempotent)
+<!-- from WORKBOOK.md sha256:cfe594159209 -->
 Status: done
 Actor: administrator, manager
 Screen: Item page
@@ -155,6 +166,7 @@ If the item no longer exists: "This item no longer exists."
 Involved: none
 
 ### DEMO-F05 See the change on another tablet in under a second
+<!-- from WORKBOOK.md sha256:31b97546bd3d -->
 Status: done
 Actor: anyone with permission to view
 Screen: Demo, Item page
@@ -171,6 +183,7 @@ round).
 Involved: none
 
 ### DEMO-F06 Try it without permission
+<!-- from WORKBOOK.md sha256:bba3659679c8 -->
 Status: done
 Actor: employee
 Screen: Demo, Item page
@@ -191,6 +204,7 @@ and says "You do not have permission".
 Involved: none
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:cdb919d608d8 -->
 
 Everything can be requested through the screens, the assistant and the API, with the same
 rules and the same permissions. Before changing or deleting an item or adding a line to it, the assistant asks for
@@ -209,24 +223,27 @@ deleted, the assistant says so. If the item comes by its id beside another one's
 shows that name, which the action does not use: it says only the item of the id (hub#1272).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
+<!-- from WORKBOOK.md sha256:f71456703706 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The items, with search by name, a status filter and pages (up to 100 per page) | view | F01–F05 | `demo.item.list` |
-| An item's page with its lines | view | F02–F05 | `demo.item.detail` |
+| The items, with search by name, a status filter and pages (up to 100 per page) | view | F01–F06 | `demo.item.list` |
+| An item's page with its lines | view | F02–F06 | `demo.item.detail` |
 | The figures: total, open, done and lines | manage | F05 | `demo.item.stats` |
 | How many items are still open (the bell's counter) | view | F05 | `demo.item.open_count` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:91a4b9caba25 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
 | Creates an item | manage | F01 | `demo.item.create` |
 | Changes an item (only what is sent) | manage | F02 | `demo.item.update` |
 | Deletes an item and its lines | manage | F03 | `demo.item.delete` |
-| Adds a line; repeating with the same identifier does not duplicate it | manage | F04 | `demo.item.add_line` |
+| Adds a line; repeating with the same identifier does not duplicate it | manage | F04, F06 | `demo.item.add_line` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:73c68c5f7051 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -239,9 +256,11 @@ What each notice refreshes: the list and the figures, with all four; the item pa
 "deleted" and "line added".
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:e01e7dd73045 -->
 Nothing: Demo depends on no app.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:37c1bbad638a -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

@@ -1,12 +1,12 @@
-<!-- generated from WORKBOOK.md sha256:d2a15b0413790d503adb007aa67f15046121ab4f1d0742b6a687544eb6003629 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:7e5addbd857f -->
 
 Menus and combos sells the menu of the day, the kids' menu or the sandwich with a drink to take away at a closed
 price. Each menu has its courses (Starter, Main, Drink…) and each course, the choices among your products, with a
 supplement if one costs more. The till charges it with the right VAT and the kitchen gets each dish at its station.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:71cb76cb2789 -->
 
 Menus and combos keeps the composite items that are sold at a **closed price**: the menu of the day
 ("starter + main + dessert + drink for €13.50"), the kids' menu or the "sandwich + drink" to take
@@ -28,6 +28,7 @@ and charges it, **Inventory** lowers the stock of each dish and **Kitchen** rece
 station. It is not a discount nor a variant, nor the extras of a dish (that is Modifiers).
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:8afbe8438d9d -->
 
 What the market does is adopted:
 
@@ -51,6 +52,7 @@ What the market does is adopted:
   question.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:3e9a187ba246 -->
 
 - Menus needs **Inventory** (its choices are products of the catalogue) and **Taxes** (the VAT
   category of a menu "eaten in"). Turning Menus on turns both on.
@@ -72,8 +74,10 @@ Initial setup, step by step:
    it lacks.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:7c7582f8acc8 -->
 
 ### Menus
+<!-- from WORKBOOK.md sha256:35f7243cd415 -->
 Here are your menus, with their photo, their closed price, whether they are eaten in or sold to take away and whether
 they are on sale. With **+** you create one; on its row, "Edit details" changes it and "Withdraw" takes it off sale
 with its courses. Tap a menu to open its builder: there you add its courses, in each course the choices with their
@@ -81,6 +85,7 @@ supplement, and you mark what is sold out today. At the top of the builder, a no
 on the till or what it lacks.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:145f270cfc64 -->
 Menu **Menus**. Table of menus with the search box "Search a menu…" (it searches by name and by
 kitchen name), table or cards view and columns: "Photo" (the thumbnail, or the initials over its colour),
 Name (sorts and filters), "Closed price" (in the business's currency; sorts), "How
@@ -97,6 +102,7 @@ highlighted), "VAT category" (only if it is "eaten in"), "Order on the menu list
 checkbox (ticked to begin with), with "Save" and "Cancel".
 
 #### Menu builder
+<!-- from WORKBOOK.md sha256:1d4779b701fb -->
 It opens when a menu is tapped (`/combo/menus/<id>`). The back arrow of the top bar goes back to Menus.
 At the top of the page, the name and the price of the menu (in the business's currency), and a notice with what that menu will do on the ticket: "This menu is billed as a
 single service: one line at its VAT category, whatever the components are taxed at." or "This menu is
@@ -121,6 +127,7 @@ same option may be picked more than once" and "Save"), which becomes "Course · 
 one.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:6a1137b25683 -->
 
 | State | What the person sees |
 |---|---|
@@ -133,12 +140,14 @@ one.
 | No permission | What they cannot do does not appear; if they arrive through another door, "You do not have permission". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:1527674e7bce -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05); a price rewritten by itself in the business's currency is no change.
 
 ## Flows
+<!-- from WORKBOOK.md sha256:fdb609818538 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -159,6 +168,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); a price 
 | COMBO-F15 | Recover the menus, their courses and their choices from a separate copy | done |
 
 ### COMBO-F01 Look up and search the menus
+<!-- from WORKBOOK.md sha256:3ab0c28c5a73 -->
 Status: done
 Actor: owner, administrator, manager, employee, assistant
 Screen: Menus
@@ -175,6 +185,7 @@ first one with the + button.".
 Involved: none
 
 ### COMBO-F02 Create a menu at a closed price
+<!-- from WORKBOOK.md sha256:f877af580080 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menus
@@ -207,6 +218,7 @@ there is no + button.
 Involved: TAX-F01
 
 ### COMBO-F03 Change the details of a menu, put it on sale or take it off sale
+<!-- from WORKBOOK.md sha256:8f0871b19936 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menus
@@ -215,6 +227,11 @@ Steps:
 2. Change what is needed: name, price, way of selling, VAT category, order or "On sale".
 3. Tap "Save". The list shows the change at once.
 4. A menu with "On sale" unticked stays in the list, but the till stops offering it.
+5. Through the assistant, "take the menu of the day off sale" or "put it back on sale" comes up on a one-tap card,
+   like the switch: "Change in Menus and combos" with the menu and how "On sale" is left, and "Run it" confirms it,
+   with nothing to type.
+   Changing the name, the price, the way of selling, the VAT category or the order, alone or together with "On sale",
+   asks to type CONFIRM, because it may change how it is charged.
 In: the same fields as when creating; only what is sent changes (through the assistant or the API, what
 is not named stays as it was).
 Out: the changed menu (announces: menu changed). What is already charged does not change: each sale line
@@ -223,9 +240,10 @@ goes up in price or is taken off sale; the way of selling and the VAT category a
 (COMBO-F08, F09).
 If it fails: the same warnings as when creating. Switching to "eaten in" without a VAT category is
 refused.
-Involved: SALE-F12
+Involved: SALE-F12, BASE-F98
 
 ### COMBO-F04 Withdraw a menu
+<!-- from WORKBOOK.md sha256:a431b751453d -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menus
@@ -245,6 +263,7 @@ what was said, nothing is withdrawn and the new card comes up.
 Involved: SALE-F12, COMBO-F15
 
 ### COMBO-F05 Set up the courses of a menu
+<!-- from WORKBOOK.md sha256:b4c2d5c77096 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menu builder
@@ -272,6 +291,7 @@ the menu the card showed.
 Involved: COMBO-F15
 
 ### COMBO-F06 Choose the products of each course and their supplement
+<!-- from WORKBOOK.md sha256:cc8c2bcc1915 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menu builder
@@ -308,11 +328,13 @@ catalogue does not load, the search box says so with "Retry". A product that doe
 created first in Inventory: the search box finds it as soon as it is saved. Through the assistant, when changing or
 removing a choice said by its product, a name that fits several choices or none brings up no card, and if before the
 "yes" another choice or another menu fits better what was said, nothing is touched and the new card comes up.
-When adding or reordering choices, the "yes" counts only for the menu, the course and the product the card
-showed.
+When adding choices, a menu, a course or a product the business does not have, or a name that fits several, brings up
+no card either: the assistant looks it up under another name or asks which one it is. When adding or reordering
+choices, the "yes" counts only for the menu, the course and the product the card showed.
 Involved: INVENTORY-F27
 
 ### COMBO-F07 Choose a menu when selling
+<!-- from WORKBOOK.md sha256:166f1b6a72b4 -->
 Status: done
 Actor: employee, manager
 Screen: Sales: Sell
@@ -342,6 +364,7 @@ also seen and sold.
 Involved: SALE-F12, SALE-F42, MODIFIER-F06
 
 ### COMBO-F08 Charge the menu: closed price and supplements
+<!-- from WORKBOOK.md sha256:d20d07e37ccc -->
 Status: done
 Actor: employee, manager
 Screen: Sales: Sell
@@ -369,6 +392,7 @@ Without Menus active, the till offers no menus and one asked for through the API
 Involved: SALE-F12
 
 ### COMBO-F09 Split the VAT of a menu
+<!-- from WORKBOOK.md sha256:3d72655fbc6e -->
 Status: done
 Actor: employee, manager
 Screen: Sales: Sell
@@ -406,6 +430,7 @@ different categories, the menu is not on the till.
 Involved: SALE-F12, TAX-F19
 
 ### COMBO-F10 Lower the stock of each dish when charging
+<!-- from WORKBOOK.md sha256:b4c62692abd9 -->
 Status: done
 Actor: system
 Screen: none
@@ -426,6 +451,7 @@ on its own (INVENTORY-F21).
 Involved: INVENTORY-F22, INVENTORY-F23, INVENTORY-F24, SALE-F12
 
 ### COMBO-F11 Send the menu to the kitchen
+<!-- from WORKBOOK.md sha256:3f4781b64992 -->
 Status: done
 Actor: employee, manager
 Screen: none (the kitchen ticket is painted by Kitchen)
@@ -445,6 +471,7 @@ ordered), so it never reaches the kitchen half done. A dish that is a service is
 Involved: KITCHEN-F06, KITCHEN-F08, SALE-F12, SALE-F20
 
 ### COMBO-F12 Mark a choice as sold out
+<!-- from WORKBOOK.md sha256:51722d5933d2 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menu builder
@@ -462,6 +489,7 @@ on the till and the builder's notice says so. An open check with a dish already 
 Involved: COMBO-F07, INVENTORY-F29
 
 ### COMBO-F13 When a product leaves the catalogue
+<!-- from WORKBOOK.md sha256:fae2dbac4c11 -->
 Status: done
 Actor: system, owner, administrator, manager, assistant
 Screen: Menu builder
@@ -485,6 +513,7 @@ on its own; meanwhile, they stay marked and nobody sells them.
 Involved: INVENTORY-F04, INVENTORY-F34, COMBO-F06, COMBO-F15
 
 ### COMBO-F14 The menu's photo
+<!-- from WORKBOOK.md sha256:c04e4e6ef01b -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menus
@@ -494,7 +523,8 @@ Steps:
    up to 2 MB).
 2. Tap "Save": the menu keeps its photo. "Remove photo" leaves it with its initials.
 3. Through the assistant: "put a photo on the menu of the day". The assistant proposes up to five
-   images of the library by their title and asks which one; it never sets one on its own.
+   images of the library by their title alone, without their internal code, and asks which one; it never
+   sets one on its own.
 In: the menu and the image chosen or the photo uploaded.
 Out: the menu with its photo (announces: menu changed); the till shows it on its tile without
 reloading (INVENTORY-F32), and the list of menus, in its row. The photo of its own is kept in the
@@ -510,6 +540,7 @@ saved. Try again.". A menu without a photo, or whose photo does not load, shows 
 Involved: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
 
 ### COMBO-F15 Recover the menus, their courses and their choices from a separate copy
+<!-- from WORKBOOK.md sha256:d200aa799299 -->
 Status: done
 Actor: ERPlora's staff who run the platform, when a business asks for it (BASE-F114)
 Screen: none of Menus: in the Hubs admin, Separate copies › "Recover into the business…", with **Menus, Menu courses,
@@ -560,6 +591,7 @@ it since, like everything it no longer has.
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, COMBO-F02, COMBO-F04, COMBO-F05, COMBO-F06, COMBO-F12, COMBO-F13, COMBO-F14
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:9f76a259809f -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever speaks) and the API, with the same rules and permissions. A menu is named by its id or by its name; a
@@ -571,7 +603,7 @@ its card (BASE-F97), which names each record as the screens name it, never by it
 Lentils"), the product by its name ("New product: Soup") and, when reordering courses or choices or adding several
 products, each one by its name and in the order sent ("Courses: Mains, Starters"). What the person asking cannot see,
 or what no longer exists, is left out; what was said in words and cannot be read comes up as it was said. A menu said
-by its name when changing it, withdrawing it, giving it a photo or
+by its name when changing it, putting it on sale or taking it off sale, withdrawing it, giving it a photo or
 reordering its courses is looked up as the action will look it up (the same name before one that contains it), and the
 card shows the menu that will be touched, with its full name ("Menu: Vegan menu" when "vegan" was said). If what was
 said fits several menus or none, no card comes up: the assistant hears "There are several menus called "vegan": Vegan
@@ -587,36 +619,42 @@ Homemade desserts" when "desserts" was said, "Choice: House flan" when "flan" wa
 courses and choices, and with an Inventory product said by its name, the card also shows the menu, the course and the
 product it found, and the "yes" counts only for them: if, before confirming, someone creates one that fits better what
 was said, nothing is touched and the new card comes up; if what was said fits several, the card shows it as it was said
-and the action asks which one (hub#1245). If the menu, the course or the choice comes by its identifier beside a name
+and the action asks which one (hub#1245); when adding choices, instead, no card comes up and the assistant asks which
+one (hub#2213). If the menu, the course or the choice comes by its identifier beside a name
 the action does not use (another menu's, another course's or another product's), the card neither reads nor shows that
 name: it says the record of the identifier, as when it comes alone (hub#1250). The same with the identifier of another
 menu or another course that comes beside the course's or the choice's, or beside that of the course a choice is added
 to, reordered in or looked for in: the action does not use it and the card does not show it (hub#1278).
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:a8cd4948eaef -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The menus, with search, filters and order, in pages of up to 100 (live) | view | F01 | `combo.combo.list` |
-| A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12 | `combo.combo.get` |
-| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20, BASE-F97) | view | F06, F07 | `combo.option.get` |
+| A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12, F13 | `combo.combo.get` |
+| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20, BASE-F97) | view | F06 | `combo.option.get` |
 | A course of a menu with its choices, by its id or by its name within the menu: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view | F05, F06 | `combo.group.get` |
+| What a new choice names, before the assistant's card that adds it: the course, with its menu, and the Inventory product; if one does not exist or fits several, no card comes up (BASE-F97); it is not an assistant tool and has no API route | view | F06 | `combo.option.check` |
+| The same with several choices at once: the course and each product, before the card that adds them (BASE-F97); it is not an assistant tool and has no API route | view | F06 | `combo.option.bulk_check` |
 | The till's menu catalogue: the ones that can be sold, with their courses and their available choices (live) | view | F07 | `combo.combo.for_sale` |
 | The line of a menu with what was chosen: amount, components and tax split | view | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Up to five images of the library for a menu's photo, by its name; it sets none | view | F14 | `combo.combo.suggest_image` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:f4fdd6c04206 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
 | Creates a menu | manage | F02 | `combo.combo.create` |
 | Changes a menu (only what is sent) | manage | F03 | `combo.combo.update` |
+| Puts a menu on sale or takes it off the till, changing nothing else | manage | F03 | `combo.combo.set_active` |
 | Withdraws a menu with its courses and choices | manage | F04 | `combo.combo.delete` |
 | Adds a course (at the end) | manage | F05 | `combo.group.create` |
 | Changes a course (only what is sent) | manage | F05 | `combo.group.update` |
 | Withdraws a course with its choices | manage | F05 | `combo.group.delete` |
 | Orders the courses of a menu, all at once | manage | F05 | `combo.group.reorder` |
-| Adds a choice (at the end) | manage | F06, F15 | `combo.option.create` |
+| Adds a choice (at the end) | manage | F06, F13, F15 | `combo.option.create` |
 | Adds several choices at once | manage | F06 | `combo.option.bulk_create` |
 | Changes a choice: product, supplement or available (only what is sent) | manage | F06, F12 | `combo.option.update` |
 | Removes a choice | manage | F06 | `combo.option.delete` |
@@ -626,6 +664,7 @@ to, reordered in or looked for in: the action does not use it and the card does 
 | Uploads a menu's own photo | manage | F14 | `combo.combo.upload_image` |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:b4eedcf4aac5 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -638,6 +677,7 @@ to, reordered in or looked for in: the action does not use it and the card does 
 | Choices reordered | Changing the order | `group_id`, `combo_id` | `combo.option.reordered` |
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:73d32de5b0df -->
 
 | Notice from | What Menus does | Flows | Service that listens |
 |---|---|---|---|
@@ -649,15 +689,17 @@ catalogue: the name, the price, whether it is active and whether it is sold out 
 To a recovered product it does not react: its choices come back from the copy (F15).
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:aad2f7400714 -->
 
 | From | What for | Flows | Service |
 |---|---|---|---|
-| Inventory (`requires`) | The products that can be a choice, with their name, SKU, price, tax category, whether they are active and whether they are sold out (direct read: it is a required app) | F06, F07, F08, F09, F12 | model `inventory.Product`; the screen's search box uses `inventory.product.list` with `is_active` and `include_sold_out` (the active ones, sold out or not) |
+| Inventory (`requires`) | The products that can be a choice, with their name, SKU, price, tax category, whether they are active and whether they are sold out (direct read: it is a required app) | F06, F07, F08, F09, F12 | model `inventory.Product`; the screen's search box uses `inventory.product.list` (the active ones, sold out or not) |
 | Taxes (`requires`) | The tax categories of the selector and that of the menu "eaten in" | F02, F03, F09 | model `tax.TaxCategory`; the selector uses `tax.category.list` |
 | Platform | The image library: searching it and naming by its title the image set on a menu | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
-| Platform | The recovery from a separate copy (BASE-F114), to which Menus says which menus, courses and choices it gives back | F15 | `recoverable_from_copy` in `apps.py` |
+| Platform | The recovery from a separate copy (BASE-F114), to which Menus says which menus, courses and choices it gives back | F15 | what its app module declares (recoverable_from_copy) |
 
 ### Contract with Sales
+<!-- from WORKBOOK.md sha256:50ecf0906376 -->
 
 Sales does not require Menus: it calls it by the operation's name (`call_app`), with the session of
 whoever sells, and if Menus is not active the till offers no menus.
@@ -686,6 +728,7 @@ whoever sells, and if Menus is not active the till offers no menus.
   the check has no channel (the "What is left out" of Sales), so the menu's setting rules.
 
 ### Contract with Inventory
+<!-- from WORKBOOK.md sha256:ea6eaaff6bc0 -->
 
 - In the notice `sale.sale.completed`, Sales puts in the menu's line `components[]` with `product_id`,
   `quantity` (that of each dish times that of the line) and `is_service` of each component of COMBO-F08; the
@@ -696,6 +739,7 @@ whoever sells, and if Menus is not active the till offers no menus.
 - Tested end to end with the worker's real handing out of notices.
 
 ### Contract with Kitchen
+<!-- from WORKBOOK.md sha256:d4c81b8cc9ad -->
 
 - Kitchen does not read Menus. It receives from Sales, in `sale.order.fired`, the menu's line with `name`,
   `kitchen_name` and its components (`product_id`, `product_name`, `category_id`, `quantity` × menus), and
@@ -703,6 +747,7 @@ whoever sells, and if Menus is not active the till offers no menus.
   (KITCHEN-F06, KITCHEN-F08). Tested end to end with the worker's real handing out of notices.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:e40a868aed5b -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

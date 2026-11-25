@@ -3,7 +3,7 @@ Prefijo: SALE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
 Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
-su paso al cobro (SALE-F39, no hecho).
+su paso al cobro (SALE-F39, parcial).
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -135,7 +135,8 @@ completa» / «Salir de pantalla completa» (la del navegador, cuando el disposi
 cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
 
 - **Catálogo**: la tira de categorías de Inventario con su número de artículos, agotados incluidos
-  («Todos» primero y, con Servicios, «Servicios» detrás), la lupa que abre el buscador («Buscar
+  («Todos» primero y, con Servicios, «Servicios» detrás; las demás, en la posición que les dio el negocio
+  y, a igual posición, por nombre: INVENTORY-F08), la lupa que abre el buscador («Buscar
   producto…», por nombre o SKU; con Servicios busca también sus servicios), la tecla «Hablar» y la
   rejilla: artículos con sus iniciales, su unidad y su precio (lo agotado, en gris con «Agotado»), y al
   final la baldosa «Precio libre». En «Servicios», cada servicio con sus iniciales, su duración y su
@@ -322,7 +323,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F36 | Preparar las notas rápidas | común | hecho |
 | SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
-| SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
+| SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | parcial — faltan lo añadido en cada cobro al repartir y en el Documento de venta |
 | SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | hecho |
 | SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | hecho |
 | SALE-F42 | Elegir los suplementos de un plato del menú | restaurante | hecho |
@@ -349,7 +350,9 @@ Pasos:
    efectivo, se abre el cajón): se lee «Enviado a Barra.» y el papel en pantalla es ya una copia.
    Sin Impresión encendida, sin impresora de tiques o con el documento fiscal pendiente, el tique se
    imprime desde el Documento de venta. Un fallo de la impresora nunca deshace el cobro.
-Entra: los artículos y precios de Inventario; los tipos de IVA de Impuestos; los ajustes del TPV.
+Entra: los artículos y precios de Inventario; los tipos de IVA de Impuestos; los ajustes del TPV; el
+cliente de la cuenta, de Clientes: una cuenta cobrada sin decir el cliente (por el asistente o la API)
+sale a nombre del que tiene la cuenta (CUSTOMER-F19), como en el TPV al recuperarla.
 Sale: la venta cobrada e inmutable, con número `AAAAMMDD-NNNN` del día del negocio, sus líneas, su
 pago y su desglose de IVA (una fila por clave fiscal, cerrada una sola vez: lo mismo que declara la
 factura), y la cuenta cerrada. Con Facturación, su tique (F2) numerado en la serie del año en el mismo
@@ -371,7 +374,7 @@ cobrar se lee en la hoja con su frase (p. ej. «Un producto del tique ya no est�
 vuelve a añadirla.») y la cuenta sigue intacta. Si otro dispositivo cambia la cuenta mientras cobras, no se cobra
 nada y la hoja dice «La cuenta ha cambiado mientras se cobraba…»: revisa las líneas y vuelve a pulsar «Cobrar»,
 que cobra lo que hay.
-Implicados: INVENTORY-F21, CUSTOMER-F20, TAX-F18
+Implicados: INVENTORY-F21, CUSTOMER-F19, CUSTOMER-F20, TAX-F18
 
 ### SALE-F02 Cobrar con tarjeta u otro medio sin cambio
 Estado: hecho
@@ -692,9 +695,11 @@ Pasos:
    con importe fijo, «Se aprueba: Descontar 5,00 € de la cuenta»), y un responsable lo aprueba con su
    PIN (o su placa) en ese mismo dispositivo. La cuenta guarda quién lo autorizó y al cobrar no se
    vuelve a pedir; si al cobrar el descuento pasa del máximo sin autorizar, se pregunta igual, con «Se
-   aprueba: Cobrar con un descuento por encima del máximo». Empleados › Aprobaciones guarda lo aprobado
-   con su cifra.
-Entra: «Permitir descuentos» y el descuento máximo de los ajustes.
+   aprueba: Cobrar con un descuento por encima del máximo». Empleados › Aprobaciones guarda con su cifra lo
+   aprobado y también el que da por su cuenta quien puede darlo.
+Entra: «Permitir descuentos» y el descuento máximo de los ajustes. El asistente solo lo pone en una cuenta de la
+que se le habla (su mesa o su nombre): el descuento que un producto o una categoría lleva en todas las ventas es
+una regla de Tarifas (PRICING-F11).
 Sale: el descuento en la cuenta o en la línea; al cobrar se reparte entre las líneas, la base y el IVA
 declarados ya lo llevan descontado, y la venta guarda el importe descontado.
 Si falla: con «Permitir descuentos» apagado no hay botones de descuento, y el asistente tampoco puede
@@ -751,7 +756,8 @@ Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesió
 de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
-La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía. En
+La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía o, si su
+cuenta no tiene nombre, lo que va antes de la @ de su correo, nunca el correo entero (BASE-F119). En
 Mesas, la ventana de la mesa y el plano dicen que la atiende esa persona (TABLE-F09).
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido cambiar quién atiende la cuenta. Se queda con quien la atendía.»;
@@ -854,7 +860,9 @@ Pasos:
    desplaza para que se lea al menos una línea entera.
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
    un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
-   del cobro desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
+   del cobro desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué. Un cobro
+   por el asistente o por la API hace lo mismo: lo que la cuenta aún no ha enviado sale a cocina como una
+   ronda nueva antes de cobrar, y si Cocina lo rechaza, no se cobra nada y se dice por qué.
 4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento. Sí se puede invitar con su
    regalo: se queda en la cuenta a 0 y a cocina no le llega nada nuevo.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
@@ -882,7 +890,7 @@ Impresión.». Una línea ya enviada no se puede quitar: «Esa línea ya no se p
 (anúlala con un motivo), ya está cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Por el asistente: su tarjeta de confirmación dice la cuenta (por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97).
+Por el asistente: su tarjeta de confirmación dice la cuenta (la de una mesa, por la mesa como la dice Mesas y en el idioma de quien lee, «4 (Comedor)»; otra, o sin poder ver Mesas, por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97). Un producto pedido con palabras sale como el que se va a añadir: «dos cafés» con «Espresso» y «White coffee» en la carta dice «2 · White coffee · 4 (Comedor)»; si las palabras valen para varios productos o para ninguno («dos cafés con leche» con «White coffee» en la carta), no sale tarjeta: el asistente oye qué productos valen o que no hay ninguno con esas palabras, y lo busca en la carta o pregunta cuál. Si el rechazo llega al confirmar (la carta cambió entre la tarjeta y el sí, o por la API), no se añade nada y dice «No hay ningún producto «café con leche». Di cuál.».
 Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
@@ -892,7 +900,8 @@ Actor: empleado, responsable
 Pantalla: Cuenta (precuenta)
 Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
-2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con la «Cabecera del recibo»
+2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor, con el prefijo de su país si está
+   inscrito en el ROI, y con la «Cabecera del recibo»
    debajo; sin emisor, la cabecera del recibo hace de nombre y domicilio), las líneas, notas,
    descuentos, el desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tique
    fiscal se entrega al cobrar.». Con descuento en la cuenta, la fila «Descuento» dice lo que quita (el
@@ -904,14 +913,17 @@ Pasos:
 Entra: la cuenta abierta y su total calculado por el servidor.
 Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta. Imprimirla
 deja la cuenta marcada como pedida, salga por la impresora de tiques o por el diálogo del dispositivo, hasta que
-se cobra entera o se elimina; volver a imprimirla, añadir líneas o cobrar una parte no la quita.
+se cobra entera o se elimina; volver a imprimirla, añadir líneas o cobrar una parte no la quita. Pedida al
+asistente («imprime la cuenta de la mesa 4»), solo sale por la impresora de tiques: si ninguna la recibe, no se
+imprime ni se marca, y su recibo dice que no se hizo, con el motivo: «Ninguna impresora de tiques recibe esta
+cuenta: ábrela en Ventas para imprimirla en este dispositivo.».
 Si falla: mientras el negocio no haya dicho todavía su moneda, «Cuenta» sigue cargando y la impresora en gris: el
 papel nunca sale con una cifra supuesta; si la moneda no se puede leer, lo dice con «Reintentar», como si falla
 el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; si la app instalada no abre su
 pantalla de impresión, el aviso dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
 servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
 imprimirlo» o «…: esta app está vinculada a otro negocio».
-Implicados: PRINTING-F09, TABLE-F34
+Implicados: PRINTING-F09, TABLE-F34, INVOICE-F21, BASE-F97
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
 Estado: hecho
@@ -992,16 +1004,17 @@ Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
 1. En la agenda de Citas, «Cobrar» abre la cuenta de la cita (con una línea por servicio, a su precio
-   reservado y con la profesional) y lleva a **Vender** con esa cuenta en pantalla.
+   reservado y con la profesional), ya a nombre de la clienta de la cita, y lleva a **Vender** con esa
+   cuenta en pantalla.
 2. Se cobra como siempre; si se aparca y se recupera, la cuenta sigue atada a la cita.
 3. Pulsar «Cobrar» otra vez (o en otro dispositivo a la vez) vuelve a la misma cuenta abierta: una cita
    tiene una sola cuenta abierta, nunca dos.
 Entra: la cita, de Citas.
-Sale: la venta con la cita y la profesional (avisa: venta cobrada y venta nacida de una cita, con la
-cita, quién atendió y el total).
+Sale: la venta con la cita, la clienta y la profesional, y la compra en la ficha de la clienta (avisa:
+venta cobrada y venta nacida de una cita, con la cita, quién atendió y el total).
 Si falla: si la cuenta de la cita ya no está abierta (se cobró o se anuló), el TPV lo dice («Esa cuenta
 ya no está abierta…») y sigue como estaba.
-Implicados: APPOINTMENT-F17
+Implicados: APPOINTMENT-F17, CUSTOMER-F19
 
 ### SALE-F27 Pagar una línea con un bono
 Estado: hecho
@@ -1075,9 +1088,10 @@ Pasos:
    una venta, sin recargar. Los paneles cuentan con la misma regla que las cifras de la pantalla: todo el
    negocio o sus ventas.
 Entra: nada de otras apps.
-Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo piden Personal y el asistente para
-la comisión) cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas
-y, de las sesiones de bono gastadas fuera del cobro, las de su ficha. Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
+Sale: nada guardado. Lo vendido por cada profesional en el periodo (lo pide el asistente para la comisión)
+cuenta con la misma regla: quien no ve todo el negocio recibe solo las líneas de sus ventas y, de las sesiones
+de bono gastadas fuera del cobro, las de su ficha. Personal lo pide como la plataforma, para que la fila de cada
+profesional cuente todo lo que hizo, y decide él qué filas ve cada persona (STAFF-F21). Ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero que vuelve sin nada que
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
@@ -1115,7 +1129,8 @@ Pasos:
 1. En **Ventas**, toca la fila o la acción «Documento»; también se abre solo tras cobrar, la cuenta
    entera o una parte.
 2. Se ve el tique («Tique», o «Factura» si se cobró como factura). Arriba, el negocio: nombre, domicilio
-   y NIF del emisor (un duplicado dice lo mismo que el original, aunque el emisor cambie después), con la
+   y NIF del emisor, con el prefijo de su país si está inscrito en el ROI (un duplicado dice lo mismo que
+   el original, aunque el emisor cambie después), con la
    «Cabecera del recibo» debajo. Sin emisor configurado, la primera línea de la cabecera es el nombre y el
    resto el domicilio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tique TICKET-2026-000031»; sin
@@ -1157,8 +1172,13 @@ abre su pantalla de impresión, con el motivo tras dos puntos, como al imprimir 
 «Emitir ahora» rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin
 motivo, «No se han podido emitir los documentos. Inténtalo de nuevo.». Una venta que la persona no ve (la
 de otro, para un empleado) no se abre, no se reimprime ni se emite: la ventana dice «Error cargando el
-documento» y la API o el asistente, «Esa venta no existe.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
+documento» y la API o el asistente, «Esa venta no existe.». Si se le pide al asistente («reimprime el último
+tique»), solo se hace si una impresora de tiques recibe el papel; si no, no se imprime nada y su recibo dice que no se
+hizo, con el motivo: «Ninguna impresora de tiques recibe el papel de esta venta: abre la venta para imprimirlo en este
+dispositivo.»; con su documento fiscal pendiente, «Su documento fiscal sigue pendiente: abre la venta para
+emitirlo.», y si no se puede leer su registro de VeriFactu, «No se pudo leer su registro de VeriFactu, y su papel
+nunca se imprime sin su QR.».
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Anular una venta cobrada
 Estado: hecho
@@ -1166,12 +1186,15 @@ Vertical: común
 Actor: responsable; cajero, con la aprobación de un responsable
 Pantalla: Ventas, Anular venta, Hace falta una aprobación
 Pasos:
-1. En **Ventas**, en una venta Completada sin devoluciones, pulsa «Anular».
+1. En **Ventas**, en una venta Completada sin devoluciones, pulsa «Anular». Antes de empezar se sabe si se podrá: si
+   tu rol lo hace «Con aprobación», sale «Un encargado tendrá que aprobar esta anulación.»; si tu rol propio dice «No»,
+   sale «Tu rol no permite anular una venta. Pídeselo a un encargado.» y no se abre nada.
 2. Se abre «Anular la venta 20261121-0007». Escribe el «Motivo (obligatorio)» y pulsa «Anular», o
    «Cancelar».
-3. Si no tienes el permiso de anular, sale encima «Hace falta una aprobación» con «Se aprueba: Anular
+3. Si tu rol anula «Con aprobación», sale encima «Hace falta una aprobación» con «Se aprueba: Anular
    una venta»: un responsable toca su cara y teclea su PIN (o pasa su placa) en ese mismo dispositivo.
-   Quien tiene el permiso no ve esta pregunta.
+   Quien tiene el permiso no ve esta pregunta, y a quien su rol le dice «No» tampoco le sale: no hay PIN que lo
+   deje anular.
 4. Sale «Venta anulada», la ventana se cierra, la fila pasa a Anulada y la cifra «Anuladas» sube.
 Entra: la venta elegida.
 Sale: la venta marcada como anulada con hora, quién y motivo; no se borra (avisa: venta anulada).
@@ -1187,8 +1210,10 @@ anularla.»; anulada desde otro dispositivo a la vez, «Esta venta ya está anul
 dentro de la ventana, que sigue abierta. Si en «Hace falta una aprobación» se pulsa «Cancelar», no se
 anula nada y la ventana dice «Esto necesita la aprobación de un encargado.». La anulación aprobada hace
 lo mismo que la del responsable, una sola vez: la rectificativa en la misma anulación, las sesiones de
-bono que vuelven, el stock y la ficha del cliente; quién la aprobó queda en **Empleados › Aprobaciones**.
-Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
+bono que vuelven, el stock y la ficha del cliente; quién la aprobó, o que la hizo por su cuenta quien puede, queda en
+**Empleados › Aprobaciones**. Si el rol pasa a «No» con la ventana abierta, la anulación se rechaza y no se
+anula nada, aunque un responsable ya la hubiera aprobado.
+Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84, BASE-F85
 
 ### SALE-F31 Devolver una venta (toda, una parte o por otro medio)
 Estado: hecho
@@ -1196,7 +1221,9 @@ Vertical: común
 Actor: responsable; cajero, con la aprobación de un responsable
 Pantalla: Devolver, Hace falta una aprobación
 Pasos:
-1. En **Ventas**, en una venta Completada (también con factura), pulsa «Devolver».
+1. En **Ventas**, en una venta Completada (también con factura), pulsa «Devolver». Antes de empezar se sabe si se podrá:
+   si tu rol lo hace «Con aprobación», sale «Un encargado tendrá que aprobar esta devolución.»; si tu rol propio dice
+   «No», sale «Tu rol no permite devolver una venta. Pídeselo a un encargado.» y no se abre nada.
 2. «Devolver la venta 20261121-0007» enseña una tarjeta por cada forma en que se pagó: «Cobrado», «Ya
    devuelto» y «Devolvible», con una propuesta de devolución total ya repartida («Devolver todo» la
    repone).
@@ -1207,9 +1234,10 @@ Pasos:
    devuelve dinero.
 4. Cambia el «Importe a devolver» de cada forma si solo vuelve una parte. Si el medio original ya no
    está disponible, elige otro en «Devolver por».
-5. Escribe el «Motivo» y pulsa «Devolver 12,00 €». Si no tienes el permiso de devolver, sale encima
+5. Escribe el «Motivo» y pulsa «Devolver 12,00 €». Si tu rol devuelve «Con aprobación», sale encima
    «Hace falta una aprobación» con «Se aprueba: Devolver una venta»: un responsable la aprueba con su PIN
-   (o su placa) en ese mismo dispositivo. Quien tiene el permiso no ve esta pregunta.
+   (o su placa) en ese mismo dispositivo. Quien tiene el permiso no ve esta pregunta, y a quien su rol le dice «No»
+   tampoco le sale: no hay PIN que lo deje devolver.
 6. Sale «Devolución registrada.»; si ya no queda nada por devolver, la venta pasa a Devuelta; si
    queda, la fila dice «Por devolver 6,00 €».
 Entra: lo cobrado y lo ya devuelto por cada forma de pago; las líneas de la venta y las que ya
@@ -1226,8 +1254,10 @@ marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para
 el Hub no contesta, volver a pulsar no devuelve dos veces. Si en «Hace falta una aprobación»
 se pulsa «Cancelar», no se devuelve nada y la ventana dice «Esto necesita la aprobación de un
 encargado.». La devolución aprobada es la misma, una sola vez, con su rectificativa y las sesiones de
-bono que vuelven; quién la aprobó queda en **Empleados › Aprobaciones**.
-Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
+bono que vuelven; quién la aprobó, o que la hizo por su cuenta quien puede, queda en **Empleados › Aprobaciones**.
+Si el rol pasa a «No» con la ventana abierta, la devolución se rechaza y no se devuelve nada, aunque un
+responsable ya la hubiera aprobado.
+Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84, BASE-F85
 Clientes resta lo devuelto del gasto de la ficha al oír «venta devuelta» (CUSTOMER-F22) e Inventario
 repone las unidades que vuelven (INVENTORY-F24), una vez por devolución.
 
@@ -1312,7 +1342,8 @@ con que se cobró.
 Si falla: una categoría de IVA que no existe se rechaza junto a su campo. El motivo de un campo se quita
 en cuanto se corrige ese campo («IVA que cobra», al elegir otra categoría). Una sección que otro ya
 borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo.».
-Por el asistente: su tarjeta de confirmación dice la sección por su nombre, nunca por un identificador; una que ya no está no sale en la tarjeta (BASE-F97).
+Por el asistente: su tarjeta de confirmación dice la sección por su nombre, nunca por un identificador (una que ya no está
+no sale en la tarjeta), y el IVA que cobra con su tipo de hoy, como la lista («Producto — general · 21 %») (BASE-F97).
 Implicados: TAX-F01, BASE-F97
 
 ### SALE-F36 Preparar las notas rápidas
@@ -1386,8 +1417,10 @@ reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Ser
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
-Estado: no hecho — la hoja Cobro todavía no pinta pasos de otras apps ni la venta guarda lo cobrado de más
-(hub#1497, hub#1500, hub#1502)
+Estado: parcial — la hoja Cobro pinta los pasos que declaran las apps encendidas (hoy, la propina de Propinas), cobra con la
+venta lo que añaden en un cobro de una sola forma de pago y, ya cobrada, deja que cada paso guarde lo suyo, con «Reintentar» si
+no puede; faltan lo añadido en cada cobro al repartir el cobro, que hoy se cobra sin los pasos (hub#1500), y la línea de lo
+añadido en el Documento de venta (hub#1502)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro, Documento de venta
@@ -1408,10 +1441,16 @@ lleva IVA (ver «Por qué la propina no entra en el tique» en el manual de Prop
 cobro, lo cobrado de más y su nombre, para cuadrar lo entregado y el cambio y para el papel, y el aviso de venta
 cobrada lo lleva aparte; las cifras de **Ventas** (SALE-F28) no lo suman. Lo suyo lo guarda la app del paso
 (TIP-F02).
-Si falla: si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
+Si falla: sin ninguna app encendida que añada un paso al cobro de quien cobra, un cobro que trae un importe añadido
+(por la API o el asistente) no cobra: «Este negocio no tiene ninguna app que añada algo al cobro, como una propina: cobra solo la
+venta.»; si la app está encendida pero quien cobra no tiene permiso para su paso, «No tienes permiso para añadir nada
+al cobro, como una propina: cobra solo la venta.». Si la app del paso se apaga con la hoja abierta, la fila desaparece y se cobra sin ella. Si la venta se
 cobra y el paso no consigue guardar lo suyo, la venta queda cobrada y la hoja dice el aviso del paso con
-«Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06). El tope del
-tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como siempre: la propina no es precio.
+«Reintentar» (TIP-F02); el reintento usa la misma clave del intento y no cobra dos veces (SALE-F06), y esa misma
+clave con otro importe añadido es otro cobro: «Esa clave de intento ya se usó para otro cobro. Vuelve a abrir el
+cobro para cobrar este.». Un importe añadido sin decir qué es no cobra: «Di qué es el importe añadido a este cobro
+(una propina, por ejemplo).». El tope del tique (3.000 €) y el del efectivo (1.000 €) miran el total de la venta, como
+siempre: la propina no es precio.
 Implicados: TIP-F02, TIP-F03, TIP-F04, CASH_REGISTER-F18, INVOICE-F01
 
 ### SALE-F40 Ver los alérgenos de un plato al pedirlo
@@ -1552,8 +1591,9 @@ atribuyeron. Una que no ve no existe para ella (404 `sale.sale_not_found`).
 | Lo vendido cada uno de los últimos 7 días | ver ventas | F28 | `sale.sale.last_7_days` |
 | Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | ver ventas | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
+| Los pasos que añaden al cobro las apps encendidas, los que ve quien cobra y en su orden: de qué app es cada uno y qué parte suya lo pinta; sin ninguno, el cobro no acepta nada añadido | cobrar | F39 | `sale.checkout.steps` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
-| Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
+| Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19, F40 | `sale.order.get` |
 | Los medios de pago activos, con los que permite hoy el negocio | ver medios de pago | F02, F03 | `sale.payment_method.list` |
 | Los ajustes del TPV (para editarlos) | ajustes | F34 | `sale.settings.get` |
 | Los ajustes que el TPV necesita para vender | ver ventas | F01–F05 | `sale.pos_settings.get` |
@@ -1563,6 +1603,7 @@ atribuyeron. Una que no ve no existe para ella (404 `sale.sale_not_found`).
 | Por cada cobro de una venta, lo devuelto y lo que queda, y por cada línea lo que ya volvió | ver ventas | F31 | `sale.refund.options` |
 | Las devoluciones de una venta, con el estado y el número de su rectificativa | ver ventas | F31 | `sale.refund.list` |
 | La devolución grabada con una clave | ver ventas | F31 | `sale.refund.by_idempotency_key` |
+| El producto de una línea nueva tal como lo encuentra la acción que la añade, para comprobarlo antes de la tarjeta del asistente; unas palabras que no son ningún producto, o que valen para varios, no sacan tarjeta | montar la cuenta | F20 | `sale.order_line.check` |
 | El nombre de un registro que una escritura de Ventas toca, por su id, y el de una devolución, por su venta («Devolución de la venta 20261014-0007»), con el que Servicios nombra la que devuelve sesiones (SERVICE-F26): solo para la tarjeta del asistente; lo que no existe o quien pregunta no puede leer no se nombra | ver ventas | F20, F32, F35 | `sale.record.get` |
 
 Las ventas, las cifras, las cuentas, la previsión del cobro, los medios de pago, los ajustes, las
@@ -1576,12 +1617,12 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | El mismo cobro, con un descuento por encima del máximo | descuento sin tope | F14 | `sale.sale.complete_over_limit` |
 | Anula una venta cobrada con motivo (y devuelve sus sesiones de bono); con su rectificativa en la misma anulación (y antes su tique, si estaba pendiente) | anular | F30, F32 | `sale.sale.void` |
 | Emite ahora los documentos fiscales de una venta que esperan («Emitir ahora»): su tique o factura y las rectificativas de su anulación y de sus devoluciones | cobrar (y el permiso de Facturación de cada documento) | F29 | `sale.sale.issue_documents` |
-| Vuelve a imprimir el tique o la factura de una venta, con «DUPLICADO», por la impresora de tiques; si no se puede encolar, lo dice y lo imprime el dispositivo | ver ventas | F29 | `sale.sale.print` |
+| Vuelve a imprimir el tique o la factura de una venta, con «DUPLICADO», por la impresora de tiques; si ninguna lo recibe (o su documento fiscal está pendiente, o no se puede leer su QR), falla y dice por qué, y la pantalla lo imprime en el dispositivo | ver ventas | F29 | `sale.sale.print` |
 | Devuelve dinero de una venta por cobro, y las líneas que vuelven (las pagadas con bono devuelven su sesión); con su rectificativa en la misma devolución | devolver | F31, F32 | `sale.sale.refund` |
 | Abre una cuenta, con o sin líneas (artículos, servicios —a su precio reservado o al de la profesional— o precio libre); la de una cita que ya tiene una abierta devuelve esa (`already`) | montar la cuenta | F01, F17, F26, F38 | `sale.order.open` |
-| Añade un artículo del catálogo a una cuenta | montar la cuenta | F01, F10 | `sale.order.add_line` |
+| Añade un artículo del catálogo a una cuenta | montar la cuenta | F01, F10, F11, F40 | `sale.order.add_line` |
 | Añade un servicio de Servicios a una cuenta | montar la cuenta | F38 | `sale.order.add_service_line` |
-| Añade un menú de Menús y combos a una cuenta, con lo elegido en cada plato; Menús comprueba la elección y pone el precio | montar la cuenta | F12 | `sale.order.add_combo_line` |
+| Añade un menú de Menús y combos a una cuenta, con lo elegido en cada plato; Menús comprueba la elección y pone el precio | montar la cuenta | F12, F40, F42 | `sale.order.add_combo_line` |
 | Paga una línea de servicio con un bono de la clienta (reserva la sesión) | montar la cuenta y gastar sesiones | F27 | `sale.order.apply_voucher` |
 | Deshace el bono de una línea (suelta la sesión) | montar la cuenta y gastar sesiones | F27 | `sale.order.remove_voucher` |
 | Añade una línea a precio libre | precio libre | F09 | `sale.order.add_open_line` |
@@ -1591,17 +1632,18 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Marca o quita la alergia del cliente en una línea sin enviar | montar la cuenta | F41 | `sale.order.set_line_allergy` |
 | Separa una línea de N unidades en N líneas | montar la cuenta | F27 | `sale.order.split_line` |
 | Quita una línea sin enviar | montar la cuenta | F01 | `sale.order.remove_line` |
-| Anula una línea ya enviada a cocina, con motivo | anular | F20 | `sale.order.void_line` |
+| Anula una línea ya enviada a cocina, con motivo | anular | F20, KITCHEN-F29 | `sale.order.void_line` |
 | Envía a cocina las líneas pendientes | montar la cuenta | F20 | `sale.order.fire` |
 | Divide una cuenta | montar la cuenta | F23 | `sale.order.split` |
 | Junta dos cuentas | montar la cuenta | F24 | `sale.order.merge` |
-| Anula una cuenta abierta (una vacía, sin líneas vivas ni cobros, con solo montar la cuenta) | anular; vacía: montar la cuenta | F18 | `sale.order.void` |
-| La misma anulación de una cuenta con algo pedido o cobrado, la que un responsable aprueba con su PIN | anular | F18 | `sale.order.void_ordered` |
+| Anula una cuenta abierta (una vacía, sin líneas vivas ni cobros, con solo montar la cuenta) | anular; vacía: montar la cuenta | F18, TABLE-F20 | `sale.order.void` |
+| La misma anulación de una cuenta con algo pedido o cobrado, la que un responsable aprueba con su PIN | anular | F18, TABLE-F20 | `sale.order.void_ordered` |
 | Pone el descuento de la cuenta (y su versión por encima del máximo) | montar la cuenta / descuento sin tope | F14 | `sale.order.set_discount`, `sale.order.set_discount_over_limit` |
 | Pone el descuento de una línea (y su versión por encima del máximo) | montar la cuenta / descuento sin tope | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Pone el título de una cuenta (aparcar) | montar la cuenta | F17 | `sale.order.set_label` |
 | Enlaza una cuenta a su cita | montar la cuenta | F26 | `sale.order.set_appointment` |
-| Imprime la cuenta de una mesa (no es factura: sin número ni cobro) por la impresora de tiques, o dice que no se encoló y la imprime el dispositivo; la mesa queda «Cuenta pedida» hasta cobrarla entera | ver ventas | F21 | `sale.order.print_bill` |
+| Imprime la cuenta de una mesa (no es factura: sin número ni cobro) por la impresora de tiques; si ninguna la recibe, falla y dice por qué, y la pantalla la imprime en el dispositivo; la mesa queda «Cuenta pedida» hasta cobrarla entera | ver ventas | F21 | `sale.order.print_bill` |
+| Apunta que el dispositivo imprimió la cuenta de una mesa porque ninguna impresora de tiques la recibió: la mesa queda «Cuenta pedida»; solo la pantalla (el asistente no imprime en el dispositivo) | ver ventas | F21 | `sale.order.note_bill` |
 | Crea un medio de pago | crear medios de pago | F37 | `sale.payment_method.create` |
 | Guarda los ajustes del TPV | ajustes | F34 | `sale.settings.update` |
 | Crea, cambia y elimina secciones | ajustes | F35 | `sale.department.create`, `.update`, `.delete` |
@@ -1611,7 +1653,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 
 | Aviso | Cuándo | Qué lleva | Servicio |
 |---|---|---|---|
-| Venta cobrada | Cobrar | La venta, su número, cuenta, documento, importes en céntimos, moneda, momento, cliente y su copia fiscal, quién atendió, cita, cobros y líneas (producto o servicio, cantidad, si es servicio, si la pagó un bono, importes) | `sale.sale.completed` |
+| Venta cobrada | Cobrar | La venta, su número, cuenta, documento, importes en céntimos, moneda, momento, cliente y su copia fiscal, quién atendió, cita, cobros (cada uno con lo que otra app le añadió aparte, y su nombre) y líneas (producto o servicio, cantidad, si es servicio, si la pagó un bono, importes) | `sale.sale.completed` |
 | Venta nacida de una cita | Cobrar una cuenta con cita | La venta, la cita, quién atendió y el total | `sale.sale.created_from_appointment` |
 | Venta anulada | Anular | La venta, su número, motivo, quién y cuándo, total, cliente, cuenta y documento | `sale.sale.voided` |
 | Venta devuelta | Devolver | La venta, la devolución, el importe, el motivo, si queda devuelta del todo, los cobros y las líneas devueltas | `sale.sale.refunded` |
@@ -1625,6 +1667,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Cuenta cerrada | Cobrar lo último de una cuenta | La cuenta | `sale.order.completed` |
 | Cuenta anulada | Anular una cuenta abierta | La cuenta | `sale.order.voided` |
 | Cuentas juntadas | Juntar | La absorbida y la que queda | `sale.order.merged` |
+| Cuenta con título nuevo | Cambiar el título de una cuenta abierta, también al pasarla a otra mesa o volver a sentarla | La cuenta | `sale.order.relabeled` |
 | Línea quitada | Quitar o anular una línea | La cuenta y la línea | `sale.order.line_removed` |
 | Línea anulada | Anular una línea enviada | La cuenta, la línea y el motivo | `sale.order.line_voided` |
 | Medio de pago, ajustes, sección, nota rápida | Crearlos o cambiarlos | Cuál | `sale.payment_method.created`, `sale.settings.updated`, `sale.department.*`, `sale.quick_note.*` |
@@ -1663,9 +1706,19 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 - **Mesas** (opcional): «Elegir mesa» del TPV (F19) habla con Mesas solo por el nombre de sus
   operaciones, desde la pantalla y con la sesión de quien atiende: `table.table.list` y
   `table.floor.status` (las mesas), `table.session.by_order` (la mesa de la cuenta), `table.session.open`
-  con la cuenta en pantalla, `.restore` y `.park`. Sin Mesas activa no hay botón.
+  con la cuenta en pantalla, `.restore` y `.park`. Sin Mesas activa no hay botón. La tarjeta del asistente
+  dice la cuenta de una mesa por su mesa con `table.session.by_order`, como quien pregunta; sin Mesas, o sin
+  permiso de ver sus cuentas, por su título.
 - **Citas** (opcional): la cita de una cuenta y lo que reservó, para cobrar su precio reservado
   (`appointment.appointment.get`).
+
+| De | Para qué | Flujos | Servicio |
+|---|---|---|---|
+| Inventario | Los artículos que se tocan o se buscan, con lo agotado, los que no tienen IVA y sus alérgenos | F07, F40 | `inventory.product.list` |
+| Inventario | Los alérgenos de los platos de un menú | F40 | `inventory.product.get` |
+| Suplementos | Los grupos y las opciones de un artículo, o de un plato de un menú | F11, F42 | `modifier.group.for_target` |
+| Menús y combos | Los menús que se pueden vender, con sus platos y elecciones | F12, F42 | `combo.combo.for_sale` |
+| VeriFactu | Si ahora se pueden emitir tiques y facturas, y si no, por qué | F07 | `verifactu.config.get` |
 
 ### Quién la usa
 
@@ -1709,8 +1762,8 @@ con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para
 y devolver una venta, anular una línea enviada a cocina, eliminar una cuenta con algo pedido, vender a
 precio libre y los descuentos por encima del máximo. La acción aprobada hace todo lo que hace la del
 responsable (también lo que mueven Facturación y Servicios: la rectificativa y las sesiones de bono que
-vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las ventas de todos, las cifras de todo
-el negocio, los ajustes y crear medios de pago no se aprueban.
+vuelven) y queda en **Empleados › Aprobaciones**, como la que el responsable hace por su cuenta (BASE-F85). Ver las
+ventas de todos, las cifras de todo el negocio, los ajustes y crear medios de pago no se aprueban.
 
 La gestoría (`hub_accountant`) solo lee: «Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas», «Ver
 los medios de pago» y «Ver las ventas de todos». No monta cuentas, no cobra, no anula ni devuelve, nadie le aprueba
@@ -1763,8 +1816,9 @@ es una línea.
   cambio, descuento de la cuenta y quién lo autorizó) y `OrderLine` (fila de trabajo: precio
   congelado, unidad, ronda de cocina, venta que la cobró, anulación); `Sale` (cabecera fiscal:
   número, día del negocio, importes, documento, cliente, clave de intento), `SaleLine` (copia fiscal:
-  categoría, tipo, país, región y regla de Impuestos), `SalePayment`, `SaleCounter` (uno por día del
-  negocio); `Refund`, `RefundPayment`, `RefundLine`; `VoucherSession` (una sesión de bono hecha fuera del cobro,
+  categoría, tipo, país, región y regla de Impuestos), `SalePayment` (un cobro: su importe de la venta y, aparte, lo
+  que otra app le añade, `extra` con su nombre `extra_label`; la base exige `change = tendered - amount - extra`),
+  `SaleCounter` (uno por día del negocio); `Refund`, `RefundPayment`, `RefundLine`; `VoucherSession` (una sesión de bono hecha fuera del cobro,
   SERVICE-F21: la sesión de Servicios, única, la profesional, el día del negocio y lo que vale; como lo cobrado,
   nunca se edita ni se borra); `PaymentMethod`, `Settings` (una fila), `Department`, `QuickNote` (borrado lógico).
 - **Un solo camino de cobro**: todo cobro sale de una cuenta. Una venta de mostrador (líneas sueltas
@@ -1781,7 +1835,7 @@ es una línea.
   hacia arriba; invitación a 0 (y su coste a `gift_total`); el importe fijo de la cuenta se reparte por
   peso (bruto con IVA incluido, base sin él) con resto mayor y empate a la línea anterior; y el cierre
   **una vez por clave fiscal**: cada categoría se resuelve a su regla con
-  `apps.tax.queries.calculate_tax` (la vigente el día del negocio, en su país y su territorio fiscal de
+  `apps.tax.queries.calculation.calculate_tax` (la vigente el día del negocio, en su país y su territorio fiscal de
   Impuestos → Ajustes, TAX-F11) y las líneas se
   agrupan por la clave de esa regla (impuesto, régimen, calificación, causa de exención y tipos de sus
   componentes: la `FiscalKey` de `apps/invoice/fiscal.py`); cada clave se cierra una sola vez sobre el
@@ -1912,7 +1966,7 @@ es una línea.
 - **El impuesto del territorio no es de Ventas** (TAX-F11): lo publica solo
   `tax.settings.get` (`tax_kind`). Las pantallas lo nombran con `useTaxName()` de Impuestos
   (`apps/tax/frontend/composables/useTaxName.ts`) y el 409 `sale.tax_category_missing` con
-  `TAX_KIND_NAMES` de `apps/tax/schemas.py`; Ventas no tiene operación propia que lo repita
+  `TAX_KIND_NAMES` de `apps/tax/schemas/jurisdiction.py`; Ventas no tiene operación propia que lo repita
   (`test_api.py` vigila que no haya una `sale.sale.tax_kind`). En los tests de la SPA, `mount-sale`
   carga el catálogo de Impuestos y `taxSettings(familia)` da la respuesta de `tax.settings.get`.
 - **La cifra del impuesto de un periodo** (SALE-F28): `sale.sale.stats` devuelve `tax_kind`, de
@@ -1969,7 +2023,7 @@ es una línea.
   son los del asistente (`assistant-icons.ts`). El TPV pasa a la disposición del
   móvil también cuando su propia caja mide menos de 700 px (`NARROW_TILL` de `PosPage.vue`): el panel
   acoplado desde 768 px dejaba la columna del catálogo en unos 90 px en una tableta de 834. Tests:
-  `SpeakKey.test.ts`, `PosPage.test.ts` (bloque `the phone`) y las e2e `tests/e2e/sale-speak.spec.ts` y
+  `SpeakKey.test.ts`, `PosPage.phone.test.ts` y las e2e `tests/e2e/sale-speak.spec.ts` y
   `tests/e2e/sale-speak-microphone.spec.ts` (el micrófono denegado: Chrome lo bloquea con una opción de
   lanzamiento, así que va en un fichero propio).
 - **El atrás del sistema** (BASE-F05, hub#302): las hojas de Ionic
@@ -1982,7 +2036,7 @@ es una línea.
   Solo cuentan las capas de la pantalla a la vista: otra app abierta desde ⠿ con el cajón o el ⋮ abiertos deja el TPV
   montado debajo (Ionic lo oculta con `ion-page-hidden`), y esa capa no se queda el atrás de la pantalla de encima.
   Una capa propia nueva del TPV se suma con `useSystemBack(abierta, cerrar)`. Tests: `useSystemBack.test.ts`,
-  `ScreenMenu.test.ts`, `PosCart.test.ts`, `PosPage.test.ts` (bloque `the phone`) y la e2e
+  `ScreenMenu.test.ts`, `PosCart.test.ts`, `PosPage.phone.test.ts` y la e2e
   `tests/e2e/sale-pos-system-back.spec.ts` (el puente de la app simulado como en `shell-nav.spec.ts`).
 
 ### Lo que la ventana de ayuda no enseña
@@ -1997,7 +2051,8 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   móvil deja la barra y el pie a la vista también en un teléfono de 320×568, y el botón de cliente se queda en su
   icono en uno de 320 px (hub#630). La tecla «Hablar» confirma lo pedido como BASE-F94 y BASE-F97.
 - **Cobro**: la fila de «Entregado» tiene alto fijo y las teclas no se mueven bajo el dedo (hub#456). La fila que
-  otra app añade al cobro (la propina) aún no existe: es SALE-F39, `no hecho`.
+  otra app añade al cobro (la propina, SALE-F39) la monta `CheckoutSteps.vue` por el nombre de su componente, con el
+  contrato de `lib/checkout/steps.ts`; al repartir el cobro se quita.
 - **SALE-F01**: con el móvil tumbado o una ventana de hasta 500 px de alto, el catálogo se desplaza con la página,
   con el botón flotante a la vista, y la cuenta tapa la barra de pestañas (hub#800); en un móvil de
   320×568 el importe del cobro sube junto al título (hub#630). El cobro pide el tique a la cola de Impresión en su
@@ -2079,8 +2134,9 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `base.queries.ownership.Owned`. Es de la persona si la cobró (`created_by` es su usuario) o si se atribuyó a su ficha
   de Personal (`staff_id`; la ficha la dice Personal por su `own_records`, sin que Ventas la requiera). Quien no
   tiene `sale.view_all_sales` lee y toca solo esas (`SALES.visible(ctx)` y `visible_sale`, con el mismo 404
-  `sale.sale_not_found` que una venta que no existe). Quien no es una persona (una llave de API, una automatización,
-  la plataforma) no tiene «suyas»: alcanza las que le abre su permiso, como en Citas. Las cifras (`queries/figures.py`:
+  `sale.sale_not_found` que una venta que no existe). Una llave de API lee como quien la creó
+  (BASE-F125). Quien no tiene a nadie detrás (una automatización, la plataforma) no tiene «suyas»: alcanza las que
+  le abre su permiso, como en Citas. Las cifras (`queries/figures.py`:
   el periodo, hoy, los 7 días y lo de cada profesional) suman `SALES.counted(ctx)`: el negocio entero solo con
   `sale.view_all_sales` y `base.view_business_totals`, y si no, las suyas, aunque abra las de todos una a una. Lo de
   cada profesional lee `SaleLine`, que no es de nadie: filtra sus líneas con `sale__in` sobre esas ventas, y las
@@ -2140,7 +2196,7 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   `requires` nuevo), igual que copia en la línea lo que vale la del cobro (`SaleLine.voucher_value`, hub#783). No la
   lee de Servicios al pedir las cifras: así la producción de un periodo no cambia si Servicios se apaga (como la del
   cobro, `test_a_session_keeps_counting_with_services_off`) y el informe no pide permisos de Servicios. El día es el
-  del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, el del negocio. Una
+  del cobro (`apps.tax.queries.jurisdiction.business_today`), el mismo reloj que el de una venta, el del negocio. Una
   sesión nunca está en las dos: la del cobro no pasa por `service.grant.redeem`.
 
 - **El código del tique para pedir la factura completa** (INVOICE-F04, hub#500): toda venta cobrada como tique
@@ -2201,9 +2257,9 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   (se abre desde el plano, TABLE-F11, o desde **Cuentas abiertas**); y el icono relleno `grid` del botón
   con mesa (no está registrado en `packages/ui`: se pinta `grid-outline` en color).
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
-  (SALE-F39, que leerá los pasos de las apps activas con una consulta `sale.checkout.steps` que aún no existe), las
-  dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
-  anota en Caja como «Entrada» (CASH_REGISTER-F05).
+  (SALE-F39, que lee los pasos de las apps encendidas con la consulta `sale.checkout.steps`), las
+  dos parciales: falta lo añadido en cada cobro al repartir, y lo que queda va por las issues hijas de
+  hub#562. Sin Propinas, la propina en efectivo se anota en Caja como «Entrada» (CASH_REGISTER-F05).
 - **Los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos del plato y la alergia
   del cliente (F40 y F41 hechos), y la tarjeta de Cocina resalta la alergia (KITCHEN-F32). La línea ya suma los de sus
   suplementos («+Queso» lleva leche) y los congela al pedirla; MODIFIER-F12 pasa a hecho con la hoja de suplementos

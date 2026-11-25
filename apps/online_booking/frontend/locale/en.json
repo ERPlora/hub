@@ -16,6 +16,7 @@
         "many": "bookings"
       },
       "search": "Search no., customer, phone, service…",
+      "searchWithoutContact": "Search no., customer, service…",
       "loadError": "The bookings could not be loaded",
       "empty": "No online bookings yet.",
       "noMatch": "No booking matches the search.",

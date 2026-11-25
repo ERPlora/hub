@@ -22,7 +22,8 @@ from live.operations import atomic, get
 from base import activation, apps_on, events
 from base.activation import OFF, ON, Activation
 from base.entitlement import EntitlementBlocked
-from base.models import AppActivation, Hub
+from base.models.activation import AppActivation
+from base.models import Hub
 from base.schemas.apps import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
 from base.tenancy.context import use_hub
@@ -148,15 +149,17 @@ def test_a_hub_of_before_keeps_every_app_on_and_its_roots_chosen():
     assert {app["id"]: (app["state"], app["chosen"]) for app in document["apps"]} == {
         label: ("on", label in roots) for label in graph
     }
-    assert (document["max_apps"], document["enabled"]) == (None, 17)
+    assert (document["max_apps"], document["enabled"]) == (None, 18)
 
 
 @HUB_DB
-def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platform(settings):
-    """ERPlora's own hub issues its invoices with Invoicing and VeriFactu; the worker's legacy scope is not it."""
-    settings.PLATFORM_HUB_SLUG, settings.WORKER_SCOPE_SLUG = "erplora", "worker-scope"
+@pytest.mark.parametrize("name", ["erp", "erplora"], ids=["renamed", "not-renamed-yet"])
+def test_erploras_own_hub_has_every_app_on_and_the_worker_scope_is_not_the_platform(settings, name):
+    """ERPlora's own hub issues its invoices with Invoicing and VeriFactu, under its name and under the one its row had
+    before; the worker's legacy scope is not it."""
+    settings.WORKER_SCOPE_SLUG = "worker-scope"
     graph = activation.module_graph()
-    scope = Scope("host", "erplora")
+    scope = Scope("host", name)
     assert activation.off_apps(scope) == frozenset()
     assert activation.states_of(scope) == activation.every_on(graph)
     assert {"invoice", "verifactu", "whatsapp_inbox"} <= apps_on.active_apps(scope)
@@ -388,8 +391,14 @@ def test_one_already_on_says_so_also_when_it_had_come_along_with_another():
 @HUB_DB
 def test_the_read_says_which_app_a_name_names_and_whether_it_is_on(monkeypatch):
     set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
-    assert app_get("reservas", language="es") == {"id": "reservation", "name": "Reservas", "state": "off"}
-    assert app_get("Reservas online", language="es") == {"id": "online_booking", "name": "Reservas online", "state": "on"}
+    said = {app: row["summary"] for app, row in by_id(app_list(language="es")).items()}
+    assert app_get("reservas", language="es") == {
+        "id": "reservation", "name": "Reservas", "summary": said["reservation"], "state": "off", "mandatory": False
+    }
+    assert app_get("Reservas online", language="es") == {
+        "id": "online_booking", "name": "Reservas online", "summary": said["online_booking"], "state": "on",
+        "mandatory": False,
+    }
     assert app_get("online_booking")["name"] == "Online booking"
     with pytest.raises(NotFound):
         app_get("nope")
@@ -410,11 +419,32 @@ def test_the_assistants_card_names_the_app_by_its_name_never_by_its_id():
     from base import assistant
 
     set_rows()
-    for name in ("base.app.enable", "base.app.disable"):
-        card = assistant.cards.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
-        assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservas online")]
-        card = assistant.cards.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
-        assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservations")]
+
+    def card(name, app, language):
+        shown = assistant.cards.card(get(name), {"app": app}, language, ctx(language=language))
+        return [(field["name"], field["value"]) for field in shown["fields"]]
+
+    assert card("base.app.enable", "online_booking", "es") == [
+        ("app", "Reservas online"),
+        ("along", "Reservas online necesita Citas, Clientes, Horarios, Impuestos, Personal y Servicios: se activan con ella."),
+    ]
+    assert card("base.app.disable", "online_booking", "es") == [("app", "Reservas online")]
+    assert card("base.app.enable", "reservas", "en") == [
+        ("app", "Reservations"),
+        ("along", "Reservations needs Customers, Sales & POS, Schedules, Tables, and Taxes: they turn on with it."),
+    ]
+    assert card("base.app.disable", "reservas", "en") == [("app", "Reservations")]
+
+
+@HUB_DB
+def test_the_apps_to_turn_off_first_are_named_as_the_screen_joins_them():
+    Hub.objects.filter(slug=A.key).update(country="PL")
+    set_rows(customer="on", tax="on*", sale="on*", table="on*", invoice="on*")
+
+    with pytest.raises(Conflict) as refused:
+        disable("customer")
+
+    assert refused.value.message == "Turn off Invoicing, Sales & POS, and Tables first."
 
 
 @HUB_DB
@@ -514,18 +544,18 @@ def test_a_lower_plan_turns_nothing_off_and_only_refuses_one_more():
     graph = activation.module_graph()
     before = by_id(app_list())
 
-    with_limit(A.key, 5)  # bought down: 17 chosen, 5 allowed
+    with_limit(A.key, 5)  # bought down: 18 chosen, 5 allowed
 
     after = by_id(app_list())
     assert {label: (app["state"], app["chosen"]) for label, app in after.items()} == {
         label: (app["state"], app["chosen"]) for label, app in before.items()
     }
-    assert app_list()["enabled"] == 17 and app_list()["max_apps"] == 5
+    assert app_list()["enabled"] == 18 and app_list()["max_apps"] == 5
     disable("task")
     with pytest.raises(OperationError) as refused:
         enable("task")
     assert refused.value.code == "base.app_limit_reached"
-    assert refused.value.envelope()["error"]["enabled"] == 16
+    assert refused.value.envelope()["error"]["enabled"] == 17
     assert len(graph) == len(after)
 
 
@@ -871,5 +901,5 @@ def test_an_owner_turns_one_off_over_http_and_a_cashier_is_refused(client, make_
     assert {key: over.json()["error"][key] for key in ("code", "max_apps", "enabled")} == {
         "code": "base.app_limit_reached",
         "max_apps": 1,
-        "enabled": 16,
+        "enabled": 17,
     }

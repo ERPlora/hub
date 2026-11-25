@@ -4,6 +4,7 @@
     "loading": "Loading…",
     "noPermission": "You do not have permission",
     "erasedCustomer": "Deleted customer",
+    "searchGuest": "Search guest…",
     "yes": "Yes",
     "no": "No",
     "retry": "Retry",
@@ -238,7 +239,8 @@
         "from": "From",
         "to": "To",
         "max": "Max",
-        "maxCovers": "Max guests (optional)",
+        "maxCovers": "Max guests",
+        "optional": "Optional",
         "submit": "Create slot"
       },
       "blockedForm": {

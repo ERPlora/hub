@@ -1,9 +1,12 @@
 """The reservation app declares its module metadata, its menu, its permissions and what each role gets."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs
+from live.meta import Category, LiveAppConfig, Nav, module_configs
 
 from base import assistant
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
@@ -109,7 +112,7 @@ def test_reservation_is_in_the_store_and_in_the_restaurant_template():
 
 
 def test_permissions_are_the_workbook_ones():
-    assert reservation().permissions == PERMISSIONS
+    assert list(reservation().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -153,6 +156,8 @@ def test_navigation_is_the_three_sections_of_the_old_module_and_the_settings_wit
 #: Done at the door by whoever receives the party (``ai.in_person``): never granted to an automation (FLOW-F12), and
 #: still of normal risk, so the assistant seats by voice without a confirmation card.
 IN_PERSON = {"reservation.reservation.seat"}
+#: The writes whose card says their data in an order of their own (``ai["summary"]``): for whom, the day and the time.
+SUMMARISED = {"reservation.reservation.create"}
 
 
 def test_seating_is_done_in_person_and_of_normal_risk():
@@ -187,6 +192,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
             expected = expected | {"asks"}
         if op.name in IN_PERSON:
             expected = expected | {"in_person"}
+        if op.name in SUMMARISED:
+            expected = expected | {"summary"}
         assert set(op.ai) == expected, op.name
         assert op.ai.get("in_person", False) is (op.name in IN_PERSON), op.name
         if op.kind == "command":
@@ -243,5 +250,23 @@ def test_the_reactions_are_the_platforms_only():
         assert get(name).permission == "reservation.system", name
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert reservation().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert reservation().help.videos == {"es": "6-9Ca12M6o0", "en": "WlNYEi3jCjU"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("RESERVATION-F06", "RESERVATION-F23"), "dtI39MRe1gk", "rFYllyUQe2Q"),
+    (("RESERVATION-F07",), "WW1mMVh51hM", "o37Ho17tWnI"),
+    (("RESERVATION-F08", "RESERVATION-F09", "RESERVATION-F20"), "S8LU9RkaLDc", "Hf2TuSIgJ1Y"),
+    (("RESERVATION-F10",), "6azOhfKZCwk", "ISpAS2jfrOc"),
+    (("RESERVATION-F14", "RESERVATION-F15"), "j_NWW1dEiYs", "zvNv_-7YbHc"),
+    (("RESERVATION-F02",), "AL8cmSYK11k", "ZOUn-FIILR4"),
+    (("RESERVATION-F03", "RESERVATION-F04"), "bdFYu4Joc3w", "Frt5bMCp6lo"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("reservation", language) == help_videos.by_task(TASK_VIDEOS, language)

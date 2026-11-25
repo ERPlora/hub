@@ -1,4 +1,4 @@
-"""The shared image library (``base.catalog_image.*``), named in the business's language."""
+"""The shared image library (``base.catalog_image.*``), named in the language of the person who asks."""
 
 from django.conf import settings
 from django.utils import translation
@@ -18,6 +18,22 @@ from base.schemas.catalog_images import CatalogImageOut, CatalogImagePage, Catal
 
 LIBRARY_UNAVAILABLE = gettext_lazy("The image library could not be loaded.")
 
+# A reference reads like words («catalog:hospitality/paella_mixta»), so the rule against writing ids in an answer does
+# not stop the model from listing it beside each title.
+BY_TITLE_ALONE = (
+    "Name each image by its title alone and ask which one; its reference (catalog:<folder>/<name>) only goes "
+    "to the tool that sets it, never in the answer, not in a table either."
+)
+
+
+def image_suggestion(set_image: str) -> str:
+    """The end of what the model reads of a read that proposes images for a record's photo: what it brings, that it
+    sets none and that ``set_image`` sets the one the person picks."""
+    return (
+        "the best matches for its name first, each with its title and its reference. It never sets one: set the one "
+        f"the person picks with {set_image}. {BY_TITLE_ALONE}"
+    )
+
 
 def image_library(ctx: OperationContext) -> image_catalog.Library:
     """The shared image library, or the 503 ``base.image_library_unavailable`` in ``ctx``'s language when its manifest
@@ -32,9 +48,15 @@ def image_library(ctx: OperationContext) -> image_catalog.Library:
             ) from None
 
 
+def titled_search(ctx: OperationContext, query: str, *, folder: str | None = None) -> list[dict]:
+    """The library's images that match ``query``, the best first, each titled in the language of the person who asks
+    (``ctx``'s, as their screens and the assistant's card read), whatever the business's."""
+    return [image.row(ctx.language) for image in image_library(ctx).search(query, ctx.language, folder=folder)]
+
+
 def business_language(ctx: OperationContext) -> str:
     """The language the business works in, as erplora.com registered it (Settings › Business), else the deployment's:
-    what its products and services are named in, so what the library's images are titled in on its screens."""
+    what its products and services are named in."""
     language = Hub.objects.filter(slug=ctx.scope.key).values_list("language", flat=True).first()
     return language or settings.LANGUAGE_CODE
 
@@ -49,8 +71,8 @@ def business_language(ctx: OperationContext) -> str:
         description=(
             "Finds an image for a product, a service or a set menu in ERPlora's shared image library by what it is "
             "called, in Spanish or English («café con leche», «women's haircut»), the best match first, each with its "
-            "title and the reference (catalog:<folder>/<name>) that sets it as the image of a product, a service or a "
-            "set menu. Empty: the whole library by title."
+            "title and the reference that sets it as the image of a product, a service or a set menu. Empty: the whole "
+            f"library by title. {BY_TITLE_ALONE}"
         ),
         asks={
             "en": (
@@ -68,12 +90,11 @@ def business_language(ctx: OperationContext) -> str:
 )
 def catalog_image_search(ctx: OperationContext, data: CatalogImageSearchIn) -> dict:
     """The library is everyone's: who may see the hub's Home may look an image up (the screens that set one need their
-    own app's permission). Any language matches; titled in the business's (INVENTORY-F30: in English when it is not
+    own app's permission). Any language matches; titled in the person's (INVENTORY-F30: in English when it is not
     Spanish)."""
-    language = business_language(ctx)
-    found = image_library(ctx).search(data.query, language, folder=data.folder)
+    found = titled_search(ctx, data.query, folder=data.folder)
     return {
-        "rows": [image.row(language) for image in found[data.offset : data.offset + data.limit]],
+        "rows": found[data.offset : data.offset + data.limit],
         "total": len(found),
         "limit": data.limit,
         "offset": data.offset,

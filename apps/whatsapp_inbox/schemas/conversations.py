@@ -9,8 +9,10 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ValidationInfo, field_validator
 
+from apps.customer.schemas.contact import PHONE
 from apps.whatsapp_inbox.schemas.fields import A_CUSTOMER, ConversationRefIn, Page, PageIn, Reference, _blank, _text
 from base.schemas.assistant import names
+from base.sensitive import CUSTOMER_CONTACT
 
 ONE_ASSIGNEE = _("Choose one person, yourself («me») or nobody.")
 ONE_CUSTOMER = _("Choose a customer card, create one or unlink it.")
@@ -31,8 +33,8 @@ def _is_uuid(value: str) -> bool:
 class ConversationListIn(PageIn):
     search: _text(120) | None = Field(
         None,
-        description="Part of the contact's or customer's name, or of the number written in any format "
-        "(600 111, +34 600 111 222, 0034600111222).",
+        description="Part of the contact's or customer's name or, for whoever sees the customers' contact details, of "
+        "the number written in any format (600 111, +34 600 111 222, 0034600111222).",
     )
     status: ConversationStatus | None = Field(
         None, description="Only open, pending or closed conversations."
@@ -48,7 +50,7 @@ class ConversationListIn(PageIn):
         None, description="Only the conversations of this customer card."
     )
     sort: Literal[
-        "last_message_at", "contact", "phone", "status", "unread_count", "assigned_to"
+        "last_message_at", "contact", "status", "unread_count", "assigned_to"
     ] = Field(
         "last_message_at",
         description="Column to sort by; the latest activity by default.",
@@ -65,14 +67,13 @@ class ConversationListIn(PageIn):
 
 class ConversationOut(Schema):
     id: UUID = Field(description="The conversation's id.")
-    phone: str = Field(
-        description="The customer's number, international format (empty once erased)."
-    )
+    phone: str | None = PHONE
     contact_name: str = Field(
         description="The name of the customer's WhatsApp profile."
     )
     display_name: str = Field(
-        description="What the inbox calls it: the card's name, the profile's or the number."
+        description="What the inbox calls it: the card's name, the profile's or the number (to whoever does not see "
+        "the customers' contact details, masked: its first three and last four digits)."
     )
     customer_id: UUID | None = Field(description="The customer card it is joined to.")
     customer_name: str = Field(description="That card's name.")
@@ -124,7 +125,8 @@ class ConversationDetailOut(ConversationOut):
 
 class ByPhoneIn(Schema):
     phone: _text(32, 1) = Field(
-        description="The exact number, international format (+34600111222)."
+        description="The exact number, international format (+34600111222).",
+        json_schema_extra=CUSTOMER_CONTACT,
     )
 
 
@@ -132,8 +134,8 @@ class ByPhoneOut(Schema):
     phone_is_international: bool = Field(
         description="Whether the number was in international format."
     )
-    phone: str = Field(
-        description="The number as compared (E.164), empty when it was not one."
+    phone: str | None = Field(
+        None, description="The number as compared (E.164), empty when it was not one.", json_schema_extra=CUSTOMER_CONTACT
     )
     conversation_id: UUID | None = Field(
         description="Its live conversation in this business, if any."
@@ -175,7 +177,10 @@ class NoticesIn(Schema):
 class NoticeOut(Schema):
     id: UUID = Field(description="The conversation's id.")
     at: datetime = Field(description="When the customer wrote her last message, still unanswered.")
-    display_name: str = Field(description="Who: the customer card's name, else her WhatsApp name, else her number.")
+    display_name: str = Field(
+        description="Who: the customer card's name, else her WhatsApp name, else her number (masked to whoever does not "
+        "see the customers' contact details)."
+    )
     last_message_preview: str = Field(
         description="What she wrote last (empty for a photo or a location without a caption)."
     )
@@ -241,7 +246,7 @@ class LinkCustomerIn(ConversationRefIn):
     customer: Reference | None = Field(
         None,
         validate_default=True,
-        description="The card's exact name, phone or email, when its id is not known.",
+        description="The card's name (or a part of it), phone or email, when its id is not known.",
     )
 
     @field_validator("customer")

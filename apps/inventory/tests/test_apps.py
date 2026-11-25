@@ -81,7 +81,7 @@ def test_inventory_is_in_the_store_and_in_the_restaurant_template():
 
 
 def test_permissions_are_the_workbook_ones():
-    assert inventory().permissions == PERMISSIONS
+    assert list(inventory().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -102,7 +102,7 @@ FRONTEND = Path(apps.get_app_config("inventory").path) / "frontend"
 def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
     # The tab bar shows the entries the person may open, the help window names the screen in view by them and the
     # assistant links each one, each with the permission that opens it. The first one keeps the cube: it is the icon of
-    # the launcher and of «My apps» (base.home.shell_icon).
+    # the launcher and of «My apps» (base.home.shown_modules.shell_icon).
     entries = inventory().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     assert [(entry.id, str(entry.label), entry.path, entry.icon, entry.permission) for entry in entries] == [
@@ -112,7 +112,7 @@ def test_the_menu_has_the_tab_bar_s_screens_with_the_launcher_s_icon_first():
         ("categories", "Categories", "/inventory/categories", "ion:list-outline", "inventory.view_category"),
         ("settings", "Settings", "/inventory/settings", "ion:settings-outline", "inventory.manage_settings"),
     ]
-    assert home.shell_icon(inventory()) == "ion:cube-outline"
+    assert home.shown_modules.shell_icon(inventory()) == "ion:cube-outline"
     shell = shell_icon_registry()
     for entry in entries:
         assert f"'{entry.icon.removeprefix('ion:')}':" in shell, entry.icon
@@ -174,8 +174,35 @@ def test_each_task_of_the_help_window_shows_its_short_video_in_the_person_s_lang
     assert videos("en") == {flow: [en] for flows, _es, en in TASK_VIDEOS for flow in flows}
 
 
-#: The reads that only name a record on the assistant's card: no tool, no route.
-CARD_ONLY = {"inventory.category.get"}
+#: The reads that only name a record on the assistant's card, or check what a write names before it: no tool, no route.
+CARD_ONLY = {
+    "inventory.category.get",
+    "inventory.product.check",
+    "inventory.product.bulk_check",
+    "inventory.product_category.check",
+}
+#: The read each write checks the product or the category it names with, before its card (hub#2295).
+CHECKS = {
+    **dict.fromkeys(
+        (
+            "inventory.product.update",
+            "inventory.product.delete",
+            "inventory.product.set_sold_out",
+            "inventory.product.set_image",
+            "inventory.product.print_label",
+        ),
+        "inventory.product.get",
+    ),
+    **dict.fromkeys(("inventory.stock.count", "inventory.stock.write_off"), "inventory.product.check"),
+    "inventory.stock.receive": "inventory.product.bulk_check",
+    **dict.fromkeys(
+        ("inventory.product_category.add", "inventory.product_category.remove"), "inventory.product_category.check"
+    ),
+    **dict.fromkeys(("inventory.category.update", "inventory.category.delete"), "inventory.category.get"),
+}
+#: The writes whose card says their data by a summary of their own: the rows of a file by their names, and a new
+#: product by its name, its price and the VAT it charges before the rest.
+CARD_SUMMARY = {"inventory.product.bulk_create", "inventory.category.bulk_create", "inventory.product.create"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
@@ -184,8 +211,9 @@ def test_every_operation_is_a_tool_of_the_assistant():
     operations = [op for name, op in registry.items() if name.startswith("inventory.")]
     # 31 + the product's image (INVENTORY-F30, F31): set_image, upload_image, suggest_image; + the category the
     # assistant's card names; + the restore of a deleted product, the recovery of a deleted category and of a product
-    # no longer held, the platform's alone (INVENTORY-F34, INVENTORY-F07, BASE-F114).
-    assert len(operations) == 38
+    # no longer held, the platform's alone (INVENTORY-F34, INVENTORY-F07, BASE-F114); + the three checks of what a
+    # write names (hub#2295).
+    assert len(operations) == 41
     for op in operations:
         if op.name in CARD_ONLY:
             assert op.ai is INTERNAL and op.expose_api is False, op.name
@@ -194,6 +222,11 @@ def test_every_operation_is_a_tool_of_the_assistant():
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
             expected |= {"asks"}
+        if op.name in CARD_SUMMARY:
+            expected |= {"summary"}
+        if op.name in CHECKS:
+            expected |= {"check"}
+            assert op.ai["check"] == CHECKS[op.name], op.name
         assert set(op.ai) == expected, op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name
@@ -234,7 +267,7 @@ def test_the_homes_step_is_your_catalog_done_with_one_active_product():
     )
     assert "active_products" in registry[step.operation].output.model_fields
     # Required, so «Important»; base alone gives the legal level, and an empty catalog stops no invoice.
-    assert home.level_of(f"inventory.{step.key}", step.required) == home.LEVEL_FUNCTIONAL
+    assert home.setup_steps.level_of(f"inventory.{step.key}", step.required) == home.setup_steps.LEVEL_FUNCTIONAL
 
 
 def test_the_step_speaks_the_language_of_whoever_reads_it():

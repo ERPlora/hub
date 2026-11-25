@@ -66,6 +66,11 @@ def fits_unit(qty: Decimal, unit: str) -> bool:
     return qty % increment_of(unit) == 0
 
 
+def measure_alike(unit: str, other: str) -> bool:
+    """Whether both units measure the same kind of thing (grams and kilos do, grams and litres do not)."""
+    return UNIT_SPECS[unit].category == UNIT_SPECS[other].category
+
+
 class Settings(UUIDModel):
     """The business's inventory settings: one row at most; without it, the factory values apply."""
 
@@ -189,6 +194,8 @@ class Product(UUIDModel):
     # Sold out («86»): still active, but the till does not offer it until it is back on sale.
     # ``db_default``: a process still on the previous code inserts products without it (expand/contract).
     is_sold_out = models.BooleanField(_("sold out"), default=False, db_default=False)
+    # Off: the website's catalog leaves it out; the till still sells it. ``db_default``: as ``is_sold_out``.
+    show_on_website = models.BooleanField(_("show on website"), default=True, db_default=True)
     # Its image (base.images): one of the shared library («catalog:<folder>/<name>») or a photo of its own
     # («file:inventory/products/<uuid7 hex>.webp» under its hub's prefix); empty: none, the till shows its initials.
     # Never a URL. ``db_default``: a process still on the previous code inserts products without it (expand/contract).

@@ -33,7 +33,7 @@ def as_admin_of(scope, name: str, data: dict | None = None):
 
 
 def option(group: str, name: str, scope=A, **fields) -> str:
-    return str(as_admin_of(scope, "modifier.option.create", {"group": group, "name": name, **fields}).id)
+    return str(as_admin_of(scope, "modifier.option.create", {"group": group, "name": name, "price_delta": 0, **fields}).id)
 
 
 def fired(sku: str, *option_ids: str, scope=A, notes: str = "", quantity: str = "1"):

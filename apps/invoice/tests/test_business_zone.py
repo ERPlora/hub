@@ -5,9 +5,8 @@ VeriFactu's testing environment and never sent: nothing here leaves the machine.
 import datetime as dt
 
 import pytest
-from django.utils import timezone
 
-from apps.invoice import services
+from apps.invoice.services import writes
 from apps.invoice.models import Invoice
 from apps.invoice.tests.conftest import HUB_DB, ISSUER, deliver, run
 from apps.sale.models import Refund, Sale
@@ -25,18 +24,6 @@ RECIPIENT = {
 }
 
 
-@pytest.fixture
-def at(monkeypatch, in_business_a):
-    """``at((zone, instant))``: business A in ``zone``, its clock stopped at ``instant``."""
-
-    def move(moment):
-        zone, instant = moment
-        monkeypatch.setattr(timezone, "now", lambda: instant)
-        monkeypatch.setattr(in_business_a, "timezone", zone)
-
-    return move
-
-
 def manual():
     lines = [{"description": "Course", "quantity": "1", "unit_price": 1000, "tax_rate": "21"}]
     return run("invoice.invoice.create", {"lines": lines, **RECIPIENT})
@@ -44,7 +31,7 @@ def manual():
 
 def test_the_day_of_a_document_is_the_business_s_at_its_midnight(at):
     at(("Atlantic/Canary", dt.datetime(2026, 11, 2, 23, 30, tzinfo=dt.UTC)))
-    assert services._today() == dt.date(2026, 11, 2)
+    assert writes._today() == dt.date(2026, 11, 2)
 
 
 def test_an_invoice_at_night_is_dated_on_the_business_s_day(issuer, at):

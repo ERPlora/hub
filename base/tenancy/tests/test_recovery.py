@@ -39,7 +39,8 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy import names, recovery
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import CopyRecovery, Hub, RestoredCopy
+from control.models.copies import CopyRecovery, RestoredCopy
+from control.models.hubs import Hub
 
 AT = dt.datetime(2026, 11, 12, 9, 0, tzinfo=dt.UTC)
 THEN = AT - dt.timedelta(days=2)
@@ -127,7 +128,7 @@ class Recoveries(hubs.CopiedHubs):
         run_in(hub, "customer.customer.delete", id=ana)
         with use_hub(hub):
             from base import activation
-            from base.models import AppActivation
+            from base.models.activation import AppActivation
 
             AppActivation.objects.filter(host=hub.slug, app="customer").update(state="off")
             activation.forget(hub.slug)
@@ -625,7 +626,7 @@ def test_the_apps_that_answer_and_never_one_whose_records_reach_the_tax_authorit
 def test_each_declaration_names_a_migration_of_its_app_and_an_operation_of_its_app():
     from base.tenancy import migrator
 
-    code = migrator.code_migrations()
+    code = migrator.app_sets.code_migrations()
     for label, declared in recovery.recoverable_apps().items():
         for one in declared:
             assert (label, one.reads_since) in code.nodes
@@ -661,5 +662,5 @@ def test_a_declaration_restores_only_what_it_reads_deleted_and_both_come_togethe
 def test_the_lease_is_the_moves():
     from base.tenancy import move
 
-    assert recovery.LEASE == move.LEASE
+    assert recovery.LEASE == move.moving.LEASE
     assert provisioning.LEASE_OWNER

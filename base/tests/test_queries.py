@@ -8,7 +8,7 @@ from live.context import OperationContext, Scope
 from live.meta import Nav, module_configs
 from live.operations import get
 
-from base.models import AppActivation
+from base.models.activation import AppActivation
 from base.schemas.sessions import SessionMeIn, SessionMeOut
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
@@ -41,6 +41,8 @@ def test_anonymous():
         "menu": [],
         "apps": [],
         "locked": {},
+        "role": None,
+        "approvable": [],
         "language": "es",
         "demo": None,
     }

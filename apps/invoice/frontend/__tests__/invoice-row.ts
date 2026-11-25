@@ -1,0 +1,30 @@
+// An invoice as the list gives it, for the tests.
+import type { InvoiceRowOut } from '../operations';
+
+export const row = (number: string, over: Partial<InvoiceRowOut> = {}): InvoiceRowOut => ({
+  id: number,
+  number,
+  invoice_type: 'F1',
+  series_code: 'FACT',
+  year: 2026,
+  issue_date: '2026-10-14',
+  due_date: null,
+  issued_at: '2026-10-14T10:00:00Z',
+  customer_name: 'Talleres Pérez SL',
+  customer_tax_id: 'B12345674',
+  base_amount: 1000,
+  tax_amount: 210,
+  total_amount: 1210,
+  currency: 'EUR',
+  currency_decimals: 2,
+  status: 'issued',
+  source_type: 'manual',
+  rectifies_id: null,
+  rectifies_number: '',
+  substituted: false,
+  overdue: false,
+  can_mark_paid: true,
+  can_rectify: true,
+  can_substitute: false,
+  ...over,
+});

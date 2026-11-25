@@ -14,14 +14,14 @@ from live.outbox import record_event
 from apps.verifactu import certificates, events
 from apps.verifactu.models import Environment, Event, OwnCertificate
 from apps.verifactu.queries.config import config_out
-from apps.verifactu.queries.route import config_row, issuer_configured, issuer_identity, own_certificate
+from apps.verifactu.queries.route import ISSUER_MISSING, config_row, issuer_configured, issuer_identity, own_certificate
 from apps.verifactu.schemas.config import ConfigOut
 from apps.verifactu.schemas.fields import NoInput
 from apps.verifactu.schemas.own_certificate import CertificateUploadIn
 from base.business import business_zone
 
 from .sending import _back_in_the_queue, _unsent
-from .writes import CONFIGURE, ISSUER_MISSING, _actor, _event
+from .writes import CONFIGURE, _actor, _event
 
 CERTIFICATE_STORAGE_UNAVAILABLE = _(
     "This server cannot keep certificates yet: ERPlora has to set its storage key."

@@ -12,6 +12,12 @@
         "label": "Secciones del Inicio",
         "summary": "Resumen",
         "activity": "Actividad"
+      },
+      "health": {
+        "label": "Cómo está funcionando tu negocio",
+        "viewSystem": "Ver sistema",
+        "loadError": "No hemos podido comprobar cómo está funcionando tu negocio.",
+        "retry": "Reintentar"
       }
     },
     "apps": {
@@ -183,14 +189,12 @@
       "alsoOff": "También se ha desactivado: {apps}.",
       "confirmOn": {
         "title": "¿Activar {app}?",
-        "message": "{app} necesita {apps}: se activa con ella. | {app} necesita {apps}: se activan con ella.",
         "confirm": "Activar",
         "cancel": "Cancelar"
       },
       "confirmOff": {
         "title": "¿Desactivar {app}?",
         "message": "Sale del menú de todos en este negocio. No se borra nada: al volver a activarla, tiene sus datos.",
-        "along": "{apps} se desactiva con ella: solo la necesitaba {app}. | {apps} se desactivan con ella: solo las necesitaba {app}.",
         "confirm": "Desactivar",
         "cancel": "Cancelar"
       },
@@ -313,7 +317,7 @@
         "versionValue": "Versión {version}",
         "brings": "Trae",
         "readError": "No se pudo leer el fichero: {reason}",
-        "tooBig": "el fichero pasa de 20 MB."
+        "fileTooBig": "No se pudo leer el fichero: el fichero pasa de 20 MB."
       },
       "review": {
         "title": "Revisa lo que trae",
@@ -513,7 +517,6 @@
         },
         "loading": "Cargando los eventos caídos…",
         "errorBody": "No se pudo cargar la cola de eventos caídos. Comprueba la conexión y reintenta.",
-        "denied": "Solo el dueño o un administrador puede ver los eventos caídos.",
         "retried": "Evento reenviado.",
         "retriedAll": "Eventos reenviados: {count}.",
         "nothingToRetry": "No había nada que reenviar.",
@@ -557,7 +560,6 @@
       },
       "usage": {
         "loading": "Consultando el sistema…",
-        "denied": "Solo el dueño o un administrador puede ver cuánto está usando el hub.",
         "plan": "Plan {name}",
         "planNames": {
           "free": "Gratis",
@@ -626,6 +628,7 @@
         },
         "demo": "En una demo no se mide el uso: sus datos se borran al terminar.",
         "unknown": "Todavía no conocemos el plan de este negocio: aparecerá en cuanto erplora.com lo envíe.",
+        "platform": "Este es el negocio de ERPlora: no tiene plan.",
         "managed": "Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com."
       }
     },
@@ -649,6 +652,7 @@
       "whereAdmin": "El nombre, la zona horaria y el idioma se cambian en erplora.com. El país no cambia una vez listo el negocio.",
       "whereOthers": "Solo el propietario o un administrador los cambian, en erplora.com.",
       "whereDemo": "Esta demo no tiene un negocio en erplora.com: sus datos no se cambian.",
+      "wherePlatform": "Este es el negocio de ERPlora: estos datos los pone ERPlora en su servidor y no se cambian aquí ni en erplora.com.",
       "change": "Cambiar en erplora.com",
       "fiscal": "Datos fiscales",
       "fiscalHint": "Razón social, NIF y domicilio: los que usan las facturas",
@@ -797,7 +801,10 @@
       "adminOnly": "Solo un administrador puede cambiar cómo entra la gente en este dispositivo.",
       "unknown": "Este navegador todavía no es un dispositivo del negocio: entra una vez aquí con tu cuenta y podrás elegir.",
       "failed": "No se pudo cambiar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
-      "loadError": "No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo."
+      "loadError": "No se pudo cargar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
+      "autostart": "Arrancar al iniciar sesión",
+      "autostartHelp": "Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre tengan dónde imprimirse.",
+      "autostartFailed": "No se pudo cambiar el ajuste de arranque al iniciar sesión."
     },
     "pinPolicy": {
       "title": "Pinpad",
@@ -907,17 +914,59 @@
       "intro": "Estos son los roles de este negocio. Cada persona recibe uno al invitarla en erplora.com, y allí se cambia.",
       "columns": {
         "role": "Rol",
-        "origin": "Viene de",
-        "available": "Disponible",
-        "members": "Miembros",
+        "origin": "Tipo",
+        "members": "Personas",
         "permissions": "Permisos"
       },
       "basic": "Básico",
-      "always": "Siempre disponible",
+      "own": "Propio",
       "search": "Buscar rol…",
       "empty": "Este negocio no tiene roles.",
       "error": "No se pudo cargar el catálogo de roles.",
-      "change": "Cambiar roles en erplora.com"
+      "change": "Cambiar roles en erplora.com",
+      "toReview": "Por revisar",
+      "new": "Nuevo rol",
+      "duplicate": "Duplicar",
+      "edit": "Editar",
+      "delete": "Borrar",
+      "add": {
+        "title": "Nuevo rol",
+        "name": "Nombre",
+        "basedOn": "A partir de",
+        "help": "Permitirá lo mismo que ese rol. Después ajustas lo que permite.",
+        "create": "Crear rol",
+        "created": "Rol {name} creado"
+      },
+      "remove": {
+        "title": "Borrar rol",
+        "message": "¿Borrar el rol {name}? No se puede deshacer.",
+        "done": "Rol {name} borrado"
+      }
+    },
+    "role": {
+      "title": "Qué permite",
+      "intro": "Lo que este rol deja hacer en este negocio, app por app. Se da en erplora.com y aquí no se cambia.",
+      "introOwn": "Lo que este rol deja hacer en este negocio, app por app.",
+      "members": "Personas con este rol: {n}",
+      "loading": "Cargando lo que permite este rol…",
+      "error": "No se pudo cargar lo que permite este rol.",
+      "retry": "Reintentar",
+      "notFound": "Este rol no existe en este negocio.",
+      "state": {
+        "on": "Permitido",
+        "approval": "Con aprobación",
+        "off": "No"
+      },
+      "introEdit": "Lo que este rol deja hacer en este negocio, app por app. Al guardar, quien lo tiene lo nota al momento.",
+      "name": "Nombre",
+      "description": "Descripción",
+      "review": {
+        "title": "Permisos nuevos por revisar",
+        "text": "Llevan la marca «Por revisar». Elige qué hace el rol con cada uno y guarda."
+      },
+      "save": "Guardar",
+      "saved": "Rol guardado.",
+      "saveError": "No se pudo guardar el rol"
     },
     "person": {
       "title": "Persona",
@@ -978,6 +1027,7 @@
         "token": "Token",
         "permissions": "Permisos",
         "state": "Estado",
+        "createdBy": "Creada por",
         "created": "Creada",
         "lastUsed": "Último uso",
         "limit": "Límite"
@@ -985,17 +1035,21 @@
       "modes": {
         "full": "Acceso total",
         "read": "Solo lectura",
-        "write": "Solo escritura",
-        "per_app": "Por app"
+        "write": "Solo escritura"
       },
-      "kinds": {
-        "read": "Lectura",
-        "write": "Escritura"
+      "actions": {
+        "read": "Leer",
+        "create": "Crear",
+        "update": "Modificar",
+        "delete": "Borrar"
       },
       "short": {
         "read": "L",
-        "write": "E"
+        "create": "C",
+        "update": "M",
+        "delete": "B"
       },
+      "allApps": "Todas las apps",
       "states": {
         "active": "Activa",
         "revoked": "Revocada"
@@ -1012,10 +1066,11 @@
         "rate": "Peticiones por minuto",
         "rateHint": "De 1 a 10.000.",
         "mode": "Qué puede hacer esta key",
-        "generalHint": "Los modos generales cubren todas las apps de tu negocio, también las que añadas después.",
+        "chooseApps": "Elegir apps",
+        "allAppsHint": "Todas las apps de tu negocio, también las que añadas después.",
         "perAppHint": "Marca qué puede hacer la key en cada app.",
         "app": "App",
-        "noApps": "Ninguna app publica todavía su API."
+        "noApps": "No hay ninguna app a la que puedas dar acceso."
       },
       "token": {
         "title": "API key creada",
@@ -1044,6 +1099,7 @@
         "gone": "Esa key ya no existe. Actualiza la lista y vuelve a intentarlo.",
         "scopesRequired": "Elige al menos una app y qué puede hacer la key en ella.",
         "scopeUnknown": "Esa app no publica lo que la key haría en ella.",
+        "beyondMaker": "Una key no puede hacer más de lo que puedes hacer tú.",
         "denied": "Solo quien lleva el negocio gestiona las API keys."
       },
       "docs": "Documentación de la API"
@@ -1070,12 +1126,12 @@
       }
     },
     "approvals": {
-      "intro": "Cada acción que necesitó el PIN de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo ni borrarlo.",
+      "intro": "Cada acción que puede necesitar la autorización de un encargado: quién la hizo, quién la autorizó y con qué. Nadie, tampoco un administrador, puede editarlo ni borrarlo.",
       "search": "Buscar por persona o acción…",
-      "empty": "Todavía nadie ha tenido que autorizar nada en este negocio.",
+      "empty": "Todavía no hay ninguna acción de este tipo en este negocio.",
       "error": "No se pudo cargar el registro de aprobaciones.",
-      "used": "Usada",
-      "unused": "Sin usar",
+      "used": "Hecha",
+      "unused": "Sin hacer",
       "export": {
         "button": "Exportar CSV",
         "pending": "Exportando…",
@@ -1083,13 +1139,14 @@
       },
       "way": {
         "pin": "PIN",
-        "badge": "Placa"
+        "badge": "Placa",
+        "role": "Su rol"
       },
       "columns": {
         "at": "Cuándo",
         "action": "Acción",
         "approvedBy": "Autorizado por",
-        "requestedBy": "Lo pidió",
+        "requestedBy": "Quién",
         "way": "Con",
         "used": "Estado"
       }
@@ -1117,6 +1174,21 @@
         "loadFailed": "No se pudo cargar el ajuste.",
         "retry": "Reintentar"
       }
+    },
+    "supportAccess": {
+      "title": "Acceso de soporte",
+      "toggle": "Dejar entrar al soporte de ERPlora",
+      "note": "Encendido, el personal de soporte de ERPlora puede entrar en el negocio con su propia cuenta para ayudarte a configurarlo, como lo haría un administrador. Sigue encendido hasta que lo apagues, y en cuanto lo apagas sale.",
+      "changed": "Último cambio: {who}, {when}.",
+      "adminOnly": "Solo quien administra el negocio puede cambiarlo.",
+      "visits": "Últimas entradas de soporte",
+      "noVisits": "Nadie del soporte de ERPlora ha entrado todavía.",
+      "loading": "Cargando el acceso de soporte…",
+      "loadFailed": "No se pudo cargar el acceso de soporte.",
+      "retry": "Reintentar",
+      "saveFailed": "No se pudo guardar el cambio.",
+      "turnedOn": "Acceso de soporte encendido: el soporte de ERPlora puede entrar.",
+      "turnedOff": "Acceso de soporte apagado: el soporte de ERPlora ya no puede entrar."
     },
     "files": {
       "title": "Archivos",
@@ -1256,7 +1328,7 @@
       "current": "En esta pantalla",
       "here": "Estás aquí",
       "how": "Cómo se hace",
-      "others": "Otras pantallas del módulo",
+      "others": "Otras pantallas",
       "failure": "Si algo falla",
       "search": "Buscar tareas…",
       "empty": "Nada coincide con tu búsqueda",
@@ -1292,8 +1364,8 @@
           "archive": "Archivar",
           "assign": "Asignar",
           "attach": "Aplicar",
-          "auto_close": "Cerrar",
-          "avatar_remove": "Quitar",
+          "auto_close": "Cerrar las sesiones que debían cerrarse solas",
+          "avatar_remove": "Quitar la foto del perfil",
           "back_to_testing": "Volver a pruebas",
           "badge_remove": "Quitar",
           "book": "Reservar",
@@ -1305,7 +1377,7 @@
           "charge": "Cobrar",
           "claim": "Tomar",
           "claim_call": "Tomar la llamada",
-          "cleanup_expired": "Limpiar los caducados",
+          "cleanup_expired": "Limpiar los carritos caducados",
           "clear": "Quitar",
           "clock_in": "Fichar la entrada",
           "clock_out": "Fichar la salida",
@@ -1374,13 +1446,13 @@
           "pin_remove": "Quitar",
           "place": "Apartar",
           "preferences_set": "Cambiar",
-          "prepare": "Preparar",
+          "prepare": "Preparar la conexión",
           "print": "Imprimir",
           "print_bill": "Imprimir la cuenta",
           "print_label": "Imprimir la etiqueta",
-          "process": "Procesar",
+          "process": "Procesar la cola ahora",
           "propose": "Proponer",
-          "prune": "Limpiar",
+          "prune": "Quitar los dispositivos sin usar",
           "publish": "Publicar",
           "query": "Consultar a la AEAT",
           "react": "Iniciar",
@@ -1398,12 +1470,13 @@
           "redeem": "Canjear",
           "refresh_service": "Actualizar",
           "refund": "Devolver",
+          "regenerate": "Regenerar",
           "register": "Registrar",
           "reject": "Rechazar",
           "release": "Liberar",
           "release_check": "Liberar",
           "release_member": "Liberar",
-          "release_unconfirmed": "Liberar",
+          "release_unconfirmed": "Liberar las reservas sin confirmar",
           "remove": "Quitar",
           "remove_line": "Quitar",
           "remove_voucher": "Quitar",
@@ -1420,9 +1493,9 @@
           "resume_due": "Reanudar",
           "retire": "Retirar",
           "retry": "Reintentar",
-          "retry_all": "Reintentar todo",
+          "retry_all": "Reintentar todos los eventos caídos",
           "return": "Devolver",
-          "review_stale": "Marcar para revisar",
+          "review_stale": "Marcar para revisar los días olvidados",
           "revoke": "Revocar",
           "run": "Ejecutar",
           "save": "Guardar",
@@ -1478,6 +1551,12 @@
           "other": "Hacer esto"
         },
         "operations": {
+          "attendance": {
+            "break": {
+              "end": "Terminar la pausa",
+              "start": "Empezar la pausa"
+            }
+          },
           "cart_checkout": {
             "cart": {
               "clear": "Vaciar"
@@ -1489,6 +1568,22 @@
             },
             "movement": {
               "add": "Registrar movimiento"
+            }
+          },
+          "schedule": {
+            "week": {
+              "confirm": "Confirmar el horario de la semana"
+            }
+          },
+          "verifactu": {
+            "certificate": {
+              "remove": "Quitar el certificado"
+            },
+            "diagnostic": {
+              "run": "Probar la conexión"
+            },
+            "test_invoice": {
+              "create": "Crear factura de prueba"
             }
           }
         }

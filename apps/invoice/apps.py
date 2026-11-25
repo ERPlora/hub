@@ -42,15 +42,15 @@ class InvoiceConfig(LiveAppConfig):
             "como cobrados",
         ),
     )
-    permissions = [
-        "invoice.view_invoice",
-        "invoice.view_all_invoices",
-        "invoice.add_invoice",
-        "invoice.rectify_invoice",
-        "invoice.manage_series",
-        "invoice.manage_issuer",
-        "invoice.public",
-    ]
+    permissions = {
+        "invoice.view_invoice": _("View and print invoices, series, numbering and the issuer"),
+        "invoice.view_all_invoices": _("View everyone's invoices"),
+        "invoice.add_invoice": _("Issue and email invoices, invoice a sale, replace a receipt and mark invoices paid"),
+        "invoice.rectify_invoice": _("Issue corrective invoices"),
+        "invoice.manage_series": _("Create and change invoice series"),
+        "invoice.manage_issuer": _("Set up the issuer"),
+        "invoice.public": _("Request the full invoice of a receipt on the public page"),
+    }
     # The page base's public door serves without a session at /p/<slug>/invoice/<code> (INVOICE-F04): whoever opens
     # it holds ``invoice.public`` and nothing else.
     public_pages = {"invoice": "invoice.public"}
@@ -69,6 +69,15 @@ class InvoiceConfig(LiveAppConfig):
         "hub_employee": ["invoice.view_invoice", "invoice.add_invoice"],
         "hub_accountant": ["invoice.view_invoice", "invoice.view_all_invoices"],
     }
+    # The worker hands over again the emails nobody took, and tells the ones that stopped half-way (cron in UTC).
+    scheduled_tasks = [
+        {
+            "name": "resume_emails",
+            "operation": "invoice.email.resume",
+            "cron": "*/5 * * * *",
+            "catch_up": "collapse",
+        }
+    ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only: the old `document-text-outline` and
     # `bookmark-outline` wait in UI-REQUESTS.md.
@@ -77,7 +86,17 @@ class InvoiceConfig(LiveAppConfig):
         Nav("series", _("Series"), "ion:layers-outline", "/invoice/series", permission="invoice.manage_series"),
         Nav("issuer", _("Issuer"), "ion:storefront-outline", "/invoice/issuer", permission="invoice.manage_issuer"),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "vPFvdGPA6uw", "en": "QeiQzDdtJng"},
+        flow_videos={
+            "INVOICE-F03": {"es": ["nORuR2xG4qs"], "en": ["TvR3mQZTxlo"]},
+            "INVOICE-F05": {"es": ["KtnQOADy0w4"], "en": ["5wsz2czzqbs"]},
+            "INVOICE-F08": {"es": ["bUVP4k5SZs8"], "en": ["b8EAicT5vjo"]},
+            "INVOICE-F17": {"es": ["Yc8UiKuP1s8"], "en": ["73SPPT0_dSY"]},
+            "INVOICE-F18": {"es": ["Yc8UiKuP1s8"], "en": ["73SPPT0_dSY"]},
+            "INVOICE-F21": {"es": ["3jb2tjLO8w8"], "en": ["ASShGRv53hc"]},
+        },
+    )
     # The Home's steps: ⛔ «Your business details» (the issuer is Invoicing's, so its level is base's ``LEGAL_STEPS``)
     # and «Your invoice numbering», on the queries the Issuer and Series screens read. The first is done with what
     # issuing refuses to go without (``Issuer.configured``). The year's series are born with the first document, so the

@@ -1,8 +1,12 @@
 """The kitchen app declares its module metadata, its menu, its permissions and what each role gets
 (WORKBOOK «Quién puede qué»)."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
+
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "kitchen.view_ticket",
@@ -61,7 +65,7 @@ def test_kitchen_is_in_the_store_and_in_the_restaurant_template():
 
 
 def test_permissions_are_the_workbook_ones():
-    assert kitchen().permissions == PERMISSIONS
+    assert list(kitchen().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles_with_the_hub_prefix():
@@ -115,6 +119,8 @@ def test_every_new_ticket_has_a_device_notice_that_opens_the_kitchen_display():
 #: The reads that are no assistant tool: what names a station and a dish on the assistant's card (hub#671); the
 #: model reads the stations from their list and the dishes with their ticket.
 INTERNAL_READS = {"kitchen.station.get", "kitchen.item.get"}
+#: The writes whose card orders its data (``ai={"summary": …}``): a ticket by hand says its dishes after where it goes.
+SUMMARIZED = {"kitchen.ticket.create"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
@@ -131,6 +137,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
             continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        expected |= {"summary"} if op.name in SUMMARIZED else set()
         if isinstance(op.ai_spec(), AI):  # a tool says what a person types to ask for it (live.E020)
             expected |= {"asks"}
             said = {language: len(op.ai.get("asks", {}).get(language, ())) for language in ("en", "es")}
@@ -170,5 +177,21 @@ def test_the_reaction_to_sales_is_the_systems_only():
     assert "kitchen.system" not in kitchen().permissions
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert kitchen().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert kitchen().help.videos == {"es": "rowV_0Chbus", "en": "2PDPgXCpbic"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("KITCHEN-F11", "KITCHEN-F13"), "8NFM7vaJ5p4", "h3M9UuelYn4"),
+    (("KITCHEN-F12",), "Y8_ivChjSPI", "IH2ppGCdFts"),
+    (("KITCHEN-F14",), "zRBB-uH4PMU", "U2OSH7MKZSA"),
+    (("KITCHEN-F01", "KITCHEN-F02", "KITCHEN-F03"), "v3Puf35Z5GI", "JiZOKyJrxao"),
+    (("KITCHEN-F04",), "7iCI2JEd3Kc", "nLW-JNwjaHg"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("kitchen", language) == help_videos.by_task(TASK_VIDEOS, language)

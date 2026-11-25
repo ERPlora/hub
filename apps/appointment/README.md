@@ -34,7 +34,8 @@ cancela por WhatsApp o por la reserva online con las reglas del negocio.
 - **Con Clientes** (F20, F23, F24): el bloque «Historial de visitas» de la ficha; unir dos fichas mueve citas y
   series; borrar los datos de una ficha los vacía de citas, series e historial.
 - **Varias de golpe y contacto** (F21, F22): hasta 50 citas, todas o ninguna; notas, teléfono (en formato
-  internacional) y email.
+  internacional) y email. El teléfono y el email de la clienta solo llegan a quien ve el contacto de los clientes
+  (`base.view_customer_contact`); a quien no, la cita llega sin ellos y no puede nombrar a la clienta por ellos.
 - **Con Personal y Servicios** (F25, F26): la baja de un profesional pasa sus citas futuras a «Sin asignar» y pausa
   sus series; archivar un servicio no cambia nada de lo reservado.
 - **Avisos** (F03, F28): la campana cuenta «Citas por confirmar»; la aplicación instalada avisa con un aviso del
@@ -50,12 +51,12 @@ cancela por WhatsApp o por la reserva online con las reglas del negocio.
 | Usa de otras apps | la ficha de Clientes (`find_customer`, `CustomerSearch` con el alta rápida), los servicios y quién los hace de Servicios (`find_service`), el profesional, su turno y sus ausencias de Personal (`resolve_member`, `staff.availability.for_member`), el horario de Horarios (`schedule.hours.for_range`) y, sin ser requisito, la cuenta de Venta (`sale.order.open`, `sale.order.get`) |
 | Quién la usa | Reservas online (la requiere y reserva por sus operaciones), Venta (comprueba el precio reservado contra `appointment.appointment.get`), Clientes (el bloque `frontend/customer-card/VisitHistory.vue`), la Bandeja de WhatsApp (la automatización de fábrica que avisa a la clienta cuando se confirma su cita), Automatizaciones, la campana y los avisos del dispositivo de la shell, y el asistente |
 | Pantallas | `/appointment/agenda` (Lista, Por profesional · Día y Semana, Periódicas) y `/appointment/settings` |
-| Operaciones | 15 consultas (`queries.py`) y 29 acciones (`services/`, un módulo por caso de uso), todas con `ai=`; 35 rutas en `/api/appointment/…` (sin ruta: las ocho reacciones de la plataforma y `appointment.blocked_time.get`) |
+| Operaciones | 15 consultas (`queries/`, un módulo por tema) y 29 acciones (`services/`, un módulo por caso de uso), todas con `ai=`; 35 rutas en `/api/appointment/…` (sin ruta: las ocho reacciones de la plataforma y `appointment.blocked_time.get`) |
 | Eventos | 21 (`events.py`): `appointment.appointment.{created,confirmed,started,completed,marked_no_show,cancelled,deleted,rescheduled,updated,charged,uncharged,check_opened,check_closed,unassigned,reassigned}`, `appointment.blocked_time.{created,deleted}`, `appointment.recurring.{created,updated,deleted}` y `appointment.settings.updated`; reacciona a `customer.customer.merged`, `customer.customer.erased`, `staff.member.terminated`, `sale.sale.created_from_appointment`, `sale.sale.voided` y `sale.order.voided` |
 | Permisos | 10 (`view_`, `add_` y `change_` de `appointment` y de `own_appointment`, `delete_appointment`, `view_schedule`, `manage_schedule` y `manage_settings`); el empleado, solo lo suyo |
 | Automatización de fábrica | «Cubrir el hueco cuando un cliente cancela» (`recipes.py`, FLOW-F33) |
 | Tareas programadas | ninguna (las series se reservan al crearlas, al editarlas y con «Reservar citas») |
-| Migraciones | `0001_initial`, `0002_appointment_order_id` y `0003_end_in_real_minutes` |
+| Migraciones | `0001_initial`, `0002_appointment_order_id`, `0003_end_in_real_minutes`, `0004_history_restored` y `0005_actor_without_address` (quien actuó guardado por su correo se queda con lo que va antes de la @) |
 | Admin | Django admin en `hubs.erplora.com`: citas, series, bloqueos, ajustes y contadores, para soporte; borrar una cita o una serie bloquea antes sus filas (`LockedDeletion`); lo que guarda no pasa por las operaciones ni deja aviso |
 
 Las decisiones de diseño (disponibilidad = Horarios ∩ Personal ∩ citas, solapes con bloqueo, numeración, reloj del

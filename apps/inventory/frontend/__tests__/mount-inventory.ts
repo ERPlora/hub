@@ -1,12 +1,14 @@
 // Test helper of the inventory's pages and components: `mountInShell` with its catalogues over base's, the dashboard,
 // its people and the hub's business; the API's answers and the catalogue's rows its tests share.
+import { DataTable } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
+import type { VueWrapper } from '@vue/test-utils';
 import { ApiError, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import type { Component, Ref } from 'vue';
 
 import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import type { ApiCall, StreamCall } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
-import { flush, mountInShell, overBase, page, resultFrame } from '../../../../base/frontend/__tests__/mount-in-shell';
+import { BYE, flush, mountInShell, overBase, page, resultFrame } from '../../../../base/frontend/__tests__/mount-in-shell';
 import { business } from '../../../../base/frontend/__tests__/business';
 import type { Business } from '../../../../base/frontend/operations/business';
 import en from '../locale/en.json';
@@ -80,6 +82,10 @@ export const ok = (data: unknown, status = 200): Response => Response.json(data,
 /** The error envelope of the API. */
 export const refusal = (status: number, code: string, message: string, fields?: Record<string, string>): Response =>
   Response.json({ error: { code, message, ...(fields ? { fields } : {}) } }, { status });
+
+/** A proxy's 502 page, what the stream's opening gets while the Hub restarts: not the API's envelope. */
+const badGateway = (): Response =>
+  new Response('<html><body><h1>502 Bad Gateway</h1></body></html>', { status: 502, headers: { 'content-type': 'text/html' } });
 
 /** The `ApiError` a refusal becomes. */
 export const apiError = (status: number, code: string, message: string, fields?: Record<string, string>): ApiError =>
@@ -172,6 +178,7 @@ export function product(overrides: Record<string, unknown> = {}) {
     tracks_stock: true,
     is_active: true,
     is_sold_out: false,
+    show_on_website: true,
     category_ids: [],
     allergens: [],
     created_at: '2026-10-13T10:00:00Z',
@@ -215,7 +222,31 @@ export async function mountInventory(component: Component, options: MountOptions
   const body = (call: ApiCall): unknown => JSON.parse(String(call.init.body));
   /** The query of an API call. */
   const query = (call: ApiCall): Record<string, string> => Object.fromEntries(new URL(call.url, 'http://a.localhost').searchParams);
-  return { ...mounted, result, calls, body, query };
+  /** The stream's first opening gets a proxy's 502 page: nothing has answered, every read hears it and the stream keeps
+   *  trying by itself. */
+  async function cannotOpen(): Promise<void> {
+    net.refuseLive(badGateway);
+    await mounted.clock.advance(150);
+    await flush();
+  }
+  /** The open stream `call` ends and every new opening gets a proxy's 502 page: what was answered stays, every read
+   *  hears the failure and the stream keeps trying by itself. */
+  async function falls(call: StreamCall): Promise<void> {
+    net.refuseLive(badGateway);
+    call.push(BYE);
+    await flush();
+    await mounted.clock.advance(30000);
+    await flush();
+  }
+  return { ...mounted, result, calls, body, query, cannotOpen, falls };
 }
 
 export * from '../../../../base/frontend/__tests__/mount-in-shell';
+
+/** A mounted page's DataTable: an element by its test id, the table and one of its props. */
+export function tableOf(m: { wrapper: VueWrapper }) {
+  const testid = (id: string) => m.wrapper.find(`[data-testid="${id}"]`);
+  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
+  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
+  return { testid, table, prop };
+}

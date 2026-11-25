@@ -27,14 +27,17 @@ class TaxConfig(LiveAppConfig):
         "ready, lets you schedule a rate change ahead, never lets two rates apply on the same day, "
         "and is what the till and the invoices use to charge and declare each line."
     )
-    # Both sectors' templates carry it (base.catalog.template_apps); every business is born with it on anyway (below).
+    # Both sectors' templates carry it (base.catalog.verticals.template_apps); every business is born with it on anyway (below).
     verticals = ["hair_salon", "restaurant"]
     # Mandatory wherever the business is: no sale is priced without it. The Home asks whoever runs a business to turn it
-    # on while it is off (base.home.mandatory_steps), and the platform turns it on by itself at sign-up
+    # on while it is off (base.home.mandatory_apps.mandatory_steps), and the platform turns it on by itself at sign-up
     # (base.activation.born_on, base.services.hub_registry.turn_on_born_apps): it binds the business to no authority.
     mandatory = {"countries": "all", "platform_turns_on": True}
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = ["tax.view", "tax.manage"]
+    permissions = {
+        "tax.view": _("View tax categories, rules and the tax territory"),
+        "tax.manage": _("Create tax categories and rules, and change the tax territory"),
+    }
     # The countries a rule is set for, by their names: no field of the models labels them, so the
     # assistant's card would say their ISO codes.
     choices = CHOICES

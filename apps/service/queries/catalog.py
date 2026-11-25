@@ -10,20 +10,18 @@ from live.operations import operation
 
 from apps.service.models import Service
 from apps.service.queries.reads import _bounds, _page, _resolve
-from apps.service.schemas import (
+from apps.service.schemas.catalog import (
     CatalogStatusOut,
-    NoIn,
     ServiceForSaleIn,
-    ServiceImageSuggestIn,
-    ServiceImageSuggestOut,
     ServiceListIn,
     ServiceOut,
     ServicePage,
-    ServiceRefIn,
     ServiceSalePage,
 )
+from apps.service.schemas.fields import NoIn, ServiceRefIn
+from apps.service.schemas.service_images import ServiceImageSuggestIn, ServiceImageSuggestOut
 from base import images
-from base.queries.catalog_images import business_language, image_library
+from base.queries.catalog_images import image_suggestion, titled_search
 from base.ordering import list_order_for
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
@@ -251,8 +249,7 @@ def get_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     expose_api=True,
     ai={
         "description": "Propose images of ERPlora's shared image library for a service's photo («ponle foto al corte "
-        "de señora»), the service named by its id or its name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
-        "never sets one: show them, and set the one the person picks with service.service.set_image.",
+        "de señora»), the service named by its id or its name: " + image_suggestion("service.service.set_image"),
         "asks": {
             "en": (
                 "suggest a drawing from the library for the beard trim",
@@ -263,15 +260,12 @@ def get_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
     },
 )
 def suggest_image(ctx: OperationContext, data: ServiceImageSuggestIn) -> dict:
-    """SERVICE-F34: the library searched by the service's name in either of its languages, titled in the business's
-    (the one its services are named in)."""
+    """SERVICE-F34: the library searched by the service's name in either of its languages, titled in the person's."""
     service = find_service(data.id, data.service)
-    language = business_language(ctx)
-    found = image_library(ctx).search(service.name, language)
     return {
         "service_id": service.id,
         "query": service.name,
-        "rows": [image.row(language) for image in found[: data.limit]],
+        "rows": titled_search(ctx, service.name)[: data.limit],
     }
 
 

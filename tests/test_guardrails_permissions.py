@@ -31,12 +31,12 @@ from live.operations import registry
 
 from base.auth import RedeemedUser
 from base.models import Membership
-from base.permissions import permissions_for
+from base.permissions import access_for
 from base.registry import REGISTRY_SCOPE
 from base.services.sessions import open_admin_session_from_saas, open_session_from_saas
-from base.tenancy.context import use_hub
+from base.tenancy.context import HubContextMissing, use_hub
 from base.tenancy.tests.business import A, HUB_DB, on_hub_a
-from control.models import Hub
+from control.models.hubs import Hub
 
 # ── Why an operation may have no permission ───────────────────────────────────────────────────────────────────────
 
@@ -82,6 +82,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     ),
     "base.hub.purge": (PLATFORM, "The worker leaves the tombstone of a business past its 90 days."),
     "base.hub.restore": (PLATFORM, "The SaaS restores a cancelled business (/internal)."),
+    "base.hub.platform_rename": (PLATFORM, "manage.py create_platform_hub --rename; internal_only refuses anyone else."),
     "base.hub.seed_local": (PLATFORM, "seed_local_hubs registers a and b, in local development only (DEBUG)."),
     "base.hub.state_apply": (PLATFORM, "The SaaS's photo of a business: plan, apps, members and roles (/internal)."),
     "base.hub_user.sync": (PLATFORM, "Inside the photo's own transaction: the people of the business's database."),
@@ -90,6 +91,11 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The SPA's own session, read at start: an anonymous visitor gets no user and no permission (the login).",
     ),
     "base.session.revoke": (PLATFORM, "The SaaS ends an account's sessions (/internal, back-channel logout)."),
+    "base.support_access.enter": (
+        PLATFORM,
+        "/auth/callback notes the entry of a person of ERPlora's support, before there is an actor, when the business "
+        "lets support in.",
+    ),
     "base.app.activation_settle": (
         PLATFORM,
         "The worker turns on, or marks failed, the apps whose tables it has just made in the business's own database "
@@ -239,7 +245,7 @@ def test_the_platform_s_operations_refuse_a_business_s_owner_with_every_permissi
 @HUB_DB
 @pytest.mark.parametrize("name", of_kind(CHECKED_INSIDE))
 def test_what_checks_its_permissions_itself_refuses_without_them(name, hub_a):
-    # The positive side (who holds one of them reads) is each app's own test (apps/staff/tests/test_queries.py,
+    # The positive side (who holds one of them reads) is each app's own test (apps/staff/tests/test_queries_accounts.py,
     # test_accounts_for_whoever_adds_or_edits_records).
     op = registry[name]
     employee = get_user_model().objects.create_user(username="saas:2")
@@ -309,24 +315,36 @@ def test_a_staff_session_on_a_business_s_host_is_anonymous_and_never_holds_every
     assert (page.status_code, b'id="hub-jump"' in page.content) == (200, True)  # the jump to the SaaS's login
 
 
-@pytest.mark.django_db
-def test_on_a_business_s_host_a_superuser_holds_only_what_its_membership_there_gives():
+@HUB_DB
+def test_on_a_business_s_host_a_superuser_holds_only_what_its_membership_there_gives(hub_a):
     staff = get_user_model().objects.create_user("saas-staff:7", is_staff=True, is_superuser=True)
-    assert permissions_for(staff, A) == frozenset()
+    assert access_for(staff, A) == frozenset()
 
     raised = get_user_model().objects.create_user("saas:7", is_staff=True, is_superuser=True)
     Membership.objects.create(user=raised, host=A.key, role=Membership.Role.EMPLOYEE)
     plain = get_user_model().objects.create_user("saas:8")
     Membership.objects.create(user=plain, host=A.key, role=Membership.Role.EMPLOYEE)
-    assert permissions_for(raised, A) == permissions_for(plain, A)
-    assert "*" not in permissions_for(raised, A)
+    with use_hub(hub_a):
+        assert access_for(raised, A) == access_for(plain, A)
+        assert "*" not in access_for(raised, A)
+
+
+@HUB_DB
+def test_outside_a_business_what_a_person_who_is_not_its_owner_may_do_is_refused_not_guessed(hub_a):
+    """The role a business gave a person is in that business's own database: with none entered there is no telling
+    whether they hold one, so the answer is a failure and never the wider role of their invitation."""
+    manager = get_user_model().objects.create_user("saas:9")
+    Membership.objects.create(user=manager, host=A.key, role=Membership.Role.MANAGER)
+
+    with pytest.raises(HubContextMissing):
+        access_for(manager, A)
 
 
 @pytest.mark.django_db
 def test_the_superuser_s_wildcard_is_the_platform_s_alone():
     staff = get_user_model().objects.create_user("saas-staff:7", is_staff=True, is_superuser=True)
-    assert permissions_for(staff, REGISTRY_SCOPE) == {"*"}
-    assert permissions_for(get_user_model().objects.create_user("saas:8"), REGISTRY_SCOPE) == frozenset()
+    assert access_for(staff, REGISTRY_SCOPE) == {"*"}
+    assert access_for(get_user_model().objects.create_user("saas:8"), REGISTRY_SCOPE) == frozenset()
 
 
 @on_hub_a

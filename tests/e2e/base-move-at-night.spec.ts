@@ -16,7 +16,7 @@ const ROOT = 'e2e-move-at-night-root';
 const CLUSTER = 'e2e-night';
 /** Takes away a move of `a` asked for the night to the spec's cluster. */
 const UNSCHEDULE = [
-  'from control.models import Cluster, Hub',
+  'from control.models.hubs import Cluster, Hub',
   `Hub.objects.filter(slug="a", move_scheduled_to__name="${CLUSTER}").update(move_scheduled_to=None, move_scheduled_for=None)`,
 ];
 /** And then the spec's cluster, once no hub points at it. */

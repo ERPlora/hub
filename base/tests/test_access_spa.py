@@ -18,7 +18,9 @@ from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 
 from base import access
-from base.models import AccessSettings, Credential, Membership, Profile, TrustedDevice
+from base.models.access import AccessSettings, Credential, TrustedDevice
+from base.models import Membership
+from base.models.profile import Profile
 from base.tenancy.context import use_hub
 from base.tests.test_auth_views import A, HOST, ON_HUB_A
 

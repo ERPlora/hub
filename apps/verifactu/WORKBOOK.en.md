@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:dc909b2adb613c07291b1e97a50da46cedfb630bfdd400bf33b488e4e3e1ae93 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:1e0f1a6af6e8 -->
 
 VeriFactu turns every invoice and every ticket that Invoicing issues into its record for the Spanish tax agency
 (AEAT): chained to the previous one by its fingerprint, with the QR the customer can check, and sent to the AEAT in
@@ -8,6 +7,7 @@ order. What cannot go out at that moment waits in the queue and goes out by itse
 in Spain, and it starts in the AEAT's test environment until you go live.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:f7442ee765b5 -->
 
 VeriFactu is the end of the fiscal chain: every invoice or ticket that Invoicing issues becomes here a chained
 **billing record** (each record carries the fingerprint of the previous one), with its verification **QR**,
@@ -36,6 +36,7 @@ invoice). The business's own certificate, if it uses one, is uploaded here and k
 database.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:c2c95b7aa3f1 -->
 
 Here the reference is not a competitor: it is the AEAT's rules.
 
@@ -59,6 +60,7 @@ Here the reference is not a competitor: it is the AEAT's rules.
   cancel one, and the two routes (own certificate or the provider on your behalf).
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:8eae15594a8c -->
 
 - Turning VeriFactu on turns **Invoicing** on with it (it requires it): without invoices there is nothing to
   record. Turning VeriFactu on in the Hub **is** activating it: from that moment it records every invoice that is
@@ -105,12 +107,14 @@ Initial setup, step by step:
 4. When the route is ready, **Settings → Go live** (VERIFACTU-F08).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:31d93f96510b -->
 
 Six tabs at the foot of every VeriFactu page (those of the menu, in this order): Records, Contingency, Events,
 Recovery, Configuration and Settings. The first four, for whoever sends records;
 Configuration and Settings, only for whoever configures VeriFactu. The buttons the person cannot use do not show.
 
 ### Records
+<!-- from WORKBOOK.md sha256:0147477cb2e5 -->
 Every invoice and every ticket you issue has its VeriFactu record here, the latest on top, with its status at the
 AEAT (Pending, Sent, Accepted, Accepted with errors or Rejected) and its environment, testing or production. Search
 them by invoice, issuer or tax ID and filter them by status, type, date or total. Tap one to open its detail: the
@@ -118,6 +122,7 @@ invoice, the fingerprint chain, the QR, the AEAT's answer and, if it has not arr
 depending on its status and your permission, you send it now, correct it or cancel it.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:62f68e946002 -->
 Menu **VeriFactu → Records**. Title "VeriFactu records". Table of 50 by 50 (table or cards; on the phone, cards
 with the invoice number as title) with "Seq", "Invoice", "Date", "Type" (Registration / Cancellation), "F."
 (F1…R5), "Issuer", "Total", "Environment" (Testing / Production) and "Status" (Pending, Sent, Accepted, Accepted
@@ -133,6 +138,7 @@ Empty: "No records yet. Every invoice you issue is sealed and listed here."; wit
 results". Loading: "Loading…". Error: the message with "Retry".
 
 #### Record detail
+<!-- from WORKBOOK.md sha256:b65914d1ce42 -->
 It opens from a row of **Records** (`/verifactu/records/<id>`). On top, "Record {number}" with its status, its
 environment and "← Back". If it is not at the AEAT (Pending or Sent), the notice "Not at the AEAT yet" with the
 why and the when (VERIFACTU-F17). If it was rejected, the notice "The AEAT rejected it" with what to do
@@ -152,12 +158,14 @@ queue, "Correct" (VERIFACTU-F24) and "Cancel record" (VERIFACTU-F30). A refusal 
 Error on opening: "Record not found" or the failure's message, with "← Back".
 
 ### Contingency
+<!-- from WORKBOOK.md sha256:3e85a70c1e35 -->
 The queue of the records that are not at the AEAT yet, in the order they will go out, with their attempts, the next
 attempt and the last error. The system sends them by itself, in order, and whatever fails again waits a little
 longer before the next attempt. "Process queue" does the pass at that moment and "Retry" sets a record to go out
 with the next one. Empty, everything is at the AEAT.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:7f441fbbb58a -->
 Menu **VeriFactu → Contingency**. Title "Contingency queue" and button "Process queue" ("Processing…" while it
 works). Table of the records not yet at the AEAT: "Invoice", "Environment", "Attempts", "Status", "Next attempt"
 and "Last error", in the order they go out (every column sorts); search box "Search invoice or error…". Per row:
@@ -165,11 +173,13 @@ and "Last error", in the order they go out (every column sorts); search box "Sea
 Empty: "Queue empty: everything is in the AEAT.". Loading: "Loading…". Error: the message above the table.
 
 ### Events
+<!-- from WORKBOOK.md sha256:22f21975f195 -->
 What has happened with your records and with the connection to the AEAT, most recent first: every record created,
 every submission accepted, deferred or failed, every pass of the queue, the chain checks, the queries to the AEAT and
 the configuration changes. Search them by type or by message and filter them by type, severity or date.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:167202573735 -->
 Menu **VeriFactu → Events**. Title "Audit events". Table, most recent first: "When", "Severity" (Debug, Info,
 Warning, Error, Critical), "Type" (Record created, Submission postponed, Submission accepted, Accepted with errors,
 Submission failed, Queue processed, Record rescheduled, Chain verified, Chain broken, AEAT query, Chain recovered,
@@ -180,12 +190,14 @@ not filter). It updates by itself.
 Empty: "No events.". Loading: "Loading…". Error: the message with "Retry".
 
 ### Recovery
+<!-- from WORKBOOK.md sha256:42860fc33c9c -->
 Here you check that the fingerprint chain of your records is intact and look up the records the AEAT has of your
 business this month. If needed, you recover the chain: from the AEAT, after restoring a backup of the database, or
 from the last fingerprint of the application you used before, when migrating. Both recoveries ask for
 confirmation.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:bbf0271c7062 -->
 Menu **VeriFactu → Recovery**. Title "Chain recovery". Field "Issuer tax ID" (filled with Invoicing's issuer's)
 and the current environment. Block "Chain integrity" with the last verdict ("Fingerprint chain intact ✓",
 "Fingerprint chain BROKEN ✗" with the sequence, or "Not validated yet") and the note "This recomputes the SHA-256
@@ -197,12 +209,14 @@ and "Recover chain from AEAT". Table "Latest records at the AEAT": "Invoice", "D
 for confirmation ("Confirm recovery" / "Cancel"). When done: "Operation completed.".
 
 ### Configuration
+<!-- from WORKBOOK.md sha256:4ee5489fcdf6 -->
 Here you prepare how your records reach the AEAT. In "My certificate" you upload your business's electronic
 certificate (a .p12 or .pfx file) with its password, see its holder and when it expires, and renew or remove it. If
 ERPlora files on behalf of businesses, the tab "ERPlora files for you" lets you download the authorisation form and,
 once signed, send it for review, and says what status it is in. Only whoever sets up VeriFactu uploads or sends anything.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:1c3f995f1be8 -->
 Menu **VeriFactu → Configuration**. Title "VeriFactu configuration". With ERPlora's route available, two tabs,
 the two routes:
 - **"ERPlora files for you"** (opens by default): "Representation
@@ -244,6 +258,7 @@ files for you", if available, shows neither the authorisation nor the procedure,
 status, without uploading or removing it.
 
 ### Settings
+<!-- from WORKBOOK.md sha256:797fd74ed063 -->
 Here you see which route your records go out by (with your certificate or through ERPlora) and which AEAT
 environment you are in, testing or production. You go live once nothing is missing (if something is, the screen
 says what), or go back to testing while no record has been sealed in production. You also test the connection with
@@ -251,6 +266,7 @@ the AEAT without sending anything, create a test invoice while in testing and re
 declaration.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:bcc7de3e4474 -->
 Menu **VeriFactu → Settings**. Title "VeriFactu settings". Three blocks:
 - **"Sending"**: with ERPlora's route available, a sentence with its icon says which route the records go out by
   and what is missing (VERIFACTU-F04), with "Open Configuration": with your certificate, "You file directly with the
@@ -281,6 +297,7 @@ live", "Test the connection" and "Create test invoice" are disabled.
 Screen notices: the result of each action in a strip on top (green if it went well, red if not).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:101ca37adb4e -->
 
 | State | What the person sees |
 |---|---|
@@ -292,6 +309,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
 
 ## Flows
+<!-- from WORKBOOK.md sha256:4c78bf93b80c -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -329,6 +347,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F35 | Ask the AEAT whether it already has a queue record | done — in the record's detail, in the Hub's admin and through the API |
 
 ### VERIFACTU-F01 Activate VeriFactu
+<!-- from WORKBOOK.md sha256:aa4da28345c0 -->
 Status: done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing and the Home does not ask it to "Set up VeriFactu" (hub#682); no template turns it on, in Spain either: the owner turns it on (hub#998)
 Actor: administrator
 Screen: Hub: Apps
@@ -358,6 +377,7 @@ If it fails: the Hub's apps page says so.
 Involved: INVOICE-F01, BASE-F18, BASE-F31, BASE-F38
 
 ### VERIFACTU-F02 Upload the business's own certificate
+<!-- from WORKBOOK.md sha256:ad2579eb45e2 -->
 Status: done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY`
 Actor: owner and administrator (configure)
 Screen: Configuration
@@ -405,6 +425,7 @@ If it fails: the certificate is not kept and the screen says why:
 Involved: VERIFACTU-F04, VERIFACTU-F08, VERIFACTU-F34
 
 ### VERIFACTU-F03 Remove the own certificate
+<!-- from WORKBOOK.md sha256:1161c68b5968 -->
 Status: done — in the Hub
 Actor: owner and administrator (configure)
 Screen: Configuration
@@ -425,6 +446,7 @@ door is refused.
 Involved: VERIFACTU-F04, VERIFACTU-F08
 
 ### VERIFACTU-F04 Know who files: my certificate or ERPlora
+<!-- from WORKBOOK.md sha256:6b1deb04a7b2 -->
 Status: done — the route is not chosen: the certificate decides it and it is fixed on going live
 Actor: administrator
 Screen: Settings
@@ -451,6 +473,7 @@ waiting:", and what is missing to go live, by the list "It cannot go live yet:",
 Involved: VERIFACTU-F02, VERIFACTU-F03, VERIFACTU-F05, VERIFACTU-F08
 
 ### VERIFACTU-F05 Sign and upload the representation authorisation so ERPlora files
+<!-- from WORKBOOK.md sha256:0a67eb208434 -->
 Status: done — uploaded in the Hub, reviewed by staff in the SaaS and the status comes back in the snapshot
 Actor: administrator ("configure" permission)
 Screen: Configuration
@@ -471,6 +494,9 @@ Steps:
    (with the reason) or "Revoked".
 7. In a business outside Spain it is not offered: on top it says "VeriFactu is only for businesses in Spain." and
    the tab shows neither the authorisation nor the procedure.
+8. To whoever asks the assistant for ERPlora to file on the business's behalf, the assistant explains these steps.
+   Where ERPlora does not file on behalf of businesses, it does not offer them: it says "ERPlora does not file on
+   behalf of businesses for now: file with your own certificate." and explains how to upload it in the "My certificate" tab.
 In: Invoicing's issuer (the taxpayer), the representative, the document type and the PDFs in base64
 (`verifactu.representation.submit`); the form, from `verifactu.representation.model`, which passes the issuer's
 details to the SaaS.
@@ -492,6 +518,7 @@ if it cannot save it, it says so with its reason and "Model downloaded" does not
 Involved: VERIFACTU-F08, BASE-F112 (inside the app)
 
 ### VERIFACTU-F06 Send the authorisation again
+<!-- from WORKBOOK.md sha256:aeb86fe4474c -->
 Status: done — in the Hub, like VERIFACTU-F05
 Actor: administrator ("configure" permission)
 Screen: Configuration
@@ -505,6 +532,7 @@ If it fails: the same as when sending it the first time.
 Involved: VERIFACTU-F05
 
 ### VERIFACTU-F08 Go live
+<!-- from WORKBOOK.md sha256:b0aa6bba02fc -->
 Status: done — production = `prod` deployment ∧ `VERIFACTU_PRODUCTION_ENABLED` ∧ (an own certificate in force and
 accepted by the AEAT's test environment | ERPlora route open on the server with an approved authorisation) ∧ active account (`status` of the snapshot), in every
 plan (Free included, with no paid option); the server keeps it closed until ERPlora opens it (under Ioan's supervision). In `pre` it never opens: everything goes to testing. A
@@ -542,6 +570,9 @@ cannot go live yet:" says what is missing:
 
 With no issuer in Invoicing, it asks to set it up first. Already live, it does nothing. In a business outside Spain,
 Settings says on top "VeriFactu is only for businesses in Spain." as the only reason and "Go live" is disabled.
+Asked of the assistant ("switch VeriFactu to the real AEAT"), while something is missing no card to confirm comes
+up: the assistant says it cannot go live yet and why, with the same reason the action would be refused with. When
+nothing is missing, its card comes up and CONFIRM has to be typed.
 If the fixed route is lost in production (with ERPlora's, your authorisation is revoked; with the certificate's, it
 expires or is removed), the route does not change and it does not go back to testing: nothing new is sealed. The sale
 or the invoice is refused with "Nothing was issued: this business files for real with the AEAT and cannot reach it
@@ -554,6 +585,7 @@ one keeps sending with it without it being tried: production never tries a certi
 Involved: VERIFACTU-F04, VERIFACTU-F05, VERIFACTU-F09
 
 ### VERIFACTU-F09 Go back to testing
+<!-- from WORKBOOK.md sha256:eab1686105dd -->
 Status: done
 Actor: administrator
 Screen: Settings
@@ -569,6 +601,7 @@ business already has records in production." and the button does not show.
 Involved: VERIFACTU-F08
 
 ### VERIFACTU-F10 Test the connection with the AEAT
+<!-- from WORKBOOK.md sha256:4d74d99e7fc2 -->
 Status: done — with the SaaS gateway's probe (`/internal/verifactu/probe`)
 Actor: administrator; the employee and the manager, from the assistant
 Screen: Settings
@@ -580,14 +613,18 @@ Steps:
    reasons.
 4. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain." and "Test the
    connection" is disabled.
+5. Asked of the assistant ("check whether it already connects to the tax office, without sending anything"), its card
+   names it as the button does: "Test the connection in VeriFactu.", and after "Run it" the receipt says "Done: Test the
+   connection in VeriFactu".
 In: the Hub's configuration; the answer of the gateway's probe.
 Out: the result as a "Connection test" event (it announces `verifactu.diagnostic.run`), without creating any
 record or touching the chain.
 If it fails: what is missing, said in the result. It never files a sample record: a filed record cannot be
 undone.
-Involved: VERIFACTU-F15
+Involved: VERIFACTU-F15, BASE-F97
 
 ### VERIFACTU-F11 Create a test invoice
+<!-- from WORKBOOK.md sha256:f12ff3dadfc7 -->
 Status: done
 Actor: administrator
 Screen: Settings
@@ -599,12 +636,16 @@ Steps:
 3. For example, "Test invoice TICKET-2026-000001 created: its record is in Records." shows.
 4. In a business outside Spain, on top it says "VeriFactu is only for businesses in Spain." and "Create test
    invoice" is disabled.
+5. Asked of the assistant, its card says "Create test invoice in VeriFactu. Check each detail before you continue." and,
+   below, what it will issue: "Series: TICKET", "Price: €1.00" and "VAT: 21%"; it is issued only after typing
+   "CONFIRM".
 In: nothing to type.
 Out: a real Invoicing invoice in testing and its record, which goes out like any other.
 If it fails: Invoicing's refusal (no issuer, no permission to issue).
-Involved: INVOICE-F03
+Involved: INVOICE-F03, BASE-F97
 
 ### VERIFACTU-F12 Look up the responsible declaration
+<!-- from WORKBOOK.md sha256:c9cea0f25c34 -->
 Status: done
 Actor: administrator; the employee and the manager, from the assistant
 Screen: Settings
@@ -619,6 +660,7 @@ If it fails: the failure's message; in the installed app, if it cannot open it, 
 Involved: none
 
 ### VERIFACTU-F13 Record an issued invoice
+<!-- from WORKBOOK.md sha256:5feb7587afd0 -->
 Status: done — Invoicing asks for it by name inside its issuing; the worker's outbox relay stays as a backup
 Actor: whoever issues (their own session); in the reaction to the notice, the system
 Screen: none
@@ -648,6 +690,7 @@ deliveries at once. An invoice that does not exist does nothing.
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F03, INVOICE-F05
 
 ### VERIFACTU-F14 Record a rectifying invoice
+<!-- from WORKBOOK.md sha256:742c1e5f013b -->
 Status: done — same as F13
 Actor: system
 Screen: none
@@ -663,6 +706,7 @@ If it fails: like VERIFACTU-F13.
 Involved: INVOICE-F07, INVOICE-F08, INVOICE-F09, INVOICE-F10
 
 ### VERIFACTU-F15 Send the record to the AEAT and collect its answer
+<!-- from WORKBOOK.md sha256:947789670279 -->
 Status: done — the worker sends it through the SaaS gateway; without `VERIFACTU_GATEWAY_URL` the records wait in the queue
 Actor: system
 Screen: none
@@ -693,6 +737,7 @@ Involved: VERIFACTU-F20, FLOW-F04 (the card of the Automations gallery that crea
 rejects a record)
 
 ### VERIFACTU-F16 Look up the records and their status
+<!-- from WORKBOOK.md sha256:18a3bfb96502 -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Records
@@ -712,6 +757,7 @@ the start date, "The end date cannot be before the start date."; neither of the 
 Involved: INVOICE-F16
 
 ### VERIFACTU-F17 See the detail of a record and why it waits
+<!-- from WORKBOOK.md sha256:0b5e68344346 -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Record detail
@@ -736,6 +782,7 @@ If it fails: "Record not found" or the failure's message.
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F18 Verify the QR at the AEAT's site
+<!-- from WORKBOOK.md sha256:7ff66825fcfc -->
 Status: partial — a record has yet to be checked in the installed app: since version 1.1.34 the app opens the AEAT's site in
 the device's browser, but it has not been tried on a device yet
 Actor: employee, manager, administrator, customer
@@ -752,6 +799,7 @@ app, if it cannot open the page, "Could not open that page. Try again.".
 Involved: VERIFACTU-F19
 
 ### VERIFACTU-F19 Give the QR and the fiscal status to the ticket and the invoice
+<!-- from WORKBOOK.md sha256:0cff62f0e3d6 -->
 Status: done (Sales and Printing ask for it by name)
 Actor: system
 Screen: none
@@ -766,6 +814,7 @@ goes out without a VeriFactu QR or receipt.
 Involved: INVOICE-F17, INVOICE-F18
 
 ### VERIFACTU-F20 Send later what could not go out (automatic contingency)
+<!-- from WORKBOOK.md sha256:f712648a8cbb -->
 Status: done — the worker runs it every minute, in each business
 Actor: system
 Screen: Contingency
@@ -785,6 +834,7 @@ out. The pass presents each record as the business it belongs to, never as ERPlo
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F21 Process the queue by hand
+<!-- from WORKBOOK.md sha256:3fc320123965 -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Contingency
@@ -799,6 +849,7 @@ stay in the queue and go out as soon as it is.
 Involved: VERIFACTU-F20
 
 ### VERIFACTU-F22 Retry a queue entry
+<!-- from WORKBOOK.md sha256:17461ce2e16c -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Contingency
@@ -813,6 +864,7 @@ AEAT rejected it.".
 Involved: VERIFACTU-F21
 
 ### VERIFACTU-F24 Act on a record rejected by the AEAT
+<!-- from WORKBOOK.md sha256:0bbad7718ae0 -->
 Status: done
 Actor: administrator
 Screen: Records, Record detail
@@ -838,6 +890,7 @@ with errors can.".
 Involved: INVOICE-F08
 
 ### VERIFACTU-F25 Resend a given record
+<!-- from WORKBOOK.md sha256:d1ac231356c1 -->
 Status: done — through the SaaS gateway
 Actor: employee, manager, administrator, assistant
 Screen: Record detail
@@ -856,6 +909,7 @@ answer.
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F26 Verify the fingerprint chain
+<!-- from WORKBOOK.md sha256:48238e09babf -->
 Status: done
 Actor: employee, manager, administrator
 Screen: Recovery
@@ -873,6 +927,7 @@ If it fails: with no records of that tax ID, "There are no records of that issue
 Involved: VERIFACTU-F28
 
 ### VERIFACTU-F27 Look up what the AEAT has
+<!-- from WORKBOOK.md sha256:1d3ec9e3ea32 -->
 Status: done — through the SaaS gateway (`/internal/verifactu/query`)
 Actor: employee, manager, administrator
 Screen: Recovery
@@ -890,6 +945,7 @@ If it fails: with no gateway, the message of the gateway not configured; a refus
 Involved: VERIFACTU-F28
 
 ### VERIFACTU-F28 Recover the chain from the AEAT after restoring a backup
+<!-- from WORKBOOK.md sha256:37bf02fe6e02 -->
 Status: done — through the SaaS gateway (`/internal/verifactu/query`)
 Actor: administrator
 Screen: Recovery
@@ -908,6 +964,7 @@ records of this chain have to go out first.".
 Involved: VERIFACTU-F26
 
 ### VERIFACTU-F29 Continue the chain of another application (migration)
+<!-- from WORKBOOK.md sha256:05c593f30e96 -->
 Status: done
 Actor: administrator
 Screen: Recovery
@@ -926,6 +983,7 @@ in the chain, "The pending records of this chain have to go out first.".
 Involved: none
 
 ### VERIFACTU-F30 Cancel a record sent by error
+<!-- from WORKBOOK.md sha256:b5217d0ca772 -->
 Status: done
 Actor: administrator, assistant
 Screen: Record detail
@@ -946,6 +1004,7 @@ that the earlier one was rejected.
 Involved: INVOICE-F07
 
 ### VERIFACTU-F31 Watch the submissions from the screens
+<!-- from WORKBOOK.md sha256:4f1b275f738e -->
 Status: done — also from the four Home panels
 Actor: employee, manager, administrator
 Screen: Records, Contingency, Events, Home
@@ -964,6 +1023,7 @@ If it fails: the message with "Retry".
 Involved: none
 
 ### VERIFACTU-F32 Prevent turning the app off once on
+<!-- from WORKBOOK.md sha256:98311aae0ac5 -->
 Status: done — the platform asks when turning off (`base.app.disable`, hub#256) and VeriFactu answers with its
 `can_disable` (hub#267); in Spain, once on, it never goes off, and Apps does not offer "Turn off" (hub#618)
 Actor: system
@@ -989,6 +1049,7 @@ AEAT.".
 Involved: BASE-F21, BASE-F23, BASE-F25
 
 ### VERIFACTU-F34 Renew the own certificate
+<!-- from WORKBOOK.md sha256:911ba3d2d9f9 -->
 Status: done — in the Hub (uploading the renewed one replaces the previous one)
 Actor: owner and administrator (configure)
 Screen: Configuration
@@ -1006,6 +1067,7 @@ upload it again".
 Involved: VERIFACTU-F02
 
 ### VERIFACTU-F35 Ask the AEAT whether it already has a queue record
+<!-- from WORKBOOK.md sha256:eb9743ae82af -->
 Status: done — in the record's detail, in the Hub's Django admin (support) and through the API
 Actor: employee, manager, administrator (send); ERPlora's staff from the admin
 Screen: Record detail ("Ask the AEAT"); for the staff, the Django admin (Records → "Ask the AEAT (out of the queue if
@@ -1030,6 +1092,7 @@ buttons, and the record stays in the queue.
 Involved: VERIFACTU-F22, VERIFACTU-F27
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:a3dfabaf8fa4 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the person's own session)
 and the API, with the same rules and permissions, except uploading the business's own certificate and sending the
@@ -1039,6 +1102,7 @@ and "ERPlora files for you") or through the API. Designed for voice: a record is
 invoice** (`TICKET-2026-000012`) or by its sequence; an issuer, by its tax ID.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:facd533b955d -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -1059,6 +1123,7 @@ invoice** (`TICKET-2026-000012`) or by its sequence; an issuer, by its tax ID.
 All of them can be followed live.
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:b067be5c44e3 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -1091,6 +1156,7 @@ and send the authorisation) answers as with the app off: 404 `app_inactive`,
 (`outside_spain`); an invoice's record (`verifactu.record.by_invoice`) is not given.
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:6b69ccfcc296 -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -1108,6 +1174,7 @@ and send the authorisation) answers as with the app off: 404 `app_inactive`,
 | Configuration changed | Route, environment or what the account sends | `fields` | `verifactu.config.changed` |
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:44f44a9ff048 -->
 
 | Notice | From | What it does | Service |
 |---|---|---|---|
@@ -1119,6 +1186,7 @@ already sealed document adds nothing (`already`). In a business outside Spain it
 delivered).
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:987aff232f8c -->
 
 - **Invoicing** (requirement): the issued invoice (`Invoice`), read from its row by its id; for the test invoice,
   its operation `invoice.invoice.create`.
@@ -1126,6 +1194,7 @@ delivered).
   "Contract with Invoicing".
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:49f80d10df5d -->
 
 | App | What for | Service |
 |---|---|---|
@@ -1135,6 +1204,7 @@ delivered).
 | Platform (`base.app.enable`) | Not turn VeriFactu on outside Spain | `can_enable` of `VerifactuConfig` |
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:92721a17a6a0 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

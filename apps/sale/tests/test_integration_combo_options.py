@@ -29,7 +29,7 @@ def setup(name: str, data: dict):
 
 
 def option(group: str, name: str, **more) -> str:
-    return str(setup("modifier.option.create", {"group": group, "name": name, **more}).id)
+    return str(setup("modifier.option.create", {"group": group, "name": name, "price_delta": 0, **more}).id)
 
 
 def steak_menu(product):

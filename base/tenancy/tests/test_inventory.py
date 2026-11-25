@@ -46,8 +46,12 @@ def test_each_model_is_classified_in_its_expected_database():
     from live.models import OutboxEvent
 
     from apps.demo.models import Item
-    from base.models import EventDelivery, HubIdentity, Membership, SessionOwner, TaskSchedule
-    from control.models import Cluster, DemoCode, Hub, HubDue
+    from base.models.relay import EventDelivery
+    from base.models.identity import HubIdentity
+    from base.models import Membership
+    from base.models.sessions import SessionOwner
+    from base.models.scheduler import TaskSchedule
+    from control.models.hubs import Cluster, DemoCode, Hub, HubDue
     from shared.models import App
 
     expected = {

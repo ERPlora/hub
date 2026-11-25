@@ -24,7 +24,7 @@ from live.errors import Conflict, InvalidPayload
 from live.operations import atomic, operation
 from live.outbox import record_event
 
-from apps.cart_checkout import events
+from apps.cart_checkout import events, item_card
 from apps.cart_checkout.models import ACTOR_MAX_LENGTH, QUANTITY, Cart, CartItem, Order, OrderCounter
 from apps.cart_checkout.queries import (
     business_currency,
@@ -56,6 +56,7 @@ from apps.cart_checkout.schemas import (
     OrderRefIn,
 )
 from base.business import business_zone
+from base.queries.people import actor_name
 
 SESSION_TAKEN = _("There is already a cart with that session.")
 CART_NOT_ACTIVE = _("This cart no longer takes changes: it is %(status)s.")
@@ -74,16 +75,9 @@ THOUSANDTH = Decimal("0.001")
 
 
 def _actor(ctx: OperationContext) -> str:
-    """Who acted, as a person reads it: an account's full name, else its email, else its username; the
-    platform or an API key as they name themselves."""
-    actor = ctx.actor
-    if actor is None:
-        return ""
-    if hasattr(actor, "get_username"):
-        name = actor.get_full_name() or actor.email or actor.get_username()
-    else:
-        name = str(actor)
-    return name[:ACTOR_MAX_LENGTH]
+    """Who acted, as a colleague reads them (never by their address); the platform or an API key as they name
+    themselves."""
+    return actor_name(ctx.actor)[:ACTOR_MAX_LENGTH]
 
 
 def _quantity(value: Decimal) -> str:
@@ -372,20 +366,15 @@ def _line_and_cart(item_id) -> tuple[CartItem, Cart]:
     expose_api=True,
     ai={
         "asks": {
-            "en": (
-                "add two shampoos to Carmen's cart",
-                "put a bottle of wine at 12 euros each in the web basket",
-            ),
-            "es": (
-                "añade dos champús al carrito de Carmen",
-                "mete un vino a 12 € cada uno en la cesta web",
-            ),
+            "en": ("add two shampoos to Carmen's cart", "put a bottle of wine at 12 euros each in the web basket"),
+            "es": ("añade dos champús al carrito de Carmen", "mete un vino a 12 € cada uno en la cesta web"),
         },
         "description": "Add a product line to an active shopping cart (named by its session code, its customer or "
         "its id): the product's reference and name as free text, the quantity (up to three decimals) and the "
         "unit price in minor units of the cart's currency (its currency_decimals: 12.50 is 1250 with two, ¥1,250 is "
         "1250). The cart's totals are recomputed.",
         "risk": "normal",
+        "summary": item_card.summary,
     },
 )
 def add_item(ctx: OperationContext, data: ItemAddIn) -> dict:

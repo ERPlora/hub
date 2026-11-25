@@ -474,6 +474,9 @@ Pasos:
    (con el motivo) o «Revocado».
 7. En un negocio de fuera de España no se ofrece: arriba dice «VeriFactu solo es para negocios de España.» y la
    pestaña no enseña el otorgamiento ni el trámite.
+8. A quien le pide al asistente que presente ERPlora por el negocio, el asistente le explica estos pasos. Donde ERPlora
+   no presenta por cuenta de los negocios, no se los ofrece: le dice «De momento ERPlora no presenta por cuenta de los
+   negocios: presenta con tu propio certificado.» y le explica cómo subirlo en la pestaña «Mi certificado».
 Entra: el emisor de Facturación (obligado tributario), el representante, el tipo de documento y los PDF en base64
 (`verifactu.representation.submit`); el modelo, de `verifactu.representation.model`, que le pasa al SaaS los datos
 del emisor.
@@ -547,6 +550,9 @@ Si falla: mientras falte algo, «Pasar a producción» se queda desactivado, el 
 Sin emisor en Facturación, pide configurarlo antes. Ya en producción, no hace nada. En un negocio de fuera de España,
 Ajustes dice arriba «VeriFactu solo es para negocios de España.» como único motivo y «Pasar a producción» va
 deshabilitado.
+Pedido al asistente («pasa VeriFactu a la AEAT real»), mientras falte algo no sale la tarjeta de confirmar: el
+asistente dice que todavía no se puede y por qué, con el mismo motivo con el que se rechazaría la acción. Cuando no
+falta nada, sale su tarjeta y hay que escribir CONFIRMAR.
 Si en producción se pierde la vía fijada (con la de ERPlora, se revoca tu autorización; con la del certificado, caduca
 o se quita), no se cambia de vía ni se vuelve a pruebas: no se sella nada nuevo. La venta o la factura se rechazan con
 «No se ha emitido nada: este negocio presenta en real a la AEAT y ahora no puede hacerle llegar sus registros:» y el
@@ -584,12 +590,15 @@ Pasos:
 3. Debajo sale el resultado, línea a línea, y «Este negocio puede enviar.» o «Todavía no puede enviar:» con los
    motivos.
 4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y «Probar la conexión» va deshabilitado.
+5. Pedido al asistente («comprueba si ya conecta bien con Hacienda, sin mandar nada»), su tarjeta lo nombra como el
+   botón: «Probar la conexión en VeriFactu.», y tras «Ejecutar» el recibo dice «Hecho: Probar la conexión en
+   VeriFactu».
 Entra: la configuración del Hub; la respuesta de la sonda de la pasarela.
 Sale: el resultado como evento «Prueba de conexión» (avisa `verifactu.diagnostic.run`), sin crear ningún
 registro ni tocar la cadena.
 Si falla: lo que falta, dicho en el resultado. Nunca presenta un registro de muestra: un registro remitido no
 se puede deshacer.
-Implicados: VERIFACTU-F15
+Implicados: VERIFACTU-F15, BASE-F97
 
 ### VERIFACTU-F11 Crear una factura de prueba
 Estado: hecho
@@ -602,10 +611,13 @@ Pasos:
    la serie TICKET, como una factura hecha a mano.
 3. Sale, por ejemplo, «Factura de prueba TICKET-2026-000001 creada: su registro está en Registros.».
 4. En un negocio de fuera de España, arriba dice «VeriFactu solo es para negocios de España.» y «Crear factura de prueba» va deshabilitado.
+5. Pedida al asistente, su tarjeta dice «Crear factura de prueba en VeriFactu. Revisa cada dato antes de seguir.» y,
+   debajo, lo que va a emitir: «Serie: TICKET», «Precio: 1,00 €» e «IVA: 21 %»; se emite solo tras escribir
+   «CONFIRMAR».
 Entra: nada que escribir.
 Sale: una factura real de Facturación en pruebas y su registro, que sale como cualquier otro.
 Si falla: el rechazo de Facturación (sin emisor, sin permiso de emitir).
-Implicados: INVOICE-F03
+Implicados: INVOICE-F03, BASE-F97
 
 ### VERIFACTU-F12 Consultar la declaración responsable
 Estado: hecho
@@ -1167,7 +1179,7 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 
 `setup` y `widgets` en `apps.py` (sin `bell`). **Paso** `verifactu.sending_route`
 («Set up VeriFactu» / «Configura VeriFactu», `required=True` → «Importante» en pruebas, gh:hub#1726; ⛔ «Necesario
-para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home.py`: el nivel
+para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home/setup_steps.py`: el nivel
 es de `base`), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
 production, scope)` sobre la vía que tendría en producción, `queries.route.sending_route`: certificado propio vigente que
 este servidor abre o, sin él, la vía ERPlora abierta en el servidor (`erplora_route.closed`) con el otorgamiento
@@ -1279,7 +1291,7 @@ negocio, y una automatización sin nadie detrás, no ven esa línea. La marca de
 
 ### Contrato con Facturación (lo que `invoice` tiene que hacer)
 
-1. **Dentro de la transacción de cada emisión** (`_issue` de `apps/invoice/services/__init__.py`, hecho), tras escribir el
+1. **Dentro de la transacción de cada emisión** (`_issue` de `apps/invoice/services/issuing.py`, hecho), tras escribir el
    documento y su aviso, Facturación llama por nombre a `verifactu.record.create` con
    `{"invoice_id": "<uuid del documento>"}` y **la misma sesión** (el sellado síncrono lo firma quien emite; el
    de la reacción, el sistema), en un savepoint, y contesta `verifactu_status`:
@@ -1573,7 +1585,7 @@ necesitan para el soporte». Por eso:
 17. **Ninguna plantilla la enciende, tampoco en España** (hub#998): una app que ata al
     negocio con la AEAT hasta fin de año y no se apaga (decisión 16) la activa el dueño, de forma explícita, como en
     Square, Odoo, Holded o Sage 50. La app no lista ningún sector en `verticals` (`apps.py`), así que
-    `base.catalog.template_apps` no la mete en las plantillas de restaurante ni de peluquería: ni «Revisa lo que trae»
+    `base.catalog.verticals.template_apps` no la mete en las plantillas de restaurante ni de peluquería: ni «Revisa lo que trae»
     la anuncia ni la carga la activa. En erplora.com, `verticals` es también lo que la tienda pública usa para
     «Pensada para» y para las apps de cada sector (`public/industries.py` del SaaS), así que VeriFactu no sale en las
     páginas de restaurante ni de peluquería, como Pagos, que tampoco viene en ninguna plantilla.

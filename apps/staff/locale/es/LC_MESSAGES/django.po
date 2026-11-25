@@ -409,3 +409,36 @@ msgstr "Miembros del personal"
 #: apps.py:117
 msgid "Settings"
 msgstr "Ajustes"
+
+msgid "View the team, roles, schedules, availability, figures and settings"
+msgstr "Ver el equipo, los roles, los horarios, la disponibilidad, las cifras y los ajustes"
+
+msgid "View pay rates, commissions and HR notes"
+msgstr "Ver la tarifa, la comisión y las notas de RRHH"
+
+msgid "Add team members"
+msgstr "Dar de alta fichas del equipo"
+
+msgid "Edit team members"
+msgstr "Editar las fichas del equipo"
+
+msgid "Deactivate team members and register leavers"
+msgstr "Desactivar fichas y dar de baja"
+
+msgid "View time off, without its reason"
+msgstr "Ver las ausencias, sin su motivo"
+
+msgid "View the reason and notes of any time off"
+msgstr "Ver el motivo y las notas de cualquier ausencia"
+
+msgid "Record, approve, reject and cancel anyone's time off"
+msgstr "Registrar, aprobar, rechazar y cancelar las ausencias de cualquiera"
+
+msgid "Manage roles, schedules and settings"
+msgstr "Gestionar los roles, los horarios y los ajustes"
+
+msgid "Request their own time off"
+msgstr "Pedir sus propias ausencias"
+
+msgid "Dates"
+msgstr "Fechas"

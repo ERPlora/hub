@@ -313,7 +313,7 @@ def test_the_people_s_photos_stay_base_s_for_the_hub_s_sessions(client, member, 
 
 def turn_off(slug: str, label: str) -> None:
     from base import activation
-    from base.models import AppActivation
+    from base.models.activation import AppActivation
 
     assert AppActivation.objects.filter(host=slug, app=label).update(state="off", chosen=False) == 1
     activation.forget(slug)
@@ -330,7 +330,7 @@ def test_an_app_turned_off_in_the_business_serves_none_of_its_folders(client, me
 
 
 def test_an_app_turned_off_in_another_business_still_serves_here(client, table, plan, monkeypatch, hub_b):
-    from base.models import AppActivation
+    from base.models.activation import AppActivation
 
     monkeypatch.setattr(table, "public_media", ["table/plans/"])
     with use_hub(hub_b):

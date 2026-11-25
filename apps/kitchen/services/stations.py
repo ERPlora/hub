@@ -14,7 +14,8 @@ from apps.kitchen.queries.reads import current_settings
 from apps.kitchen.queries.routing import category_routes, product_routes
 from apps.kitchen.queries.scope import STATION_NOT_FOUND, find_station
 from apps.kitchen.queries.stations import in_progress_by_station, station_row
-from apps.kitchen.schemas import DeletedOut, StationIn, StationOut, StationPatchIn, StationRefIn
+from apps.kitchen.schemas.fields import DeletedOut, StationRefIn
+from apps.kitchen.schemas.stations import StationIn, StationOut, StationPatchIn
 from apps.kitchen.services.settling import begin
 from apps.kitchen.services.writes import actor, locked_row
 
@@ -79,7 +80,10 @@ def _save_station(station: Station, **save) -> None:
             ),
         },
         "description": "Create a kitchen station (grill, bar, desserts) with its colour, whether it goes to the "
-        "screen, to paper or both, and its printer (the kitchen or bar function, or a printer by its name).",
+        "screen, to paper or both, and its printer (the kitchen or bar function, or a printer by its name). A new "
+        "station gets nothing until products or categories are routed to it: whatever has no route goes to «No "
+        "station». So after creating one, say that nothing goes to it yet and offer to route the products or "
+        "categories it should get.",
         "risk": "normal",
     },
 )

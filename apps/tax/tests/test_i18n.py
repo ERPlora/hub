@@ -28,25 +28,25 @@ SCREENS = Path(apps.get_app_config("tax").path) / "frontend" / "locale" / "es.js
 
 
 MESSAGES = [
-    queries.CATEGORY_NOT_FOUND,
-    queries.RULE_NOT_FOUND,
-    queries.NO_RATE,
-    schemas.REGION_UNKNOWN,
-    schemas.REGION_OF_ANOTHER_COUNTRY,
-    schemas.REGION_NOT_AVAILABLE,
+    queries.categories.CATEGORY_NOT_FOUND,
+    queries.rules.RULE_NOT_FOUND,
+    queries.calculation.NO_RATE,
+    schemas.jurisdiction.REGION_UNKNOWN,
+    schemas.jurisdiction.REGION_OF_ANOTHER_COUNTRY,
+    schemas.settings.REGION_NOT_AVAILABLE,
     WHOLE_COUNTRY,
-    schemas.RATE_WITHOUT_TAX,
-    schemas.RANGE_BACKWARDS,
-    schemas.WHICH_RULE,
-    *schemas.TAX_KIND_NAMES.values(),
-    services.CATEGORY_EXISTS,
-    services.ALIAS_EXISTS,
-    services.RULE_OVERLAPS,
-    services.RULE_INCOHERENT,
-    services.RULE_END_INVALID,
-    services.RULE_EXISTS,
-    services.RULE_ALREADY_ACTIVE,
-    services.RULE_ALREADY_INACTIVE,
+    schemas.rules.RATE_WITHOUT_TAX,
+    schemas.rules.RANGE_BACKWARDS,
+    schemas.rules.WHICH_RULE,
+    *schemas.jurisdiction.TAX_KIND_NAMES.values(),
+    services.categories.CATEGORY_EXISTS,
+    services.aliases.ALIAS_EXISTS,
+    services.overlaps.RULE_OVERLAPS,
+    services.rules.RULE_INCOHERENT,
+    services.rule_lifecycle.RULE_END_INVALID,
+    services.rules.RULE_EXISTS,
+    services.rule_lifecycle.RULE_ALREADY_ACTIVE,
+    services.rule_lifecycle.RULE_ALREADY_INACTIVE,
     tax_admin.CHOOSE_A_HUB,
 ]
 
@@ -103,8 +103,8 @@ def test_spanish_texts():
         assert str(TaxRule.OperationClass.SUBJECT_REVERSE.label) == "Inversión del sujeto pasivo"
         assert str(TaxRule.TaxType.IGIC.label) == "IGIC (Canarias)"
         assert str(TaxAlias.Source.SHIPPED.label) == "De fábrica"
-        assert str(queries.NO_RATE) == "Ninguna regla fiscal se aplica a esta categoría en este país."
-        assert str(services.RULE_ALREADY_ACTIVE) == "Esa regla ya está activa."
+        assert str(queries.calculation.NO_RATE) == "Ninguna regla fiscal se aplica a esta categoría en este país."
+        assert str(services.rule_lifecycle.RULE_ALREADY_ACTIVE) == "Esa regla ya está activa."
         assert str(apps.get_app_config("tax").verbose_name) == "Impuestos"
 
 

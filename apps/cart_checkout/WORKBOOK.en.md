@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:914c0562992de81c25dd09227c3977aa4fce7dcea175e1dfea99defb07611748 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:1ea0321801fa -->
 
 Cart & Checkout is an **internal notebook of carts and orders**: it keeps the carts of a customer or of
 an anonymous visit and turns them into orders with their number and their status. **It is not the till
@@ -8,6 +7,7 @@ and it charges nothing**: a person marks "Paid" after charging some other way, a
 fiscal. To charge at the counter there is **Sales**.
 
 ### What it keeps
+<!-- from WORKBOOK.md sha256:60433b97b2fa -->
 
 It keeps **carts** — of a person (their email and their name) or of an anonymous visit, told apart by a
 **session code** — with their lines (product, quantity and price), and turns them into **orders** with a
@@ -15,6 +15,7 @@ number, addresses, a shipping and a payment method and a status: **Initiated**, 
 and **Completed**.
 
 ### What it does not do
+<!-- from WORKBOOK.md sha256:381e9420b005 -->
 
 An order paid and completed here does **not** create a sale, an invoice, a VeriFactu record, a cash
 movement or a stock movement, and nothing charged here reaches the AEAT. "Paid" is a status that **a
@@ -24,6 +25,7 @@ asks for no amount or receipt.
 It has no shop and no public page: only staff with a session in the Hub use it.
 
 ### Who uses it
+<!-- from WORKBOOK.md sha256:762cec0307f1 -->
 
 - The **employee**: only looks at the carts and the orders.
 - The **manager**, the **administrator** and the **owner**: they also create, abandon and delete
@@ -32,6 +34,7 @@ It has no shop and no public page: only staff with a session in the Hub use it.
   offer: adding and changing lines, emptying a cart, starting an order and expiring the overdue carts.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:526d7e8b11d6 -->
 
 The cart and order model of an online shop (Shopify Checkout, WooCommerce, Odoo eCommerce): a cart
 with a session code, an order with a consecutive number and the statuses initiated → paid or failed →
@@ -39,6 +42,7 @@ completed. **Only the status model** is adopted: the public shop, the payment ga
 shipping and stock of those references **do not exist here**.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:d63f49895b7a -->
 
 1. Cart & Checkout does not come turned on with any type of business: it is turned on from the app store.
    It turns on no other app and needs none: it can be turned on and off on its own.
@@ -47,12 +51,14 @@ shipping and stock of those references **do not exist here**.
 3. A cart may carry an expiry date; without one it never expires.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:d928230cfdfb -->
 
 Cart & Checkout opens from the menu and has two tabs, at the bottom: **Carts** and **Orders**. The top
 bar says "Cart & Checkout" and the tab you are on. What a person cannot do does not show, and the app
 refuses it even if they try it through the API or the assistant.
 
 ### Carts
+<!-- from WORKBOOK.md sha256:e67a15ca4e7d -->
 
 A table with the carts, the most recent on top: **Session**, **Email**, **Status** (Active, Abandoned,
 Converted, Expired), **Items** and **Total**, in each cart's currency. The search box searches the
@@ -61,6 +67,7 @@ session, the email and the name, and the funnel of the bar opens "Filters", with
 a cart are not seen nor added on this screen: the assistant does that.
 
 #### The table of carts
+<!-- from WORKBOOK.md sha256:51087d70d9b8 -->
 
 A search box "Search session or email…" (it searches the session code, the email and the name), filters
 per column behind the funnel of the bar, which opens "Filters" — session and email by a piece of the
@@ -79,6 +86,7 @@ with two decimals and nothing is warned; when it answers, the filter is read aga
 first page.
 
 #### New cart
+<!-- from WORKBOOK.md sha256:e8804821a8d2 -->
 
 The **New cart** button opens the "New cart" form: **Session** (required; "Save" is not enabled
 without it), **Email** and **Name**. Each row offers **Abandon** (only an active cart) and
@@ -86,6 +94,7 @@ without it), **Email** and **Name**. Each row offers **Abandon** (only an active
 the assistant or the API does that.
 
 ### Orders
+<!-- from WORKBOOK.md sha256:b05d9b51f72f -->
 
 A table with the orders, the most recent on top: **Order** (its number), **Email**, **Status**
 (Initiated, Paid, Failed, Completed), **Payment** (the payment method, as text) and **Total**, in the
@@ -94,6 +103,7 @@ fits it: **Mark paid** (Initiated, after charging some other way), **Complete** 
 (Initiated or Paid). Orders are not created here: they are started from a cart with the assistant.
 
 #### The table of orders
+<!-- from WORKBOOK.md sha256:359682b93504 -->
 
 A table with **Order** (its number, always whole), **Email**, **Status** (Initiated, Paid, Failed,
 Completed), **Payment** (the payment method, as text) and **Total**, in the order's currency. A search box
@@ -106,6 +116,7 @@ working, its button spins and a second tap does nothing. There is no button to c
 born from the flow CART_CHECKOUT-F08, from a cart, with the assistant or the API.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:bc25e49c6202 -->
 
 | State | What the person sees |
 |---|---|
@@ -120,12 +131,14 @@ Amounts in the format of the language of whoever looks and in the currency of ea
 currency's decimals (the yen has no cents); quantities without decorative zeros ("2", "0.5").
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:673221c45f92 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -145,6 +158,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | CART_CHECKOUT-F14 | Erase a customer's personal data | done |
 
 ### CART_CHECKOUT-F01 Create a cart
+<!-- from WORKBOOK.md sha256:6e7effde12c8 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Carts
@@ -165,6 +179,7 @@ is kept. Without permission, it is refused.
 Involved: none
 
 ### CART_CHECKOUT-F02 Add a line to a cart
+<!-- from WORKBOOK.md sha256:75012e644f70 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: assistant
@@ -172,7 +187,10 @@ Steps:
 1. Ask the assistant to add a product to a cart, saying the cart (its session, or the customer's email or
    name), the product's reference and name, the quantity and the unit price.
 2. Confirm the assistant's card, which says the cart by its session (for example, sess_a1b2c3) or by the
-   customer said, never by its internal code.
+   customer said, never by its internal code; then the line (the product, the quantity as the person's
+   language writes it and the unit price in the cart's currency) and the reference («Pedro · Bravas
+   (portion) · 4 · €6.00 · BRAVAS»). If the cart is not found or what was said fits several, the card gives
+   the price in no currency: the action refuses it on confirming.
 3. The line is saved and the cart's totals (items and amount) are recalculated.
 In: the cart; the product's reference and name (free text: they are not checked against the
 catalogue), optional SKU and variant attributes (size, colour…), a quantity greater than zero and at most
@@ -188,6 +206,7 @@ Nothing is saved.
 Involved: none
 
 ### CART_CHECKOUT-F03 Change the quantity of a line or remove it
+<!-- from WORKBOOK.md sha256:d590c57abda8 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: assistant
@@ -207,6 +226,7 @@ total above what fits in a cart, under the quantity. Nothing changes.
 Involved: none
 
 ### CART_CHECKOUT-F04 Empty a cart
+<!-- from WORKBOOK.md sha256:3e18c5ecbb3f -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: assistant
@@ -222,6 +242,7 @@ If it fails: a cart that does not exist or is not active. Nothing changes.
 Involved: none
 
 ### CART_CHECKOUT-F05 Abandon a cart
+<!-- from WORKBOOK.md sha256:664ca5292249 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Carts
@@ -236,6 +257,7 @@ the table, and nothing changes.
 Involved: none
 
 ### CART_CHECKOUT-F06 Delete a cart
+<!-- from WORKBOOK.md sha256:6a9c2306189a -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Carts
@@ -251,6 +273,7 @@ If it fails: a cart that does not exist (or is already deleted) is refused; noth
 Involved: none
 
 ### CART_CHECKOUT-F07 Expire the overdue carts
+<!-- from WORKBOOK.md sha256:a2a294ae9602 -->
 Status: done
 Actor: system (scheduled task), administrator, assistant
 Screen: Carts (the status)
@@ -270,6 +293,7 @@ is brought up to date at that moment.
 Involved: none
 
 ### CART_CHECKOUT-F08 Start the order from a cart
+<!-- from WORKBOOK.md sha256:836b364ece4a -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: assistant
@@ -290,6 +314,7 @@ is not an email. No order is created, **no number is used up** and nothing is an
 Involved: none
 
 ### CART_CHECKOUT-F09 Mark an order as paid
+<!-- from WORKBOOK.md sha256:31ab73e9aea9 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Orders
@@ -306,6 +331,7 @@ employee cannot.
 Involved: none
 
 ### CART_CHECKOUT-F10 Record that the payment failed
+<!-- from WORKBOOK.md sha256:3a69d5c17b74 -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Orders
@@ -323,6 +349,7 @@ what was written.
 Involved: none
 
 ### CART_CHECKOUT-F11 Complete an order
+<!-- from WORKBOOK.md sha256:42ce3b4ca06d -->
 Status: done
 Actor: manager, administrator, owner, assistant
 Screen: Orders
@@ -336,6 +363,7 @@ If it fails: only a Paid order is completed; in another status it is refused say
 Involved: none
 
 ### CART_CHECKOUT-F12 Look up carts, lines and orders
+<!-- from WORKBOOK.md sha256:5b0f11612483 -->
 Status: done
 Actor: employee, manager, administrator, owner, assistant
 Screen: Carts, Orders
@@ -350,13 +378,16 @@ Steps:
    by its number.
 In: the "view carts" permission (the employee has it).
 Out: lists of 50 rows (up to 100 per request). Quantities with their decimals, amounts in the minor
-unit of the row's currency (cents; the yen has none) with the currency and its decimals.
+unit of the row's currency (cents; the yen has none) with the currency and its decimals. Whoever created or
+last changed a cart or an order shows by their name or, if their account has none, by what goes before the @ of
+their email, never the whole email, also in earlier ones.
 If it fails: a loading error with "Retry"; without permission, "You do not have permission"; a Total amount that
 cannot be read, what the amount field would say ("This is not an amount. Type a figure, for example 12.50.", or
 the two readings of "1,250") under its box, without filtering.
-Involved: none
+Involved: BASE-F119
 
 ### CART_CHECKOUT-F13 Tell other apps what happens
+<!-- from WORKBOOK.md sha256:464ea8c00e9f -->
 Status: done
 Actor: system
 Screen: none
@@ -373,6 +404,7 @@ If it fails: a refused change leaves neither the change nor the notice.
 Involved: FLOW-F21 (Automations starts with any notice of the business)
 
 ### CART_CHECKOUT-F14 Erase a customer's personal data
+<!-- from WORKBOOK.md sha256:08f0bd8545a7 -->
 Status: done
 Actor: manager, administrator, owner, assistant; the platform staff from the admin
 Screen: assistant; the Hub's admin (action "Erase the personal data of their customers")
@@ -391,8 +423,10 @@ In the admin, with no hub chosen it does nothing and says so.
 Involved: none
 
 ## Cart & Checkout: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:c9b7e8d1a54f -->
 
 ### What it offers: queries (they read and change nothing)
+<!-- from WORKBOOK.md sha256:3e9a1dcd02fd -->
 
 | Operation | What it gives | Flows |
 |---|---|---|
@@ -404,6 +438,7 @@ Involved: none
 | `cart_checkout.order.get` | An order with everything (addresses, methods, dates, notes), by id or number. | F12 |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:bb6c0bb02551 -->
 
 | Operation | What it does | Permission | Flows |
 |---|---|---|---|
@@ -422,15 +457,18 @@ Involved: none
 | `cart_checkout.customer.erase` | Erases a customer's personal data by their email (dangerous) | manage carts | F14 |
 
 ### What it announces
+<!-- from WORKBOOK.md sha256:0835c6589b5e -->
 
 The thirteen notices of CART_CHECKOUT-F13. They only go out when the change happened.
 
 ### What it reacts to and what it needs from other apps
+<!-- from WORKBOOK.md sha256:a8e3c94b1705 -->
 
 Nothing. It reads and writes nothing in other apps: product, reference, SKU and price are free text and numbers,
 with no link to Inventory, and the customer is an email and a name with no link to Customers.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:c5ae03bb510a -->
 
 | Permission | What it lets you do | Who has it |
 |---|---|---|

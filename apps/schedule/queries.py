@@ -19,7 +19,6 @@ from live.operations import INTERNAL, operation
 
 from apps.schedule import engine
 from apps.schedule.models import (
-    WEEKDAY_NAMES,
     Override,
     OverrideInterval,
     ScheduleSettings,
@@ -28,25 +27,16 @@ from apps.schedule.models import (
     WeekDay,
     WeekDayInterval,
 )
-from apps.schedule.schemas import (
-    ByIdIn,
-    HoursRangeIn,
-    HoursRangeOut,
-    IsOpenIn,
-    IsOpenOut,
-    NoParamsIn,
-    OverrideListIn,
-    OverrideOut,
-    OverridePage,
-    PageIn,
-    SettingsOut,
-    SpecialDayListIn,
-    SpecialDayOut,
-    SpecialDayPage,
-    WeekOut,
-)
+from apps.schedule.schemas.fields import ByIdIn, NoParamsIn, PageIn
+from apps.schedule.schemas.hours import HoursRangeIn, HoursRangeOut
+from apps.schedule.schemas.is_open import IsOpenIn, IsOpenOut
+from apps.schedule.schemas.overrides import OverrideListIn, OverrideOut, OverridePage
+from apps.schedule.schemas.settings import SettingsOut
+from apps.schedule.schemas.special_days import SpecialDayListIn, SpecialDayOut, SpecialDayPage
+from apps.schedule.schemas.week import WeekOut
 from base.business import business_zone, zone_name
 from base.ordering import list_order
+from base.weekdays import weekday_name
 
 SPECIAL_DAY_NOT_FOUND = _("That special day does not exist in this business.")
 OVERRIDE_NOT_FOUND = _("That temporary change does not exist in this business.")
@@ -186,7 +176,7 @@ def week_out() -> dict:
         days.append(
             {
                 "weekday": weekday,
-                "name": str(WEEKDAY_NAMES[weekday]),
+                "name": weekday_name(weekday),
                 "id": day.id if day else None,
                 "is_set": day is not None,
                 "is_closed": bool(day and day.is_closed),
@@ -420,7 +410,7 @@ def list_overrides(ctx: OperationContext, params: OverrideListIn) -> dict:
     )
 
 
-# Not assistant tools: what names a special day or a temporary change on the card of a write (``schemas.A_SPECIAL_DAY``,
+# Not assistant tools: what names a special day or a temporary change on the card of a write (``schemas.fields.A_SPECIAL_DAY``,
 # ``A_OVERRIDE``), as their list shows them; the model finds them in their lists.
 @operation(
     "schedule.special_day.get",

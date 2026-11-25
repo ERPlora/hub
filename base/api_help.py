@@ -1,4 +1,4 @@
-"""Ninja route of a module's help window: it calls ``base.help.get`` and holds no logic. ``config/api.py`` mounts it."""
+"""Ninja route of an app's help: it calls ``base.help.get`` and holds no logic. ``config/api.py`` mounts it."""
 
 from live.ninja import bind, run_operation
 from ninja import Query, Router

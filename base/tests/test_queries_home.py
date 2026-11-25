@@ -87,7 +87,7 @@ def modules(monkeypatch, settings):
 
     def use(*configs, on=None):
         labels = {config.label for config in configs} if on is None else set(on)
-        monkeypatch.setattr("base.home.module_configs", lambda: list(configs))
+        monkeypatch.setattr("base.home.shown_modules.module_configs", lambda: list(configs))
         monkeypatch.setattr("base.activation.module_configs", lambda: list(configs))
         monkeypatch.setattr("base.queries.home.active_apps", lambda scope: frozenset(labels | {"base"}))
 
@@ -104,7 +104,7 @@ def module(label, *, setup=(), widgets=(), bell=(), notices=(), listed=True, per
         widgets=list(widgets),
         bell=list(bell),
         notices=list(notices),
-        permissions=list(permissions),
+        permissions=dict.fromkeys(permissions, "A phrase"),
         **more,
     )
 

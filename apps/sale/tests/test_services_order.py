@@ -131,9 +131,9 @@ def test_a_product_is_named_by_its_sku_or_its_name_and_never_guessed(product):
     with pytest.raises(Conflict) as refusal:
         add(order.id, product="coffee")
     assert refusal.value.code == "inventory.product_ambiguous"
-    with pytest.raises(Conflict) as refusal:
+    with pytest.raises(InvalidPayload) as refusal:
         add(order.id, product="tea")
-    assert refusal.value.code == "sale.product_not_available"
+    assert refusal.value.fields == {"product": "There is no product “tea”. Say which one."}
 
 
 def test_an_inactive_product_is_not_sold(coffee):
@@ -436,8 +436,9 @@ def test_firing_sends_the_pending_lines_as_a_round(coffee, steak):
 
 
 def test_a_round_says_who_sends_it_by_the_name_a_person_reads(steak, django_user_model):
-    """«Quién atiende» in ``sale.order.fired`` is a person (KITCHEN-F05, F08): their name, else their e-mail;
-    their username (the id of the session) only as the last resort."""
+    """«Quién atiende» in ``sale.order.fired`` is a person (KITCHEN-F05, F08): their name, else what goes before the
+    «@» of their e-mail, never the address (BASE-F119); their username (the id of the session) only as the last
+    resort."""
     people = [
         django_user_model.objects.create_user("saas:42", email="ana@example.com", first_name="Ana", last_name="García"),
         django_user_model.objects.create_user("saas:43", email="luis@example.com"),
@@ -450,7 +451,7 @@ def test_a_round_says_who_sends_it_by_the_name_a_person_reads(steak, django_user
         run("sale.order.fire", {"order_id": str(order.id)}, ctx_for(actor=person))
         ((_, payload), _changed) = events()
         sent.append(payload["waiter"])
-    assert sent == ["Ana García", "luis@example.com", "saas:44"]
+    assert sent == ["Ana García", "luis", "saas:44"]
 
 
 def test_a_round_names_who_attends_the_check_else_who_sends_it(steak, django_user_model):
@@ -716,7 +717,7 @@ def test_whoever_builds_checks_voids_an_empty_one(coffee):
     assert run("sale.order.void", {"order_id": str(emptied.id)}, waiter).status == "voided"
 
 
-def test_a_check_with_something_ordered_or_charged_is_the_managers_to_void(coffee):
+def test_a_check_with_something_ordered_or_charged_is_the_managers_to_void(coffee, without_kitchen):
     waiter = ctx_for(EMPLOYEE)
     ordered = open_order({"product": "COF"}, ctx=waiter)
     with pytest.raises(PermissionDenied) as refusal:

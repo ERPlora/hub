@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:c590635851edbee4e9258f039215ebb16551b6d7717d1836083e5669d8207bcb -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:f295864027c8 -->
 
 Inventory is the catalog of what you sell with stock: each product with its price, its cost, its tax
 category, its unit of measure and how many units are left. In the restaurant it is the menu the till
@@ -8,6 +7,7 @@ shows; in the hair salon, the products for sale. The stock goes down on its own 
 payment, and every receipt or removal leaves a movement that is never edited or deleted.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:497e5a05ddf9 -->
 
 Each product carries its name, its SKU, its price, its cost, its tax category, its unit of measure and
 how many units are left.
@@ -30,6 +30,7 @@ Sales are not made here: the stock goes down only when Sales takes the payment. 
 required to sell**: without it, the till charges services and open-price lines.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:77d25f41a073 -->
 
 ERPlora does not invent flows: it adopts the ones the market has already proven. From the restaurant
 reference it adopts the menu by categories, stock control per item and the count with a reason
@@ -73,6 +74,7 @@ but not the quantity left on the till, which does not exist here. Also:
   uploaded from the product's card, and it travels in the business's backup.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:1cbf62fc5465 -->
 
 - **Taxes** is essential: each product points at one of its tax categories. To turn Inventory on,
   Taxes is needed, and Taxes cannot be turned off while Inventory is on. Out of the box, Taxes brings
@@ -99,6 +101,7 @@ Initial setup, step by step:
 6. Make a test sale and check in **Movements** that the stock went down (INVENTORY-F21).
 
 ## Screens
+<!-- from WORKBOOK.md sha256:52676d812ab2 -->
 
 Inventory has five tabs, in the bar at the bottom: **Dashboard**, **Products**, **Movements**,
 **Categories** and **Settings**. The apps launcher and "My apps" open the Dashboard. All of them can be seen by anyone who
@@ -106,6 +109,7 @@ can view products, except Settings (below); what a person cannot do does not app
 app also refuses it even if someone tries it through another door (the assistant or the API).
 
 ### Dashboard
+<!-- from WORKBOOK.md sha256:f29854e94f4d -->
 The stock's figures at a glance: "Tracked products" (those with stock control), "In stock", "Out of
 stock", "Low stock" and "Inventory value", at cost, which shows only to whoever sees the costs (the owner, the
 administrator and the manager). Tap one of the first four to go to Products. Below,
@@ -113,6 +117,7 @@ the "Low stock products" table, from the one with the least to the one with the 
 threshold. It updates on its own with every sale and every movement.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:719a589300c9 -->
 Figures at the top: "Tracked products", "In stock", "Out of stock", "Low stock" and "Inventory
 value" ("at cost"). The first four lead to Products. If there are items with stock control and no
 cost, the note "N product(s) without recorded cost: the value shown is partial". Whoever does not see the costs
@@ -122,6 +127,7 @@ stock.". Loading: "Loading…". Error: "Inventory metrics could not be loaded." 
 with "Retry".
 
 ### Products
+<!-- from WORKBOOK.md sha256:4853f466b5dd -->
 Your catalog: each product with its photo, its name, its SKU, its price, its stock and whether it is on
 sale. Search it by name or SKU and filter it by price, stock or status. With **+** you add a product and
 with "Edit" you change it; from each row you receive goods, count the stock, write off what breaks or is
@@ -129,6 +135,7 @@ lost, mark it sold out or delete it. Tapping the row opens its card, with the ba
 The table's buttons import and export the catalog as a CSV file.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:26c3f8b6b683 -->
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
 Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
@@ -144,15 +151,16 @@ The table's buttons: **+** (create), import CSV and export CSV, each one only fo
 permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on
 physical products) and "Edit". In the "⋮" menu: "Details" (the same card that tapping the row
 opens), "Write off stock" (also, only on items with stock control), "Mark sold out" or, if it already
-is, "Put back on sale" (for whoever can change products) and "Delete". Tapping the row opens the
+is, "Put back on sale", "Hide from website" or, if it already is, "Show on website" (these two pairs, for whoever
+can change products) and "Delete". Tapping the row opens the
 product's card. If the row has no room, the ones in sight go to the "⋮" too.
 
 The **+** and "Edit" open the form's side panel: Name, SKU (locked when editing: "The SKU is the
 product's identity: it is not edited"), Price, "Cost (<currency>)", "Initial stock" (only when
 creating), "Low stock threshold", "EAN-13", "Description", "Type" ("Physical" or "Service", only when
 creating), the "Track stock for this item" box with its note, "Unit of measure", "Tax category"
-("Pick a tax category") and "Categories" (if there are any), and "Save" / "Save changes"
-("Saving…").
+("Pick a tax category"), "Categories" (if there are any) and the "Show on website" box (ticked when
+creating), and "Save" / "Save changes" ("Saving…").
 
 The item's photo (INVENTORY-F30 to F32): the table has the "Photo" column, before the name, with the
 photo's thumbnail or the initials over its colour, and the cards their "Photo" line; the product's card
@@ -168,28 +176,34 @@ Empty: "No products". Loading: "Loading…". Error: the table's notice with "Ret
 form shows inside the panel; that of a row action, above the table.
 
 #### Product card
-Window with the product's name: SKU, Price, Stock and Status ("Yes · Sold out" if it is sold out); the
+<!-- from WORKBOOK.md sha256:8b09d28b06ff -->
+Window with the product's name: SKU, Price, Stock, Status ("Yes · Sold out" if it is sold out) and "Website"
+("Shown" or "Hidden"); the
 SKU's barcode on a white plate with the SKU below; "Print barcode" and, with stock permission and on a
 physical product, "Receive stock" and "Count stock", and "Write off stock" if the item tracks its
 stock; with permission to change products, "Mark sold out" or "Put back on sale". A failure when
 printing or when marking shows inside the window.
 
 #### Goods receipt
+<!-- from WORKBOOK.md sha256:a08f9ac3c0cd -->
 Window "Goods receipt — <product>": "Current stock", "Quantity received", "Unit cost (<currency>)" and
 "Record receipt". A refusal shows inside the window.
 
 #### Stock count
+<!-- from WORKBOOK.md sha256:ab82d2f190ff -->
 Window "Stock count — <product>": "Current stock", "Difference" (as soon as there is a figure),
 "Counted stock", "Reason (required)" and "Apply count", with the note of what is missing ("Enter the
 counted stock to continue." / "A reason is required to apply the count."). A refusal shows inside the
 window.
 
 #### Write-off
+<!-- from WORKBOOK.md sha256:a46819eda19a -->
 Window "Write-off — <product>": "Current stock", "Quantity written off", "Reason: waste, breakage, own
 consumption… (required)" and "Write off", with the note of what is missing. A refusal shows inside the
 window.
 
 #### Import products
+<!-- from WORKBOOK.md sha256:fdc9dc8c846d -->
 Three windows in a row:
 
 1. "Check the import": a drop-down per column of the file ("Do not import" or the field; Name and
@@ -203,12 +217,14 @@ Three windows in a row:
    · SKU — reason") and "Copy report".
 
 ### Movements
+<!-- from WORKBOOK.md sha256:2f11def10984 -->
 The history of every stock receipt and removal, the most recent first: the date, the product, the type
 (a goods receipt, a sale, a count, a write-off…), the quantity with its sign, the balance left, the
 reason and the reference, which in a sale is the number of its ticket or its invoice. It is read-only: a
 movement is never edited or deleted. Search by product, SKU or ticket number and filter by type.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:be700bb98314 -->
 Read-only table: Date, Name, SKU, Type ("Initial", "Reception", "Sale", "Void", "Count", "Decrease",
 "Refund"), Quantity (with its sign), Balance, Reason and Reference (in a sale, the number of its
 ticket, its invoice or the sale itself). Search box by product, SKU, reference or ticket number;
@@ -219,12 +235,14 @@ Products, and with every sale.". No matches: "No movement matches the search or 
 found by the number of its ticket, invoice or sale.". Error: the table's notice with "Retry".
 
 ### Categories
+<!-- from WORKBOOK.md sha256:96951d506c60 -->
 The categories that group the products on the till, each one with how many active products it has
 (sold-out ones count too). With **+** you create one, tapping the row edits it and "Delete" removes it
 without deleting its products: they just stop being in it. The table's buttons import and export the
 categories as a CSV file.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:8f710badce80 -->
 Table with Name, Slug and Products (how many active ones it has, sold-out ones included: the same
 figure as the till's category strip, which shows them too); search box "Search category…"; 25 per page;
 import and export CSV. The **+** and the row (or "Edit") open the panel: Name, "Slug (optional)",
@@ -233,12 +251,14 @@ opens "Delete category" with what is going to happen and "Delete and unlink" / "
 categories.". Loading: "Loading…".
 
 ### Settings
+<!-- from WORKBOOK.md sha256:095cff87d13c -->
 How your business keeps its stock: "Track stock", whether the items keep their stock except those that
 decide otherwise; "Allow selling without stock", whether a sale may leave the stock below zero; and the
 "Low stock threshold" a product created without its own takes. Only whoever can manage the inventory
 settings sees it: out of the box, the administrator and the manager.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:f636abb91d54 -->
 Heading "Inventory" with "Allow selling without stock", "Low stock threshold" (with its explanation)
 and "Track stock", and "Save". It is seen and saved by whoever can manage the inventory settings: out
 of the box, the administrator and the manager. The employee and the cashier are not shown the tab; if
@@ -246,6 +266,7 @@ they type its address, they see "No access" (BASE-F118). Loading: "Loading setti
 settings could not be loaded." with "Retry", never the factory values as if they were the business's.
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:64850ccc1b8a -->
 
 | State | What the person sees |
 |---|---|
@@ -257,6 +278,7 @@ settings could not be loaded." with "Retry", never the factory values as if they
 | No permission | What it cannot do does not appear (neither **+**, nor import or export, nor the stock actions, nor the switch: "Yes"/"No"); Settings does not show and its address says "No access" (BASE-F118); if it loses the permission with Settings open, the fields lock with "You do not have permission to change these settings. Ask an administrator if you need it.". |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:0fff66737941 -->
 
 In the category and stock movement windows (receive, count and write-off), the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
@@ -265,6 +287,7 @@ When creating and editing a product, "Cancel" ("Cancel editing"), the panel's "�
 same, in the browser too (hub#1023).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:ee1afee5af32 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -280,6 +303,7 @@ same, in the browser too (hub#1023).
 | INVENTORY-F29 | Mark an item as sold out | done |
 | INVENTORY-F34 | Recover a deleted product | done |
 | INVENTORY-F35 | Declare a product's allergens | done |
+| INVENTORY-F36 | Show or hide a product on the website | done |
 | | **Import and export** | |
 | INVENTORY-F09 | Import products from a CSV | done |
 | INVENTORY-F10 | Import categories from a CSV | done |
@@ -312,6 +336,7 @@ same, in the browser too (hub#1023).
 All the flows are common to both verticals (restaurant and hair salon).
 
 ### INVENTORY-F01 Create a product
+<!-- from WORKBOOK.md sha256:95d688133d98 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -343,7 +368,8 @@ whole or nothing is saved. If initial stock was given, it stays in **Movements**
 Inventory tells the other apps there is a new product: Sales offers it on the till's grid and the
 setup step "Your catalog" is done (INVENTORY-F28). Through the assistant or the API it can be created
 already inactive, out of the till until it is activated (INVENTORY-F03), as one that was inactive comes
-back when it is recovered from a separate copy (BASE-F114).
+back when it is recovered from a separate copy (BASE-F114). A backup or a template of "Data and backups" (BASE-F35)
+keeps which products are a "Service", and when it is loaded (BASE-F31) they still are.
 If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
 as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
@@ -357,11 +383,12 @@ tax category that is no longer in Taxes is refused, also if it arrives through t
 API. Every refusal shows inside the panel and nothing is saved. Only whoever sees the costs writes the cost: a
 creation with a cost by someone who does not see them, through the assistant or the API, is refused as an
 operation they may not run and nothing is saved; without a cost, the product is created with cost 0.
-Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119, BASE-F114 (the ERPlora staff bring back from a separate copy
+Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F31, BASE-F35, BASE-F119, BASE-F114 (the ERPlora staff bring back from a separate copy
 the products the business no longer has at all, each by this same creation; a deleted one comes back the same,
 INVENTORY-F34)
 
 ### INVENTORY-F02 Edit a product
+<!-- from WORKBOOK.md sha256:3c49452c412e -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -381,13 +408,19 @@ Out: the product changed, with its categories, in a single step. Inventory tells
 each category added or removed. The new price is for what is added to a bill from now on: an open
 bill keeps the price from when it was ordered (Sales decides it).
 If it fails: the same refusals as creating, inside the panel, and nothing is saved.
+Asked of the assistant, a product the business does not have, or a name that fits several, draws no card: the
+assistant says which one is not there or asks which one it is (as in every action of Inventory, see "Services").
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock
 is not changed: "The unit of a product with stock cannot be changed. Count its stock to zero and change
 it afterwards.". Changing the cost belongs to whoever sees the costs: it is refused to someone who does not see
 them as an operation they may not run, and the rest of a change without a cost is saved.
+If, when the panel opens, the business's currency, the tax categories or the categories cannot be read, each field
+says so with the reason, also while the connection recovers by itself; the currency also with "Retry". What the product
+has saved is not lost: saving sends only what was changed.
 Involved: SALE-F01, TAX-F01, TAX-F19, BASE-F05, BASE-F119
 
 ### INVENTORY-F03 Turn a product on and off
+<!-- from WORKBOOK.md sha256:3a29ddd33264 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -404,6 +437,7 @@ gives). Without permission to change, "Yes"/"No" shows without a switch.
 Involved: SALE-F01
 
 ### INVENTORY-F04 Delete a product
+<!-- from WORKBOOK.md sha256:730c20caf32c -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -422,6 +456,7 @@ Involved: SALE-F01, BASE-F114, INVENTORY-F34 (from a separate copy, the ERPlora 
 back: the same one, with its stock and its movements)
 
 ### INVENTORY-F05 Review the products that cannot be sold for lack of VAT
+<!-- from WORKBOOK.md sha256:717aa6bf770f -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -441,6 +476,7 @@ If it fails: the refusals of the product's edit form.
 Involved: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Create and edit a category
+<!-- from WORKBOOK.md sha256:990b87af6aa8 -->
 Status: done
 Actor: administrator, manager
 Screen: Categories
@@ -460,6 +496,7 @@ If it fails: "Save" is off without a Name. A refusal shows inside the panel, wit
 Involved: KITCHEN-F04, SALE-F01, TAX-F01
 
 ### INVENTORY-F07 Delete a category
+<!-- from WORKBOOK.md sha256:48a351afd4cb -->
 Status: done
 Actor: administrator, manager
 Screen: Categories
@@ -488,6 +525,7 @@ If it fails: "The category could not be deleted" (or the reason) above the table
 Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Group products into categories for the till
+<!-- from WORKBOOK.md sha256:ca333a1f5a04 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -501,13 +539,15 @@ Steps:
 In: the business's categories.
 Out: the link between product and category, saved together with the product; Inventory tells of each
 category added or removed. A product can be in several. Sales filters the till's grid with these links
-(only of active products) and Kitchen uses them for its routing. The till sorts products and
-categories by name.
+(only of active products) and Kitchen uses them for its routing. The till shows the categories in the
+position the business gave them (through the assistant or the API, and the one the sector's template
+brings) and, at equal position, by name; the ones nobody placed go by name. The products, by name.
 If it fails: the form's refusals; if something fails neither the product nor its categories are saved.
 A product without a category is sold all the same: it shows under "All".
 Involved: KITCHEN-F04, SALE-F01
 
 ### INVENTORY-F09 Import products from a CSV
+<!-- from WORKBOOK.md sha256:162443c90a4c -->
 Status: done
 Actor: administrator, manager
 Screen: Import products
@@ -532,8 +572,10 @@ Steps:
 In: the file; the tax categories, their names (the translated ones too) and the learnt texts, from
 Taxes; the units.
 Out: an active "Physical" product per ready row, which follows the business's stock control and carries
-no till categories; Inventory tells of each new product. The stock each row brings stays in
-**Movements** as "Initial". In Taxes, the learnt texts and the categories created from the tax window.
+no till categories; Inventory tells of each new product. Through the assistant or the API, a row can also say that it
+is a "Service" and which quantity and unit its price refers to (INVENTORY-F26). The stock each row brings stays in
+**Movements** as "Initial", also one below zero (-3, that of a business that sells without
+stock), as it comes. In Taxes, the learnt texts and the categories created from the tax window.
 A row with a SKU that a live product already has counts as skipped and that product is not touched,
 whatever its other cells say (so the export itself imports back without failures, also with a negative
 stock); a SKU of a deleted product creates a new one.
@@ -541,15 +583,18 @@ If it fails: row reasons: "Name or SKU missing", "Price is not a number" (also f
 cost too large", "SKU repeated in the file", "Quantity is not a number", "Quantity too large", "The
 quantity does not respect the step allowed for this unit", "Unit of measure not recognized", "A text is
 longer than its column allows", "Another product of the catalog already has that EAN-13" and "The tax
-category is missing" or "Tax category not recognized". If Taxes cannot save a learnt text or a created
+category is missing" or "Tax category not recognized"; through the assistant or the API, also "Product type not
+recognized", "A service has no stock." and "The price must refer to a unit of the same kind as the product's unit.". If
+Taxes cannot save a learnt text or a created
 category, the report says so and its rows stay as failed with that reason. "Cancel" in the tax window
 imports nothing. "Stop" keeps what was already created and the report says "The import was stopped
 halfway. What had already been created is counted below; the rest of the file was left untouched.". Only whoever
 sees the costs imports costs: a file with costs from someone who does not see them is refused whole as an operation
 they may not run and nothing is created.
-Involved: TAX-F02, TAX-F14, TAX-F15, BASE-F119
+Involved: TAX-F02, TAX-F14, TAX-F15, BASE-F119, INVENTORY-F26
 
 ### INVENTORY-F10 Import categories from a CSV
+<!-- from WORKBOOK.md sha256:7aa64b34ec09 -->
 Status: done
 Actor: administrator, manager
 Screen: Categories
@@ -569,6 +614,7 @@ If it fails: each row that does not go in shows in the report with its reason: "
 Involved: TAX-F15
 
 ### INVENTORY-F11 Export the catalog to CSV
+<!-- from WORKBOOK.md sha256:60ad0a73f8ea -->
 Status: done
 Actor: administrator, manager
 Screen: Products, Categories
@@ -578,6 +624,8 @@ Steps:
    filters, not only the page shown.
 3. In **Categories**, the same button downloads "inventory-categories.csv" (Name, Slug and number of
    products).
+4. Asked of the assistant ("Give me the whole menu as a CSV"), "Download inventory-products.csv" comes under its
+   answer, the same file the button gives; the assistant does not paste its content into the chat.
 In: the products or the categories that match the search and the filters.
 Out: the file, with the same headers the import recognises (Name, SKU, Price, Cost, Stock, Threshold,
 EAN-13, Description, Allergens, Unit, Tax category, Active) and the figures as they read on screen (€2.20, 3
@@ -588,9 +636,10 @@ If it fails: with no products, the file carries only the header. Without permiss
 button does not show and the app does not hand it over through any other door. A text a spreadsheet
 would run as a formula (it starts with =, +, -, @…) comes out with an apostrophe in front, which the
 import removes.
-Involved: BASE-F112 (inside the app), BASE-F119
+Involved: BASE-F112 (inside the app and from the assistant), BASE-F119
 
 ### INVENTORY-F12 Load the menu of a sector template
+<!-- from WORKBOOK.md sha256:ee732603f7e1 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Import
@@ -623,6 +672,7 @@ the report says why. What was loaded can be undone whole (BASE-F34).
 Involved: BASE-F29, BASE-F31, BASE-F32, BASE-F34, BASE-F38, INVENTORY-F05, INVENTORY-F09, INVENTORY-F33
 
 ### INVENTORY-F13 Receive goods
+<!-- from WORKBOOK.md sha256:c1103fc7c77a -->
 Status: done
 Actor: administrator, manager
 Screen: Goods receipt
@@ -653,6 +703,7 @@ as an operation they may not run, and without a cost it is recorded and the prod
 Involved: BASE-F119
 
 ### INVENTORY-F14 Count a product's stock
+<!-- from WORKBOOK.md sha256:1c8d1bf6d232 -->
 Status: done
 Actor: administrator, manager
 Screen: Stock count
@@ -677,6 +728,7 @@ also the reason of any other refusal.
 Involved: none
 
 ### INVENTORY-F15 Write off stock without a sale (waste, breakage, own consumption)
+<!-- from WORKBOOK.md sha256:53dbde58d7b2 -->
 Status: done
 Actor: administrator, manager (screen); assistant
 Screen: Products ("Write-off" window, from the row or the card); assistant
@@ -704,6 +756,7 @@ silent success nor a movement. Everything shows inside the window.
 Involved: none
 
 ### INVENTORY-F16 Look up the history of movements
+<!-- from WORKBOOK.md sha256:cc877ffda530 -->
 Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Movements
@@ -725,6 +778,7 @@ Involved: INVOICE-F20, SALE-F28, INVENTORY-F34 (the movements of a deleted produ
 its own: the history is not split in two)
 
 ### INVENTORY-F17 See the dashboard and the low-stock products
+<!-- from WORKBOOK.md sha256:8f32654017e9 -->
 Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Dashboard
@@ -737,6 +791,9 @@ Steps:
    cost)" and "Lowest-stock products" (the five with the least, the first the one with the least) show
    by default; "Products in stock" is added with ⋮ ("Customize panel"), where they are grouped under
    "Inventory". The value shows in the business's currency.
+4. To the assistant ("what is running low?"), the same list, and for each product whether it is marked
+   sold out. Reaching 0 or below does not take it off the till, which still offers it: only what is
+   marked with "Mark sold out" stops being offered, and the assistant says so.
 In: the active, physical products with stock control. The value is the sum of cost times balance of
 those with a positive balance; a negative balance does not subtract.
 Out: nothing.
@@ -749,6 +806,7 @@ add.
 Involved: BASE-F119
 
 ### INVENTORY-F18 Warn when an item crosses its minimum
+<!-- from WORKBOOK.md sha256:1e2ee88c90eb -->
 Status: done
 Actor: system
 Screen: none
@@ -770,6 +828,7 @@ neither lost nor sent twice. If the movement does not get saved, the notice does
 Involved: FLOW-F21
 
 ### INVENTORY-F19 Set up the inventory
+<!-- from WORKBOOK.md sha256:be709b6f9c6e -->
 Status: done
 Actor: administrator, manager
 Screen: Settings
@@ -799,6 +858,7 @@ to change these settings. Ask an administrator if you need it." shows.
 Involved: SALE-F01
 
 ### INVENTORY-F20 Decide which items have stock control
+<!-- from WORKBOOK.md sha256:020eda224833 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -818,6 +878,7 @@ the hub setting".
 Involved: SALE-F01
 
 ### INVENTORY-F21 Lower the stock when a sale is paid
+<!-- from WORKBOOK.md sha256:04c6fe54001e -->
 Status: done
 Actor: system
 Screen: none
@@ -843,6 +904,7 @@ negative.
 Involved: SALE-F01, SALE-F11, SALE-F15
 
 ### INVENTORY-F22 Lower the stock of the components of a menu or a pack
+<!-- from WORKBOOK.md sha256:72d651cee0dc -->
 Status: done
 Actor: system
 Screen: none
@@ -860,6 +922,7 @@ If it fails: as INVENTORY-F21.
 Involved: COMBO-F10, SALE-F12
 
 ### INVENTORY-F23 Put the stock back when a sale is voided
+<!-- from WORKBOOK.md sha256:03331c6ea0db -->
 Status: done
 Actor: system
 Screen: none
@@ -879,6 +942,7 @@ longer lowers anything. An item deleted after the sale gets nothing back.
 Involved: SALE-F30
 
 ### INVENTORY-F24 Put back the stock of a refund
+<!-- from WORKBOOK.md sha256:d890860dfc98 -->
 Status: done
 Actor: system
 Screen: none
@@ -902,6 +966,7 @@ refund's notice does not bring them; if they go back to the shelf, they are coun
 Involved: SALE-F31
 
 ### INVENTORY-F25 Print the barcode label
+<!-- from WORKBOOK.md sha256:69d5dc301c13 -->
 Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Product card
@@ -929,6 +994,7 @@ barcode: use letters without accents, digits and signs.". Any other refusal show
 Involved: PRINTING-F04, PRINTING-F12
 
 ### INVENTORY-F26 Sell by weight or by measure: units and step
+<!-- from WORKBOOK.md sha256:f3e0ff751be0 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -944,13 +1010,15 @@ Steps:
 In: the business's units, which arrive when Inventory is turned on.
 Out: the product with its unit. Sales reads it for the line; the price is per 1 of the unit. Through the
 assistant or the API, the price can refer to another quantity (per 100 g, or per kilo with the stock in
-grams).
+grams). A backup or a template of "Data and backups" (BASE-F35) keeps which quantity and unit it refers to, and the
+product that comes in when it is loaded (BASE-F31) is charged at the same price.
 If it fails: "The quantity does not respect the step allowed for this unit" on screen; "The quantity
 does not respect the step allowed for this unit: use multiples of …" through the assistant or the API.
 The unit of a product with stock is not changed.
-Involved: SALE-F10
+Involved: SALE-F10, INVENTORY-F09, BASE-F31, BASE-F35
 
 ### INVENTORY-F27 Hand the catalog to the till, to Kitchen and to Menus
+<!-- from WORKBOOK.md sha256:be8537894c61 -->
 Status: done
 Actor: system
 Screen: none
@@ -959,7 +1027,9 @@ Steps:
    grey), the categories, which categories each product has and the units. When charging, it asks for
    the whole sales catalog: price, cost, tax category, unit, allergens and whether each item has stock
    control.
-2. Kitchen asks for the products and the categories to choose what it sends to each station.
+2. Kitchen asks for the products and the categories to choose what it sends to each station. Website asks
+   for the same sales catalog for its menu, with each product's description, photo and allergens, and only
+   the ones the business shows there (INVENTORY-F36, WEBSITE-F05).
 3. Menus asks for the products that can be set as a component: the active ones, also those sold out
    today (a menu is built with them); when selling, it does not offer a choice whose product is sold out.
 4. Without Inventory active, the till says so on the grid ("Inventory is not active, so there is no
@@ -976,9 +1046,10 @@ that cannot be completed without that item leaves the till (COMBO-F12). The sale
 stock: the till neither shows nor checks how many units are left.
 If it fails: whoever asks decides. Sales refuses a catalog line if it cannot read the sales catalog and
 warns on the till if Inventory is active and does not answer; Kitchen is left without routing options.
-Involved: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29
+Involved: COMBO-F06, KITCHEN-F04, SALE-F01, INVENTORY-F29, INVENTORY-F36, WEBSITE-F05
 
 ### INVENTORY-F28 Complete the first step "Your catalog"
+<!-- from WORKBOOK.md sha256:43a7d50e4571 -->
 Status: done
 Actor: administrator, manager
 Screen: Home: Finish setting up your business
@@ -988,13 +1059,16 @@ Steps:
 2. "Set up" leads to **Inventory → Products**.
 3. As soon as there is an active product (physical or of the service type), the step shows as done,
    without reloading.
+4. Asked about this step, the assistant says it is done because there are already products or, asked how
+   many, the active products there are, read in Inventory; never a figure taken from the step's text.
 In: the number of active products.
 Out: the step done or pending. It is seen by whoever can create products.
 If it fails: if all the products are turned off or deleted, the step goes back to pending, also without
 reloading.
-Involved: none
+Involved: BASE-F12
 
 ### INVENTORY-F29 Mark an item as sold out
+<!-- from WORKBOOK.md sha256:e4f8012c70e2 -->
 Status: done
 Actor: administrator, manager
 Screen: Products; Product card
@@ -1011,17 +1085,22 @@ Steps:
 4. When there is some again, tap "Put back on sale" in the "⋮" menu or on the card: the badge goes away
    and the till sells it again.
 In: the item (through the screen, or by its SKU or its name from the assistant or the API) and whether
-it is sold out or goes back on sale.
+it is sold out or goes back on sale. The assistant's card says the item it is going to change as it
+finds it, even when it was said in other words ("Change in Inventory: Tarta de queso QA · Sold out: Yes"
+when "the cheesecake" was said).
 Out: the item marked or unmarked; Inventory tells of the change (`inventory.product.updated`). Marking
 it twice changes nothing. Turning it off, on or editing it does not take the mark away. A sold-out item
 keeps counting in its category, because the till keeps showing it in grey (INVENTORY-F27), and it does
 not show in the sales catalog.
 If it fails: the reason shows above the table or inside the card ("Could not change whether the product
 is sold out" or the one the app gives). Whoever cannot change products sees the badge, but not the
-actions. An item that no longer exists gives "This product does not exist in this hub".
+actions. An item that no longer exists gives "This product does not exist in this hub". Through the
+assistant, words that fit several items or none draw no card: the assistant says which ones fit and asks
+which one.
 Involved: SALE-F01, INVENTORY-F27, COMBO-F12
 
 ### INVENTORY-F30 Choose an item's image from the library
+<!-- from WORKBOOK.md sha256:1e459258ee2c -->
 Status: done
 Actor: administrator, manager, assistant
 Screen: Products
@@ -1029,14 +1108,15 @@ Steps:
 1. In the product's form (the **+** or "Edit"), in "Photo", tap "Choose from the library": the "Image
    library" window opens with the "Search image…" box already filled with the product's name.
 2. Search in Spanish or in English ("café con leche", "latte", "champú"): the search looks at each
-   image's title and synonyms, never at its file name. Each image shows with its title in the business's
-   language (in English if it is not Spanish). The tabs "All", "Hospitality", "Hair", "Beauty", "Retail",
+   image's title and synonyms, never at its file name. Each image shows with its title in the language of
+   whoever looks at it, the one in "My profile" (in English if it is not Spanish). The tabs "All", "Hospitality", "Hair", "Beauty", "Retail",
    "Fitness" and "Spa and wellness" narrow by sector; they come 60 at a time with "Load more".
 3. Tap an image: the window closes and the form shows it in "Photo", with "Change" and "Remove photo".
 4. Tap "Save" or "Save changes": the photo stays on the item. "Cancel editing" or closing the panel asks
    "Discard changes?" first and, with "Discard changes", discards it.
 5. Through the assistant: "put a photo on the white coffee". The assistant searches by the item's name,
-   shows up to five candidate images by their title and asks which one; it never sets one on its own.
+   shows up to five candidate images by their title alone, without their internal code, and asks which
+   one; it never sets one on its own.
    When one is chosen, it asks for the one-tap confirmation card and sets it.
 In: the item and ERPlora's image library, the same for every business, with each image's title and
 synonyms in Spanish and in English.
@@ -1059,6 +1139,7 @@ through the assistant or the API.
 Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F32, INVENTORY-F34, BASE-F93, BASE-F114
 
 ### INVENTORY-F31 Upload the item's own photo
+<!-- from WORKBOOK.md sha256:a9e7d80c6812 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -1085,6 +1166,7 @@ could not be saved. Try again.".
 Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F40
 
 ### INVENTORY-F32 The photo on the till's tile
+<!-- from WORKBOOK.md sha256:9f83fbbe9f20 -->
 Status: done
 Actor: employee, cashier
 Screen: Sales: Sell; Products; Product card
@@ -1099,13 +1181,15 @@ Steps:
    thumbnail (or the initials), and each card its "Photo" line; the product's card shows it at the top,
    larger.
 In: each item's photo, from the library or its own.
-Out: nothing: it is only shown. The library's images are kept on the device and are not asked for again;
-the own ones are only seen by whoever has signed in to the business.
+Out: nothing: it is only shown. The library's images are kept on the device and are not asked for again.
+The own ones, like the library's, can be opened by anyone who has their address, because the business's
+website shows them on its menu (WEBSITE-F05), as online shops do.
 If it fails: a photo that does not load (no connection, deleted or no longer in the library) leaves the
 initials, without a notice; the till sells all the same.
-Involved: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29
+Involved: SALE-F01, SALE-F07, COMBO-F07, INVENTORY-F27, INVENTORY-F29, WEBSITE-F05
 
 ### INVENTORY-F33 The photos travel in the blueprint
+<!-- from WORKBOOK.md sha256:d801605fa879 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups
@@ -1134,6 +1218,7 @@ WebP of up to 2 MB makes the file unreadable ("The file holds a photo that is no
 Involved: BASE-F31, BASE-F34, BASE-F35, BASE-F36, BASE-F37, INVENTORY-F12
 
 ### INVENTORY-F34 Recover a deleted product
+<!-- from WORKBOOK.md sha256:6488e40ef2dd -->
 Status: done
 Actor: the ERPlora staff, when the business asks (in the business no screen undoes a deletion)
 Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)
@@ -1167,6 +1252,7 @@ Involved: BASE-F114, INVENTORY-F01, INVENTORY-F03, INVENTORY-F04, INVENTORY-F07,
 INVENTORY-F35, PRICING-F14, PRICING-F15, MODIFIER-F09, MODIFIER-F10, COMBO-F13, COMBO-F15
 
 ### INVENTORY-F35 Declare a product's allergens
+<!-- from WORKBOOK.md sha256:cb788a981629 -->
 Status: done
 Actor: administrator, manager
 Screen: Products, Product card, Import products
@@ -1201,7 +1287,36 @@ of the form.
 Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F09, INVENTORY-F11, INVENTORY-F27, INVENTORY-F34, SALE-F40, SALE-F41,
 KITCHEN-F32
 
+### INVENTORY-F36 Show or hide a product on the website
+<!-- from WORKBOOK.md sha256:c0d789f73141 -->
+Status: done
+Actor: administrator, manager, assistant, API
+Screen: Products, Product card
+Steps:
+1. A product is sold at the till but must not appear on the menu of the business's website (the staff meal, a dish
+   only offered at the bar). In **Products**, in its row's "⋮" menu, tap "Hide from website", or open "Edit" and
+   untick the "Show on website" box: under it the note "Your website’s catalog leaves it out; the till still sells
+   it." appears. Press "Save changes".
+2. When creating a product the box comes ticked: it shows on the website unless you untick it.
+3. The product's card says "Website: Shown" or "Hidden".
+4. To bring it back, tap "Show on website" in its row's "⋮" or tick the box again.
+In: the product (by the screen, or by its SKU or its name from the assistant or the API, which do it with the same
+change of the product, INVENTORY-F02, and the same permissions: "hide the product Coffee from the website" asks for
+the confirmation card first) and whether it shows or not.
+Out: the product with the mark; Inventory announces the change (`inventory.product.updated`, with `show_on_website`).
+The website's menu (WEBSITE-F05) leaves the hidden products out, also in the preview, and they take no room among its
+200 items; the published page shows it on the next visit, within a minute at most. The till, Kitchen and Menus do not
+change: a hidden product is still sold, and selling it out or turning it off does not remove the mark. The products
+that already existed show on the website, as before. Recovering the business from a separate copy (BASE-F114) gives
+each product back with its mark. A backup or a template of "Data and backups" (BASE-F35) says which products are hidden
+and, when it is loaded (BASE-F31), the ones that come in are still hidden; a product the business already had stays as
+it was, and a file that does not say it brings its products visible.
+If it fails: the reason shows above the table or inside the form ("The product could not be updated" or the one the
+app gives). Whoever cannot change products sees the card's line, but not the actions nor the form.
+Involved: INVENTORY-F02, INVENTORY-F27, WEBSITE-F05, WEBSITE-F10, BASE-F31, BASE-F35, BASE-F114
+
 ## What the verticals share
+<!-- from WORKBOOK.md sha256:ddaf4af257f8 -->
 
 The restaurant uses Inventory for the menu and the hair salon for the products for sale, with the same
 screens, the same settings and the same reaction to the sale. There is no setting per vertical: touching
@@ -1221,6 +1336,7 @@ a piece of this table affects both businesses.
 | The item's photo: from the common library or its own, with the initials if there is none | F30, F31, F32, F33 |
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:967d8ac168b7 -->
 
 Everything Inventory does can be asked for through three doors, always with the same rules and the same
 permissions: its **screens**, the **assistant** and the **API**. This section is the full list. The
@@ -1235,40 +1351,47 @@ its card (BASE-F97), which names each record as the screens name it, never by it
 ("Product: Red wine"), the category by its name ("Category: Drinks"), a product's categories one by one ("Categories:
 Drinks, Wines") and each line of a goods receipt with its product and its quantity ("Receive in Inventory: Red wine ·
 6, Beer · 2.5"). What the person asking cannot see,
-or what no longer exists, is left out.
+or what no longer exists, is left out. An action that names a product or a category the business does not have, or a
+name that matches several, draws no card: before asking for the yes, Inventory looks it up as the action will, and the
+assistant says which one is not there (in a goods receipt, on which line) or asks which one it is.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:7a66b54910a8 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The products with their stock and whether they are sold out, with search, filters (name, SKU, price, stock, status, sold out) and pages; "on sale" gives what the till offers | view products | F03, F05, F27, F29 | `inventory.product.list` |
+| The products with their stock and whether they are sold out, with search, filters (name, SKU, price, stock, status, sold out) and pages; "on sale" gives what the till offers | view products | F03, F05, F27, F29, F32, F33, F36 | `inventory.product.list` |
 | A product's full card (by its id, its SKU or its name) | view products | F02, F25 | `inventory.product.get` |
-| The whole sales catalog: products on sale (active and not sold out) with price, cost (empty for whoever does not see the costs), tax category, unit, allergens and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
+| The whole sales catalog: products on sale (active and not sold out) with price, cost (empty for whoever does not see the costs), tax category, unit, allergens, description, photo and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
 | The products at their threshold or below, from the one with least to the one with most | view products | F17 | `inventory.product.list_low_stock` |
 | Which categories each active product has | view products | F08, F27 | `inventory.product_category.list` |
 | The categories, with how many active products each one has (sold-out ones included, what the till shows) | view categories | F06, F27 | `inventory.category.list` |
 | One category by its id or its name: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view categories | F06, F07, F08 | `inventory.category.get` |
+| The product a stock count or a write-off names, as the action will find it: what the assistant checks before its card; it is not an assistant tool and has no API route | view products | F14, F15 | `inventory.product.check` |
+| The products of each line of a goods receipt, all of them or none: what the assistant checks before its card; it is not an assistant tool and has no API route | view products | F13 | `inventory.product.bulk_check` |
+| The product and the category that putting a product in a category or taking it out names: what the assistant checks before its card; it is not an assistant tool and has no API route | view products | F08 | `inventory.product_category.check` |
 | The ledger of movements: date, product, type, quantity, balance, reason, reference and who made it | view stock | F16 | `inventory.movement.list` |
 | The dashboard's figures: tracked products, in stock, sold out, in low stock, value at cost (empty for whoever does not see the costs) and number of active products | view products | F17, F28 | `inventory.stock.get_summary` |
 | The units of measure with their step | view products | F26 | `inventory.unit.list` |
 | The inventory settings | manage settings | F19 | `inventory.config.get` |
-| Up to five library images for a product's photo, by its name and titled in the business's language; it sets none | view products | F30 | `inventory.product.suggest_image` |
+| Up to five library images for a product's photo, by its name and titled in the language of whoever asks; it sets none | view products | F30 | `inventory.product.suggest_image` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:cf3be781420c -->
 
 | What it does | Who can | Confirmation in the assistant | Flows | Service |
 |---|---|---|---|---|
-| Creates a product, with its categories, its allergens and its initial stock | create products | one tap | F01, F20, F26, F35 | `inventory.product.create` |
-| Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09, F35 | `inventory.product.bulk_create` |
-| Changes a product: data, allergens, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F20, F35 | `inventory.product.update` |
+| Creates a product, with its categories, its allergens and its initial stock | create products | one tap | F01, F20, F26, F35, F36 | `inventory.product.create` |
+| Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09, F12, F26, F33, F35 | `inventory.product.bulk_create` |
+| Changes a product: data, allergens, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F12, F20, F35, F36 | `inventory.product.update` |
 | Deletes a product | delete products | type to confirm | F04 | `inventory.product.delete` |
 | Gives a deleted product back to the catalog, as it was (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F34 | `inventory.product.restore` |
 | Marks a product as sold out or puts it back on sale | change products | one tap | F29 | `inventory.product.set_sold_out` |
-| Sets a product's photo, from the library, or removes it | change products | one tap | F30 | `inventory.product.set_image` |
-| Uploads a product's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | change products | not the assistant's: the file is chosen on the card | F31 | `inventory.product.upload_image` |
+| Sets a product's photo, from the library, or removes it | change products | one tap | F12, F30, F33 | `inventory.product.set_image` |
+| Uploads a product's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | change products | not the assistant's: the file is chosen on the card | F31, F33 | `inventory.product.upload_image` |
 | Adds a product to a category (also the platform, when recovering a deleted category from a separate copy with the products the business keeps) | change products | one tap | F08, F07 | `inventory.product_category.add` |
 | Removes a product from a category | change products | one tap | F08 | `inventory.product_category.remove` |
-| Creates a category | create categories | one tap | F06 | `inventory.category.create` |
+| Creates a category | create categories | one tap | F06, F12 | `inventory.category.create` |
 | Creates many categories at once, with a report per row | create categories | one tap | F10 | `inventory.category.bulk_create` |
 | Changes a category | change categories | one tap | F06 | `inventory.category.update` |
 | Deletes a category and unlinks its products | delete categories | type to confirm | F07 | `inventory.category.delete` |
@@ -1281,11 +1404,12 @@ or what no longer exists, is left out.
 | Saves the settings | manage settings | one tap | F19 | `inventory.config.update` |
 
 ### What it announces (for the apps that want to react)
+<!-- from WORKBOOK.md sha256:2567a13b12b4 -->
 
 | Notice | When | What it carries | Who uses it | Service |
 |---|---|---|---|---|
 | New product | Created on screen, import, template, assistant or API | The product and its categories | Flows; Home's panels | `inventory.product.created` |
-| Product changed | Change, turn on or off, mark sold out or put back on sale | The product as it is left, also whether it is sold out | Flows; Home's panels; the till, Kitchen and Menus | `inventory.product.updated` |
+| Product changed | Change, turn on or off, mark sold out or put back on sale, show or hide on the website | The product as it is left, also whether it is sold out and whether the website shows it | Flows; Home's panels; the till, Kitchen and Menus | `inventory.product.updated` |
 | Product deleted | Delete | Which one it was (SKU and name) | Flows; Home's panels | `inventory.product.deleted` |
 | Product recovered | Recover a deleted product (also its repetition) | The product as it comes back | Flows; Home's panels | `inventory.product.restored` |
 | Product added to a category | Creation, change or a single link | Product and category | Flows | `inventory.product.categorized` |
@@ -1299,6 +1423,7 @@ The notices carry only what the "What it carries" column says: neither the busin
 data of whoever caused it.
 
 ### What it reacts to
+<!-- from WORKBOOK.md sha256:77c4b5dd9b21 -->
 
 | Notice from | What Inventory does | Flows | Service that listens |
 |---|---|---|---|
@@ -1307,6 +1432,7 @@ data of whoever caused it.
 | Sales: sale refunded | Puts back the units of the lines that come back, once per refund | F24 | `sale.sale.refunded` |
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:33e66e21905e -->
 
 | From | What for | Flows | Service |
 |---|---|---|---|
@@ -1323,6 +1449,7 @@ Inventory uses nothing else from other apps: a sale's number arrives in its noti
 ticket or invoice is given by Sales, not by Invoicing.
 
 ### Who can do what
+<!-- from WORKBOOK.md sha256:619db1c4957b -->
 
 | Permission | Administrator | Manager | Employee | Cashier | Service |
 |---|---|---|---|---|---|

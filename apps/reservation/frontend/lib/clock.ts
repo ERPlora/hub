@@ -70,9 +70,14 @@ export function hhmm(time: string): string {
   return time.slice(0, 5);
 }
 
+/** «Thursday, October 15» / «jueves, 15 de octubre»: a day inside a sentence, cased as the language writes it. */
+export function formatDayInSentence(day: string, locale: string): string {
+  return formatIn(locale, { weekday: 'long', month: 'long', day: 'numeric' }).format(asUtc(day));
+}
+
 /** «Thursday, October 15» / «Jueves, 15 de octubre»: the day bar, sentence case. */
 export function formatDay(day: string, locale: string): string {
-  const text = formatIn(locale, { weekday: 'long', month: 'long', day: 'numeric' }).format(asUtc(day));
+  const text = formatDayInSentence(day, locale);
   return text.charAt(0).toLocaleUpperCase(locale) + text.slice(1);
 }
 

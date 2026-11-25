@@ -167,7 +167,7 @@ def test_a_job_names_each_document_the_renderer_paints_and_no_other():
     from typing import get_args
 
     from apps.printing.documents import DOCUMENT_TYPES
-    from apps.printing.schemas import DocumentType
+    from apps.printing.schemas.fields import DocumentType
 
     assert PrintJob.DocumentType.values == list(DOCUMENT_TYPES) == list(get_args(DocumentType))
     assert PrintJob._meta.get_field("document_type").choices == PrintJob.DocumentType.choices

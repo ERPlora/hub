@@ -8,6 +8,7 @@ import { DataTable, EmptyState } from '@erplora/ui/components';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { resolveIcon } from '../../../../packages/ui/src/shell/icons';
 import { click, EMPLOYEE, flush, ionValue, MANAGER, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
@@ -179,7 +180,11 @@ describe('RecoveryPage', () => {
     const s = await setup();
     await ionValue(s.find('verifactu-recovery-hash').element, 'xyz', 'ionInput');
     await ionValue(s.find('verifactu-recovery-invoice').element, 'OLD-1', 'ionInput');
-    await ionValue(s.find('verifactu-recovery-date').element, '2026-10-01');
+    const day = s.find('verifactu-recovery-date').element as HTMLElement & { readonly?: boolean; required?: boolean; value?: string };
+    // The invoice's day is the app's own calendar (never the device's), and the anchor needs it.
+    expect([day.readonly, day.required]).toEqual([true, true]);
+    await pick(day, '2026-10-01');
+    expect(day.value).toBe('10/01/2026');
     await click(s.find('verifactu-recovery-manual').element);
     expect(s.find('verifactu-recovery-result').text()).toBe('The fingerprint must be 64 hexadecimal characters');
     expect(mocks.confirm).not.toHaveBeenCalled();

@@ -7,20 +7,20 @@
 // The business's printers are switched off for the run and back on after it; what it makes is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { A, api, capture, login, shown } from './helpers';
+import { issuedIds } from './invoice-helpers';
+import { freshSession } from './cash-session-helpers';
+import { type Product } from './inventory-helpers';
+import { endPrintRun, type PrintRun, startPrintRun } from './print-run-helpers';
+import { chargeByApi, stamp } from './sale-helpers';
 import { numberRow } from './sale-receipt';
 import { rowAction } from './service-helpers';
 import { toastSaying, toasts } from './toast-helpers';
 
 const RUN = stamp();
+/** The business's printers off for the run: nothing is queued, the device prints. */
+let run: PrintRun;
 let coffee: Product;
-/** The printers that were on before the run (switched off for it: nothing is queued, the device prints). */
-let printersOn: string[] = [];
-/** The cash sessions this run opened. */
-const sessions = new Set<string>();
 
 /** The window the app prints in (ERPlora/app `src-tauri/src/lib.rs`, `print_document`): no script, no address. */
 const PRINT_WINDOW_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data: blob: https:; font-src data: https:";
@@ -85,34 +85,11 @@ async function paintAsTheApp(page: Page, html: string, name: string, read?: (pri
 }
 
 test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  snapshotSeries();
-  await ensureIssuer(context);
-  await drawerOff(context);
-  coffee = await createProduct(context, { name: `E2E App Coffee ${RUN}`, sku: `E2E-PIA-${RUN}`, price: 150 });
-  printersOn = psql('select string_agg(id::text, \',\') from printing_printer where is_active').split(',').filter(Boolean);
-  if (printersOn.length) psql(`update printing_printer set is_active = false where id in (${printersOn.map((id) => `'${id}'`).join(',')})`);
-  await context.close();
+  run = await startPrintRun(browser, `E2E App Coffee ${RUN}`, `E2E-PIA-${RUN}`);
+  coffee = run.coffee;
 });
 
-test.afterAll(() => {
-  try {
-    const ids = [...sessions].map((id) => `'${id}'`).join(',');
-    if (ids) {
-      psql(`delete from cash_register_count where session_id in (${ids})`);
-      psql(`delete from cash_register_movement where session_id in (${ids})`);
-      psql(`delete from cash_register_session where id in (${ids})`);
-    }
-    cleanInvoices();
-  } finally {
-    if (printersOn.length) psql(`update printing_printer set is_active = true where id in (${printersOn.map((id) => `'${id}'`).join(',')})`);
-    cleanSales();
-    cleanInventory();
-    restoreDrawer();
-  }
-});
+test.afterAll(() => endPrintRun(run));
 
 test('SALE-F29: «Print» on a sale\'s document opens the app\'s print screen with the receipt alone', async ({ page, context }) => {
   await appBridge(context);
@@ -219,18 +196,11 @@ test('INVOICE-F18: «Print / PDF» of an invoice opens the app\'s print screen w
 test('CASH_REGISTER-F16: «Print» on a closed session opens the app\'s print screen with its Z report', async ({ page, context }) => {
   await appBridge(context);
   await login(page, A, '/cash_register/sessions');
-  const left = (await api<{ session: { id: string; expected_balance: number | null } | null }>(context, A, 'GET', '/cash_register/sessions/current')).data.session;
-  if (left) {
-    const closed = await api(context, A, 'POST', '/cash_register/sessions/close', { session_id: left.id, closing_balance: Math.max(left.expected_balance ?? 0, 0) });
-    expect(closed.status, JSON.stringify(closed.data)).toBe(200);
-  }
-  const opened = await api<{ id: string }>(context, A, 'POST', '/cash_register/sessions/open', { opening_balance: 1000 });
-  expect(opened.status, JSON.stringify(opened.data)).toBe(201);
-  sessions.add(opened.data.id);
-  const closed = await api(context, A, 'POST', '/cash_register/sessions/close', { session_id: opened.data.id, closing_balance: 1000, closing_notes: 'e2e app' });
+  const session = await freshSession(context, run.sessions);
+  const closed = await api(context, A, 'POST', '/cash_register/sessions/close', { session_id: session, closing_balance: 1000, closing_notes: 'e2e app' });
   expect(closed.status, JSON.stringify(closed.data)).toBe(200);
-  const { number } = (await api<{ number: string }>(context, A, 'GET', `/cash_register/sessions/detail?session_id=${opened.data.id}`)).data;
-  await page.goto(`${A}/cash_register/sessions/${opened.data.id}`);
+  const { number } = (await api<{ number: string }>(context, A, 'GET', `/cash_register/sessions/detail?session_id=${session}`)).data;
+  await page.goto(`${A}/cash_register/sessions/${session}`);
   await shown(page).locator('[data-testid=cash-register-summary]').waitFor({ state: 'visible' });
   await shown(page).locator('[data-testid=cash-register-detail-print]').click();
   const html = await theDocument(page);

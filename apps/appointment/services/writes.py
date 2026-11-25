@@ -20,24 +20,17 @@ from apps.appointment.models import (
     Recurring,
     Settings,
 )
-from apps.appointment.queries import (
-    CUSTOMER_SOURCES,
-    business_zone,
-    by_person,
-    check_member,
-    conflicts_of,
-    lines_for,
-    load_agenda,
-    may_book_for,
-    now,
-    resolve_services,
-    today,
-    verdict_message,
-)
-from apps.customer.queries import find_customer
+from apps.appointment.queries.access import by_person, may_book_for
+from apps.appointment.queries.agenda import conflicts_of, load_agenda, verdict_message
+from apps.appointment.queries.booking import check_member, lines_for, resolve_services
+from apps.appointment.queries.business import now, today
+from apps.appointment.queries.reads import CUSTOMER_SOURCES
+from apps.customer.queries.reads import find_customer
 from apps.service.models import Service
 from apps.staff.models import Member
-from apps.staff.queries import resolve_member
+from apps.staff.queries.reads import resolve_member
+from base.business import business_zone
+from base.queries.people import actor_name
 
 #: Run only by the platform (events.py): outside ``appointment.*``, so no role and no API key holds it.
 SYSTEM = "system.appointment"
@@ -69,13 +62,8 @@ CHANGE_OWN_ONLY = _("You may only change your own appointments.")
 
 
 def _actor(ctx: OperationContext) -> str:
-    """Who acted, as a person reads it: an account's full name, else its email, else its username."""
-    actor = ctx.actor
-    if actor is None:
-        return ""
-    if hasattr(actor, "get_username"):
-        return (actor.get_full_name() or actor.email or actor.get_username())[:128]
-    return str(actor)[:128]
+    """Who acted, as a colleague reads it in the appointment's history: never their e-mail address."""
+    return actor_name(ctx.actor)[:128]
 
 
 def _wall_text(moment: dt.datetime) -> str:

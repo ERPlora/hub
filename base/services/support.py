@@ -18,12 +18,13 @@ from django.conf import settings
 from django.core import signing as django_signing
 from django.utils.translation import gettext
 from live.context import OperationContext
-from live.errors import InvalidPayload, OperationError, PermissionDenied
+from live.errors import Conflict, InvalidPayload, OperationError, PermissionDenied
 from live.operations import AI, INTERNAL, operation
 
 from base import auth, signing
 from base.access import CREDENTIAL_SESSION_KEY
-from base.models import SessionOwner
+from base.models.sessions import SessionOwner
+from base.operations import is_platform_hub
 from base.permissions import OPEN_MANAGEMENT, VIEW_HOME
 from base.schemas.support import SaasPassIn, SaasPassOut, SupportReportIn, SupportReportOut
 from base.services.devices import saas_user_id_of
@@ -175,7 +176,8 @@ SAAS_PASS_SALT = "erplora.hub-pass.v1"
 )
 def saas_pass_create(ctx: OperationContext, data: SaasPassIn) -> dict:
     """The address of erplora.com with a pass of this person to this business's plan or panel: a minute, one use. The
-    SaaS decides again whether the account is a member; ``business`` here only for who may see that button."""
+    SaaS decides again whether the account is a member; ``business`` here only for who may see that button, ``plan``
+    never on ERPlora's own hub, which has none."""
     account = _session_account(ctx)
     if account is None:
         raise PermissionDenied(
@@ -186,6 +188,8 @@ def saas_pass_create(ctx: OperationContext, data: SaasPassIn) -> dict:
             gettext("You don't have permission to manage this business on erplora.com."),
             code="base.saas_pass_needs_management",
         )
+    if data.next == "plan" and is_platform_hub(ctx.scope):
+        raise Conflict(gettext("This business has no plan."), code="base.saas_pass_no_plan")
     secret = settings.INTERNAL_SHARED_SECRET
     if not secret:
         # Django's signer would fall back on SECRET_KEY, and erplora.com would refuse that pass.

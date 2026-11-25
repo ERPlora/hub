@@ -83,8 +83,8 @@ test('the waiter sees dish allergens and the customer allergy on lines and sheet
     products[key] = await createProduct(context, { name: `E2E ${name} ${RUN}`, sku: `${SKU}-${key}`, price: 800, tax_category_key: FOOD, allergens });
   }
   const group = await post<{ id: string }>(context, '/modifier/groups', { name: GROUP, max_choices: 1 });
-  const cheese = await post<{ id: string }>(context, '/modifier/options', { group_id: group.id, name: 'Cheese', allergens: ['milk'] });
-  const extra = await post<{ id: string }>(context, '/modifier/options', { group_id: group.id, name: 'Extra' });
+  const cheese = await post<{ id: string }>(context, '/modifier/options', { group_id: group.id, name: 'Cheese', price_delta: 0, allergens: ['milk'] });
+  const extra = await post<{ id: string }>(context, '/modifier/options', { group_id: group.id, name: 'Extra', price_delta: 0 });
   await post(context, '/modifier/links/attach', { group_id: group.id, product_id: products.plate.id });
   menuId = (await post<{ id: string }>(context, '/combo/combos', { name: MENU, price: 1400, tax_category_key: FOOD })).id;
   for (const course of ['Main', 'Dessert']) await post(context, '/combo/groups', { combo: MENU, name: course, min_choices: 1, max_choices: 1 });

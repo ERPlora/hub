@@ -5,6 +5,7 @@
 // with the stack's SaaS gateway and the e2e's provider (assistant-provider.ts, `E2E-ASK <tool> <JSON>`): the SaaS must
 // be seeded with it (README of this folder, «El asistente»). Cancelled, nothing changes. What this file creates is
 // named «E2E Tarjeta pago …» and goes away before and after; the app it turns on is turned off again.
+// A method said in the person's words is named as the write's own search finds it (hub#2290).
 // flow: PAYMENT-F02 PAYMENT-F05 PAYMENT-F08 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
@@ -101,6 +102,19 @@ for (const language of ['es', 'en'] as const) {
       await expect(card(page)).toContainText(words.cash);
       await expect(card(page)).not.toContainText('cash', { ignoreCase: false });
       await capture(page, `hub-674-method-update-${language}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await cancel(page);
+
+    // «Al método del BBVA cámbiale el nombre»: the method said in the person's words, named as the write will find it,
+    // never as said.
+    const renamed = await datumOf(page, 'payment__method__update', { method: 'pago bbva', name: `${TAG} Proveedores` }, 'method');
+    expect(renamed.value).toBe(books.method.name);
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(card(page)).toContainText(books.method.name);
+      await expect(card(page)).not.toContainText('pago bbva', { ignoreCase: false });
+      await capture(page, `hub-2290-method-said-${language}-${vp.label}`);
     }
     await page.setViewportSize({ width: 1440, height: 900 });
     await cancel(page);

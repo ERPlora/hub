@@ -173,14 +173,14 @@ def test_an_owner_loads_a_file_over_http_bigger_than_any_other_body(client, make
     settings.DATA_UPLOAD_MAX_MEMORY_SIZE = 1024
     client.force_login(make_user("ana", host=A.key, role="hub_owner"))
     zone = {"name": "Patio", "description": "", "color": "warning", "sort_order": 1}
-    bundle = blueprint.Bundle(
-        manifest=blueprint.manifest(
+    bundle = blueprint.archive.Bundle(
+        manifest=blueprint.archive.manifest(
             name="Patio", language="es", country="ES", purpose="template", created_at="", vertical="", apps=["table"]
         ),
         data={"table.zone": [zone]},
     )
     # Beyond Django's ceiling for any other view (1 KB here): a field the schema ignores makes the body weigh more.
-    padded = {"file_base64": base64.b64encode(blueprint.write_zip(bundle)).decode(), "apps": ["table"], "note": "x" * 2048}
+    padded = {"file_base64": base64.b64encode(blueprint.archive.write_zip(bundle)).decode(), "apps": ["table"], "note": "x" * 2048}
 
     response = client.post(
         "/api/settings/data/blueprints/import", padded, content_type="application/json", HTTP_HOST=HOST

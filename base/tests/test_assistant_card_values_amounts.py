@@ -436,10 +436,12 @@ def test_a_currency_mark_is_checked_at_start(monkeypatch, ledger_reads, write, w
 
 # ── The ratchet: amounts nobody marks, by app ─────────────────────────────────────────────────────────────────────────
 
-#: How an amount says itself in this repo's schemas: a whole number named ``…_cents``, or whose description speaks of
-#: cents or of the minor unit (``in cents``, ``in whole cents``, ``in minor units``, «céntimos»). Not a percentage
-#: («Percent off in basis points»), a count, nor a text whose name says cents.
+#: How an amount says itself in this repo's schemas: a whole number named ``…_cents``, ``amount``, ``price`` (or ending
+#: so) or ``price_delta``, or whose description speaks of cents or of the minor unit (``in cents``, ``in whole cents``,
+#: ``in minor units``, «céntimos»). Not a percentage («Percent off in basis points»), a count, the decimals of a
+#: currency, nor a text whose name says cents.
 AMOUNT_WORDS = re.compile(r"\bcents?\b|\bminor units?\b|\bcéntimos?\b", re.IGNORECASE)
+AMOUNT_NAME = re.compile(r"_cents$|(?:^|_)(?:amount|price)$|^price_delta$")
 
 #: The amounts the assistant shows or fills that no ``money`` mark declares, by app: the card paints them as a bare
 #: figure and the model is not told their unit. Only ever lower: an app that marks its own lowers its number here, and
@@ -452,8 +454,8 @@ def is_marked_amount(prop: dict) -> bool:
 
 
 def looks_like_an_amount(name: str, prop: dict) -> bool:
-    return prop.get("type") == "integer" and (
-        name.endswith("_cents") or bool(AMOUNT_WORDS.search(str(prop.get("description", ""))))
+    return prop.get("type") == "integer" and not name.endswith("_decimals") and (
+        bool(AMOUNT_NAME.search(name)) or bool(AMOUNT_WORDS.search(str(prop.get("description", ""))))
     )
 
 

@@ -37,7 +37,7 @@ import { cleanInventory, type Product, VIEWPORTS } from './inventory-helpers';
 import { type IssuerOut, issuerNow, parkIssuer, unparkIssuer } from './invoice-helpers';
 import { checkWithDish, cleanSales, dishForTheTill } from './sale-helpers';
 import { post } from './service-helpers';
-import { compactBar, expectTitleCentred, openApps, openAssistant, topbar, topbarMore, topbarMoreMenu } from './topbar';
+import { compactBar, expectTitleCentred, expectTitleWhole, openApps, openAssistant, topbar, topbarMore, topbarMoreMenu } from './topbar';
 
 const KEY = 'BASE-ACTION-CENTER';
 /** Hub `a`'s issuer, parked while the run needs a business that cannot issue invoices yet. */
@@ -187,26 +187,30 @@ async function expectThePanel(page: Page, size: (typeof SIZES)[number], shotOf: 
   await expectFocusOnTheBell(page);
 }
 
-/** The buttons at the end of the bar, as `data-testid`s, without the rows of an open «⋮». */
+/** The buttons at the end of the bar as they read from the left, as `data-testid`s, without the rows of an open «⋮». */
 function endOfTheBar(page: Page): Promise<(string | null)[]> {
   return topbar(page)
     .locator('ion-buttons[slot=end]')
     .evaluate((group) =>
       [...group.querySelectorAll('ion-button')]
         .filter((button) => !button.closest('ion-popover') && button.getBoundingClientRect().width > 0)
+        .sort((one, other) => one.getBoundingClientRect().left - other.getBoundingClientRect().left)
         .map((button) => button.getAttribute('data-testid')),
     );
 }
 
-/** On a phone, «⋮» and the bell at the end of the bar and the title centred; «⋮» lists «Mis apps» and «Asistente», and
- *  each one opens. From a tablet, «Mis apps», the sparkles and the bell, all on the bar. */
+/** On a phone, «⋮», the help and the bell at the end of the bar and the title whole; «⋮» lists «Mis apps» and
+ *  «Asistente», and each one opens. From a tablet, «Mis apps», the sparkles, the help and the bell, all on the bar, and
+ *  the title centred. */
 async function expectTheBar(page: Page, size: (typeof SIZES)[number], shotOf: (state: string) => Promise<void>): Promise<void> {
-  await expectTitleCentred(page, size.label);
+  await expect(topbar(page).locator('[data-testid=help-button]')).toBeVisible();
   if (!compactBar(page)) {
-    expect(await endOfTheBar(page)).toEqual(['topbar-apps', 'assistant-button', 'action-bell']);
+    await expectTitleCentred(page, size.label);
+    expect(await endOfTheBar(page)).toEqual(['topbar-apps', 'assistant-button', 'help-button', 'action-bell']);
     return;
   }
-  expect(await endOfTheBar(page)).toEqual(['topbar-more', 'action-bell']);
+  await expectTitleWhole(page, size.label);
+  expect(await endOfTheBar(page)).toEqual(['topbar-more', 'help-button', 'action-bell']);
   await topbarMore(page).click();
   await expect(topbarMoreMenu(page).locator('ion-button')).toHaveText(['Mis apps', 'Asistente']);
   await shotOf('bar-more');

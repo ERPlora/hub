@@ -24,6 +24,7 @@
     },
     "inbox": {
       "search": "Filtrar contacto o teléfono…",
+      "searchWithoutContact": "Filtrar contacto…",
       "empty": "Sin conversaciones.",
       "loadError": "No se pudieron cargar las conversaciones.",
       "entity": {

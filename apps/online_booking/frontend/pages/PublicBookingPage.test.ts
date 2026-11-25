@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import appointmentEn from '../../../appointment/frontend/locale/en.json';
 import appointmentEs from '../../../appointment/frontend/locale/es.json';
+import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { click, ionChecked, ionValue, mountInShell, page, settle } from '../__tests__/mount-online-booking';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -240,7 +241,7 @@ describe('PublicBookingPage', () => {
 
   async function fillBooking(s: Awaited<ReturnType<typeof open>>): Promise<void> {
     await ionChecked(s.el('service-v1'), true);
-    await ionValue(s.el('day'), '2030-03-05', 'ionChange');
+    await pick(s.el('day'), '2030-03-05');
     await settle();
     await click(s.el('time-10:00'));
     await ionValue(s.el('name'), 'Marta Gil', 'ionInput');
@@ -299,12 +300,66 @@ describe('PublicBookingPage', () => {
     await settle();
     expect(s.el('status')?.textContent).toContain('Pending');
     await click(s.el('cancel'));
+    await click(s.inDoc('ob-cancel-submit'));
     await settle();
     expect(s.el('status')?.textContent).toContain('Cancelled');
     const byLink = posted.filter(({ op }) => op === 'online_booking.public.booking' || op === 'online_booking.public.cancel');
     expect(byLink.map(({ op, body }) => [op, body])).toEqual([
       ['online_booking.public.booking', { token: BOOKED.token }],
-      ['online_booking.public.cancel', { token: BOOKED.token }],
+      ['online_booking.public.cancel', { token: BOOKED.token, reason: '' }],
     ]);
+  });
+
+  it('right after booking, a tap on Cancel only asks, naming the booking and when; the confirmation cancels it', async () => {
+    door();
+    const s = await open();
+    await booked(s);
+    await click(s.el('cancel'));
+    await settle();
+    expect(posted.filter(({ op }) => op === 'online_booking.public.cancel')).toEqual([]);
+    expect(s.inDoc('ob-cancel')?.textContent).toContain('Cancel booking APT-20300304-0001 (Tuesday, March 5, 2030 · 10:00 AM)?');
+    await ionValue(s.inDoc('ob-cancel-reason'), 'I cannot make it', 'ionInput');
+    await click(s.inDoc('ob-cancel-submit'));
+    await settle();
+    const cancelled = posted.filter(({ op }) => op === 'online_booking.public.cancel');
+    expect(cancelled.map(({ body }) => body)).toEqual([{ token: BOOKED.token, reason: 'I cannot make it' }]);
+    expect(s.el('status')?.textContent).toContain('Cancelled');
+    expect(s.inDoc('ob-personal-cancelled')?.textContent).toContain('This booking is cancelled.');
+  });
+
+  it('keeping the booking from the confirmation leaves it as it was', async () => {
+    door();
+    const s = await open();
+    await booked(s);
+    await click(s.el('cancel'));
+    await click(s.inDoc('ob-cancel-cancel'));
+    await settle();
+    expect(posted.filter(({ op }) => op === 'online_booking.public.cancel')).toEqual([]);
+    expect(s.el('booked')?.textContent).toContain('We have received your booking.');
+    expect(s.inDoc('ob-personal-cancelled')).toBeNull();
+    expect(s.el('cancel')?.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('says the confirmation is cancelling while the door answers', async () => {
+    door({ ...ANSWERS, 'online_booking.public.cancel': 'hang' });
+    const s = await open();
+    await booked(s);
+    await click(s.el('cancel'));
+    await click(s.inDoc('ob-cancel-submit'));
+    expect(s.inDoc('ob-cancel')?.querySelector('form')?.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('keeps a refusal in the confirmation, in Spanish, and the booking stays', async () => {
+    const message = 'Esta cita solo se puede cancelar online con 24 horas de antelación.';
+    door({ ...ANSWERS, 'online_booking.public.cancel': [409, { error: { code: 'online_booking.cancel_too_late', message } }] });
+    const s = await open('es');
+    await booked(s);
+    await click(s.el('cancel'));
+    expect(s.inDoc('ob-cancel')?.textContent).toContain('¿Cancelar la reserva APT-20300304-0001');
+    expect(s.inDoc('ob-cancel-submit')?.textContent).toContain('Cancelar la reserva');
+    await click(s.inDoc('ob-cancel-submit'));
+    await settle();
+    expect(s.inDoc('ob-cancel-error')?.textContent).toContain(message);
+    expect(s.inDoc('ob-personal-cancelled')).toBeNull();
   });
 });

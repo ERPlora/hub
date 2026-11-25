@@ -32,7 +32,10 @@ class DemoConfig(LiveAppConfig):
     assistant_synonyms = (
         ("elemento", "elementos", "item", "items"),
     )
-    permissions = ["demo.view", "demo.manage"]
+    permissions = {
+        "demo.view": _("View items"),
+        "demo.manage": _("Manage items and view their figures"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["demo.*"],

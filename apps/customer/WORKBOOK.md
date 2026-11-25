@@ -225,15 +225,16 @@ Pasos:
 4. Pulsa **Guardar**: el panel se cierra y la ficha aparece en la lista; las cifras se recalculan.
 Entra: lo que se teclea. El país se guarda con su código de dos letras (`ES`, `FR`). El teléfono se
 guarda en formato internacional (`+34` y las cifras seguidas, CUSTOMER-F11); el email y el NIF, sin los
-espacios de los extremos.
+espacios de los extremos. «Cumpleaños» y «Aniversario» se escriben en tres casillas, «Día», «Mes» y «Año» (en el
+orden en que el idioma escribe una fecha), y el año solo si se sabe: «12» y «3» sin año guardan el 12 de marzo.
 Sale: la ficha nueva, activa y sin consentimiento de ningún tipo (CUSTOMER-F14), y el aviso de ficha
 creada (`customer.customer.created`), que escucha WhatsApp para unir a la ficha las conversaciones
 que ya tenía ese número.
 Si falla: el motivo sale debajo de su campo y lo tecleado se conserva. Un email mal formado: «Escribe
 un email válido.». Un teléfono que no es un número de su país: «No es un teléfono válido de su país:
 revisa las cifras o escríbelo con su prefijo internacional (+44…).». Un país que no existe: «Elige
-un país de la lista.». Una fecha que no existe en «Cumpleaños» o «Aniversario» (un 31/02): «Introduce
-una fecha válida.». No se guarda nada. Los campos personalizados no se piden en el alta.
+un país de la lista.». Un día que no existe en «Cumpleaños» o «Aniversario» (un 31 de febrero), o al que le falta el
+día o el mes: «Introduce una fecha válida.». No se guarda nada. Los campos personalizados no se piden en el alta.
 Implicados: WHATSAPP_INBOX-F04, BASE-F114 (el personal de ERPlora recupera desde una copia aparte las fichas que se perdieron, cada una por esta misma alta, con sus grupos y etiquetas, CUSTOMER-F06, y sus campos propios, CUSTOMER-F04)
 
 ### CUSTOMER-F02 Buscar y filtrar fichas
@@ -271,9 +272,10 @@ Pantalla: Ficha de cliente
 Pasos:
 1. Desde **Clientes**, toca la fila.
 2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos
-   personalizados), sus grupos y etiquetas, su
+   personalizados; un cumpleaños sin año, como «12 de marzo»), sus grupos y etiquetas, su
    consentimiento por canal, la actividad (más reciente primero, 50 por página; cada entrada dice
-   cuándo y quién: la persona o la API key por su nombre, o «Lo hizo la plataforma» cuando no la hizo
+   cuándo y quién: la persona por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su
+   correo, nunca el correo entero; la API key por el suyo, o «Lo hizo la plataforma» cuando no la hizo
    nadie en persona, como la compra que apunta una venta cobrada, una automatización o una recuperación
    desde una copia aparte), sus compras y los bloques de otras apps. El email, el teléfono y la dirección para la
    que se dio cada consentimiento, solo a quien ve el contacto de los clientes.
@@ -282,7 +284,7 @@ Entra: la ficha y, aparte, su actividad, sus compras y su historial de consentim
 Sale: nada; solo lectura. Si otra persona la cambia mientras está abierta, se ve el cambio sin
 recargar.
 Si falla: «Este cliente ya no está disponible.» si se eliminó, se unió a otra o se borraron sus datos.
-Implicados: CUSTOMER-F24
+Implicados: CUSTOMER-F24, BASE-F119
 
 ### CUSTOMER-F04 Editar la ficha y sus campos personalizados
 Estado: hecho
@@ -302,9 +304,8 @@ Sale: la ficha y sus campos guardados en una sola escritura, y el aviso de ficha
 corregido. Guardar sin cambiar nada no avisa a nadie. El consentimiento queda anotado con la
 dirección para la que se dio: cambiar el teléfono o el email no lo traslada (CUSTOMER-F14).
 Si falla: un campo obligatorio vacío («Este campo es obligatorio.»), un valor que no encaja con su
-tipo («Introduce un número.» si se escribe «tres» en un número, «Introduce una fecha válida.» si la
-fecha no existe, como un 31/02, también en «Cumpleaños» y «Aniversario», «Elige una de las
-opciones.»), un campo que ya no existe o un teléfono que no es de su país rechazan TODO el guardado:
+tipo («Introduce un número.» si se escribe «tres» en un número, «Elige una de las opciones.»), un
+campo que ya no existe o un teléfono que no es de su país rechazan TODO el guardado:
 el motivo sale junto a su campo y la ficha conserva lo que tenía guardado. La casilla «Activo»
 desmarcada solo cambia la cifra «Activos»: la ficha sigue saliendo en búsquedas, en el TPV y en
 WhatsApp.
@@ -319,13 +320,15 @@ Pasos:
 2. Pulsa **Añadir**. Sale «Nota añadida» y la nota aparece arriba de la «Actividad», con quién la
    escribió y cuándo.
 Entra: el texto (hasta 5.000 caracteres) y, si lo pone quien la escribe por otra vía (una
-automatización), un título propio y el nombre del autor.
+automatización), un título propio y el nombre del autor. Una alergia, una prueba de sensibilidad u otro
+dato de salud no va en una nota ni en las notas internas de la ficha: si se le pide al asistente, dice que
+eso no lo apunta él y que se hace en «Salud y alergias» de la ficha, con su permiso (CUSTOMER-F32).
 Sale: la nota, que ES su entrada de la actividad (una sola fila: no puede haber nota sin actividad),
 y el aviso de nota añadida (`customer.note.added`). Las notas no se editan ni se borran. Una
 automatización puede escribir notas por el mismo servicio.
 Si falla: una nota vacía sale debajo del campo; «Este cliente ya no está disponible.» si la ficha ya
 no existe.
-Implicados: ninguno
+Implicados: CUSTOMER-F32
 
 ### CUSTOMER-F06 Poner grupos y etiquetas a una ficha
 Estado: hecho
@@ -387,7 +390,9 @@ Entra: el fichero, que la pantalla envía en bloques de 50 filas. Cabeceras que 
 `email`/«Email»/«correo», `phone`/«Teléfono»/«tel», `tax_id`/«NIF»/«CIF», `company_name`/«Empresa»,
 `address`/«Dirección», `city`/«Ciudad», `postal_code`/«CP»/«Código postal», `country`/«País»,
 `lifecycle_stage`/«Etapa» y `notes`/«Notas» (las mismas columnas que da la exportación, CUSTOMER-F09), y además
-`source`, `preferred_channel`, `birthday`, `anniversary` y `avatar`.
+`source`, `preferred_channel`, `birthday`, `anniversary` y `avatar`. Un cumpleaños o un aniversario va como
+`AAAA-MM-DD`, o como `--MM-DD` si no se sabe el año (`--03-12`, el 12 de marzo); otro, omite la fila con «Introduce
+una fecha válida.».
 Sale: las fichas creadas, con origen «Importación», el teléfono en formato internacional y sin
 consentimiento (aunque el fichero traiga una columna de consentimiento), y un aviso de ficha creada
 por cada una, así WhatsApp une sus conversaciones como en el alta a mano. Una fila sin etapa entra
@@ -408,6 +413,8 @@ Pasos:
 1. Con la búsqueda y los filtros que se quieran, pulsa **Exportar CSV**.
 2. El navegador descarga el fichero «customers.csv» con TODAS las fichas que cumplen la búsqueda, no solo la
    página que se ve.
+3. Pedido al asistente («Sácame todos los clientes en un CSV»), bajo su respuesta sale «Descargar customers.csv», el
+   mismo fichero que da el botón; el asistente no pega las fichas en el chat.
 Entra: la búsqueda y los filtros de la tabla.
 Sale: un fichero con las columnas `name`, `email`, `phone`, `tax_id`, `company_name`, `address`,
 `city`, `postal_code`, `country`, `lifecycle_stage`, `notes`, `source`, `is_active`,
@@ -418,7 +425,7 @@ un apóstrofo delante para que la hoja de cálculo no lo lea como una fórmula; 
 ve el contacto de los clientes (BASE-F119) le sale sin las columnas `email` ni `phone`.
 Si falla: sin permiso de exportar, el servidor lo rechaza aunque se llame por la API. Sin fichas,
 sale un fichero solo con las cabeceras.
-Implicados: BASE-F112 (dentro de la app)
+Implicados: BASE-F112 (dentro de la app y desde el asistente)
 
 ### CUSTOMER-F10 Reconocer a una persona por su número de teléfono
 Estado: hecho
@@ -577,11 +584,12 @@ Servicios, Citas, Reservas, Reservas online y Mesas para vaciar sus copias, y Au
 las ejecuciones que aún podían seguir con sus datos (esperando, preguntando o reanudables) y les hace
 olvidar lo que leyeron: ninguna le manda ya nada; y toda ejecución que nombra su ficha, también una ya
 terminada, olvida los textos libres de su historial que pueden llevar su nombre (FLOW-F16). Ventas y
-Facturación conservan su copia fiscal (es un documento fiscal).
+Facturación conservan su copia fiscal (es un documento fiscal); Facturación quita la dirección de los correos con que
+envió sus facturas (INVOICE-F26).
 Si falla: «Este cliente ya no está disponible.» si no existe. Repetirlo no cambia los datos ni
 duplica la auditoría, pero vuelve a avisar.
 Implicados: RESERVATION-F22, SERVICE-F29, WHATSAPP_INBOX-F11, APPOINTMENT-F24, ONLINE_BOOKING-F12, TABLE-F31,
-FLOW-F16, FLOW-F23, FLOW-F24
+FLOW-F16, FLOW-F23, FLOW-F24, INVOICE-F26
 
 ### CUSTOMER-F17 Asignar un cliente a la venta en el TPV
 Estado: hecho — el buscador es `CustomerSearch` (ver «Buscador de cliente del TPV · API»); lo monta Venta en su pantalla
@@ -631,17 +639,19 @@ Actor: sistema (lo pide Venta)
 Pantalla: ninguna
 Pasos:
 1. Con un cliente asignado, Venta abre o guarda el pedido (la cuenta de la mesa, el carrito) y le
-   pide a Clientes que lo enlace.
+   pide a Clientes que lo enlace. Citas hace lo mismo con la cuenta que abre al cobrar una cita, con la
+   clienta de la cita.
 2. Clientes anota qué cliente tiene ese pedido. Reasignar otro cliente al mismo pedido sustituye el
    anterior (un pedido, como mucho un cliente); el mismo cliente otra vez no reescribe nada.
 3. Al soltar el cliente (quitarlo, dejar la cuenta en la mesa, eliminar la cuenta), Venta pide el
    enlace sin cliente y el enlace se quita.
 Entra: el pedido y el cliente (o ninguno), con el permiso de quien está en la caja.
 Sale: el enlace cliente ↔ pedido y su aviso (`customer.order.linked` o `customer.order.unlinked`).
-Venta lo lee para devolver el cliente a la cuenta (CUSTOMER-F17).
+Venta lo lee para devolver el cliente a la cuenta (CUSTOMER-F17) y, al cobrar una cuenta sin decir el
+cliente (por el asistente o la API), para que la venta sea suya (SALE-F01).
 Si falla: la venta sigue; Venta avisa «No se ha podido unir el cliente a la cuenta. Vuelve a
 elegirlo.» (o con el motivo que dé Clientes). Un cliente que ya no está disponible no se enlaza.
-Implicados: SALE-F17
+Implicados: SALE-F01, SALE-F17, APPOINTMENT-F17
 
 ### CUSTOMER-F20 Sumar la compra a la ficha al cobrar
 Estado: hecho
@@ -900,14 +910,15 @@ Sale: el permiso, como un hecho más del libro de consentimientos (finalidad «d
 entrada en la «Actividad» y su aviso `customer.health.consent_granted` o
 `customer.health.consent_withdrawn`), y los datos de salud, con «Datos de salud actualizados» en la
 actividad (sin su contenido) y el aviso `customer.health.updated`. Los avisos solo llevan
-identificadores. Retirar el permiso BORRA los datos de salud en el mismo paso.
+identificadores. Retirar el permiso BORRA los datos de salud en el mismo paso. El asistente no lee ni
+apunta datos de salud: si se le pide una alergia, manda a este bloque (CUSTOMER-F05).
 Si falla: sin el permiso en vigor no se guarda nada: «Registra antes su permiso para guardar datos de
 salud.». Una prueba con fecha futura: «Esta fecha está en el futuro.»; un resultado sin fecha: «Pon la
 fecha de la prueba.», cada uno debajo de su campo: se quita en cuanto se corrige ese campo y vuelve si el
 siguiente intento también se rechaza; lo que no es de un campo sale en el bloque y se queda hasta el siguiente
 intento. «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona
 fichas ve el bloque sin botones.
-Implicados: CUSTOMER-F13, CUSTOMER-F16
+Implicados: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16
 
 ### CUSTOMER-F33 Recuperar una ficha eliminada
 Estado: hecho
@@ -974,9 +985,12 @@ agenda (F25).
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien lo
 usa) y la API, con las mismas reglas y los mismos permisos. Las listas van por páginas de hasta 100 y
-todas tienen buscador. Para hablar con naturalidad, un cliente se puede nombrar por su id o por su
-nombre exacto, su teléfono o su email («añade una nota a Ana García»), y un grupo, una etiqueta o un
-campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el email. Antes de cambiar nada, el
+todas tienen buscador. Para hablar con naturalidad, un cliente se puede nombrar por su id, su teléfono, su
+email o su nombre, entero o una parte, con tildes o sin ellas («añade una nota a Ana García», «las citas de
+Lucía»), y un grupo, una etiqueta o un campo, por su nombre. Cuenta primero la ficha cuyo email, teléfono o nombre
+es exactamente lo dicho; si no hay ninguna, las que encuentra el buscador de la lista con esas palabras (F02). Si
+encajan varias fichas, la respuesta dice cuáles, hasta cinco por su nombre, para elegir una o dar su id, su
+teléfono o su email. Antes de cambiar nada, el
 asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por
 su id: la ficha («Cliente: Ana García»), la ficha duplicada de una unión, los grupos y las etiquetas que se le ponen,
 el grupo, la etiqueta o el campo que se cambia o se elimina, por su nombre, y el pedido abierto como lo nombra Venta
@@ -1021,9 +1035,9 @@ nada y sale la tarjeta nueva.
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Da de alta una ficha | gestionar | F01, F18, F25, F26 | `customer.customer.create` |
-| Cambia la ficha (solo lo enviado) y sus campos personalizados | gestionar | F04 | `customer.customer.update` |
-| Crea hasta 50 fichas de un CSV, fila a fila | gestionar | F08 | `customer.customer.import` |
+| Da de alta una ficha | gestionar | F01, F11, F18, F25, F26 | `customer.customer.create` |
+| Cambia la ficha (solo lo enviado) y sus campos personalizados | gestionar | F04, F11 | `customer.customer.update` |
+| Crea hasta 50 fichas de un CSV, fila a fila | gestionar | F08, F11 | `customer.customer.import` |
 | Sustituye los grupos de una ficha | gestionar | F06 | `customer.customer.set_groups` |
 | Sustituye las etiquetas de una ficha | gestionar | F06 | `customer.customer.set_tags` |
 | Elimina una ficha (conserva sus datos) | eliminar | F07 | `customer.customer.delete` |
@@ -1120,8 +1134,8 @@ asistente.
 
 ## Para quien lo mantiene
 
-- Anatomía completa de una app, copiada de `apps/demo`: `apps.py`, `models.py`, `schemas.py`,
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+- Anatomía completa de una app, copiada de `apps/demo`: `apps.py`, `models.py`, `schemas/` (un módulo por tema),
+  `queries/`, `services/` (un módulo por tema), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Además, `phones.py` (la lectura E.164) y `search.py` (el
   texto de búsqueda), sin ORM.
 - **Orden de las listas** (`_ordered`, con `base.ordering.list_order`): fichas,
@@ -1130,7 +1144,7 @@ asistente.
   y el CSV sale en el mismo orden. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - `phones.py` lee el teléfono con `phonenumbers` (el port de Python de libphonenumber) y exige un
   número válido de su país. Los países se validan con `pycountry` (ISO 3166). El país del negocio
-  para un teléfono sin prefijo es el que erplora.com registró (`queries.business_country(ctx)` →
+  para un teléfono sin prefijo es el que erplora.com registró (`queries.reads.business_country(ctx)` →
   `base.operations.business_country`, que lee `base.business.get` como la moneda y, sin país, España
   por `base.business.country_or_market`). Guardar y buscar lo leen igual: `find_customer(ctx, …)`
   exige el contexto de quien busca, así que ninguna app (Citas, Ventas, Facturas, Servicios, Tarifas,
@@ -1144,14 +1158,14 @@ asistente.
   `customer.manage`; `tests/test_approvals.py` es el contrato.
 - **Recuperar desde una copia aparte** (BASE-F114, hub#1257, hub#1306, hub#1285): `apps.py` responde a la plataforma
   (`recoverable_from_copy`, `base.recovery.Recoverable`) con lo que devuelve una copia aparte del negocio: de sus fichas
-  vivas con lo que colgaba de cada una (`queries.recoverable_cards_in_copy`: `cards_in_copy` más sus grupos y etiquetas,
+  vivas con lo que colgaba de cada una (`queries.recovery.recoverable_cards_in_copy`: `cards_in_copy` más sus grupos y etiquetas,
   activos o no, y sus valores de los campos activos, por nombre; por SQL sobre los nombres del modelo: la copia no es
   un negocio y no tiene alias), las que el negocio aún guarda eliminadas vuelven las mismas por
-  `customer.customer.restore` (`queries.cards_deleted_in_business`: ni unidas a otra, ni con los datos borrados, ni
+  `customer.customer.restore` (`queries.recovery.cards_deleted_in_business`: ni unidas a otra, ni con los datos borrados, ni
   hechas otra vez, con `has_live_twin`, la misma regla que la importación; CUSTOMER-F33), y las que ya no tiene se
-  vuelven a crear por `customer.customer.recover` (`queries.cards_not_in_business`), todo o nada por ficha: encadena
+  vuelven a crear por `customer.customer.recover` (`queries.recovery.cards_not_in_business`), todo o nada por ficha: encadena
   `customer.customer.create`, `customer.group.create`/`update`, `customer.tag.create`/`update`,
-  `customer.field.create`, `set_groups` y `set_tags`, con lo del negocio del mismo nombre (`queries.named`, la misma
+  `customer.field.create`, `set_groups` y `set_tags`, con lo del negocio del mismo nombre (`queries.reads.named`, la misma
   regla que `set_groups` por nombre: el activo primero), y los valores con la comprobación de la ficha
   (`_validated_field_values`) sin pedir los obligatorios, como el alta del TPV; un valor de un campo desactivado o que
   su campo ya no admite (`_why_left_out`, con `_field_problem`) no deja fuera la ficha: la salida de `recover` y de
@@ -1162,15 +1176,15 @@ asistente.
   hecha la ficha, una creada por la recuperación no se distingue de una que el negocio rehízo a mano, que se queda
   como está. A una ficha eliminada, `customer.customer.restore` le devuelve lo que el negocio borró después (hub#1356):
   la plataforma le da del registro de la copia lo que declara su entrada (`CustomerRestoreIn`: el `id` y los grupos,
-  etiquetas y valores, cada uno con su id en la copia), `queries.lost_since_copy` deja lo que el negocio ya no tiene
+  etiquetas y valores, cada uno con su id en la copia), `queries.reads.lost_since_copy` deja lo que el negocio ya no tiene
   por ese id y `_hang_from_copy`, el mismo camino que `recover`, lo cuelga otra vez de la ficha, sin quitarle nada ni
   pisar un valor que ya tenga; todo dentro del bloqueo de la ficha (`tests/test_concurrency.py`, una supresión de
   datos que llega a la vez espera y no deja la ficha viva). `customer.customer.restore` y `customer.customer.recover` no tienen ruta ni son herramientas del
   asistente (`ai=INTERNAL`) y su permiso, `customer.restore`, no lo declara ninguna app: solo lo tiene el sistema.
   Lee desde `0001_initial`; una migración que quite o renombre una de sus columnas, de las fichas, los grupos, las
   etiquetas o los campos, cambia también `recoverable_cards_in_copy` y su `reads_since`. Tests:
-  `tests/test_recovery.py` (también de punta a punta, con la base del negocio y su copia), `tests/test_services.py`
-  (las operaciones) y `base/tenancy/tests/test_recovery_customers.py`.
+  `tests/test_recovery.py` (también de punta a punta, con la base del negocio y su copia),
+  `tests/test_services_recovery.py` (las operaciones) y `base/tenancy/tests/test_recovery_customers.py`.
 - Las reacciones a Venta (`events.REACTIONS`, `events.react`) las entrega el relay del outbox del
   worker en cada pasada (`base.relay`); `base/tests/test_relay.py` recorre el cobro, la anulación y la
   devolución hasta la ficha.
@@ -1178,14 +1192,26 @@ asistente.
   `purpose = "health"` y sin canal. Sus cuatro operaciones (`customer.health.*`) declaran
   `ai=INTERNAL` y no `expose_api`: los datos de salud no llegan al asistente ni a las API keys (RGPD
   art. 9, minimización). No salen en la lista, la búsqueda, la exportación ni `customer.customer.detail`.
+  Los textos libres de la ficha que escribe el asistente (`customer.note.add`, el dato `notes` del alta y
+  de la edición, los valores de los campos propios, `field_values`, y el texto de una entrada de
+  `customer.activity.add`) llevan `schemas/health.NOT_FOR_HEALTH_DATA`, que le dice que la salud no va ahí
+  y a qué bloque mandar; lo fija `tests/test_assistant_health_data.py` (hub#2278).
 - Toda operación declara `ai`: `AI(…)` con su descripción para el asistente, su `risk` en las escrituras y sus `asks`
   (2–4 frases en `en` y `es`, como las diría quien la usa); las de salud y las tres de compras que solo lanza la venta
   (`customer.purchase.*`), `INTERNAL`. `tests/test_assistant_asks.py` comprueba que cada frase lleva a su herramienta
-  entre las 10 primeras del catálogo real del dueño, el encargado y el empleado. Todo campo de `schemas.py` lleva su
+  entre las 10 primeras del catálogo real del dueño, el encargado y el empleado. Todo campo de `schemas/` lleva su
   descripción: son la herramienta del asistente. Las referencias humanas
-  (nombre, teléfono, email) las resuelve `queries.find_customer`, solo entre fichas vivas.
+  (nombre, teléfono, email) las resuelve `queries.reads.find_customer`, solo entre fichas vivas.
+- **Palabras del asistente** (`assistant_synonyms`, en `apps.py`): para el Hub, un cliente asignado a una cuenta, como
+  lo dice el botón del TPV («Asignar cliente», «Assign customer»), o una cuenta puesta «a su nombre» es lo que hace
+  `customer.order.link` (F19). Solo dicho en frase: «asigna», «pon» o «set» solos asignan o ponen cualquier cosa, y
+  por eso ofrecen antes los cambios de la cuenta de Venta. «a nombre de» no entra: «¿a nombre de quién va este
+  pedido?» pregunta por el cliente de la cuenta (`customer.order.customer`). Con «La cuenta de la mesa 4 es de Lucía,
+  ponla a su nombre» el turno ofrece el enlace o, si no cabe en sus puestos, lo encuentra la búsqueda que hace el
+  modelo («assign customer to an open check of a table»); abrir una cuenta nueva a nombre de alguien sigue ofreciendo
+  antes `sale.order.open`. Lo fija `tests/test_assistant_asks.py`.
 - La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
-  marcas `refers` de `schemas.py` (`A_CUSTOMER`, `A_GROUP`, `A_TAG`, `A_FIELD`, `A_ORDER`), leídas como quien
+  marcas `refers` de `schemas/fields.py` (`A_CUSTOMER`, `A_GROUP`, `A_TAG`, `A_FIELD`, `A_ORDER`), leídas como quien
   pregunta: la ficha con `customer.customer.detail` (solo las vivas, como sus pantallas) y el grupo, la etiqueta y el
   campo con `customer.group.detail`, `customer.tag.detail` y `customer.field.detail`, lecturas internas
   (`ai=INTERNAL`, sin API) porque el modelo los encuentra en sus listas. El pedido es de Venta, que no es requisito:
@@ -1222,7 +1248,8 @@ asistente.
   sin acentos) y `search_text_without_contact` (lo mismo sin email ni teléfono), recalculados en `Customer.save()`;
   así no hace falta la extensión `unaccent`. La lista, la exportación y la auditoría de cifras buscan en el segundo a
   quien no tiene `base.view_customer_contact` (`queries/contact.py`), y `find_customer` solo lee una referencia como
-  teléfono o email exactos con ese permiso.
+  teléfono o email exactos con ese permiso. Cuando nada encaja exactamente, `find_customer` busca como la lista, con
+  `search_term` y `contact.searched` (`queries/naming.py`): una sola forma de buscar una ficha por sus palabras.
 - Contacto (BASE-F119): la marca `CUSTOMER_CONTACT` (`base/sensitive.py`) va en `email` y `phone` de `CustomerRow` (y
   lo que hereda), de `PhoneMatch` y de la fila de la exportación (`schemas/exports.py`, que escribe solo las columnas
   de `visible_columns`), en el `contact_point` de los consentimientos, en los filtros `email` y `phone` y en la

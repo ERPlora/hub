@@ -14,20 +14,14 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import operation
 
-from apps.customer.queries import find_customer
+from apps.customer.queries.reads import find_customer
 from apps.service.models import Grant, GrantAdjustment, Redemption
 from apps.service.queries.packages import find_package
 from apps.service.queries.reads import CUSTOMER_VIEW, _page
-from apps.service.schemas import (
-    ByIdIn,
-    GrantDetailOut,
-    SessionDetailOut,
-    SessionRefIn,
-    GrantListIn,
-    GrantPage,
-    OrphanPage,
-    PageIn,
-)
+from apps.service.queries.sale_numbers import name_the_sales
+from apps.service.schemas.fields import ByIdIn, PageIn
+from apps.service.schemas.grants import GrantDetailOut, GrantListIn, GrantPage, OrphanPage
+from apps.service.schemas.sessions import SessionDetailOut, SessionRefIn
 from base.business import babel_locale, business_zone
 
 SESSION_NOT_FOUND = _("That voucher session does not exist in this business.")
@@ -269,11 +263,13 @@ def list_grants(ctx: OperationContext, params: GrantListIn) -> dict:
     if params.status is not None:
         sold = sold.filter(voided_at__isnull=params.status == "active")
     now = timezone.now()
-    return _page(
+    page = _page(
         sold.order_by("-granted_at", "-id"),
         params,
         lambda grant: grant_row(ctx, grant, now),
     )
+    name_the_sales(ctx, page["rows"])
+    return page
 
 
 @operation(

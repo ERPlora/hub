@@ -1,8 +1,10 @@
 """``scripts/checks.sh fast``: what a change passes before it is pushed (.githooks/pre-push runs it on the pushed commit).
 
-It runs the guardrail tests of the size of each file, ruff, the import contracts and the cognitive complexity, the
-lists that only shrink included, in seconds, without the network or a database. Then it checks what the change touches:
-ESLint on its TypeScript and Vue files, the typecheck when it touches any, the Vitest tests related to them, and pytest
+It runs the guardrail tests of the size of each file, ruff, the import contracts, the cognitive complexity and a test
+named after each module the branch adds, the lists that only shrink included, in seconds, without the network or a
+database. Then it checks what the change touches:
+ESLint on its TypeScript and Vue files, the typecheck when it touches any, the Vitest tests related to them and to its
+.json files (those of the root configure the tools), and pytest
 on its test files and on each touched module's ``tests/test_<module>.py``, on Postgres; a touched WORKBOOK runs the
 tests that read the WORKBOOKs. A tree that breaks any of them fails the command, and its output names the file and the
 reason.
@@ -18,6 +20,9 @@ import sys
 from pathlib import Path
 
 import pytest
+from allow_list_base import comparison_point, git
+from test_guardrails_lint import PYTHON
+from test_guardrails_ruff import NOQA_MARKERS, family_codes
 
 REPO = Path(__file__).resolve().parent.parent
 #: The checkout with the node_modules and packages/ui the frontend checks borrow: this one, or the one that lends them
@@ -33,15 +38,16 @@ KNOTTY = "".join(
 BREAKS = {
     "apps/demo/filler.py": "".join(f"# filler {line}\n" for line in range(501)),
     "apps/demo/unused.py": "import os\n",
-    # Spelled apart so that this file carries no noqa marker of its own.
-    "apps/demo/silenced.py": "import os  " + "#" + " noqa: F401\n",
+    # Spelled apart so that this file carries no noqa marker of its own. No other marker names B905, so a branch that
+    # removes markers cannot make up for this one.
+    "apps/demo/silenced.py": "PAIRS = list(zip([1], [2]))  " + "#" + " noqa: B905\n",
     "apps/demo/knotty.py": KNOTTY,
     "base/crossing.py": "import apps.demo\n\nDEMO = apps.demo\n",
 }
 REPORTS = {
     "size": "apps/demo/filler.py: 501 lines, over its cap of 500",
     "ruff": "apps/demo/unused.py:1:8: F401",
-    "frozen noqa markers": "A new noqa for these rules",
+    "frozen noqa markers": "B905: 1 exceptions, 0 where the branch left origin/main",
     "complexity": "apps/demo/knotty.py::knotty scores 21, over 15",
     "imports": "base.crossing -> apps.demo",
 }
@@ -68,6 +74,15 @@ import { answer } from './probe';
 
 test('the answer', () => {
   expect(answer).toBe(42);
+});
+"""
+PROBE_JSON = "apps/demo/frontend/probe.json"
+PROBE_JSON_TEST = """import { expect, test } from 'vitest';
+
+import probe from './probe.json';
+
+test('the answer', () => {
+  expect(probe.answer).toBe(42);
 });
 """
 # One edit, three faults no other check sees: four parameters (ESLint's max-params), a string where a number is
@@ -126,12 +141,31 @@ def test_fast_passes_on_this_tree(head_tree):
     assert done.returncode == 0, done.stdout[-4000:] + done.stderr[-2000:]
 
 
+def f401_markers(tree: Path, commit: str) -> int:
+    found = git(tree, "grep", "-h", "-o", "-E", NOQA_MARKERS, commit, "--", *PYTHON)
+    assert found.returncode == 0, found.stderr
+    return family_codes(found.stdout.splitlines())["F401"]
+
+
+def silenced_imports(tree: Path) -> tuple[str, str]:
+    """Unused imports that silence F401 once more than where the branch left origin/main, and how they are reported.
+    The markers of a rule are counted over the whole repository, so a branch that removed some may add as many: the
+    probe adds those and one more."""
+    left, head = f401_markers(tree, comparison_point(tree)), f401_markers(tree, "HEAD")
+    planted = max(left - head, 0) + 1
+    # Spelled apart so that this file carries no noqa marker of its own.
+    text = "".join(f"import os as unused_{line}  " + "#" + " noqa: F401\n" for line in range(planted))
+    return text, f"F401: {head + planted} exceptions, {left} where the branch left origin/main"
+
+
 def test_fast_fails_naming_the_file_and_the_reason_of_every_check(head_tree):
-    for path, text in BREAKS.items():
+    imports, one_more = silenced_imports(head_tree)
+    for path, text in {**BREAKS, "apps/demo/silenced_imports.py": imports}.items():
         (head_tree / path).write_text(text, encoding="utf-8")
     done = checks(head_tree, "fast", "HEAD")
     assert done.returncode == 1, done.stdout[-4000:] + done.stderr[-2000:]
-    missing = [check for check, report in REPORTS.items() if report not in done.stdout]
+    reports = {**REPORTS, "one more noqa marker of a rule that has some": one_more}
+    missing = [check for check, report in reports.items() if report not in done.stdout]
     assert missing == [], done.stdout[-8000:]
 
 
@@ -187,6 +221,19 @@ def test_a_sound_frontend_change_passes_with_the_borrowed_dependencies(head_tree
     assert f"checks: pnpm exec vitest related --run --passWithNoTests {PROBE_TS}" in output, output[-4000:]
 
 
+@needs_lent_frontend
+def test_a_change_to_a_json_file_alone_fails_on_the_vitest_tests_that_import_it(head_tree):
+    """As a new route in frontend/generated/operations.json that operation-routes.test.ts does not expect."""
+    commit(head_tree, {PROBE_JSON: '{ "answer": 42 }\n', "apps/demo/frontend/probe.test.ts": PROBE_JSON_TEST})
+    (head_tree / PROBE_JSON).write_text('{ "answer": 41 }\n', encoding="utf-8")
+    done = checks(head_tree, "fast", "HEAD", CHECKS_DEPENDENCIES_FROM=str(LENDER))
+    output = done.stdout + done.stderr
+    assert done.returncode == 1, output[-6000:]
+    assert f"checks: pnpm exec vitest related --run --passWithNoTests {PROBE_JSON}" in output, output[-6000:]
+    assert "FAIL  apps/demo/frontend/probe.test.ts > the answer" in output, output[-6000:]
+    assert "checks: pnpm exec eslint" not in output, output[-6000:]
+
+
 FIXES = {"node_modules": "pnpm install", "packages/ui": "git submodule update --init"}
 
 
@@ -225,6 +272,59 @@ def load_helper():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def ran_on(tmp_path, monkeypatch, files: list[str]) -> list[list[str]]:
+    """The commands the command runs on a tree whose change since HEAD is ``files``, recorded instead of run, with the
+    frontend's dependencies in place."""
+    helper = load_helper()
+    monkeypatch.chdir(tmp_path)
+    for variable in [key for key in os.environ if key.startswith("GIT_")] + ["CHECKS_DEPENDENCIES_FROM"]:
+        monkeypatch.delenv(variable, raising=False)
+    subprocess.run(["git", "init", "-q"], check=True)
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "packages/ui").mkdir(parents=True)
+    commit(tmp_path, {"packages/ui/package.json": "{}\n"})
+    for path in files:
+        (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / path).write_text("{}\n", encoding="utf-8")
+    ran = []
+
+    def passing(command: list[str], **_env: str) -> bool:
+        ran.append(command)
+        return False
+
+    monkeypatch.setattr(helper, "run", passing)
+    assert helper.main(["fast", "HEAD"]) == 0
+    return ran
+
+
+def given_to(ran: list[list[str]], *program: str) -> set[str] | None:
+    """The files given to ``program``, or None when it did not run."""
+    commands = [command[len(program) :] for command in ran if command[: len(program)] == list(program)]
+    return {arg for arg in commands[0] if not arg.startswith("-")} if commands else None
+
+
+CODE, LOCALE, ROUTES = "shop/frontend/probe.ts", "shop/frontend/locale/en.json", "frontend/generated/operations.json"
+
+
+@pytest.mark.parametrize(
+    "files, linted, related",
+    [
+        ([CODE, LOCALE], {CODE}, {CODE, LOCALE}),
+        ([ROUTES], None, {ROUTES}),
+        (["package.json", "complexipy-snapshot.json"], None, None),
+        (["shop/orders.py", "shop/notes.md"], None, None),
+    ],
+    ids=["with-code", "alone", "the-root-s-tool-configuration", "neither-json-nor-code"],
+)
+def test_a_json_file_goes_to_the_related_vitest_tests_and_never_to_eslint(tmp_path, monkeypatch, files, linted, related):
+    """No linter reads a .json, but a frontend module that imports it has tests that pin what it says. Those of the root
+    configure the tools, and Vitest would run its whole suite for package.json."""
+    ran = ran_on(tmp_path, monkeypatch, files)
+    assert given_to(ran, "pnpm", "exec", "eslint") == linted
+    assert (["pnpm", "typecheck"] in ran) == bool(linted)
+    assert given_to(ran, "pnpm", "exec", "vitest", "related") == related
 
 
 def test_by_default_the_change_is_what_differs_from_where_head_left_origin_main(tmp_path, monkeypatch):
@@ -297,6 +397,21 @@ def test_fast_fails_on_a_change_to_a_workbook_alone_that_its_tests_refuse(head_t
     assert done.returncode == 1, output[-6000:]
     assert "FAILED tests/test_help_workbooks.py::" in output, output[-6000:]
     assert "has a flow id: 'INVENTORY-F14'" in output, output[-6000:]
+
+
+UNSEEN = {"apps/demo/unseen.py": "X = 1\n"}
+UNSEEN_TEST = {"apps/demo/tests/test_unseen.py": "from apps.demo.unseen import X\n\n\ndef test_x():\n    assert X == 1\n"}
+
+
+@pytest.mark.parametrize("files, returncode", [(UNSEEN, 1), ({**UNSEEN, **UNSEEN_TEST}, 0)], ids=["alone", "with-test"])
+def test_fast_fails_on_a_committed_module_without_a_test_named_after_it(head_tree, files, returncode):
+    """However the module was written: a shell redirection or a script never passes through an editor's hook."""
+    commit(head_tree, files)
+    done = checks(head_tree, "fast", "HEAD")
+    output = done.stdout + done.stderr
+    assert done.returncode == returncode, output[-6000:]
+    named = "apps/demo/unseen.py has no test named after it: apps/demo/tests/test_unseen.py" in output
+    assert named == (returncode == 1), output[-6000:]
 
 
 @pytest.mark.parametrize("args", [(), ("slow",)])

@@ -672,3 +672,36 @@ msgstr "Confirmar las citas"
 #: apps.py:107
 msgid "Settings"
 msgstr "Ajustes"
+
+msgid "View the whole appointment book"
+msgstr "Ver toda la agenda"
+
+msgid "View their own appointment book"
+msgstr "Ver su propia agenda"
+
+msgid "Book appointments for anyone"
+msgstr "Reservar citas para cualquiera"
+
+msgid "Book appointments in their own appointment book"
+msgstr "Reservar citas en su propia agenda"
+
+msgid "Change any appointment: status, move, cancel, charge and series"
+msgstr "Cambiar cualquier cita: estado, mover, cancelar, cobrar y series"
+
+msgid "Change their own appointments"
+msgstr "Cambiar sus propias citas"
+
+msgid "Delete appointments"
+msgstr "Borrar citas"
+
+msgid "View availability and blocked time"
+msgstr "Ver la disponibilidad y los bloqueos"
+
+msgid "Block time"
+msgstr "Bloquear tiempo"
+
+msgid "Change the settings"
+msgstr "Cambiar los ajustes"
+
+msgid "When"
+msgstr "Cuándo"

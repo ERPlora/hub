@@ -16,7 +16,7 @@ from apps.sale import events
 from apps.sale.models import Order, OrderLine
 from apps.sale.queries.business import actor
 from apps.sale.queries.orders import ORDER_CHANGED, ORDER_NOT_FOUND, dish_allergens, find_order, order_detail
-from apps.sale.queries.people import member_name, person_label
+from apps.sale.queries.people import member_name
 from apps.sale.schemas.orders import (
     OrderFireIn,
     OrderFireOut,
@@ -39,6 +39,7 @@ from apps.sale.services.orders import (
     _touch,
     lock_orders,
 )
+from base.queries.people import actor_name
 
 NOTHING_TO_FIRE = _("There is nothing new to send to the kitchen.")
 APPOINTMENT_CHECK_OPEN = _(
@@ -96,7 +97,7 @@ def fire(ctx: OperationContext, data: OrderFireIn) -> dict:
             "priority": data.priority,
             "round_no": round_no,
             # Whoever the till names, else who serves the check, else who sends the round.
-            "waiter": (data.waiter or order.staff_name or person_label(ctx.actor))[:128],
+            "waiter": (data.waiter or order.staff_name or actor_name(ctx.actor))[:128],
             "items": [
                 {
                     "order_item_id": str(line.id),
@@ -376,6 +377,7 @@ def set_label(ctx: OperationContext, data: OrderSetLabelIn) -> dict:
     order.label = data.label
     order.save(update_fields=["label", "updated_at"])
     _touch(ctx, order)
+    record_event(ctx, events.ORDER_RELABELED, {"order_id": str(order.id)})
     return _out(order)
 
 

@@ -19,7 +19,7 @@ from live.operations import get as get_operation
 
 from apps.modifier import queries
 from apps.modifier.models import ModifierGroup, ModifierOption
-from apps.modifier.services import DEFAULT_KEPT
+from apps.modifier.services.recovery import DEFAULT_KEPT
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of, giving_back
 from base.tenancy.context import current_alias, use_hub
@@ -35,7 +35,7 @@ OPTIONS = whole.GROUPS | {"label": "Modifier options"}
 
 def an_option(group, name: str, **fields) -> ModifierOption:
     return ModifierOption.objects.get(
-        pk=run_here("modifier.option.create", {"group_id": str(group.id), "name": name, **fields}).id
+        pk=run_here("modifier.option.create", {"group_id": str(group.id), "name": name, "price_delta": 0, **fields}).id
     )
 
 
@@ -61,7 +61,7 @@ def test_the_copy_gives_each_option_with_its_group_and_what_its_create_takes():
     bbq = an_option(sauces, "BBQ", sort_order=1)
     generic = TaxCategory.objects.get(key=GENERIC).pk
 
-    read = queries.options_in_copy(whole.direct())
+    read = queries.recovery.options_in_copy(whole.direct())
 
     # By id, the order they were added in, with every group of the copy by name to pair a group the business deleted.
     named = {sauces.id: "Sauces", extras.id: "Extras"}
@@ -81,7 +81,7 @@ def test_a_copy_whose_options_table_is_there_without_any_option_reads_no_group()
         # Undone with the test's transaction: with no option to pair, the groups by name are never read.
         cursor.execute("DROP TABLE modifier_modifiergroup CASCADE")
 
-    assert queries.options_in_copy(whole.direct()) == []
+    assert queries.recovery.options_in_copy(whole.direct()) == []
 
 
 @HUB_DB
@@ -101,7 +101,7 @@ def test_lacking_is_an_option_a_group_the_business_keeps_no_longer_has():
         tax_category_id=generic,
     )
 
-    lacking = queries.options_not_in_business([still, made_again, taken])
+    lacking = queries.recovery.options_not_in_business([still, made_again, taken])
 
     assert lacking == [as_recovered(taken, sauces.id, tax_category_key=GENERIC)]
 
@@ -113,7 +113,7 @@ def test_an_option_another_group_has_by_its_name_is_lacking_all_the_same():
     an_option(extras, "Alioli")
     taken, other = of_the_copy(sauces.id, "Alioli"), of_the_copy(extras.id, "Cheese")
 
-    lacking = queries.options_not_in_business([taken, other])
+    lacking = queries.recovery.options_not_in_business([taken, other])
 
     assert lacking == [as_recovered(taken, sauces.id), as_recovered(other, extras.id)]
 
@@ -131,7 +131,7 @@ def test_an_option_of_a_group_gone_goes_to_the_one_a_recovery_brought_back_with_
     taken = of_the_copy(lost, "Mayo", copy_groups=copy)
     by_hand = of_the_copy(gone, "Cheese", copy_groups=copy)
 
-    lacking = queries.options_not_in_business([kept, taken, by_hand])
+    lacking = queries.recovery.options_not_in_business([kept, taken, by_hand])
 
     assert lacking == [as_recovered(taken, back.id), as_recovered(by_hand, gone)]
 
@@ -148,15 +148,15 @@ def test_the_options_of_a_group_this_same_recovery_brought_back_came_back_with_i
     taken = of_the_copy(extras, "Cheese", copy_groups=copy)
 
     with giving_back(now):
-        lacking = queries.options_not_in_business([left_out, taken])
+        lacking = queries.recovery.options_not_in_business([left_out, taken])
 
     assert lacking == [as_recovered(taken, before.id)]
-    assert queries.options_not_in_business([left_out]) == [as_recovered(left_out, with_it.id)]
+    assert queries.recovery.options_not_in_business([left_out]) == [as_recovered(left_out, with_it.id)]
 
 
 @HUB_DB
 def test_with_nothing_read_no_option_is_lacking():
-    assert queries.options_not_in_business([]) == []
+    assert queries.recovery.options_not_in_business([]) == []
 
 
 def recovered(record: dict, actor: str = "system"):
@@ -171,7 +171,7 @@ def recovered(record: dict, actor: str = "system"):
 def test_an_option_comes_back_by_the_option_sheets_own_create():
     actor = actor_of(uuid.uuid7())
     sauces = whole.a_group("Sauces")
-    [record] = queries.options_not_in_business([
+    [record] = queries.recovery.options_not_in_business([
         of_the_copy(sauces.id, "Truffle", kitchen_name="+TRF", price_delta=300, sort_order=3,
                     tax_category_id=TaxCategory.objects.get(key=GENERIC).pk)
     ])
@@ -193,7 +193,7 @@ def alioli_back_to(most: int, chosen: list[str], **fields) -> tuple:
     sauces = run_here("modifier.group.create", {"name": "Sauces", "max_choices": most})
     for name in chosen:
         an_option(sauces, name, is_default=True)
-    [record] = queries.options_not_in_business([of_the_copy(sauces.id, "Alioli", **fields)])
+    [record] = queries.recovery.options_not_in_business([of_the_copy(sauces.id, "Alioli", **fields)])
     return sauces, record
 
 
@@ -252,15 +252,15 @@ def test_the_app_declares_the_options_of_its_groups_after_the_groups_and_before_
         "Modifier groups", "Modifier options", "Modifier groups of categories", "Modifier groups of products"
     ]
     assert (options.read, options.missing, options.create, options.deleted, options.restore) == (
-        queries.options_in_copy,
-        queries.options_not_in_business,
+        queries.recovery.options_in_copy,
+        queries.recovery.options_not_in_business,
         "modifier.option.recover",
         None,
         "",
     )
     assert options.reads_since == "0001_initial"
     # A copy that far back holds what the read takes: each column of an option, and its group's name.
-    assert {"id", "group", "tax_category", *queries.OPTION_COPY_FIELDS} <= fields_held_since(
+    assert {"id", "group", "tax_category", *queries.recovery.OPTION_COPY_FIELDS} <= fields_held_since(
         "modifier", "modifieroption", options.reads_since
     )
     assert {"id", "name"} <= fields_held_since("modifier", "modifiergroup", options.reads_since)
@@ -286,7 +286,7 @@ class TestOptionsComeBack:
         sauces = run_in(hub, "modifier.group.create", name="Sauces", max_choices=most).id
         with use_hub(hub):
             own = TaxCategory.objects.filter(is_active=True).order_by("key").first().key
-        ketchup = run_in(hub, "modifier.option.create", group_id=sauces, name="Ketchup").id
+        ketchup = run_in(hub, "modifier.option.create", price_delta=0, group_id=sauces, name="Ketchup").id
         alioli = run_in(hub, "modifier.option.create", group_id=sauces, name="Alioli", kitchen_name="+ALI",
                         price_delta=50, tax_category_key=own, is_default=True, sort_order=1).id
         self.own = own

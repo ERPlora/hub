@@ -7,24 +7,17 @@ from live.context import OperationContext
 from live.errors import Conflict
 from live.operations import operation
 
+from apps.appointment import assistant_cards
 from apps.appointment import engine
 from apps.appointment.models import Appointment
-from apps.appointment.queries import (
-    ADD_OWN,
-    CUSTOMER_SOURCES,
-    business_zone,
-    current_settings,
-    load_agenda,
-    load_detail,
-    read_moment,
-)
-from apps.appointment.schemas import (
-    AppointmentCreateIn,
-    AppointmentOut,
-    AppointmentsOut,
-    BulkCreateIn,
-)
+from apps.appointment.queries.access import ADD_OWN
+from apps.appointment.queries.agenda import load_agenda
+from apps.appointment.queries.business import current_settings, read_moment
+from apps.appointment.queries.reads import CUSTOMER_SOURCES, load_detail
+from apps.appointment.schemas.appointments import AppointmentOut, AppointmentsOut
+from apps.appointment.schemas.booking import AppointmentCreateIn, BulkCreateIn
 from apps.appointment.services.writes import _booking_basis, _create, _judge, _short
+from base.business import business_zone
 
 BATCH_AT = _("%(time)s: %(reason)s")
 
@@ -54,6 +47,7 @@ BATCH_AT = _("%(time)s: %(reason)s")
         "another appointment of the professional, ask the person and send confirm_overlap=true to book anyway. "
         "source=online or whatsapp when the customer books herself.",
         "risk": "normal",
+        "summary": assistant_cards.booking,
     },
 )
 def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict:

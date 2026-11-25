@@ -18,7 +18,7 @@ from django.utils import timezone
 from live.models import OutboxEvent
 
 from base import access
-from base.models import AccessSettings, Credential, TrustedDevice
+from base.models.access import AccessSettings, Credential, TrustedDevice
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_access_devices import employee, owner  # noqa: F401 (fixtures)
@@ -59,7 +59,9 @@ def test_each_control_is_saved_on_its_own_and_the_answer_is_what_was_confirmed(c
     assert (row.pin_policy, row.pin_inactivity_minutes, row.pin_length, row.updated_by) == ("always", 15, 6, "Olga")
 
 
-@pytest.mark.parametrize("body", [{"pin_policy": "sometimes"}, {"pin_inactivity_minutes": 7}, {"pin_length": 5}, {}])
+@pytest.mark.parametrize(
+    "body", [{"pin_policy": "sometimes"}, {"pin_inactivity_minutes": 7}, {"pin_length": 5}, {}, {"pin_policy": "always"}]
+)
 def test_a_value_out_of_the_controls_is_refused(client, owner, hub_a, body):
     assert change(client, **body).status_code == 422
     with use_hub(hub_a):

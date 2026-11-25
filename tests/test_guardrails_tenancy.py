@@ -413,7 +413,7 @@ ANY_KEY = "0193a2b4-0000-7000-8000-000000000001"
 #: payload}``. A business that still shares control's database (``db_name=""``, not cut yet) has nothing of them: it is
 #: not served at all, its host answers 503 maintenance to anyone until its cut gives it a database of its own.
 OWN_DATABASE_OPERATIONS: dict[str, dict] = {
-    "base.api_key.create": {"name": "Till", "mode": "full"},
+    "base.api_key.create": {"name": "Till", "scopes": {"*": ["read"]}},
     "base.api_key.rotate": {"id": ANY_KEY},
     "base.api_key.revoke": {"id": ANY_KEY},
     "base.api_key.detail": {"id": ANY_KEY},
@@ -506,7 +506,7 @@ def not_cut(client):
     from django.contrib.auth import get_user_model
 
     from base.models import Membership
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     hub = Hub.objects.create(slug="not-cut", status=Hub.Status.READY)
     assert not hub.db_name

@@ -74,7 +74,7 @@ export interface CategoryFiltersIn {
   color?: string;
   product_count_min?: number;
   product_count_max?: number;
-  sort?: Sorted<'name' | 'slug' | 'icon' | 'color' | 'product_count'>;
+  sort?: Sorted<'name' | 'slug' | 'icon' | 'color' | 'product_count' | 'order'>;
 }
 
 export interface CategoryListIn extends PageIn, CategoryFiltersIn {
@@ -273,6 +273,7 @@ export interface ConfigPatchIn {
 export interface SaleProductOut {
   id: string;
   name: string;
+  description: string;
   sku: string;
   product_type: ProductType;
   /** Cents, per `price_quantity` of `pricing_unit`. */
@@ -296,7 +297,6 @@ export interface SaleProductOut {
 
 export interface ProductOut extends SaleProductOut {
   ean13: string | null;
-  description: string;
   stock: string;
   low_stock_threshold: string;
   /** Its own decision; `null` follows the business. */
@@ -321,15 +321,9 @@ export interface ProductImageSuggestOut {
   rows: CatalogImage[];
 }
 
-export interface LowStockOut {
-  id: string;
-  name: string;
-  sku: string;
-  stock: string;
-  low_stock_threshold: string;
-  unit: UnitCode;
-  price_quantity: string;
-  pricing_unit: UnitCode;
+export interface LowStockOut
+  extends Pick<ProductOut, 'id' | 'name' | 'sku' | 'stock' | 'low_stock_threshold' | 'unit' | 'price_quantity' | 'pricing_unit'> {
+  is_sold_out: boolean;
 }
 
 export interface ProductCategoryOut {

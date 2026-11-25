@@ -197,6 +197,9 @@ msgstr "forma de pago"
 msgid "concept"
 msgstr "concepto"
 
+msgid "recorded by app"
+msgstr "apuntado por la app"
+
 msgid "sale"
 msgstr "venta"
 
@@ -378,3 +381,57 @@ msgstr "Invitaciones"
 msgctxt "cash report"
 msgid "Expected"
 msgstr "Esperado"
+
+#, python-format
+msgctxt "cash report"
+msgid "%(app)s in cash"
+msgstr "%(app)s en efectivo"
+
+#, python-format
+msgctxt "cash report"
+msgid "%(app)s by card"
+msgstr "%(app)s con tarjeta"
+
+#, python-format
+msgctxt "cash report"
+msgid "%(app)s with other payment methods"
+msgstr "%(app)s con otras formas de pago"
+
+#. Translators: %(app)s is the name of the app that records these lines in the drawer: Tips («Propinas pagadas»).
+#, python-format
+msgctxt "cash report"
+msgid "%(app)s paid out"
+msgstr "%(app)s pagadas"
+
+msgid "View sessions, settings, drawers and currency"
+msgstr "Ver las sesiones, los ajustes, los cajones y la moneda"
+
+msgid "View everyone's sessions"
+msgstr "Ver las sesiones de todos"
+
+msgid "Open a cash register session"
+msgstr "Abrir una sesión de caja"
+
+msgid "Close a cash register session"
+msgstr "Cerrar una sesión de caja"
+
+msgid "View cash movements"
+msgstr "Ver los movimientos de caja"
+
+msgid "Record cash in and out"
+msgstr "Apuntar entradas y salidas de dinero"
+
+msgid "View cash counts"
+msgstr "Ver los arqueos"
+
+msgid "Record cash counts"
+msgstr "Registrar arqueos"
+
+msgid "See the expected cash during a blind count"
+msgstr "Ver el esperado en un arqueo ciego"
+
+msgid "Change the settings and drawers"
+msgstr "Cambiar los ajustes y los cajones"
+
+msgid "No receipt printer takes this report: open the session to print it on this device."
+msgstr "Ninguna impresora de recibos recibe este informe: abre la sesión para imprimirlo en este dispositivo."

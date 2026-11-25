@@ -8,9 +8,10 @@ from django.http import HttpRequest
 from live.context import OperationContext
 from live.operations import AI, operation
 
-from base import access
-from base.auth import SAAS_PANEL_PATH, saas_url
-from base.models import AccessSettings, Credential, Membership, SessionOwner
+from base import access, saas_store
+from base.models.access import AccessSettings, Credential
+from base.models import Membership
+from base.models.sessions import SessionOwner
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.access import AccessDoorIn, AccessDoorOut, AccessSettingsIn, AccessSettingsOut
 from base.throttle import client_key
@@ -38,7 +39,7 @@ def pin_people(slug: str, *, exclude: str = "") -> list[tuple[Credential, Any]]:
     Two reads, never a join: who is a member is control's (``Membership``) and the PINs are the hub's."""
     users = {
         membership.user.get_username(): membership.user
-        for membership in Membership.objects.filter(host=slug, user__is_active=True).select_related("user")
+        for membership in Membership.objects.team(slug).select_related("user")
     }
     users.pop(exclude, None)
     credentials = Credential.objects.filter(username__in=list(users)).exclude(pin_hash="")
@@ -56,7 +57,7 @@ def pin_owner(slug: str, person: str, pin: str) -> Any | None:
     if credential is None:
         return None
     membership = (
-        Membership.objects.filter(host=slug, user__username=credential.username, user__is_active=True)
+        Membership.objects.team(slug).filter(user__username=credential.username)
         .select_related("user")
         .first()
     )
@@ -128,7 +129,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
         "people": faces,
         "wait": wait,
         # «Upgrade plan» to a browser nobody is signed in on: erplora.com's plans, never this hub's id.
-        "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans"),
+        "plan_url": saas_store.plans_url(ctx.scope.key),
     }
 
 
@@ -144,8 +145,11 @@ def has_pin(user) -> bool:
     output=AccessSettingsOut,
     ai=AI(
         description=(
-            "Reads how the business asks who is at the till: whether the PIN pad shows, when it asks again (after some "
-            "minutes without use, or once per shift) and how many digits a PIN has."
+            "Reads how the business asks who is at the till, as the «PIN pad» card of Settings › General names it: "
+            "«Show PIN pad» is off when pin_policy is never; «Ask again after inactivity» is pin_inactivity_minutes "
+            "min when pin_policy is always, and «Until signing out» when it is per_shift (its minutes then do not "
+            "count); and how many digits a PIN has. With the PIN pad on, each person enters with their own PIN and "
+            "every sale carries their name. Say it to the person by those names."
         ),
         asks={
             "en": (

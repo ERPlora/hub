@@ -711,3 +711,30 @@ msgstr "alergia en el plato"
 #: apps.py:101
 msgid "Settings"
 msgstr "Ajustes"
+
+msgid "View kitchen tickets, stations, routing and settings"
+msgstr "Ver las comandas, las estaciones, el enrutado y los ajustes"
+
+msgid "Send rounds and create tickets by hand"
+msgstr "Enviar rondas y crear comandas a mano"
+
+msgid "Change tickets: fire, ready, recall, rush and reprint"
+msgstr "Cambiar comandas: lanzar, listo, recuperar, urgencia y reimprimir"
+
+msgid "Mark tickets served"
+msgstr "Marcar comandas como servidas"
+
+msgid "Cancel tickets"
+msgstr "Cancelar comandas"
+
+msgid "Delete tickets made by hand"
+msgstr "Borrar comandas hechas a mano"
+
+msgid "Manage stations and routing"
+msgstr "Gestionar las estaciones y el enrutado"
+
+msgid "Change the settings"
+msgstr "Cambiar los ajustes"
+
+msgid "View the history"
+msgstr "Ver el historial"

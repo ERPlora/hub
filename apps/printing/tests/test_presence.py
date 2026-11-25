@@ -3,7 +3,7 @@
 permissions that user really has. Whoever is signed in at the till prints, an employee too: its till is seen, and the
 bell stops ringing for it.
 
-Driven through ``config.asgi.application`` with base's own socket client (``base/tests/test_ws_print.py``).
+Driven through ``config.asgi.application`` with base's own socket client (``base/tests/print_socket.py``).
 """
 
 import datetime as dt
@@ -14,7 +14,7 @@ from django.utils import timezone
 from apps.printing.models import PrintDevice
 from base import ws_print
 from base.models import Membership
-from base.tests.test_ws_print import (  # noqa: F401 (fresh_live, session and sockets are fixtures)
+from base.tests.print_socket import (  # noqa: F401 (fresh_live, session and sockets are fixtures)
     db,
     fresh_live,
     printer,
@@ -45,7 +45,7 @@ def went_quiet(minutes: int = 10):
 
 
 async def test_an_employees_till_is_seen_at_its_hello_and_at_every_beat(sockets, session, monkeypatch, caplog):
-    monkeypatch.setattr(ws_print, "PRESENCE_SECONDS", 0)
+    monkeypatch.setattr(ws_print.presence, "PRESENCE_SECONDS", 0)
     cookie = await db(session, "eva", host=A.key, role=Membership.Role.EMPLOYEE)
     till = await db(printer, scope=A)
     await db(set_up, DEVICE, till, scope=A)

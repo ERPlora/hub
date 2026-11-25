@@ -1,7 +1,7 @@
 """Schemas of what an automation is built from (``flow.catalog.read``, ``flow.operation.get``): the events,
 actions and reads of the active apps, and an operation by its name."""
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from ninja import Field, Schema
 
@@ -18,7 +18,21 @@ class OperationNameOut(Schema):
 
 
 class CatalogIn(In):
-    pass
+    apps: list[Annotated[str, Field(max_length=64)]] | None = Field(
+        None,
+        max_length=30,
+        description="Every event and action of these apps, by their id (`task`, `cash_register`).",
+    )
+    names: list[Annotated[str, Field(max_length=96)]] | None = Field(
+        None,
+        max_length=30,
+        description="These events and actions, by name (`cash_register.session.closed`, `task.task.create`).",
+    )
+    only_names: bool = Field(
+        False,
+        description="The events and only the names of the actions (`action_names`), to choose which to read whole "
+        "by `names`.",
+    )
 
 
 class CatalogEventOut(Schema):
@@ -61,5 +75,7 @@ class CatalogAppOut(Schema):
 class CatalogOut(Schema):
     events: list[CatalogEventOut]
     actions: list[CatalogActionOut]
+    #: With ``only_names``, the actions by name alone, instead of whole in ``actions``.
+    action_names: list[str] = []
     #: The installed apps that are off in the business: what a saved automation may still name (hub#1054).
     off_apps: list[CatalogAppOut]

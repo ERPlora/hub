@@ -114,7 +114,7 @@ def test_merged_rounds_charge_with_the_check_that_stays(clock, product):
     absorbed = send(first.id)
     second = open_check("Table 6")
     add_line(second.id, product("Soup"))
-    send(second.id)
+    staying = send(second.id)
     run(
         "sale.order.merge",
         {"from_order_id": str(first.id), "to_order_id": str(second.id)},
@@ -123,8 +123,8 @@ def test_merged_rounds_charge_with_the_check_that_stays(clock, product):
     clock.advance(minutes=1)
     charge(second.id, key="merged")
     run("kitchen.ticket.sync", {}, ctx_for(permissions={"*"}))
-    statuses = {ticket.label: ticket.status for ticket in Ticket.objects.all()}
-    assert statuses == {"Table 5": "served", "Table 6": "pending"}
+    statuses = {ticket.id: (ticket.label, ticket.status) for ticket in Ticket.objects.all()}
+    assert statuses == {absorbed.id: ("Table 6", "served"), staying.id: ("Table 6", "pending")}
 
 
 def test_a_split_check_closes_a_round_only_when_every_check_of_it_is_charged(
@@ -241,7 +241,8 @@ def test_a_round_not_saved_yet_already_says_its_waiter_by_name(product, ana, dja
     order = open_check("Table 4")
     add_line(order.id, product("Burger"), ctx=ctx_for(actor=ana))
     fire(order.id, ctx=ctx_for(actor=ana))
-    # Who has no name is said by their e-mail; the id of the session only as the last resort.
+    # Who has no name is said by what goes before the «@» of their e-mail, never by the address; the id of the
+    # session only as the last resort.
     for username, email in (("saas:43", "luis@example.com"), ("saas:44", "")):
         person = django_user_model.objects.create_user(username, email=email)
         other = open_check(f"Table {username[-1]}")
@@ -250,4 +251,4 @@ def test_a_round_not_saved_yet_already_says_its_waiter_by_name(product, ana, dja
 
     shown = board().cooking
     assert all(not t.saved for t in shown)
-    assert sorted(t.waiter for t in shown) == ["Ana García", "luis@example.com", "saas:44"]
+    assert sorted(t.waiter for t in shown) == ["Ana García", "luis", "saas:44"]

@@ -16,9 +16,9 @@ from live.operations import AI, operation
 from live.operations import get as get_operation
 from live.outbox import record_event
 
-from base import activation, blueprint, entitlement, events
+from base import activation, blueprint, business, entitlement, events
 from base.activation import CREATING
-from base.models import ImportBatch
+from base.models.blueprints import ImportBatch
 from base.permissions import ADMINISTER_HUB
 from base.schemas.apps import AppChangeIn
 from base.schemas.blueprints import (
@@ -36,6 +36,26 @@ def _who(ctx: OperationContext) -> str:
     if hasattr(actor, "get_username"):
         return (actor.get_full_name() or actor.get_username())[:150]
     return str(actor)[:150]
+
+
+def _import_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    """The template by its name and its language, as the Import screen shows them, and, when no apps are chosen (an
+    empty list loads every one too), the apps it loads by their names."""
+    seed = blueprint.seeds.template(arguments.get("template") or "")
+    if seed is None:
+        return fields
+    language = business.babel_locale(ctx.language).languages.get(seed.language, seed.language)
+    chosen = arguments.get("apps")
+    shown = [
+        {**field, "value": f"{seed.name} ({language})"} if field["name"] == "template" else field
+        for field in fields
+        if chosen or field["name"] != "apps"
+    ]
+    if chosen:
+        return shown
+    apps = [str(blueprint.datasets.app_label(app)) for app in seed.bundle.manifest["apps"]]
+    title = gettext(BlueprintImportIn.model_fields["apps"].title)
+    return [*shown, {"name": "apps", "label": title, "kind": "list", "value": apps, "titled": True, "named": True}]
 
 
 @operation(
@@ -63,8 +83,8 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     by GET), like the rehearsal (``dry_run``) of the apps' imports.
     """
     with translation.override(ctx.language):
-        bundle, seed = blueprint.open_source(data.template, data.file_base64)
-        return blueprint.summary(ctx, bundle, seed=seed)
+        bundle, seed = blueprint.preview.open_source(data.template, data.file_base64)
+        return blueprint.preview.summary(ctx, bundle, seed=seed)
 
 
 @operation(
@@ -73,30 +93,36 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     permission=ADMINISTER_HUB,
     input=BlueprintImportIn,
     output=ImportOut,
-    ai=AI(
-        description=(
-            "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on its apps "
+    ai={
+        "description": (
+            "Loads a template of the catalogue (a restaurant, a hair salon…), or a copy of a business the person "
+            "attached in the chat (a .blueprint.zip, from another business or a backup: its name in file_base64), "
+            "into this business: turns on its apps "
             "that are off (with the apps they need, within the plan's limit of apps), then loads its menu or services, "
             "its tables and the rest of its apps' data, app by app; what is already there is left as it was. An app "
             "still being set up («waiting») brings its data by itself when it is ready: nothing to do but say so. "
             "Returns the report of what went in, with why an app could not be turned on. Never brings people, PINs or "
-            "fiscal data. Use this, not blueprint.list or blueprint.inspect, when asked to load, import or apply one."
+            "fiscal data. Use this, not blueprint.list or blueprint.inspect, when asked to load, import or apply one. "
+            f"A copy is made in the business it comes from. {blueprint.export.TO_ANOTHER_BUSINESS}"
         ),
-        risk="high",
-        asks={
+        "risk": "high",
+        "asks": {
             "en": (
                 "load the restaurant template",
                 "set me up like a hair salon",
                 "fill the business with the café starter menu",
                 "import the restaurant template",
+                "load this copy of another business I attached",
             ),
             "es": (
                 "carga la plantilla de restaurante",
                 "quiero empezar con la plantilla de bar",
                 "importa la plantilla de restaurante",
+                "cárgame la copia de otro bar que te he adjuntado",
             ),
         },
-    ),
+        "summary": _import_summary,
+    },
 )
 def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
     """Load a template, a file or what a load left out and keep its report and the rows it created.
@@ -112,16 +138,16 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
             retried = ImportBatch.objects.select_for_update().filter(pk=data.retry_of).first()
             if retried is None:
                 raise NotFound(gettext("This load is not there any more."), code="base.import_not_found")
-            blocked = blueprint.retry_state(ctx, retried)
+            blocked = blueprint.loads.retry_state(ctx, retried)
             if blocked:
-                code, message = blueprint.RETRY_BLOCKED[blocked]
+                code, message = blueprint.loads.RETRY_BLOCKED[blocked]
                 raise Conflict(str(message), code=code)
-            bundle, seed = blueprint.open_source(retried.template_key, "")
+            bundle, seed = blueprint.preview.open_source(retried.template_key, "")
             apps = list(retried.apps)
             # What it still waited for (an app whose setup failed) is this load's now: one report, one load of it.
-            _stop_waiting(ctx, [retried], None, blueprint.STOPPED_RETRIED)
+            _stop_waiting(ctx, [retried], None, blueprint.loads.STOPPED_RETRIED)
         else:
-            bundle, seed = blueprint.open_source(data.template, data.file_base64)
+            bundle, seed = blueprint.preview.open_source(data.template, data.file_base64)
             apps = list(dict.fromkeys(data.apps)) if data.apps is not None else []
         # A hub is born with every app off. The apps the blueprint lists are turned on first, and
         # what loads reads its rows, never the cache of the apps off kept before this change.
@@ -129,9 +155,9 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
             refused = _turn_on_listed(ctx, bundle.manifest["apps"], set(apps))
             waiting = _being_set_up(ctx, bundle.manifest["apps"], set(apps)) - refused.keys()
             if seed is None:
-                refused |= dict.fromkeys(waiting, str(blueprint.FILE_BEING_SET_UP))
+                refused |= dict.fromkeys(waiting, str(blueprint.loads.FILE_BEING_SET_UP))
                 waiting = set()
-            applied = blueprint.apply(ctx, bundle, apps=set(apps) if apps else None, refused=refused, waiting=waiting)
+            applied = blueprint.loading.apply(ctx, bundle, apps=set(apps) if apps else None, refused=refused, waiting=waiting)
         load = ImportBatch.objects.create(
             name=bundle.manifest["name"],
             source=ImportBatch.Source.CATALOG if seed else ImportBatch.Source.FILE,
@@ -146,7 +172,7 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
             retry_of=retried,
         )
         record_event(ctx, events.BLUEPRINT_IMPORTED, {"id": str(load.pk), "status": load.status})
-        return blueprint.describe_load(ctx, load)
+        return blueprint.loads.describe_load(ctx, load)
 
 
 @operation(
@@ -176,8 +202,8 @@ def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
             raise NotFound(gettext("This load is not there any more."), code="base.import_not_found")
         if load.undone_at is not None:
             raise Conflict(gettext("This load was undone already."), code="base.import_undone")
-        removed = blueprint.undo(ctx, load.created_rows)
-        _stop_waiting(ctx, [load], None, blueprint.STOPPED_UNDONE)
+        removed = blueprint.removal.undo(ctx, load.created_rows)
+        _stop_waiting(ctx, [load], None, blueprint.loads.STOPPED_UNDONE)
         load.undone_at = timezone.now()
         load.save(update_fields=["undone_at"])
         record_event(ctx, events.IMPORT_UNDONE, {"id": str(load.pk)})
@@ -199,7 +225,7 @@ def _waiting_loads() -> list[ImportBatch]:
     """The loads of this business still waiting for an app, oldest first, locked as what is written on them is."""
     return list(
         ImportBatch.objects.select_for_update()
-        .filter(report__apps__contains=[{"status": blueprint.WAITING}], undone_at__isnull=True)
+        .filter(report__apps__contains=[{"status": blueprint.loading.WAITING}], undone_at__isnull=True)
         .order_by("created_at", "id")
     )
 
@@ -207,9 +233,9 @@ def _waiting_loads() -> list[ImportBatch]:
 def _stop_waiting(ctx: OperationContext, loads: Iterable[ImportBatch], apps: Collection[str] | None, reason: Any) -> None:
     """``loads`` stop waiting for ``apps`` (``None``: for any): their report says ``reason``, and they load nothing."""
     for load in loads:
-        waited = [app for app in blueprint.waiting_apps(load) if apps is None or app in apps]
+        waited = [app for app in blueprint.loads.waiting_apps(load) if apps is None or app in apps]
         if waited:
-            blueprint.stop_waiting(ctx, load, waited, reason)
+            blueprint.loads.stop_waiting(ctx, load, waited, reason)
             load.save(update_fields=["report", "status", "created_rows"])
 
 
@@ -219,9 +245,9 @@ def _load_what_waited(ctx: OperationContext, on: Iterable[str]) -> None:
     the next one does both, so nothing is lost or left half done. Oldest first: what is there already is left as it is."""
     on = set(on)
     for load in _waiting_loads():
-        waited = set(blueprint.waiting_apps(load)) & on
+        waited = set(blueprint.loads.waiting_apps(load)) & on
         if waited:
-            blueprint.finish_waiting(ctx, load, waited)
+            blueprint.loads.finish_waiting(ctx, load, waited)
             load.save(update_fields=["report", "status", "created_rows"])
             record_event(ctx, events.BLUEPRINT_IMPORTED, {"id": str(load.pk), "status": load.status})
 

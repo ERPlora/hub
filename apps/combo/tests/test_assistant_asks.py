@@ -20,7 +20,7 @@ from live.operations import AI, registry
 from apps.invoice.tests.conftest import in_hubs
 from base import assistant
 from base.models import Membership
-from base.tests.test_assistant_asks import TOP, assert_offered_with_room, comparable
+from base.tests.test_assistant_asks import TOP, assert_offered_or_found, comparable
 from base.tests.test_assistant_asks import offered_place, offered_to, place_of_no_ask, probe_phrases
 from base.tests.test_assistant_asks import english_coverage_test, english_words_test, own_words_test
 
@@ -33,6 +33,7 @@ WRITES = {
     "combo.combo.update",
     "combo.combo.delete",
     "combo.combo.set_image",
+    "combo.combo.set_active",
     "combo.group.create",
     "combo.group.update",
     "combo.group.delete",
@@ -73,6 +74,7 @@ OWN_WORDS = [
     ("combo.combo.update", "rebájame el infantil a 8,50"),
     ("combo.combo.delete", "el de Navidad no vuelve, quítalo del todo"),
     ("combo.combo.set_image", "para el de invierno quiero el dibujo del cocido"),
+    ("combo.combo.set_active", "el menú de verano, que no se venda más por ahora"),
     ("combo.group.create", "al infantil le hace falta un plato más: el postre"),
     ("combo.group.update", "deja que elijan dos entrantes"),
     ("combo.group.delete", "el vegano se queda sin postre"),
@@ -96,12 +98,12 @@ def test_menus_and_combos_is_listed_so_layer_1_sweeps_every_ask_of_it():
     assert "combo" in settings.LIVE_ASSISTANT_ASKS_REQUIRED
 
 
-def test_combo_offers_its_eighteen_tools():
-    """Menus and combos' tools are its eighteen operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails.
+def test_combo_offers_its_nineteen_tools():
+    """Menus and combos' tools are its nineteen operations (``AI``, never ``INTERNAL``): a silent drop of a tool fails.
     The upload of a photo of its own (the form's file) and the reaction to Inventory's deletion are none."""
     tools = {name for name, op in registry.items() if op.app_label == "combo" and assistant.tools.is_tool(op)}
     assert all(isinstance(registry[name].ai_spec(), AI) for name in tools)
-    assert len(tools) == 18
+    assert len(tools) == 19
     assert WRITES < tools
     assert not {"combo.combo.upload_image", "combo.option.drop_product"} & tools
 
@@ -133,19 +135,24 @@ def test_putting_the_choices_in_order_is_offered_ahead_of_deleting_and_creating_
     assert ahead == [], ahead
 
 
+#: The task the model searches for when a probe brings its tool past the places of a turn.
+SEARCHED = {"combo.option.bulk_create": "añadir varias opciones a un menú"}
+
+
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
 @pytest.mark.parametrize("probe", PROBES, ids=[probe["id"] for probe in PROBES])
 def test_every_probe_of_menus_offers_its_tool_to_whoever_may_run_it(catalog_of, probe):
     """The phrases of layer 2 of Menus and combos, the ones the model answered right too: a tool of Menus that a new ask
-    elsewhere pushes out of the first half of the ones a turn offers fails here before the real-model QA sees it. What
-    the employee asks of a change of the menus is a refusal: the tool is not theirs to be offered."""
+    elsewhere pushes out of the ones a turn offers, or past them out of what the search of its task finds
+    (``SEARCHED``), fails here before the real-model QA sees it. What the employee asks of a change of the menus is a
+    refusal: the tool is not theirs to be offered."""
     role = {"owner": Membership.Role.OWNER, "employee": Membership.Role.EMPLOYEE}[probe["role"]]
     tools = catalog_of(role, probe["language"])
     if probe["expect"] == "refused":
         assert (probe["role"], probe["tool"] in WRITES) == ("employee", True)
         assert probe["tool"] not in tools
         return
-    assert_offered_with_room(tools, probe["tool"], probe["phrase"], probe["language"])
+    assert_offered_or_found(tools, probe["tool"], probe["phrase"], SEARCHED.get(probe["tool"]), probe["language"])
 
 
 test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
@@ -161,6 +168,7 @@ OWN_WORDS_EN = [
     ("combo.combo.list", "go over the ones we have and what each costs"),
     ("combo.combo.resolve", "how much would the tasting one come to with steak?"),
     ("combo.combo.set_image", "for the summer one use the paella drawing"),
+    ("combo.combo.set_active", "stop selling the summer one for now"),
     ("combo.combo.suggest_image", "what would suit the summer one?"),
     ("combo.combo.update", "bring the kids' one down to 8.50"),
     ("combo.group.create", "the kids' one needs one more: dessert"),

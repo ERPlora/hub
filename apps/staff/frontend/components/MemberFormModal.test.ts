@@ -1,7 +1,7 @@
 // STAFF-F01, F02, F03, F21 — the record of a staff member, the old side panel as a dialog: «New» from
 // «+», «Edit · {name}» from a row. Fields, in the old order: First name, Last name, Email, Phone,
 // Employee ID, Role («No role»), Hub user («No Hub access», with the hint of why to link one), Status
-// (only when editing), Bookable, Buffer between appointments, Hire date, Color, Specialties, Bio and,
+// (only when editing), Bookable, Booking buffer, Hire date, Color, Specialties, Bio and,
 // for whoever may see the pay, Hourly rate, Commission (%) and the HR notes. Role and Hub user are
 // Combo fields that search the server (a business may have more than the 100 it gives at once): the
 // active roles (`staff.role.list`) and the accounts with access to this business
@@ -14,24 +14,11 @@ import { describe, expect, it } from 'vitest';
 import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { MemberOut, RoleOut } from '../operations';
-import {
-  BUSINESS,
-  business,
-  click,
-  EMPLOYEE,
-  ionChecked,
-  ionValue,
-  JAPANESE,
-  MANAGER,
-  mountStaff,
-  type MountOptions,
-  page,
-  POLISH,
-  settle,
-} from '../__tests__/mount-staff';
+import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
+import { BUSINESS, business, click, EMPLOYEE, ionChecked, ionValue, JAPANESE, MANAGER, mountStaff, type MountOptions, page, POLISH, settle } from '../__tests__/mount-staff';
 import MemberFormModal from './MemberFormModal.vue';
 
-type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; errorText?: string; type?: string; disabled?: boolean };
+type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; errorText?: string; readonly?: boolean; disabled?: boolean };
 
 const role = (id: string, name: string, is_active = true): RoleOut => ({ id, name, description: '', color: '', order: 0, is_active, member_count: 0 });
 const ROLES = page([role('r1', 'Stylist'), role('r2', 'Receptionist')]);
@@ -113,7 +100,7 @@ describe('MemberFormModal: New (STAFF-F01)', () => {
   it('is «New», with the old fields in order and no Status (a new person is born Active)', async () => {
     const s = await setup();
     expect(s.inDoc('staff-member-form')?.getAttribute('aria-label')).toBe('New');
-    // A Combo carries `data-field` on its wrapper, around its ion-input.
+    // A Combo and a DateField carry `data-field` on their wrapper, around their ion-input.
     const label = (el: Element) => (el as Control).label ?? (el.querySelector('ion-input') as Control | null)?.label ?? el.textContent?.trim();
     const labels = [...(s.inDoc('staff-member-form-fields') as HTMLElement).querySelectorAll('[data-field]')].map(label);
     expect(labels).toEqual([
@@ -125,7 +112,7 @@ describe('MemberFormModal: New (STAFF-F01)', () => {
       'Role',
       'Hub user',
       'Bookable',
-      'Buffer between appointments (min)',
+      'Booking buffer (min)',
       'Hire date',
       'Color',
       'Specialties',
@@ -136,7 +123,7 @@ describe('MemberFormModal: New (STAFF-F01)', () => {
     ]);
     expect(s.field('status')).toBeNull();
     expect(s.field('is_bookable').checked).toBe(true);
-    expect(s.field('hire_date').type).toBe('date');
+    expect([s.field('hire_date').readonly, picked(s.field('hire_date'))]).toEqual([true, '']);
     expect(s.field('first_name').getAttribute('mode')).toBe('md');
   });
 
@@ -287,7 +274,7 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
       ['/api/staff/accounts', { user_id: '4', limit: '1' }],
     ]);
     // The role and the Hub user the record holds, by name.
-    expect([s.field('role_id').value, s.field('user_id').value]).toEqual(['Barber', 'Ana López']);
+    expect([s.field('role_id').value, s.field('user_id').value, picked(s.field('hire_date')), s.field('hire_date').value]).toEqual(['Barber', 'Ana López', '2024-02-01', '02/01/2024']);
     expect([s.field('first_name').value, s.field('booking_buffer').value, s.field('bio').value, s.field('hourly_rate').value, s.field('commission_rate').value, s.field('notes').value]).toEqual([
       'Ana',
       '10',
@@ -447,9 +434,10 @@ describe('MemberFormModal: Edit · {name} (STAFF-F02, F03)', () => {
     await ionValue(s.field('phone'), '611', 'ionInput');
     await s.choose('user_id', '');
     await ionValue(s.field('status'), 'on_leave');
+    await pick(s.field('hire_date'), '2024-03-01');
     await click(s.save());
     expect(s.posts()).toEqual([
-      { method: 'POST', path: '/api/staff/members/update', query: {}, body: { id: 'm1', phone: '611', user_id: null, status: 'on_leave' } },
+      { method: 'POST', path: '/api/staff/members/update', query: {}, body: { id: 'm1', phone: '611', user_id: null, status: 'on_leave', hire_date: '2024-03-01' } },
     ]);
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });

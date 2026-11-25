@@ -1,6 +1,5 @@
-<!-- generated from WORKBOOK.md sha256:3b55c34ad79ead9c0f5abc6f9f41ae744dce374d390eeb8f486329b36c459322 -->
-
 ## What it is for and who it is for
+<!-- from WORKBOOK.md sha256:e5c7eb8c3b42 -->
 
 Customers is the file of the people and companies of your business: each one's card with their contact and tax
 details, their groups and tags, your notes, their permission to receive advertising through each channel and what
@@ -8,6 +7,7 @@ they have bought from you. In the hair salon it is the client of the agenda; in 
 or asks for an invoice.
 
 ### In detail
+<!-- from WORKBOOK.md sha256:38eb9283cf98 -->
 
 Customers is the business's **file of people and companies** and the owner of their personal data: the
 card with the contact and tax details, its groups, tags and own fields, its notes and its activity, its
@@ -23,6 +23,7 @@ Appointments and Reservations look them up by name or phone, WhatsApp recognises
 all of them learn when two cards are merged or a person's data is erased. Customers needs no other app.
 
 ### Who uses it and what each one does
+<!-- from WORKBOOK.md sha256:d2eb5e86e029 -->
 
 - The **owner** and the **administrator**: everything, also deleting cards and erasing personal data.
 - The **manager**: edits cards, merges duplicates, creates and changes groups, tags and fields (and
@@ -39,6 +40,7 @@ all of them learn when two cards are merged or a person's data is erased. Custom
   through their WhatsApp.
 
 ## Reference adopted
+<!-- from WORKBOOK.md sha256:f772e5c764a2 -->
 
 ERPlora does not invent flows: it adopts the ones the market has already proven.
 
@@ -64,6 +66,7 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   erase personal data are different permissions.
 
 ## Before you start
+<!-- from WORKBOOK.md sha256:b7bc1f9601b3 -->
 
 1. Turn on **Customers** on the business's apps page. It needs no other app. With **Sales & POS** the
    search appears at the till and purchases are recorded by themselves; with **Appointments**, the
@@ -83,6 +86,7 @@ The business is the first part of the address (`a.localhost:8000` is business `a
 has its own database: its cards are seen by that business alone.
 
 ## Screens
+<!-- from WORKBOOK.md sha256:a0a53eceedca -->
 
 Customers opens from the **Customers** menu and has four tabs: **Customers**, **Groups**, **Tags** and
 **Fields**; the last three, only for whoever can configure Customers. It has no settings
@@ -90,6 +94,7 @@ tab. The till's customer search is not a tab of Customers: it lives in
 **Sales & POS → Sell**, behind the "Assign customer" button.
 
 ### Customers
+<!-- from WORKBOOK.md sha256:6843579836bd -->
 Here is the file of your customers. At the top you see four figures: how many there are, how many are active, how
 many are VIP and how much they have spent. Below, the list: look them up by name, phone, email, tax ID or company,
 filter them and sort them. With **Add** you create a card, with **Import CSV** you bring in the customers you
@@ -97,6 +102,7 @@ already had and with **Export CSV** you take them to a spreadsheet. Tap a row to
 your notes, their advertising permission, their allergies and their purchases.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:8c7fc3dc774a -->
 At the top, four figures: "Customers", "Active", "VIP" and "Revenue" (what the live cards have spent, only to whoever sees the business totals).
 Below, the table: "Name", "Email", "Phone", "Stage" and "Spent"; search "Search name, phone or email…"
 (it also searches tax ID and company); filters by stage, source, active and spent ("From / To", in the
@@ -106,6 +112,7 @@ company…", which does not look into the email or the phone. In the bar, **Add*
 may manage cards, and **Export CSV** for whoever may export. Tapping a row opens the card.
 
 #### Customer card
+<!-- from WORKBOOK.md sha256:77d17c67449e -->
 The name and the buttons the profile allows: **Edit**, **Delete**, **Merge with…** and **Erase personal
 data** (the employee sees **Merge with…**, which they do with a manager's PIN). Blocks: the details (Email, Phone, Tax ID, Company, Address, Stage, Source, Preferred channel,
 Purchases, Spent, Last purchase, Active, internal notes, birthday, anniversary and custom fields);
@@ -115,32 +122,39 @@ end the blocks of other apps (today, the "Visit history" of Appointments). Whoev
 contact details gets the card without "Email" or "Phone" and the consent without the address it was given for.
 
 ### Groups
+<!-- from WORKBOOK.md sha256:f7d9b7be1427 -->
 Groups sort your customers, for example "Members" or "Companies". Here you create them, change their name or
 color, deactivate them and delete them; then, on each customer's card, you tick which groups they belong to.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:b126d64bd602 -->
 Table "Name", "Description", "Customers" (how many live cards it has), "Order" and "Active"; search
 "Search group…" and an active filter; **Add** and **Edit** for whoever may configure and for the
 employee (with a manager's PIN), **Delete** for the owner and the administrator.
 
 ### Tags
+<!-- from WORKBOOK.md sha256:41648cb6ffd1 -->
 Tags are colored marks you put on a card to recognise the customer at a glance, for example "Regular" or "Prefers
 mornings". Here you create, change and delete them; on each customer's card you tick the ones they carry.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:9f5c74e35ffe -->
 Table "Name", "Color", "Customers" and "Active"; search "Search tag…"; same actions as Groups.
 
 ### Fields
+<!-- from WORKBOOK.md sha256:796220c857b0 -->
 Own fields are the details your business wants to keep about each customer and that the card does not bring, such
 as their size or their hair type. Here you create them with their type (text, number, date, yes or no, a list of
 options or a long text) and decide whether they are required; they show on the card of all your customers.
 
 #### Detail
+<!-- from WORKBOOK.md sha256:91809b0453c2 -->
 Table "Name", "Type", "Required" (Yes/No), "Order" and "Active"; search "Search field…"; filters by
 type, required and active; **Add**, **Edit** and **Delete** for whoever may configure and for the
 employee (with a manager's PIN).
 
 ## States of each screen
+<!-- from WORKBOOK.md sha256:15512b6ed01c -->
 
 | State | What the person sees |
 |---|---|
@@ -153,12 +167,14 @@ employee (with a manager's PIN).
 | Card that is no longer there | "This customer is no longer available." (deleted, merged into another or with its data erased). |
 
 ## Unsaved changes on Android
+<!-- from WORKBOOK.md sha256:8bbcfe6718c8 -->
 
 In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
 or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
+<!-- from WORKBOOK.md sha256:f5af076e5087 -->
 
 | ID | Flow | Status | Vertical |
 |---|---|---|---|
@@ -199,6 +215,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 "Done": server and pages with their tests (of the pages and end to end in Chrome).
 
 ### CUSTOMER-F01 Add a card
+<!-- from WORKBOOK.md sha256:033ae5916566 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Customers
@@ -212,18 +229,22 @@ Steps:
 4. Tap **Save**: the panel closes and the card appears in the list; the figures are recalculated.
 In: what is typed. The country is stored with its two-letter code (`ES`, `FR`). The phone is stored in
 the international format (`+34` and the digits together, CUSTOMER-F11); the email and the tax ID, without
-the spaces at the ends.
+the spaces at the ends. "Birthday" and "Anniversary" are typed in three boxes, "Day", "Month" and "Year" (in the
+order the language writes a date), and the year only if it is known: "12" and "3" without a year save the 12th of
+March.
 Out: the new card, active and with no consent of any kind (CUSTOMER-F14), and the card-created notice
 (`customer.customer.created`), which WhatsApp listens to so as to join to the card the conversations
 that number already had.
 If it fails: the reason shows under its field and what was typed is kept. A malformed email: "Enter a
 valid email.". A phone that is not a number of its country: "This is not a valid phone number of its
 country: check the digits or write it with its international prefix (+44…).". A country that does not
-exist: "Choose a country from the list.". A date that does not exist in "Birthday" or "Anniversary" (a
-31/02): "Enter a valid date.". Nothing is saved. Custom fields are not asked for when adding.
+exist: "Choose a country from the list.". A day that does not exist in "Birthday" or "Anniversary" (a 31st of
+February), or one missing its day or its month: "Enter a valid date.". Nothing is saved. Custom fields are not
+asked for when adding.
 Involved: WHATSAPP_INBOX-F04, BASE-F114 (the ERPlora staff bring back from a separate copy the cards that were lost, each by this same creation, with its groups and tags, CUSTOMER-F06, and its custom fields, CUSTOMER-F04)
 
 ### CUSTOMER-F02 Search and filter cards
+<!-- from WORKBOOK.md sha256:0aca2a10042e -->
 Status: done
 Actor: everyone
 Screen: Customers
@@ -253,15 +274,17 @@ not exist.
 Involved: BASE-F119
 
 ### CUSTOMER-F03 Open a customer's card
+<!-- from WORKBOOK.md sha256:91e5a4c2477e -->
 Status: done
 Actor: everyone
 Screen: Customer card
 Steps:
 1. From **Customers**, tap the row.
-2. The card shows all its details (also internal notes, birthday, anniversary and custom fields), its
-   groups and tags, its consent per channel, the
-   activity (newest first, 50 per page; each entry says when and who: the person or the API key by their
-   name, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
+2. The card shows all its details (also internal notes, birthday, anniversary and custom fields; a birthday
+   without its year, as "March 12"), its groups and tags, its consent per channel, the
+   activity (newest first, 50 per page; each entry says when and who: the person by their name or, if their
+   account has none, by what goes before the @ of their email, never the whole email; the API key by its
+   own, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
    records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps. The
    email, the phone and the address each consent was given for, only to whoever sees the customers' contact
    details.
@@ -271,9 +294,10 @@ Out: nothing; read only. If another person changes it while it is open, the chan
 reloading.
 If it fails: "This customer is no longer available." if it was deleted, merged into another or its data
 was erased.
-Involved: CUSTOMER-F24
+Involved: CUSTOMER-F24, BASE-F119
 
 ### CUSTOMER-F04 Edit the card and its custom fields
+<!-- from WORKBOOK.md sha256:013920c85fca -->
 Status: done
 Actor: everyone who manages cards (owner, administrator, manager, employee)
 Screen: Customer card
@@ -292,14 +316,14 @@ Out: the card and its fields saved in a single write, and the card-updated notic
 corrected. Saving without changing anything notifies nobody. The consent stays recorded with the address
 it was given for: changing the phone or the email does not carry it over (CUSTOMER-F14).
 If it fails: an empty required field ("This field is required."), a value that does not fit its type
-("Enter a number." if "three" is written in a number, "Enter a valid date." if the date does not exist,
-like a 31/02, also in "Birthday" and "Anniversary", "Choose one of the options."), a field that no longer
+("Enter a number." if "three" is written in a number, "Choose one of the options."), a field that no longer
 exists or a phone that is not of its country reject the WHOLE save: the reason shows next to its field
 and the card keeps what it had saved. The "Active" checkbox unticked only changes the "Active" figure:
 the card still shows in searches, at the till and on WhatsApp.
 Involved: WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F05 Add a note to the card
+<!-- from WORKBOOK.md sha256:f1a5565fec8c -->
 Status: done
 Actor: everyone who manages cards
 Screen: Customer card
@@ -308,15 +332,18 @@ Steps:
 2. Tap **Add**. "Note added" shows and the note appears at the top of the "Activity", with who wrote it
    and when.
 In: the text (up to 5,000 characters) and, if whoever writes it puts them in by another way (an
-automation), a title of its own and the author's name.
+automation), a title of its own and the author's name. An allergy, a sensitivity test or other health data
+does not go in a note nor in the card's internal notes: asked to the assistant, it says it does not note
+that itself and that it is done in "Health and allergies" on the card, with their permission (CUSTOMER-F32).
 Out: the note, which IS its entry in the activity (a single row: there can be no note without activity),
 and the note-added notice (`customer.note.added`). Notes are neither edited nor deleted. An automation can
 write notes through the same service.
 If it fails: an empty note shows under the field; "This customer is no longer available." if the card no
 longer exists.
-Involved: none
+Involved: CUSTOMER-F32
 
 ### CUSTOMER-F06 Put groups and tags on a card
+<!-- from WORKBOOK.md sha256:f4b91ca5e5a8 -->
 Status: done
 Actor: everyone who manages cards
 Screen: Customer card
@@ -338,6 +365,7 @@ or tags: "No groups." / "No tags.".
 Involved: none
 
 ### CUSTOMER-F07 Delete a card
+<!-- from WORKBOOK.md sha256:d2caae585e8c -->
 Status: done
 Actor: owner, administrator
 Screen: Customer card
@@ -358,6 +386,7 @@ notifies again.
 Involved: SERVICE-F29, CUSTOMER-F33 (the deleted card can come back as it was)
 
 ### CUSTOMER-F08 Import cards from a CSV
+<!-- from WORKBOOK.md sha256:181dd2c3fc36 -->
 Status: done
 Actor: everyone who manages cards
 Screen: Customers
@@ -375,7 +404,9 @@ In: the file, which the screen sends in blocks of 50 rows. Headers it understand
 `email`/"Email"/"correo", `phone`/"Teléfono"/"tel", `tax_id`/"NIF"/"CIF", `company_name`/"Empresa",
 `address`/"Dirección", `city`/"Ciudad", `postal_code`/"CP"/"Código postal", `country`/"País",
 `lifecycle_stage`/"Etapa" and `notes`/"Notas" (the same columns the export gives, CUSTOMER-F09), and also
-`source`, `preferred_channel`, `birthday`, `anniversary` and `avatar`.
+`source`, `preferred_channel`, `birthday`, `anniversary` and `avatar`. A birthday or an anniversary goes as
+`YYYY-MM-DD`, or as `--MM-DD` when the year is not known (`--03-12`, the 12th of March); anything else skips the row
+with "Enter a valid date.".
 Out: the cards created, with source "Import", the phone in the international format and without consent
 (even if the file brings a consent column), and a card-created notice for each one, so WhatsApp joins
 their conversations as with adding by hand. A row without stage comes in as "Active" (it is a customer
@@ -389,6 +420,7 @@ the three to change for it to be created (a mother and her daughter may share a 
 Involved: WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F09 Export the cards to CSV
+<!-- from WORKBOOK.md sha256:a314e2d9d504 -->
 Status: done
 Actor: owner, administrator, manager
 Screen: Customers
@@ -396,6 +428,8 @@ Steps:
 1. With the search and the filters wanted, tap **Export CSV**.
 2. The browser downloads the file "customers.csv" with ALL the cards that match the search, not only the page
    that is seen.
+3. Asked of the assistant ("Give me all the customers in a CSV"), "Download customers.csv" comes under its answer,
+   the same file the button gives; the assistant does not paste the cards into the chat.
 In: the table's search and filters.
 Out: a file with the columns `name`, `email`, `phone`, `tax_id`, `company_name`, `address`, `city`,
 `postal_code`, `country`, `lifecycle_stage`, `notes`, `source`, `is_active`, `total_purchases`,
@@ -406,9 +440,10 @@ formula; the import removes it. For whoever does not see the customers' contact 
 without the `email` and `phone` columns.
 If it fails: without permission to export, the server refuses it even if called through the API. With no
 cards, a file with only the headers comes out.
-Involved: BASE-F112 (inside the app)
+Involved: BASE-F112 (inside the app and from the assistant)
 
 ### CUSTOMER-F10 Recognise a person by their phone number
+<!-- from WORKBOOK.md sha256:718e630f3a4b -->
 Status: done
 Actor: system
 Screen: none
@@ -433,6 +468,7 @@ a number is reads the contact details: whoever does not see the customers' conta
 Involved: RESERVATION-F06, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F11 Store the phone in the international format (E.164)
+<!-- from WORKBOOK.md sha256:dc43e3b0ad4c -->
 Status: done
 Actor: whoever adds or edits
 Screen: Customer card
@@ -457,6 +493,7 @@ is saved.
 Involved: APPOINTMENT-F01, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F12 Avoid duplicate cards of the same person
+<!-- from WORKBOOK.md sha256:90732d94ab43 -->
 Status: done
 Actor: everyone who manages cards
 Screen: Customers, Till customer search
@@ -475,6 +512,7 @@ If it fails: the duplicate card is created; it is joined later.
 Involved: WHATSAPP_INBOX-F37
 
 ### CUSTOMER-F13 Merge two cards of the same person
+<!-- from WORKBOOK.md sha256:251a845092bd -->
 Status: done
 Actor: owner, administrator, manager; the employee, with a manager's PIN
 Screen: Customer card
@@ -507,6 +545,7 @@ approval is needed", "This needs a manager's approval.". Nothing changes.
 Involved: APPOINTMENT-F23, RESERVATION-F21, SALE-F33, SERVICE-F28, WHATSAPP_INBOX-F12, ONLINE_BOOKING-F09, BASE-F84
 
 ### CUSTOMER-F14 Record the consent of a channel
+<!-- from WORKBOOK.md sha256:0fafbdb274e4 -->
 Status: done
 Actor: everyone who manages cards
 Screen: Customer card
@@ -530,6 +569,7 @@ without buttons. Editing, creating or importing a card NEVER sets consent.
 Involved: none
 
 ### CUSTOMER-F15 Withdraw the consent of a channel
+<!-- from WORKBOOK.md sha256:9fbbffc9952d -->
 Status: done
 Actor: everyone who manages cards
 Screen: Customer card
@@ -545,6 +585,7 @@ manage cards sees the status without buttons.
 Involved: none
 
 ### CUSTOMER-F16 Erase a customer's personal data (GDPR)
+<!-- from WORKBOOK.md sha256:a1ed2bfacbbf -->
 Status: done
 Actor: owner, administrator
 Screen: Customer card
@@ -569,13 +610,14 @@ Online booking and Tables to empty their copies, and by Automations, which cance
 go on with her data (waiting, asking or resumable) and makes them forget what they read: none sends her
 anything any more; and every run that names her card, also one that has already ended, forgets the free
 texts of its history that may carry her name (FLOW-F16). Sales & POS and Invoicing keep their tax copy (it
-is a tax document).
+is a tax document); Invoicing takes the address off the emails it sent their invoices in (INVOICE-F26).
 If it fails: "This customer is no longer available." if it does not exist. Repeating it does not change
 the data or duplicate the audit, but notifies again.
 Involved: RESERVATION-F22, SERVICE-F29, WHATSAPP_INBOX-F11, APPOINTMENT-F24, ONLINE_BOOKING-F12, TABLE-F31,
-FLOW-F16, FLOW-F23, FLOW-F24
+FLOW-F16, FLOW-F23, FLOW-F24, INVOICE-F26
 
 ### CUSTOMER-F17 Assign a customer to the sale at the till
+<!-- from WORKBOOK.md sha256:4c936d0dc73c -->
 Status: done — the search is `CustomerSearch` (see "Till customer search · API"); Sales & POS mounts it on its screen
 Actor: everyone
 Screen: Till customer search
@@ -600,6 +642,7 @@ read. Choose them again if the sale needs one." (or with the reason Customers gi
 Involved: SALE-F04, SALE-F05, SALE-F17, INVOICE-F02
 
 ### CUSTOMER-F18 Create a customer from the till's search
+<!-- from WORKBOOK.md sha256:a070a49cce02 -->
 Status: done — the search is `CustomerSearch` (see "Till customer search · API"); Sales & POS mounts it on its screen
 Actor: everyone who manages cards
 Screen: Till customer search
@@ -622,24 +665,28 @@ are joined with CUSTOMER-F13).
 Involved: SALE-F05, WHATSAPP_INBOX-F04
 
 ### CUSTOMER-F19 Link the customer to the open order
+<!-- from WORKBOOK.md sha256:8e10cfecae79 -->
 Status: done
 Actor: system (Sales & POS asks for it)
 Screen: none
 Steps:
 1. With a customer assigned, Sales & POS opens or saves the order (the table's check, the cart) and asks
-   Customers to link it.
+   Customers to link it. Appointments does the same with the check it opens when an appointment is
+   charged, with the appointment's customer.
 2. Customers notes which customer that order has. Reassigning another customer to the same order
    replaces the previous one (an order, at most one customer); the same customer again rewrites nothing.
 3. On letting go of the customer (removing them, leaving the check at the table, deleting the check),
    Sales & POS asks for the link without a customer and the link is removed.
 In: the order and the customer (or none), with the permission of whoever is at the till.
 Out: the customer ↔ order link and its notice (`customer.order.linked` or `customer.order.unlinked`).
-Sales & POS reads it to give the customer back to the check (CUSTOMER-F17).
+Sales & POS reads it to give the customer back to the check (CUSTOMER-F17) and, when a check is charged
+without naming the customer (through the assistant or the API), so that the sale is theirs (SALE-F01).
 If it fails: the sale goes on; Sales & POS warns "The customer could not be linked to the check. Choose
 them again." (or with the reason Customers gives). A customer that is no longer available is not linked.
-Involved: SALE-F17
+Involved: SALE-F01, SALE-F17, APPOINTMENT-F17
 
 ### CUSTOMER-F20 Add the purchase to the card when charging
+<!-- from WORKBOOK.md sha256:8e0ed5299360 -->
 Status: done
 Actor: system
 Screen: none
@@ -658,6 +705,7 @@ card that is deleted, merged or with its data erased does not add up.
 Involved: SALE-F01
 
 ### CUSTOMER-F21 Subtract a voided sale
+<!-- from WORKBOOK.md sha256:c08a3ef13ffc -->
 Status: done
 Actor: system
 Screen: none
@@ -674,6 +722,7 @@ If it fails: voiding the same sale twice subtracts only once; a sale that was no
 Involved: SALE-F30
 
 ### CUSTOMER-F22 Subtract a refund
+<!-- from WORKBOOK.md sha256:d37d6e42fae4 -->
 Status: done
 Actor: system
 Screen: none
@@ -692,6 +741,7 @@ activity.
 Involved: SALE-F31
 
 ### CUSTOMER-F23 See a customer's purchase history
+<!-- from WORKBOOK.md sha256:0285d3d50a6a -->
 Status: done
 Actor: everyone
 Screen: Customer card
@@ -706,6 +756,7 @@ If it fails: "No purchases." if there are none.
 Involved: none
 
 ### CUSTOMER-F24 See on the card what other apps know about the customer
+<!-- from WORKBOOK.md sha256:f09a5eda6300 -->
 Status: done
 Actor: everyone
 Screen: Customer card
@@ -722,6 +773,7 @@ of the card goes on.
 Involved: APPOINTMENT-F20
 
 ### CUSTOMER-F25 Create the client without leaving the agenda
+<!-- from WORKBOOK.md sha256:c922f93fa69e -->
 Status: done
 Actor: everyone who manages cards
 Screen: Appointments: Agenda
@@ -745,6 +797,7 @@ assign" again. Whoever does not manage cards does not see "+ New customer".
 Involved: APPOINTMENT-F01, CUSTOMER-F18
 
 ### CUSTOMER-F26 Create the card of whoever asks for an appointment on WhatsApp
+<!-- from WORKBOOK.md sha256:88d6aa761827 -->
 Status: done
 Actor: assistant
 Screen: none
@@ -761,6 +814,7 @@ none.
 Involved: WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24, WHATSAPP_INBOX-F37, APPOINTMENT-F18
 
 ### CUSTOMER-F27 Create, change and delete customer groups
+<!-- from WORKBOOK.md sha256:df79810b1c0f -->
 Status: done
 Actor: owner, administrator, manager (deleting: owner and administrator); an employee does not open
 Groups: by its address, "No access" (BASE-F118)
@@ -786,6 +840,7 @@ manager's approval.".
 Involved: BASE-F84
 
 ### CUSTOMER-F28 Create, change and delete customer tags
+<!-- from WORKBOOK.md sha256:afcb75d7f968 -->
 Status: done
 Actor: owner, administrator, manager (deleting: owner and administrator); an employee does not open
 Tags: by its address, "No access" (BASE-F118)
@@ -803,6 +858,7 @@ If it fails: "There is already a tag with that name. Choose another name." under
 Involved: BASE-F84
 
 ### CUSTOMER-F29 Define the card's custom fields
+<!-- from WORKBOOK.md sha256:acc7f606c83a -->
 Status: done
 Actor: owner, administrator, manager; an employee does not open Fields: by its address, "No access" (BASE-F118)
 Screen: Fields
@@ -827,6 +883,7 @@ needs a manager's approval." and nothing changes.
 Involved: BASE-F84
 
 ### CUSTOMER-F30 Give a customer's card to other apps
+<!-- from WORKBOOK.md sha256:4cfb7664941a -->
 Status: done
 Actor: system
 Screen: none
@@ -849,6 +906,7 @@ returned: "This customer is no longer available.". A deactivated card is returne
 Involved: APPOINTMENT-F01, SERVICE-F16, SALE-F05
 
 ### CUSTOMER-F31 See the customers' figures
+<!-- from WORKBOOK.md sha256:8b3b6fc1342f -->
 Status: done
 Actor: everyone
 Screen: Customers
@@ -871,6 +929,7 @@ row of its own.
 Involved: BASE-F119
 
 ### CUSTOMER-F32 Note allergies or the sensitivity test with their permission
+<!-- from WORKBOOK.md sha256:0e310d72620d -->
 Status: done
 Actor: everyone who manages cards (seeing it: everyone)
 Screen: Customer card
@@ -895,16 +954,18 @@ Out: the permission, as one more fact of the consent book (purpose "health data"
 "Activity" and its notice `customer.health.consent_granted` or `customer.health.consent_withdrawn`), and
 the health data, with "Health data updated" in the activity (without its content) and the
 `customer.health.updated` notice. The notices carry only identifiers. Withdrawing the permission ERASES
-the health data in the same step.
+the health data in the same step. The assistant neither reads nor notes health data: asked for an allergy,
+it sends to this block (CUSTOMER-F05).
 If it fails: without the permission in force nothing is saved: "Record their permission first to keep
 health data.". A test with a future date: "This date is in the future."; a result without a date: "Enter
 the date of the test.", each under its field: it goes as soon as that field is corrected and comes back if
 the next try is refused too; what is not of a field shows in the block and stays until the next try.
 "This customer is no longer available." if the card is no longer there. Whoever
 does not manage cards sees the block without buttons.
-Involved: CUSTOMER-F13, CUSTOMER-F16
+Involved: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16
 
 ### CUSTOMER-F33 Recover a deleted card
+<!-- from WORKBOOK.md sha256:d22a2a0e055b -->
 Status: done
 Actor: ERPlora's staff, when the business asks (in the business no screen undoes a deletion)
 Screen: none of the business; the Hubs admin › Separate copies › "Recover into the business…" (BASE-F114)
@@ -948,6 +1009,7 @@ Involved: BASE-F114, CUSTOMER-F01, CUSTOMER-F04, CUSTOMER-F06, CUSTOMER-F07, CUS
 CUSTOMER-F29
 
 ## What the verticals share
+<!-- from WORKBOOK.md sha256:5a26183a0ee5 -->
 
 Touching a piece of this table affects the hair salon **and** the restaurant.
 
@@ -967,12 +1029,16 @@ What is **not** shared: the visit history on the card (Appointments only, F24) a
 (F25).
 
 ## Services: what goes in and what comes out
+<!-- from WORKBOOK.md sha256:f00b1cc354c9 -->
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever uses it) and the API, with the same rules and the same permissions. Lists come in pages of up to
-100 and all of them have a search. To speak naturally, a customer can be named by their id or by their
-exact name, their phone or their email ("add a note to Ana García"), and a group, a tag or a field, by
-its name; if two cards fit, the id, the phone or the email is asked for. Before changing anything, the
+100 and all of them have a search. To speak naturally, a customer can be named by their id, their phone, their
+email or their name, whole or a part of it, with or without accents ("add a note to Ana García", "Lucía's
+appointments"), and a group, a tag or a field, by its name. The card whose email, phone or name is exactly what was
+said counts first; if there is none, the ones the list's search finds with those words (F02). If several cards fit,
+the answer says which, up to five by their name, to choose one or give its id, its phone or its email. Before
+changing anything, the
 assistant asks for confirmation with its card (BASE-F97), which names each record as the screens name it, never by
 its id: the card ("Customer: Ana García"), the duplicate card of a merge, the groups and tags it is given, the group,
 tag or field being changed or deleted, by its name, and the open order as Sales names it (its title or, without one,
@@ -990,6 +1056,7 @@ another one (another card with that email, an active group with that name), noth
 confirmation card is shown.
 
 ### What it offers: queries (they read, they change nothing)
+<!-- from WORKBOOK.md sha256:ec76a5aaaf17 -->
 
 | What it gives | Who may | Flows | Live | Service |
 |---|---|---|---|---|
@@ -1015,12 +1082,13 @@ confirmation card is shown.
 | The name of an open order, as Sales names it: what the assistant's card reads (BASE-F97) | view (and view sales, in Sales) | F19 | no | `customer.order.get` |
 
 ### What it offers: actions (they change data)
+<!-- from WORKBOOK.md sha256:0f4967e2b658 -->
 
 | What it does | Who may | Flows | Service |
 |---|---|---|---|
-| Adds a card | manage | F01, F18, F25, F26 | `customer.customer.create` |
-| Changes the card (only what is sent) and its custom fields | manage | F04 | `customer.customer.update` |
-| Creates up to 50 cards from a CSV, row by row | manage | F08 | `customer.customer.import` |
+| Adds a card | manage | F01, F11, F18, F25, F26 | `customer.customer.create` |
+| Changes the card (only what is sent) and its custom fields | manage | F04, F11 | `customer.customer.update` |
+| Creates up to 50 cards from a CSV, row by row | manage | F08, F11 | `customer.customer.import` |
 | Replaces a card's groups | manage | F06 | `customer.customer.set_groups` |
 | Replaces a card's tags | manage | F06 | `customer.customer.set_tags` |
 | Deletes a card (keeps its data) | delete | F07 | `customer.customer.delete` |
@@ -1044,6 +1112,7 @@ confirmation card is shown.
 | Records a refund and subtracts it from spent (system only) | system | F22 | `customer.purchase.refund` |
 
 ### What it announces (for the apps that want to react)
+<!-- from WORKBOOK.md sha256:21c2219cc284 -->
 
 The notices carry only identifiers, never personal data: whoever needs the card asks for it
 (CUSTOMER-F30).
@@ -1069,6 +1138,7 @@ The notices carry only identifiers, never personal data: whoever needs the card 
 | Health data saved | Save with some change | `id` and `customer_id` | `customer.health.updated` |
 
 ### What it reacts to (notices from other apps)
+<!-- from WORKBOOK.md sha256:f5a7ec85fd91 -->
 
 | Notice | From | What it does | Service |
 |---|---|---|---|
@@ -1082,6 +1152,7 @@ out (a few seconds after the charge, the void or the refund). Customers does not
 it is the only link.
 
 ### What it needs from other apps
+<!-- from WORKBOOK.md sha256:95fde5167879 -->
 
 Nothing to work. With **Sales & POS**, the till's search, the link to the order and the purchases are
 used; with **Appointments**, the visits block and adding from the agenda; with the **WhatsApp inbox**,
@@ -1089,6 +1160,7 @@ recognition by number and automatic adding. None of those apps is a requirement 
 who use the services of Customers.
 
 ### Who may do what
+<!-- from WORKBOOK.md sha256:501ed6c71217 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|

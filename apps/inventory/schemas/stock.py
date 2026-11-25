@@ -87,6 +87,7 @@ class LowStockOut(Schema):
     sku: str = Field(description="SKU.")
     stock: Decimal = Field(description="Current stock.")
     low_stock_threshold: Decimal = Field(description="Its threshold.")
+    is_sold_out: bool = Field(description="Marked sold out: only then the till does not offer it.")
     unit: UnitCode = Field(description="Unit of measure.")
     price_quantity: Decimal = Field(description="Quantity the price refers to.")
     pricing_unit: UnitCode = Field(description="Unit the price refers to.")

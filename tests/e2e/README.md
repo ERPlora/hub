@@ -34,7 +34,9 @@ una línea de import; lo que no importa ninguno de ellos está en los demás mó
 |---|---|
 | `helpers.ts` | `api`, los hubs `A` y `B`, las cuentas `OWNER` y `EMPLOYEE`, `login` y las páginas que abre (`hostPage`, `signedInSpanish`), el SaaS por el que pasa el login y los pasos del viaje (`SAAS`, `SAAS_SIGN_IN`, `SAAS_CODE`, la carpeta de su correo, `runningTimeout`), la puerta de «Mis apps» (`MY_APPS_DOOR`, `topbarApps`), `collectProblems`, las carpetas `HUB_DIR` y `REPO_DIR`, la página a la vista (`shown`, `testid`, `appRow`), la espera de «nada se mueve» (`settled`, `untilStill`, `painted`), `scrolledTo`, las capturas (`capture`, `shot`, `record`), `horizontalOverflow`, las apps de la spec (`turnOn`, `turnOnMissing`, `turnOffTurnedOn`), `upgradeLandsInside`, el registro del negocio (`registrationOf`, `registerBusinessIn`), `psql` y los elementos de la demo que borran (`clearItems`, `uniqueName`) |
 | `business.ts` | el negocio de la spec, vaciado y devuelto: lo que trae una plantilla (`emptyOfTemplateData`), el plan de su foto (`dropPlanFromPhoto`, `restorePhotoFrom`) y quién ha entrado (`usernameOf`) |
+| `saas-photo.ts` | la foto de erplora.com de `a` para una spec que cambia lo que dice (sus personas, su plan…): guardada antes de la ejecución, enviada más nueva y firmada como la manda el SaaS, y devuelta después (`keepPhotoOfA`) |
 | `screen.ts` | más de la pantalla: el tamaño de la tableta alta, `iconStates`, `settledCapture` y `capturedFitting` |
+| `table-columns.ts` | cómo reparte su ancho una lista `DataTable`, columna a columna, cuando deja de moverse (`steady`): lo que mide cada una, lo que corta y si la cabecera cae encima de sus celdas |
 | `detectors.ts` | los dos detectores que corren en la página: qué se mueve (`movingInPage`) y si una captura repite su parte de arriba (`repeatedTop`) |
 | `demo-items.ts` | los elementos de la app de demo: crearlos y leerlos por la API, y la lista |
 | `dev-server.ts` | el `runserver` y su Vite: si contestan, quién escucha en un puerto y arrancarlo otra vez |
@@ -515,10 +517,12 @@ primero y por su precio después. El examen son las sondas de arriba: la misma s
 deja un registro por turno que se puede comparar entre ejecuciones. Lo mismo vale para el panel del SaaS (su
 `tests/e2e/README.md`, «Sondas del asistente»): sus informes tienen el mismo formato y este mismo comando los compara.
 
-**Qué modelo contesta.** Sin ninguna variable `QA_ANSWER_*`, el de producción: Qwen (`qwen3.7-plus`) con
-`gpt-5.4-mini` de reserva. Con `QA_ANSWER_MODEL`, el modelo a prueba, en un proveedor propio del SaaS de la pila
-(`qa-answer`) y **sin reserva**: un turno en el que falla cuenta como fallo suyo, nunca como respuesta de otro modelo
-(`assistant-seed.ts`, probado en `assistant-seed.test.ts`).
+**Qué modelo contesta.** En producción, Claude Haiku 5.5 (`claude-haiku-5-5`), con Qwen 3.7 Plus de reserva: lo dejó la
+migración `assistant/0010_haiku_answers` del SaaS, y lo que se elija después en su admin manda. La pila no pregunta a
+ese: sin ninguna variable `QA_ANSWER_*` siembra Qwen (`qwen3.7-plus`) con `gpt-5.4-mini` de reserva, y para preguntar al
+de producción se le nombra como modelo a prueba. Con `QA_ANSWER_MODEL`, el modelo a prueba, en un proveedor propio del
+SaaS de la pila (`qa-answer`) y **sin reserva**: un turno en el que falla cuenta como fallo suyo, nunca como respuesta
+de otro modelo (`assistant-seed.ts`, probado en `assistant-seed.test.ts`).
 
 | Variable | Qué dice |
 |---|---|
@@ -585,7 +589,7 @@ las peticiones del turno (`rounds`), los tokens de entrada, salida y huellas, el
 - Una ejecución es de un modelo: volver a preguntar sondas (`QA_PROBES_RUN`) con otro modelo se niega.
 
 ```bash
-# El modelo de producción, 150 sondas con la semilla 7:
+# El que siembra la pila (Qwen, con su reserva), 150 sondas con la semilla 7:
 QA_PROBES_SAMPLE=150 QA_PROBES_SEED=7 CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
 # Otro modelo, las mismas 150 sondas, sin reserva (en una pila con su BD recién creada y su SaaS arrancado con
 # ANTHROPIC_API_KEY exportada):

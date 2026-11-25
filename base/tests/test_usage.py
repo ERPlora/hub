@@ -39,7 +39,8 @@ from base.tenancy.tests.business import HUB_DB
 from base.tenancy.tests.hubs import make_cluster, make_database, make_hub  # noqa: F401 (fixtures)
 from base.tests.test_internal import signed
 from base.tests.test_session_revoke import ANA, OLGA, login
-from control.models import Hub, HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
+from control.models.hubs import Hub
+from control.models.usage import HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
 
 #: A night long past, never the real yesterday of a run: no row a real clock writes can be this day's.
 DAY = dt.date(2026, 3, 10)
@@ -182,7 +183,7 @@ def test_the_visits_older_than_the_window_are_forgotten(hub_a):
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_the_night_forgets_the_copies_the_bucket_no_longer_keeps(hub_a):
-    from control.models import HubDump
+    from control.models.dumps import HubDump
 
     def made(days: int) -> HubDump:
         at = NIGHT - dt.timedelta(days=days)
@@ -259,9 +260,9 @@ def test_a_measurement_that_fails_is_logged_and_the_next_tick_tries_again(hub_a,
 
 def run_the_loop_once(monkeypatch) -> None:
     from base import catalog
-    from base.catalog import RegisterResult
+    from base.catalog.register_apps import RegisterResult
 
-    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
+    monkeypatch.setattr(catalog.register_apps, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
     monkeypatch.setattr(worker_data, "_measured", None)
     stop = threading.Event()
     assert worker.run(stop, tick_seconds=0, wait=lambda seconds: stop.set()) == 0
@@ -425,11 +426,11 @@ def test_an_unsigned_call_is_refused(db):
 def admin_of(slug: str) -> OperationContext:
     from django.contrib.auth import get_user_model
 
-    from base.permissions import permissions_for
+    from base.permissions import access_for
 
     user = get_user_model().objects.create_user(username=f"olga-{slug}", password="pw")
     Membership.objects.create(user=user, host=slug, role=Membership.Role.OWNER)
-    return OperationContext(scope=Scope("host", slug), actor=user, permissions=permissions_for(user, Scope("host", slug)), language="en")
+    return OperationContext(scope=Scope("host", slug), actor=user, permissions=access_for(user, Scope("host", slug)), language="en")
 
 
 def plan_usage(hub: Hub):

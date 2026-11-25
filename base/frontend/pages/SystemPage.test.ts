@@ -2,7 +2,7 @@
 import { AppPage, type ShellTab } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, flush, mountBase } from '../__tests__/mount-base';
+import { flush, mountBase } from '../__tests__/mount-base';
 import FailedEvents from '../components/FailedEvents.vue';
 import SystemLog from '../components/SystemLog.vue';
 import SystemRelease from '../components/SystemRelease.vue';
@@ -15,9 +15,7 @@ import SystemPage from './SystemPage.vue';
 
 async function at(path: string, options: Parameters<typeof mountBase>[1] = {}) {
   const m = await mountBase(SystemPage, { path, routes: ['/system', '/settings'], ...options });
-  // «Usage and plan» follows the cards of the apps on for anyone (hub#683); anyone else asks nothing else live here.
-  const isUsage = !/#(updates|events)$/.test(path);
-  if (options.session !== EMPLOYEE || isUsage) await m.live();
+  await m.live();
   await flush();
   return m;
 }
@@ -36,12 +34,6 @@ describe('SystemPage › its tabs', () => {
     ]);
   });
 
-  it('anyone else has three: Logs does not exist for them', async () => {
-    const m = await at('/system', { session: EMPLOYEE, locale: 'es' });
-    expect(tabIds(m).map(([id]) => id)).toEqual(['tab-usage', 'tab-updates', 'tab-events']);
-    expect(tabIds(m).map(([, label]) => label)).toEqual(['Uso y plan', 'Actualizaciones', 'Eventos caídos']);
-  });
-
   it('opens «Usage and plan», its own and nothing of the others', async () => {
     const m = await at('/system');
     expect(m.wrapper.findComponent(SystemUsage).exists()).toBe(true);
@@ -49,14 +41,10 @@ describe('SystemPage › its tabs', () => {
     expect(m.wrapper.findComponent(SystemLog).exists()).toBe(false);
   });
 
-  it('«Usage and plan» has, below, the cards of the apps on, for anyone (hub#683)', async () => {
+  it('«Usage and plan» has, below, the cards of the apps on (hub#683)', async () => {
     const owner = await at('/system');
     expect(owner.wrapper.findComponent(SystemAppCards).exists()).toBe(true);
     expect(owner.client.stream.subscriptions('base.system.cards')).toHaveLength(1);
-    const employee = await at('/system', { session: EMPLOYEE });
-    expect(employee.wrapper.find('[data-testid="system-usage-denied"]').exists()).toBe(true);
-    expect(employee.wrapper.findComponent(SystemAppCards).exists()).toBe(true);
-    expect(employee.client.stream.subscriptions('base.system.cards')).toHaveLength(1);
     expect((await at('/system#events')).wrapper.findComponent(SystemAppCards).exists()).toBe(false);
   });
 
@@ -79,44 +67,19 @@ describe('SystemPage › its tabs', () => {
     expect(m.wrapper.findComponent(FailedEvents).exists()).toBe(true);
   });
 
-  it('Logs in the address of anyone else opens «Usage and plan», which tells who may see it', async () => {
-    const m = await at('/system#logs', { session: EMPLOYEE });
-    expect(m.wrapper.findComponent(SystemLog).exists()).toBe(false);
-    expect(m.wrapper.find('[data-testid="system-usage-denied"]').text()).toBe(
-      'Only the owner or an administrator can see how much the hub is using.',
-    );
-    // Nothing of who runs the business is asked: the Hub would refuse it.
-    expect(m.client.stream.subscriptions('base.plan.usage')).toEqual([]);
-    expect(m.wrapper.find('[data-testid="system-usage-retry"]').exists()).toBe(false);
-  });
-
-  it('Failed events tells anyone else who may see them, never «All in order»', async () => {
-    const m = await at('/system#events', { session: EMPLOYEE });
-    expect(m.wrapper.find('[data-testid="system-events-denied"]').text()).toBe(
-      'Only the owner or an administrator can see the failed events.',
-    );
-    expect(m.wrapper.text()).not.toContain('All in order');
-    expect(m.client.stream.subscriptions('base.failed_event.list')).toEqual([]);
-  });
-
-  it('Updates says the hub updates itself; the version only to who runs the business', async () => {
+  it('Updates says the hub updates itself, with its version', async () => {
     const owner = await at('/system#updates');
     expect(owner.wrapper.find('[data-testid="system-updates"] h2').text()).toBe('What we have updated');
     expect(owner.wrapper.text()).toContain('This hub updates itself when we publish a new version');
     expect(owner.wrapper.findComponent(SystemRelease).exists()).toBe(true);
-    const employee = await at('/system#updates', { session: EMPLOYEE });
-    expect(employee.wrapper.text()).toContain('This hub updates itself when we publish a new version');
-    expect(employee.wrapper.findComponent(SystemRelease).exists()).toBe(false);
   });
 
-  it('Updates lists what is new below the version and its date, for anyone in the business', async () => {
+  it('Updates lists what is new below the version and its date', async () => {
     const owner = await at('/system#updates');
     const release = owner.wrapper.getComponent(SystemRelease).element;
     const notes = owner.wrapper.getComponent(SystemReleaseNotes).element;
     expect(release.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(owner.find('system-updates').element.contains(notes)).toBe(true);
-    const employee = await at('/system#updates', { session: EMPLOYEE });
-    expect(employee.wrapper.findComponent(SystemReleaseNotes).exists()).toBe(true);
     expect((await at('/system')).wrapper.findComponent(SystemReleaseNotes).exists()).toBe(false);
   });
 

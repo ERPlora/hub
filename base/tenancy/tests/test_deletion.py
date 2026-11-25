@@ -41,7 +41,7 @@ from base.tests.test_worker_activations import (  # noqa: F401 (fixtures)
     nothing_checked_yet,
     platform_template,
 )
-from control.models import Hub
+from control.models.hubs import Hub
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def with_modules(business):  # noqa: F811
 
     def make(*labels: str) -> Hub:
         hub = business("-".join(label.replace("_", "-") for label in labels))
-        migrator.ensure_schema(hub, add=labels)
+        migrator.schema.ensure_schema(hub, add=labels)
         return fresh(hub)
 
     return make
@@ -245,7 +245,7 @@ def test_a_row_read_before_the_tables_were_made_keeps_the_protection(with_module
     """The context may hold a row of before the module's tables: what it lacks is asked of control, as the router does."""
     business_row = with_modules("tax")
     read_before = fresh(business_row)
-    migrator.ensure_schema(fresh(business_row), add=["inventory"])
+    migrator.schema.ensure_schema(fresh(business_row), add=["inventory"])
     assert "inventory" not in read_before.schema_apps
 
     with use_hub(read_before):
@@ -301,7 +301,7 @@ def test_with_no_context_nothing_is_passed_over(with_modules):
 
 
 def test_a_row_the_migrator_never_confirmed_says_nothing_and_nothing_is_passed_over(with_modules):
-    """As with the router: such a row (``migrator.is_behind`` says so too) lists no app, and that is no list of what is
+    """As with the router: such a row (``migrator.hubs_pass.is_behind`` says so too) lists no app, and that is no list of what is
     missing. The next ``migrate_hubs`` confirms it."""
     hub = with_modules("tax")
     never_confirmed = fresh(hub)

@@ -9,8 +9,9 @@ from django.db.models import Min
 from django.db.models.functions import Coalesce, Greatest
 from live.operations import atomic
 
-from base.models import EventDelivery, TaskSchedule
-from control.models import Hub, HubDue
+from base.models.relay import EventDelivery
+from base.models.scheduler import TaskSchedule
+from control.models.hubs import Hub, HubDue
 
 
 @dataclass(frozen=True)

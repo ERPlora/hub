@@ -33,9 +33,9 @@ negocio. Ventas y Facturación calculan con ella cada línea; no fija precios ni
 | Verticales | `hair_salon` y `restaurant` (entra en sus plantillas) |
 | `requires` | `[]`: no depende de ninguna app ni reacciona a sus avisos |
 | Usa de otras apps | nada; de la plataforma, la zona horaria (`timezone.localdate()`, en la fase 1 `settings.TIME_ZONE`) y `pycountry` para países y regiones |
-| La usan | Inventario, Servicios, Ventas, Facturación, Menús y combos y Suplementos (todas la requieren); todas menos Facturación enlazan `TaxCategory` (`PROTECT`) y eligen la categoría con `tax.category.list`; de `queries.py`, Ventas importa `calculate_tax`, `current_rates`, `business_jurisdiction`, `business_tax_kind`, `business_today` y `category_by_reference`, Facturación `resolve_tax`, `resolve_category_text`, `tax_kind_of`, `business_tax_kind`, `round_half_up` y `split_amount` (y lee por id la regla que congeló cada línea, `TaxRule.objects.in_bulk`), Suplementos `resolve_category_text` y Servicios `held_categories`; Ventas y Facturación re-ejecutan sus consultas vivas con `RULE_EVENTS`; las pantallas de Ventas y Facturación leen `tax.settings.get` con `useTaxKind()`/`useTaxName()`; Inventario, además, `tax.alias.resolve`, `tax.alias.create` y `tax.category.create` al importar |
+| La usan | Inventario, Servicios, Ventas, Facturación, Menús y combos y Suplementos (todas la requieren); todas menos Facturación enlazan `TaxCategory` (`PROTECT`) y eligen la categoría con `tax.category.list`; de `queries/`, Ventas importa `calculate_tax`, `current_rates`, `business_jurisdiction`, `business_tax_kind`, `business_today` y `category_by_reference`, Facturación `resolve_tax`, `resolve_category_text`, `tax_kind_of`, `business_tax_kind`, `round_half_up` y `split_amount` (y lee por id la regla que congeló cada línea, `TaxRule.objects.in_bulk`), Suplementos `resolve_category_text` y Servicios `held_categories`; Ventas y Facturación re-ejecutan sus consultas vivas con `RULE_EVENTS`; las pantallas de Ventas y Facturación leen `tax.settings.get` con `useTaxKind()`/`useTaxName()`; Inventario, además, `tax.alias.resolve`, `tax.alias.create` y `tax.category.create` al importar |
 | Pantallas | `/tax/categories`, `/tax/rules`, `/tax/aliases` y `/tax/settings` |
-| Operaciones | 11 consultas (`queries.py`) y 8 acciones (`services.py`), todas con `ai=`; 18 rutas en `/api/tax/…` (sin ruta: `tax.rule.get`); 7 consultas y acciones abiertas a las API keys (`expose_api`) |
+| Operaciones | 11 consultas (`queries/`) y 8 acciones (`services/`), todas con `ai=`; 18 rutas en `/api/tax/…` (sin ruta: `tax.rule.get`); 7 consultas y acciones abiertas a las API keys (`expose_api`) |
 | Eventos | 7, `tax.<entidad>.<hecho>` (`events.py`); `RULE_EVENTS` (las cuatro de reglas y el cambio de territorio) recalculan la caja de Ventas y el tipo general de Facturación; no reacciona a ninguno |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial` a `0006_tax_settings`: `0002` siembra el catálogo de fábrica (con vuelta atrás), `0005` añade `retail.alcohol` sin reescribir ningún tipo y `0006` crea el territorio fiscal |
@@ -57,9 +57,10 @@ pnpm e2e tests/e2e/tax-flows.spec.ts tests/e2e/tax-categories.spec.ts tests/e2e/
   tests/e2e/fix-tax-setup-hooks.spec.ts
 ```
 
-- `test_queries.py` prueba la resolución y el cálculo (región frente a país, territorios con impuesto propio,
-  redondeo, reglas ilegibles) y el guardarraíl `test_only_tax_resolves_a_rule` (ninguna otra app busca reglas
-  por su cuenta, hub#295); `test_services.py`, el solape con dos sesiones reales; `test_migrations.py`, el
+- `test_queries_resolution.py` y `test_queries_calculation.py` prueban la resolución y el cálculo (región frente
+  a país, territorios con impuesto propio, redondeo, reglas ilegibles), y el primero lleva el guardarraíl
+  `test_only_tax_resolves_a_rule` (ninguna otra app busca reglas por su cuenta, hub#295); las demás lecturas
+  tienen cada una su `test_queries_<caso>.py`; `test_services_overlaps.py`, el solape con dos sesiones reales; `test_migrations.py`, el
   catálogo de fábrica y que sembrar dos veces no duplica nada; `test_admin.py`, que el territorio solo se
   guarda por su operación.
 - Lo que leen las demás apps se prueba contra Impuestos real en sus `test_integration_tax.py` y en

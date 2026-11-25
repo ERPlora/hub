@@ -17,7 +17,7 @@ Para qué: preparar cuándo se puede reservar, tomar y cambiar reservas por tel�
 2. RESERVATION-F03 — las reglas de reserva.
 3. RESERVATION-F04 — las reservas no se confirman solas.
 4. RESERVATION-F02 — el lunes que viene, cerrado por inventario.
-5. RESERVATION-F06 — Lucía llama: el viernes a las 14:00, cuatro personas.
+5. RESERVATION-F06 — Lucía llama: el viernes a las 14:00, cuatro personas; el empleado la busca por su móvil y ve su teléfono en el libro.
 6. RESERVATION-F23 — la mesa 8.
 7. RESERVATION-F07 — la reserva de Lucía, confirmada.
 8. RESERVATION-F05 — cuánto queda libre el viernes.

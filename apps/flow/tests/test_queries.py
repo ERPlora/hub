@@ -18,7 +18,7 @@ from apps.flow import queries
 from apps.flow.models import Draft, Flow, FlowRun
 from apps.task.models import Task
 
-from base.tenancy.context import current_alias
+from base.tenancy.context import current_alias, use_hub
 from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import A, B, HUB_DB, TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
@@ -360,14 +360,15 @@ def test_the_status_counts_the_set_up_the_on_and_the_half_built():
 # The last real event of a kind
 
 
-def test_the_sample_is_the_newest_event_of_this_business():
+def test_the_sample_is_the_newest_event_of_this_business(hub_b):
     outbox(
         "sale.sale.completed",
         {"total": 100},
         created_at=timezone.now() - dt.timedelta(hours=2),
     )
     newest = outbox("sale.sale.completed", {"total": 250})
-    outbox("sale.sale.completed", {"total": 999}, scope=B)
+    with use_hub(hub_b):
+        outbox("sale.sale.completed", {"total": 999}, scope=B)
     sample = run("flow.event.sample", {"event": "sale.sale.completed"})
     assert (sample.found, sample.payload, sample.at) == (
         True,

@@ -10,27 +10,14 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from apps.service.schemas import (
-    AdjustIn,
-    AssignIn,
-    AssignmentPatchIn,
-    CategoryIn,
-    CategoryPatchIn,
-    GrantIn,
-    GrantListIn,
-    MovementListIn,
-    PackageIn,
-    PackagePatchIn,
-    PageIn,
-    RedeemIn,
-    ServiceBulkIn,
-    ServiceIn,
-    ServiceListIn,
-    ServicePatchIn,
-    ServiceRefIn,
-    SettingsIn,
-    VoidIn,
-)
+from apps.service.schemas.assignments import AssignIn, AssignmentPatchIn
+from apps.service.schemas.catalog import ServiceBulkIn, ServiceIn, ServiceListIn, ServicePatchIn
+from apps.service.schemas.categories import CategoryIn, CategoryPatchIn
+from apps.service.schemas.fields import PageIn, ServiceRefIn
+from apps.service.schemas.grants import AdjustIn, GrantIn, GrantListIn, RedeemIn, VoidIn
+from apps.service.schemas.movements import MovementListIn
+from apps.service.schemas.packages import PackageIn, PackagePatchIn
+from apps.service.schemas.settings import SettingsIn
 
 
 def errors(schema, **data) -> dict[str, str]:

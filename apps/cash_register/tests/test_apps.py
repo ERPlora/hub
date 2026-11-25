@@ -1,14 +1,13 @@
 """The cash register app declares its module metadata, its menu, its permissions, what each role gets,
 its scheduled task (the daily auto-close the worker runs) and its hooks of the Home."""
 
-
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import (
     Category,
-    Help,
     LiveAppConfig,
     Nav,
     SetupCheck,
@@ -21,6 +20,8 @@ from live.operations import registry
 
 from apps.cash_register import events as E
 from base import home
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
@@ -83,7 +84,7 @@ def test_it_is_in_the_store_and_in_both_verticals():
 
 def test_permissions():
     # The product's ten but «view reports», which no operation asked for (it was the home panel's), and «view all sessions».
-    assert config().permissions == PERMISSIONS
+    assert list(config().permissions) == PERMISSIONS
 
 
 def test_roles_are_the_four_customer_roles():
@@ -206,7 +207,7 @@ def test_the_homes_step_is_your_cash_drawer_done_once_the_settings_are_saved():
     )
     assert "updated_at" in registry[step.operation].output.model_fields
     # Not required, so «Recommended»: a drawer on its factory values stops no sale nor invoice.
-    assert home.level_of(f"cash_register.{step.key}", step.required) == home.LEVEL_RECOMMENDED
+    assert home.setup_steps.level_of(f"cash_register.{step.key}", step.required) == home.setup_steps.LEVEL_RECOMMENDED
 
 
 def test_the_step_speaks_the_language_of_whoever_reads_it():
@@ -358,5 +359,23 @@ def test_cash_register_has_no_bell_counters():
     assert config().bell == []
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert config().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert config().help.videos == {"es": "rqBH2VUFcko", "en": "IEzfwEgMXwM"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("CASH_REGISTER-F03",), "Ftpqm8vFpHo", "KOYwIoKqcw4"),
+    (("CASH_REGISTER-F05",), "8AHpbffKmlo", "ZEo0EiJqlDU"),
+    (("CASH_REGISTER-F06",), "RCCtdEgyaV8", "n4dY9lEBttg"),
+    (("CASH_REGISTER-F08", "CASH_REGISTER-F09"), "uaqdwweCK5Q", "liCdrUnVem0"),
+    (("CASH_REGISTER-F11",), "dO3Ju_an_fs", "kMgq2HIRE8I"),
+    (("CASH_REGISTER-F02",), "HoqsdW2qM-8", "IjMK8xGz_T0"),
+    (("CASH_REGISTER-F01", "CASH_REGISTER-F07"), "dgr-M9sxkV0", "zrWOUH8Kb4s"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("cash_register", language) == help_videos.by_task(TASK_VIDEOS, language)

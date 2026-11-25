@@ -2,8 +2,9 @@
 inside the charge's own
 transaction, a reprint marked as a copy and the bill of a check. No mocks: Inventory owns the products,
 Invoicing numbers the ticket and VeriFactu seals it, Printing queues the paper. Without Printing on, without a
-printer that takes the paper or with a fiscal document still pending, nothing is queued and the screen prints
-it; a refusal of Printing never spoils the charge.
+printer that takes the paper or with a fiscal document still pending, nothing is queued: the charge goes on and
+the screen prints it, and a reprint or a bill fails with why, so the assistant's receipt says it was not done; a
+refusal of Printing never spoils the charge.
 """
 
 import dataclasses
@@ -11,13 +12,14 @@ import datetime as dt
 
 import pytest
 from django.test import RequestFactory
+from live.errors import Conflict
 from live.operations import registry
 
 from apps.printing.models import PrintJob
-from apps.sale.models import Sale
-from apps.sale.tests.conftest import HUB_DB, ctx_for, run
+from apps.sale.models import Order, Sale
+from apps.sale.tests.conftest import HUB_DB, confirmed_by_the_assistant, ctx_for, run
 from base.business import paper_date
-from base.models import Profile
+from base.models.profile import Profile
 from apps.sale.tests.test_integration_invoice import ISSUER
 
 pytestmark = HUB_DB
@@ -58,6 +60,18 @@ def charge(key="sale-print-1", payments=None, ctx=None, **more):
 
 def jobs() -> list[PrintJob]:
     return list(PrintJob.objects.select_related("printer").order_by("created_at", "id"))
+
+
+def not_printed(name: str, data: dict, ctx=None) -> str:
+    """The code the print ``name`` fails with; nothing is queued."""
+    with pytest.raises(Conflict) as failed:
+        run(name, data, ctx)
+    assert not PrintJob.objects.exists()
+    return failed.value.code
+
+
+def open_check():
+    return run("sale.order.open", {"lines": [{"product": "COF", "quantity": "2"}], "label": "Table 4"})
 
 
 @pytest.fixture
@@ -150,8 +164,7 @@ def test_a_ticket_whose_fiscal_document_is_pending_is_left_to_the_screen(product
     out = charge()
     assert out.invoice_status == "pending"
     assert out.printed.queued is False
-    assert run("sale.sale.print", {"sale_id": str(out.id)}).queued is False
-    assert not PrintJob.objects.exists()
+    assert not_printed("sale.sale.print", {"sale_id": str(out.id)}) == "sale.document_pending"
 
 
 def test_a_record_that_cannot_be_read_keeps_the_receipt_from_the_queue(bar, till):
@@ -163,8 +176,7 @@ def test_a_record_that_cannot_be_read_keeps_the_receipt_from_the_queue(bar, till
     assert out.invoice_status == "issued"
     assert out.printed.queued is False
     assert Sale.objects.filter(pk=out.id, status="completed").exists()
-    assert run("sale.sale.print", {"sale_id": str(out.id)}, blind).queued is False
-    assert not PrintJob.objects.exists()
+    assert not_printed("sale.sale.print", {"sale_id": str(out.id)}, blind) == "sale.record_unreadable"
 
 
 def test_a_reprint_is_a_copy_with_its_own_key_each_time(bar, till):
@@ -201,8 +213,95 @@ def test_the_first_paper_after_charging_can_be_the_original(bar, till):
     assert job.document["duplicate"] is False
 
 
+def test_a_reprint_no_printer_takes_is_not_printed(bar):
+    sale = {"sale_id": str(charge().id)}
+    assert not_printed("sale.sale.print", sale) == "sale.no_printer"
+    # The computer's printer takes an A4 page, not a receipt: the paper would wait for ever.
+    run("printing.printer.create", {"name": "Office", "kind": "system", "usage": "receipt"})
+    assert not_printed("sale.sale.print", sale) == "sale.no_printer"
+
+
+def test_without_printing_in_the_business_neither_a_reprint_nor_a_bill_is_printed(bar, till, monkeypatch):
+    monkeypatch.delitem(registry, "printing.job.create")
+    assert not_printed("sale.sale.print", {"sale_id": str(charge().id)}) == "sale.no_printer"
+    assert not_printed("sale.order.print_bill", {"order_id": str(open_check().id)}) == "sale.no_printer"
+
+
+def test_a_refusal_of_printing_leaves_a_reprint_unprinted(bar, till):
+    out = charge()
+    PrintJob.objects.all().delete()
+    seller = ctx_for()
+    refused = dataclasses.replace(seller, permissions=seller.permissions - {"printing.print"})
+    assert not_printed("sale.sale.print", {"sale_id": str(out.id)}, refused) == "sale.no_printer"
+
+
+def test_a_bill_no_printer_takes_is_not_printed_and_the_check_is_not_noted(bar):
+    """Nothing came out for the table: its plan does not say «Bill requested» (TABLE-F34)."""
+    order = open_check()
+    assert not_printed("sale.order.print_bill", {"order_id": str(order.id)}) == "sale.no_printer"
+    assert Order.objects.get(pk=order.id).bill_printed_at is None
+
+
+# ── From the assistant (BASE-F97, BASE-F99) ───────────────────────────────────────────────────────────────────────────
+# hub#2328: with no printer for the paper, the receipt under the answer said «Done» and nothing was printed. A paper
+# no printer takes is not done: the receipt says why, and only a paper a printer took says «Done».
+
+NO_PRINTER_FOR_THE_SALE = {
+    "es": "Ninguna impresora de tiques recibe el papel de esta venta: abre la venta para imprimirlo en este dispositivo.",
+    "en": "No receipt printer takes this sale's paper: open the sale to print it on this device.",
+}
+
+
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_from_the_assistant_a_reprint_no_printer_takes_is_not_done_and_says_why(bar, language):
+    sale = {"sale_id": str(charge().id)}
+    row = confirmed_by_the_assistant("sale.sale.print", sale, ctx_for(language=language))
+    said = NO_PRINTER_FOR_THE_SALE[language]
+    assert (row["outcome"], row["code"], row["reason"]) == ("error", "sale.no_printer", {language: said})
+    assert not PrintJob.objects.exists()
+
+
+def test_from_the_assistant_a_reprint_of_a_pending_document_says_it_is_pending(product, till):
+    product("Coffee", "COF", 150, "restaurant.drink")
+    row = confirmed_by_the_assistant("sale.sale.print", {"sale_id": str(charge().id)}, ctx_for(language="es"))
+    assert (row["outcome"], row["code"]) == ("error", "sale.document_pending")
+    assert row["reason"] == {"es": "Su documento fiscal sigue pendiente: abre la venta para emitirlo."}
+
+
+def test_from_the_assistant_a_reprint_whose_record_cannot_be_read_says_it_never_prints_without_its_qr(bar, till):
+    out = charge()
+    PrintJob.objects.all().delete()
+    seller = ctx_for(language="es")
+    blind = dataclasses.replace(seller, permissions=seller.permissions - {"verifactu.view_record"})
+    row = confirmed_by_the_assistant("sale.sale.print", {"sale_id": str(out.id)}, blind)
+    assert (row["outcome"], row["code"]) == ("error", "sale.record_unreadable")
+    assert row["reason"] == {"es": "No se pudo leer su registro de VeriFactu, y su papel nunca se imprime sin su QR."}
+    assert not PrintJob.objects.exists()
+
+
+def test_from_the_assistant_a_bill_no_printer_takes_is_not_done_and_says_why(bar):
+    row = confirmed_by_the_assistant("sale.order.print_bill", {"order_id": str(open_check().id)}, ctx_for(language="es"))
+    assert (row["outcome"], row["code"]) == ("error", "sale.no_printer")
+    assert row["reason"] == {
+        "es": "Ninguna impresora de tiques recibe esta cuenta: ábrela en Ventas para imprimirla en este dispositivo."
+    }
+
+
+def test_from_the_assistant_a_reprint_and_a_bill_a_printer_took_are_done(bar, till):
+    out, order = charge(), open_check()
+    seller = ctx_for(language="es")
+    assert [
+        (row["outcome"], row["code"], row["reason"])
+        for row in (
+            confirmed_by_the_assistant("sale.sale.print", {"sale_id": str(out.id)}, seller),
+            confirmed_by_the_assistant("sale.order.print_bill", {"order_id": str(order.id)}, seller),
+        )
+    ] == [("ok", "", {}), ("ok", "", {})]
+    assert [job.document_type for job in jobs()][1:] == ["receipt", "prebill"]
+
+
 def test_the_bill_of_a_check_prints_with_its_lines(bar, till):
-    order = run("sale.order.open", {"lines": [{"product": "COF", "quantity": "2"}], "label": "Table 4"})
+    order = open_check()
     out = run("sale.order.print_bill", {"order_id": str(order.id)})
     (job,) = jobs()
     assert (out.queued, out.job_id, out.printer) == (True, job.id, "Till")
@@ -258,6 +357,18 @@ def test_a_role_that_sells_without_reading_invoicing_still_prints_who_the_busine
     charge("sale-print-no-reading", ctx=dataclasses.replace(seller, permissions=seller.permissions - {"invoice.view_invoice"}))
     (job,) = jobs()
     assert (job.document["business_name"], job.document["vat_number"]) == (ISSUER["legal_name"], ISSUER["tax_id"])
+
+
+def test_the_ticket_of_a_business_in_the_roi_prints_its_eu_vat_number_and_its_reprint_too(bar, till):
+    """INVOICE-F21: with the issuer registered for intra-EU operations the printed ticket says «ESB12345674»; its QR
+    keeps the bare tax ID, and a copy printed after the mark is taken off says what the original said."""
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": True})
+    out = charge("sale-print-roi")
+    run("invoice.issuer.update", {**ISSUER, "intra_eu_operator": False})
+    run("sale.sale.print", {"sale_id": str(out.id), "duplicate": True})
+    original, copy = jobs()
+    assert [original.document["vat_number"], copy.document["vat_number"]] == ["ESB12345674", "ESB12345674"]
+    assert "nif=B12345674&" in original.document["qr_data"]
 
 
 def test_a_reprint_says_what_its_document_says_whatever_the_issuer_becomes(bar, till):

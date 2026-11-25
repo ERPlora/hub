@@ -353,6 +353,7 @@ Implicados: FLOW-F02, FLOW-F16, FLOW-F23
 Estado: hecho (pantalla)
 Actor: propietario, administrador
 Pantalla: Guía
+Operaciones: ninguna
 Pasos:
 1. En la galería, pulsa **¿Cómo funciona esto?**.
 2. Lee los cinco apartados. «Lo que todavía no puede hacer» dice lo que de verdad falta: bifurcaciones,
@@ -611,8 +612,14 @@ Pasos:
 1. Abre el asistente del Hub y pídele algo que pase solo, hablando o escribiendo («crea un flujo que al completar
    una venta de más de 100 € me cree una tarea»).
 2. El asistente escribe un **borrador**: nombre, cuándo arranca, de uno a ocho pasos de «hacer algo»,
-   «solo sigue si» o «esperar», y las notas de lo que no supo decidir. Antes de dejarlo te enseña su tarjeta y
-   espera tu sí, como cualquier cambio que te pide.
+   «solo sigue si» o «esperar», y las notas de lo que no supo decidir. Para escribirlo mira primero los nombres
+   de los avisos y las acciones de las apps del caso, y después lee enteros, con los datos que pide cada acción,
+   solo los que va a usar: también en un negocio con muchas apps llega a cualquier acción y usa los nombres y los
+   datos reales, sin avisarte de que no los pudo comprobar. Antes de dejarlo te enseña su tarjeta y espera tu
+   sí, como cualquier cambio que te pide. La tarjeta dice el nombre, cuándo arranca y cada paso con las mismas
+   frases que la lista y el editor («Cuando se cierra una caja», «Todos los días a las 10:00», «Crear una
+   tarea», «Esperar 1 hora»), nunca los códigos de su definición; igual si le pides que cree la automatización
+   directamente.
 3. Te dice que lo ha dejado esperando en Automatizaciones y repite sus dudas; lo revisas en **Propuestas por el
    asistente** (FLOW-F18).
 Entra: lo que se pide, en palabras, y lo que pueden usar las automatizaciones del negocio.
@@ -1159,7 +1166,8 @@ Pasos:
    el historial, y los términos del buscador no dejan guardar sus resultados, ni en parte (FLOW-F39). Sí tiene la
    fecha y la hora de hoy y el tipo de cambio entre monedas, como en el chat.
 3. Lo que el asistente consulta se hace en el acto y no se le pregunta a nadie; el historial dice «El asistente
-   ha usado «…».».
+   ha usado «…».». Lo que consulta o cambia le llega como en el chat: las horas en la del negocio y los importes en
+   su moneda, como los enseñan las pantallas (BASE-F93).
 4. Lo que quiere cambiar:
    - con «Que me lo pregunte», no se hace: espera en **Esperan tu respuesta** como «El asistente quiere cambiar
      algo en «…»», con lo que quiere hacer justo debajo («Anular una reserva»), lo que dijo y los datos que
@@ -1245,44 +1253,44 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Las automatizaciones, con búsqueda, filtros, orden y su última ejecución, en páginas de hasta 100 (en vivo) | ver | F02 | `flow.flow.list` |
-| Una automatización, con los permisos que necesita y los que le faltan (en vivo) | ver | F09–F16 | `flow.flow.detail` |
+| Las automatizaciones, con búsqueda, filtros, orden y su última ejecución, en páginas de hasta 100 (en vivo) | ver | F01, F02, F05 | `flow.flow.list` |
+| Una automatización, con los permisos que necesita y los que le faltan (en vivo) | ver | F09–F16, F25, F27, F28, F31, F32, F37 | `flow.flow.detail` |
 | Las ejecuciones de una automatización, de 20 en 20, y cuántas fallaron (en vivo) | ver | F16 | `flow.run.list` |
 | Una ejecución, con las palabras con que se nombra (su automatización y cuándo empezó) | ver | F24 | `flow.run.get` |
-| Los borradores pendientes del asistente (en vivo) | ver | F18, F19 | `flow.draft.list` |
+| Los borradores pendientes del asistente (en vivo) | ver | F01, F18, F19 | `flow.draft.list` |
 | Un borrador del asistente, esté pendiente, usado o descartado | ver | F18, F19 | `flow.draft.get` |
-| Los avisos y las acciones de las apps activas, con los datos que pide cada acción y los que deja (también los de dentro de un objeto) | ver | F10, F11 | `flow.catalog.read` |
+| Los avisos y las acciones de las apps activas, con los datos que pide cada acción y los que deja (también los de dentro de un objeto); todos, o solo los de unas apps o unos nombres, enteros o solo sus nombres | ver | F01, F05, F10, F11, F17, F25, F27, F28, F31, F37 | `flow.catalog.read` |
 | El último aviso real de un tipo, con sus datos | gestionar | F11, F13 | `flow.event.sample` |
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |
-| Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26 | `flow.secret.list` |
-| Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente su acción y sus datos en palabras, leídos como esa persona y en su idioma (en vivo) | contestar | F29, F38 | `flow.question.list` |
+| Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26, F27 | `flow.secret.list` |
+| Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente su acción y sus datos en palabras, leídos como esa persona y en su idioma (en vivo) | contestar | F01, F29, F38 | `flow.question.list` |
 | Una pregunta que espera respuesta, como sale en «Esperan tu respuesta», solo para quien puede contestarla | contestar (su rol) | F29 | `flow.question.get` |
-| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F33–F36 | `flow.recipe.list` |
+| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F01, F33–F36 | `flow.recipe.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Crea una automatización (de cero, de una tarjeta o de un borrador), en pausa y sin permisos | gestionar | F04, F09, F18 | `flow.flow.create` |
-| Cambia el nombre, el disparador o los pasos (el interruptor es `set_enabled`); no deja quitar lo que fija la app de su receta (`flow.recipe_fixed`) | gestionar | F10, F11, F14, F36 | `flow.flow.update` |
+| Cambia el nombre, el disparador o los pasos (el interruptor es `set_enabled`); no deja quitar lo que fija la app de su receta (`flow.recipe_fixed`) | gestionar | F10, F11, F14, F25, F27, F28, F31, F32, F36, F37 | `flow.flow.update` |
 | Enciende o pausa | gestionar | F03, F14 | `flow.flow.set_enabled` |
 | Hace una copia en pausa y sin permisos | gestionar | F06 | `flow.flow.duplicate` |
 | Borra (su historial se queda) | gestionar | F07 | `flow.flow.delete` |
-| Fija la lista entera de acciones y consultas que puede hacer | gestionar | F12 | `flow.flow.grant` |
+| Fija la lista entera de acciones y consultas que puede hacer | gestionar | F12, F27, F31, F37 | `flow.flow.grant` |
 | La ejecuta ahora | gestionar | F15 | `flow.flow.run` |
 | Deja un borrador del asistente | gestionar | F17 | `flow.draft.propose` |
 | Descarta un borrador | gestionar | F19 | `flow.draft.dismiss` |
 | Arranca las automatizaciones de un aviso | solo la plataforma | F21 | `flow.run.react` |
-| Al borrar los datos de un cliente, cancela las ejecuciones que aún podían seguir con lo suyo y hace olvidar lo que leyeron y los textos libres de su historial a toda ejecución que nombra su ficha, también a las terminadas (CUSTOMER-F16) | solo la plataforma | F16, F23, F24 | `flow.customer.erase` |
+| Al borrar los datos de un cliente, cancela las ejecuciones que aún podían seguir con lo suyo y hace olvidar lo que leyeron y los textos libres de su historial a toda ejecución que nombra su ficha, también a las terminadas (CUSTOMER-F16) | solo la plataforma | F23 | `flow.customer.erase` |
 | Arranca las de horario o fecha que toca | solo la plataforma | F22 | `flow.schedule.fire_due` |
 | Sigue las ejecuciones cuya espera terminó | solo la plataforma | F23 | `flow.run.resume_due` |
 | Reanuda una ejecución parada por un error en el paso que falló | gestionar | F24 | `flow.run.retry` |
 | Guarda (o cambia) un secreto, sellado | gestionar (nunca el asistente) | F26 | `flow.secret.set` |
 | Borra un secreto | gestionar | F26 | `flow.secret.delete` |
-| Hace, por detrás, la llamada de una ejecución que la espera | solo la plataforma | F27 | `flow.run.call` |
-| Toma la llamada de una ejecución para hacerla | solo la plataforma | F27 | `flow.run.claim_call` |
-| Apunta cómo acabó la llamada y sigue la ejecución | solo la plataforma | F27 | `flow.run.record_call` |
+| Hace, por detrás, la llamada de una ejecución que la espera | solo la plataforma | — | `flow.run.call` |
+| Toma la llamada de una ejecución para hacerla | solo la plataforma | — | `flow.run.claim_call` |
+| Apunta cómo acabó la llamada y sigue la ejecución | solo la plataforma | — | `flow.run.record_call` |
 | Contesta sí o no, con una nota, a una pregunta de una automatización | contestar (su rol) | F29 | `flow.question.answer` |
 | Cierra las preguntas que nadie contestó a tiempo | solo la plataforma | F30 | `flow.question.expire_due` |
 | Enciende una automatización que trae otra app: la primera vez la crea encendida con exactamente sus permisos; después solo la enciende | gestionar | F33 | `flow.recipe.enable` |
@@ -1340,6 +1348,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   teléfono. Repetir el aviso no cambia nada.
 - De la plataforma: la zona horaria del negocio (los horarios) y los avisos del outbox (el último de un
   tipo, para Probar y los ejemplos).
+
+| De | Para qué | Flujos | Servicio |
+|---|---|---|---|
+| Bandeja de WhatsApp | Las plantillas que sabe rellenar, para elegir una en el paso | F31, F32 | `whatsapp_inbox.template.list` |
+| Bandeja de WhatsApp | Guardar el archivo de la cabecera y leerlo al abrir el paso | F32 | `whatsapp_inbox.template_sample.upload`, `.detail` |
 
 ### Quién puede qué
 
@@ -1440,7 +1453,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `document.fill`/`resolve` meten cada dato tal cual (`true`, ISO, céntimos) salvo con un `say`; `queries.values.words_for`
   es el de lo que lee una persona — el título y los detalles de un paso `ask` (`_ask` y «Probar») y los datos de
   `PERSON_PARAMS` (`whatsapp_inbox.message.notify`: `text` y `template`, en `map_params`) —: un `bool` como «Sí»/«No»
-  (`pgettext "datum"`), un día, una hora con segundos o un instante ISO (`base.home.moment`, a la hora del negocio)
+  (`pgettext "datum"`), un día, una hora con segundos o un instante ISO (`base.home.device_notices.moment`, a la hora del negocio)
   como CLDR en `flow.language` (en «Probar», el de quien prueba), y un `int` de una ruta `steps.<id>.<campo>` cuyo
   esquema de salida (`step_fields`: el de la acción, la primera fila de una consulta) lo marca como dinero
   (`json_schema_extra={"money": True}`, `live.assistant.MONEY`, la marca de la tarjeta de base) con
@@ -1717,7 +1730,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   Bandeja de WhatsApp), «pasos» es «pasó» sin tilde («¿qué pasó con…?») y «pregunta» también es verbo («se les
   pregunta»); «borra» y «bórralo» tienen otra raíz que «borrador». `tests/test_assistant_asks.py` mide con las 30 frases
   reales de la QA de la capa 2 (`tests/e2e/qa/probes/owner-es-flow-2026-11-08.json`), nunca con los propios `asks`: cada
-  una se ofrece, y con ella la lectura que encuentra su registro cuando la herramienta solo toma un id (el borrador, la
+  una se ofrece (o, las del último evento real, el recuento por evento y los permisos, las encuentra la búsqueda de
+  su tarea), y con ella la lectura que encuentra su registro cuando la herramienta solo toma un id (el borrador, la
   ejecución, la receta; sin ella el modelo pedía el id). También cuando la automatización se nombra solo por su
   nombre propio: `live` da el peso del verbo pedido a la acción que lo hace dicho de otra forma, «activa X» a
   `flow.flow.set_enabled`, «renombra X» a `flow.flow.update` (recibe `name`) y «permite a X…» a `flow.flow.grant`.

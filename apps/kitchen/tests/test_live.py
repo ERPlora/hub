@@ -2,8 +2,9 @@
 
 The board is live (KITCHEN-F10): every write of the kitchen, a station renamed or recoloured, the routing (rounds not
 saved yet follow it), the settings («works from the screen» changes what charging serves) and what Sales does to its
-checks (the read itself sees it before the relay's reaction saves it) re-run it. A line added or a check retitled in any
-till does not re-run the board (its cost per display); only the tickets of one check follow its moves (a split).
+checks (the read itself sees it before the relay's reaction saves it) re-run it, a check given a new title too (moved to
+another table: its rounds say the new one). A line added in any till does not re-run the board (its cost per display);
+only the tickets of one check follow its moves (a split).
 """
 
 from live.live_registry import live_registry
@@ -16,6 +17,7 @@ SALE = [
     "sale.order.voided",
     "sale.order.line_voided",
     "sale.order.merged",
+    "sale.order.relabeled",
 ]
 #: A split moves lines to a new check (opened) and changes the old one: only a check's own tickets care.
 CHECK_MOVES = ["sale.order.opened", "sale.order.changed"]

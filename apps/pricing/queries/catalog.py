@@ -3,10 +3,10 @@
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.customer.queries import find_group
+from apps.customer.queries.reads import find_group
 from apps.inventory import queries as inventory_queries
 from apps.pricing.queries.other_apps import call_service
-from apps.pricing.schemas import CatalogRecordOut, CatalogRefIn
+from apps.pricing.schemas.catalog import CatalogRecordOut, CatalogRefIn
 
 
 @operation(

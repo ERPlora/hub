@@ -11,7 +11,7 @@ import respx
 
 from apps.whatsapp_inbox.models import Conversation
 from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, ctx_for, receive, run, system
-from base.models import EventDelivery
+from base.models.relay import EventDelivery
 
 pytestmark = HUB_DB_COMMITTED
 

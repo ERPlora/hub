@@ -340,7 +340,7 @@ const listError = computed(() => (list.status.value === 'error' ? t('appointment
       :title="t('appointment.deleteDialog.title')"
       :message="t('appointment.deleteDialog.message', { number: actions.target.value?.number ?? '' })"
       :confirm-label="t('appointment.deleteDialog.confirm')"
-      :cancel-label="t('appointment.cancelDialog.keep')"
+      :cancel-label="t('appointment.deleteDialog.keep')"
       :pending="actions.deleting.pending.value"
       :error="actions.deleting.error.value"
       @confirm="actions.confirmDelete()"

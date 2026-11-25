@@ -1,5 +1,5 @@
-"""base.help.get: the help window of a module whose help is ready, read from its WORKBOOK in the person's language, or in
-the source's while that language has no current file.
+"""base.help.get: the help of an app whose help is ready, a module's or the Hub's own screens', read from its WORKBOOK in
+the person's language, or in the source's while that language has no current file.
 
 A stand-in for Tables is the module with its help ready: its name and menu are the real ones, and its WORKBOOK is the
 made-up one of ``help_workbooks`` (floor plan, zones and the settings Tables shows as its fifth tab).
@@ -12,14 +12,16 @@ from django.apps import apps
 from live.assistant import is_tool
 from live.context import OperationContext
 from live.errors import NotFound
-from live.meta import Help, module_configs
+from live.meta import Help, all_live_app_configs
 from live.operations import AI, get
 
 from base import workbook_help
+from base.models import Membership
+from base.permissions import permissions_of_role
 from base.queries import app_help
 from base.schemas.app_help import AppHelpIn
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
-from base.tests.help_workbooks import EN, ready_tables, write_workbooks
+from base.tests.help_workbooks import EN, ready_platform, ready_tables, write_workbooks
 
 __all__ = ["in_business_a"]
 
@@ -28,10 +30,19 @@ pytestmark = HUB_DB
 VIDEO_ES, VIDEO_EN = "dQw4w9WgXcQ", "M7lc1UVf-VE"
 
 
-def ask(app: str = "table", language: str = "es") -> dict:
+def ask(app: str = "table", language: str = "es", *also: str) -> dict:
+    """The help of ``app`` for a person who sees the Home and ``also`` holds those permissions."""
     op = get("base.help.get")
-    ctx = OperationContext(scope=A, actor="ana", permissions=frozenset({"base.view_home"}), language=language)
+    ctx = OperationContext(scope=A, actor="ana", permissions=frozenset({"base.view_home", *also}), language=language)
     return op(ctx, AppHelpIn(app=app)).model_dump(mode="json")
+
+
+def titles(answer: dict) -> list[str]:
+    return [screen["title"] for screen in answer["screens"]]
+
+
+def tasks(answer: dict) -> list[str]:
+    return [flow["id"] for flow in answer["flows"]]
 
 
 @pytest.fixture
@@ -49,8 +60,8 @@ def test_it_is_a_read_of_whoever_sees_the_home_that_holds_no_database_and_is_a_t
 
 @pytest.fixture
 def no_help(monkeypatch):
-    """No module declares its help, whichever modules already have it."""
-    for config in module_configs():
+    """No app declares its help, whichever ones already have it."""
+    for config in all_live_app_configs():
         monkeypatch.setattr(config, "help", None)
 
 
@@ -67,6 +78,224 @@ class TestWhichApps:
         with pytest.raises(NotFound) as refused:
             ask(app)
         assert (refused.value.code, refused.value.message) == ("base.help_missing", "Esta app aún no tiene ayuda.")
+
+
+    def test_the_hub_s_own_screens_are_ready_and_an_app_that_declares_no_help_is_not(self):
+        assert "base" in app_help.ready_apps()
+        assert not {"demo", "control"} & set(app_help.ready_apps())
+
+    @pytest.mark.parametrize("app", ["demo", "control"])
+    def test_an_app_that_declares_no_help_has_none_for_anyone(self, app):
+        with pytest.raises(NotFound) as refused:
+            ask(app, "es", "*")
+        assert refused.value.code == "base.help_missing"
+
+
+class TestTheHubsOwnScreens:
+    """base's help: a section per screen of the Hub, each for whoever can see that screen."""
+
+    @pytest.fixture
+    def platform(self, monkeypatch, tmp_path):
+        return ready_platform(monkeypatch, tmp_path)
+
+    def test_it_answers_as_a_module_does_named_as_the_product(self, platform):
+        answer = ask("base", "es", "*")
+        assert {key: answer[key] for key in ("app", "name", "language", "video", "purpose")} == {
+            "app": "base",
+            "name": "ERPlora",
+            "language": "es",
+            "video": None,
+            "purpose": "Lo que el Hub trae **siempre**, sin activar nada.",
+        }
+
+    def test_a_screen_s_text_is_its_summary_and_a_section_that_is_no_screen_is_left_out(self, platform):
+        assert [(screen["id"], screen["title"], screen["path"], screen["text"]) for screen in ask("base", "es", "*")["screens"]] == [
+            ("home", "Inicio · Resumen", "/", "El negocio de un vistazo."),
+            ("files", "Archivos", "/files", "Los documentos del negocio."),
+            ("system_logs", "Sistema · Registros", "/system#logs", "Lo que ha pasado."),
+        ]
+
+    def test_in_another_language_it_reads_its_current_file(self, platform):
+        answer = ask("base", "en", "*")
+        assert (answer["language"], answer["name"]) == ("en", "ERPlora")
+        assert titles(answer) == ["Home · Summary", "Files", "System · Logs"]
+
+    def test_its_tasks_are_those_done_on_a_screen_as_a_module_s_are(self, platform):
+        answer = ask("base", "es", "*")
+        assert tasks(answer) == ["BASE-F01", "BASE-F02", "BASE-F03", "BASE-F04", "BASE-F05", "BASE-F06", "BASE-F08"]
+        assert answer["flows"][5] == {
+            "id": "BASE-F06",
+            "title": "Descargar un archivo",
+            "screens": ["system_logs", "files"],
+            "steps": "1. Pulsa «Descargar».",
+            "failure": "Lo dice un aviso.",
+            "videos": [],
+        }
+
+    @pytest.mark.parametrize("language", ["es", "en"])
+    @pytest.mark.parametrize(
+        ("role", "seen"),
+        [
+            (Membership.Role.ACCOUNTANT, ["BASE-F01", "BASE-F05"]),
+            (Membership.Role.EMPLOYEE, ["BASE-F01", "BASE-F05", "BASE-F06", "BASE-F08"]),
+            (Membership.Role.MANAGER, ["BASE-F01", "BASE-F02", "BASE-F05", "BASE-F06", "BASE-F08"]),
+            (Membership.Role.ADMIN, ["BASE-F01", "BASE-F02", "BASE-F03", "BASE-F05", "BASE-F06", "BASE-F08"]),
+            (Membership.SUPPORT, ["BASE-F01", "BASE-F02", "BASE-F03", "BASE-F05", "BASE-F06", "BASE-F08"]),
+            (Membership.Role.OWNER, ["BASE-F01", "BASE-F02", "BASE-F03", "BASE-F04", "BASE-F05", "BASE-F06", "BASE-F08"]),
+        ],
+    )
+    def test_a_task_goes_only_to_the_roles_that_do_it_and_those_above_them(self, platform, language, role, seen):
+        assert tasks(ask("base", language, *permissions_of_role(role))) == seen
+
+    def test_a_role_of_the_business_gets_the_tasks_of_what_it_may_do(self, platform):
+        assert tasks(ask("base", "es", "base.administer_hub")) == ["BASE-F01", "BASE-F03", "BASE-F05", "BASE-F06"]
+
+    def test_a_task_done_on_several_screens_names_those_the_person_sees(self, platform):
+        def screens(*also: str) -> list[str]:
+            return next(flow["screens"] for flow in ask("base", "es", *also)["flows"] if flow["id"] == "BASE-F06")
+
+        assert screens("base.view_files") == ["files"]
+        assert screens("base.administer_hub") == ["system_logs"]
+        assert screens("base.*") == ["system_logs", "files"]
+
+    @pytest.mark.parametrize(
+        ("also", "seen"),
+        [
+            ((), ["Inicio · Resumen"]),
+            (("base.view_files",), ["Inicio · Resumen", "Archivos"]),
+            (("base.administer_hub",), ["Inicio · Resumen", "Sistema · Registros"]),
+            (("base.*",), ["Inicio · Resumen", "Archivos", "Sistema · Registros"]),
+        ],
+    )
+    def test_whoever_cannot_see_a_screen_gets_no_help_of_it(self, platform, also, seen):
+        assert titles(ask("base", "es", *also)) == seen
+
+    def test_what_one_person_may_see_is_not_kept_for_the_next(self, platform):
+        assert titles(ask("base")) == ["Inicio · Resumen"]
+        assert titles(ask("base", "es", "base.*")) == ["Inicio · Resumen", "Archivos", "Sistema · Registros"]
+        assert titles(ask("base")) == ["Inicio · Resumen"]
+        assert tasks(ask("base")) == ["BASE-F01", "BASE-F05"]
+
+
+class TestTheRealScreens:
+    """base's own WORKBOOK, in each language."""
+
+    OWNER = ("base.*", "printing.manage_settings")
+    EVERYONES_ES = [
+        "Inicio · Resumen",
+        "Inicio · Actividad",
+        "Empleados · Personal",
+        "Empleados · Roles",
+        "Empleados · Roles · Qué permite",
+        "Apps",
+        "Ajustes · General",
+        "Ajustes · Negocio",
+        "Mi perfil",
+    ]
+
+    def test_whoever_runs_the_business_gets_every_screen_in_spanish(self):
+        answer = ask("base", "es", *self.OWNER)
+        assert answer["language"] == "es"
+        assert titles(answer) == [
+            "Inicio · Resumen",
+            "Inicio · Actividad",
+            "Empleados · Personal",
+            "Empleados · Roles",
+            "Empleados · Roles · Qué permite",
+            "Empleados · API keys",
+            "Empleados · Aprobaciones",
+            "Ficha de una persona",
+            "Archivos",
+            "Apps",
+            "Sistema · Uso y plan",
+            "Sistema · Actualizaciones",
+            "Sistema · Eventos caídos",
+            "Sistema · Registros",
+            "Ajustes · General",
+            "Ajustes · Negocio",
+            "Ajustes · Impresión",
+            "Ajustes · Datos y copias",
+            "Mi perfil",
+        ]
+        assert all(screen["text"] for screen in answer["screens"])
+
+    def test_and_in_english(self):
+        answer = ask("base", "en", *self.OWNER)
+        assert answer["language"] == "en"
+        assert titles(answer) == [
+            "Home · Summary",
+            "Home · Activity",
+            "Employees · Staff",
+            "Employees · Roles",
+            "Employees · Roles · What it allows",
+            "Employees · API keys",
+            "Employees · Approvals",
+            "A person's page",
+            "Files",
+            "Apps",
+            "System · Usage and plan",
+            "System · Updates",
+            "System · Failed events",
+            "System · Logs",
+            "Settings · General",
+            "Settings · Business",
+            "Settings · Printing",
+            "Settings · Data and backups",
+            "My profile",
+        ]
+        assert all(screen["text"] for screen in answer["screens"])
+
+    def test_an_accountant_gets_the_screens_everyone_has(self):
+        assert titles(ask("base")) == self.EVERYONES_ES
+
+    #: What each role may do on the screens it sees, over what the roles below it may.
+    TASKS = (
+        (
+            Membership.Role.ACCOUNTANT,
+            "F01 F02 F04 F05 F06 F07 F08 F09 F12 F14 F15 F16 F17 F20 F48 F49 F50 F64 F65 F81 F82 F119 F120",
+        ),
+        (Membership.Role.EMPLOYEE, "F72 F74 F112"),
+        (Membership.Role.MANAGER, "F03"),
+        (
+            Membership.Role.ADMIN,
+            "F18 F19 F21 F22 F23 F24 F25 F29 F30 F31 F32 F33 F34 F35 F36 F38 F39 F40 F41 F42 F43 F44 F45 F46 F51 F62 "
+            "F66 F67 F68 F69 F70 F71 F73 F75 F76 F77 F78 F79 F80 F83 F85 F86 F87 F88 F89 F91 F116 F126 F127 "
+            "F128 F129 F131",
+        ),
+        (Membership.Role.OWNER, "F37"),
+    )
+
+    @pytest.mark.parametrize("language", ["es", "en"])
+    def test_each_role_gets_every_task_it_may_do_and_no_other(self, language):
+        expected: set[str] = set()
+        for role, more in self.TASKS:
+            expected |= {f"BASE-{flow}" for flow in more.split()}
+            seen = tasks(ask("base", language, *permissions_of_role(role)))
+            assert (role, set(seen)) == (role, expected)
+            assert len(seen) == len(expected)
+
+    @pytest.mark.parametrize(
+        ("permission", "more"),
+        [
+            ("base.view_files", {"Archivos"}),
+            ("printing.manage_settings", {"Ajustes · Impresión"}),
+            (
+                "base.administer_hub",
+                {
+                    "Empleados · API keys",
+                    "Empleados · Aprobaciones",
+                    "Ficha de una persona",
+                    "Sistema · Uso y plan",
+                    "Sistema · Actualizaciones",
+                    "Sistema · Eventos caídos",
+                    "Sistema · Registros",
+                    "Ajustes · Datos y copias",
+                },
+            ),
+        ],
+    )
+    def test_each_permission_adds_the_screens_it_opens(self, permission, more):
+        assert set(titles(ask("base", "es", permission))) - set(self.EVERYONES_ES) == more
 
 
 class TestTheAnswer:

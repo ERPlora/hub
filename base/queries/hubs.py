@@ -11,7 +11,8 @@ from live.operations import AI, INTERNAL, operation
 
 from base import business
 from base.auth import SAAS_PANEL_PATH, saas_url
-from base.models import Hub, Location
+from base.models import Hub
+from base.models.locations import Location
 from base.operations import is_platform_hub
 from base.permissions import VIEW_HOME
 from base.registry import hub_answer, internal_only
@@ -22,7 +23,8 @@ from base.schemas.hub_registry import HubGetIn, HubGetOut, HubsBySlugIn, HubsByS
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
 @operation("base.hub.get", kind="query", permission=None, input=HubGetIn, output=HubGetOut, ai=INTERNAL)
 def hub_get(ctx: OperationContext, data: HubGetIn) -> dict[str, Any]:
-    """The registry's row of ``data.id`` and control's active freeze, for the SaaS's signed status poll.
+    """The registry's row of ``data.id``, control's active freeze and when the business's move asked for its night
+    starts, for the SaaS's signed status poll.
 
     Maintenance is global provisioning state, not part of the SaaS photo: reading it never changes ``state_version``;
     a repeated poll is idempotent and one after a missed notification or a lift recovers the current truth.
@@ -35,7 +37,7 @@ def hub_get(ctx: OperationContext, data: HubGetIn) -> dict[str, Any]:
         raise NotFound(gettext("No hub has this id."))
     freeze = active_freeze()
     maintenance = None if freeze is None else {"frozen": freeze.frozen, "reason": freeze.reason, "since": freeze.since}
-    return {**hub_answer(hub), "maintenance": maintenance}
+    return {**hub_answer(hub), "maintenance": maintenance, "move_scheduled_for": hub.move_scheduled_for}
 
 
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
@@ -59,9 +61,11 @@ def hubs_by_slugs(ctx: OperationContext, data: HubsBySlugIn) -> dict[str, Any]:
     output=BusinessOut,
     ai=AI(
         description=(
-            "Reads this business's name, country, time zone, language and currency, as erplora.com registered it. They "
-            "are changed on erplora.com by the owner or an administrator, never here; the country no longer changes "
-            "once the business is ready, and the currency is always the country's."
+            "Reads this business's name, country, time zone, language and currency, as erplora.com registered it. Its "
+            "name, time zone and language are changed on erplora.com by the owner or an administrator, never here. Its "
+            "country no longer changes once the business is ready, and its currency is always the country's: it "
+            "changes only with the country. Without settings_url and not a demo, it is ERPlora's own business: only "
+            "ERPlora sets all of this, on its server."
         ),
         asks={
             "en": (

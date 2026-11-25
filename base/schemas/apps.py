@@ -45,6 +45,10 @@ class AppOut(Schema):
     #: ``can_disable``, base's for one the business's country requires on, and the apps it depends on (hub#618,
     #: hub#694, hub#997); ``None``: nothing refuses it.
     refusal: str | None
+    #: What else flipping its switch turns on or off, as its question says it before the yes, in the reader's language
+    #: (``base.app_switch``, the assistant's card says the same): «Mesas se desactiva con ella: solo la necesitaba
+    #: Reservas.»; empty when it changes only this app.
+    along_said: str
     #: The business's country requires it on, as the app declares it (``mandatory``, hub#997): «Mandatory in …», on or
     #: off; once on there, it never goes off.
     mandatory: bool
@@ -55,7 +59,8 @@ class AppListOut(Schema):
     #: The business's country by its name in the reader's language (a business without one is in Spain): what
     #: «Mandatory in …» says.
     country_name: str
-    #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub).
+    #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub); empty in
+    #: ERPlora's own business, which buys nothing, as ``plan_url``.
     store_url: str
     #: erplora.com's plans of this business, where a higher limit is bought.
     plan_url: str
@@ -79,12 +84,16 @@ class AppRefIn(Schema):
 
 
 class AppRefOut(Schema):
-    """Which app a name names: its id, its name in the reader's language and its state, as the Apps screen says it
-    (``AppOut.state``: ``creating`` and ``failed`` while a hub's own database gets its tables)."""
+    """Which app a name names: its id, its name in the reader's language, its state and whether the business's country
+    requires it, as the Apps screen says them (``AppOut.state``: ``creating`` and ``failed`` while a hub's own database
+    gets its tables; ``AppOut.mandatory``)."""
 
     id: str
     name: str
+    #: What it is for, as the Apps screen says it (``AppOut.summary``).
+    summary: str
     state: Literal["on", "off", "blocked", "creating", "failed"]
+    mandatory: bool
 
 
 class AppChangeIn(Schema):

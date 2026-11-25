@@ -17,6 +17,7 @@ from apps.inventory.schemas.fields import (
     T_PRODUCT,
     Cents,
     Description,
+    IN_THEIR_WORDS,
     Page,
     PageIn,
     ProductRefIn,
@@ -26,6 +27,7 @@ from apps.inventory.schemas.fields import (
     UnitCode,
     _text,
 )
+from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.allergens import AllergensIn, AllergensOut, AllergensPatchIn
 from base.recovery import ImageInCopyIn
 from base.sensitive import COSTS
@@ -50,6 +52,8 @@ ProductCost = Annotated[
     int | None,
     Field(description="Cost in cents; null for whoever does not see the costs.", json_schema_extra={"money": True, **COSTS}),
 ]
+SHOW_ON_WEBSITE = gettext_noop("Show on website")
+SHOWN_ON_WEBSITE = "Whether the website's catalog shows it; off, the till still sells it."
 Name = _text(200, 1)
 Sku = _text(64, 1)
 Ean13 = _text(13)
@@ -78,7 +82,7 @@ class ProductFiltersIn(Schema):
     """The product list's search, filters and order; the export takes the same."""
 
     search: ProductSearch = None
-    name: str | None = Field(None, max_length=200, description="Part of the name.")
+    name: str | None = Field(None, max_length=200, description=f"Part of the name, {IN_THEIR_WORDS}.")
     sku: str | None = Field(None, max_length=64, description="Part of the SKU.")
     price_min: Cents | None = Field(None, description="Lowest price, in cents.")
     price_max: Cents | None = Field(None, description="Highest price, in cents.")
@@ -124,6 +128,9 @@ class ProductListIn(PageIn, ProductFiltersIn):
 
 class ForSaleListIn(PageIn):
     search: ProductSearch = None
+    show_on_website: bool | None = Field(
+        None, description="Only the ones the business shows (true) or hides (false) on its website; the till asks none."
+    )
 
 
 class ProductIn(AllergensIn):
@@ -138,7 +145,8 @@ class ProductIn(AllergensIn):
     )
     tax_category_key: TaxKey = Field(
         title=TAX_CATEGORY,
-        description="Key of the tax category (Taxes app) that says how it is taxed."
+        description="Key of the tax category (Taxes app) that says how it is taxed.",
+        json_schema_extra=A_TAX_CATEGORY,
     )
     cost: Cents = Field(0, description="Cost in cents; only whoever sees the costs sends one.", json_schema_extra=COSTS)
     initial_stock: Quantity = Field(
@@ -181,6 +189,7 @@ class ProductIn(AllergensIn):
     is_active: bool = Field(
         True, description="Whether it is on sale; one created inactive stays out of the till until it is activated."
     )
+    show_on_website: bool = Field(True, title=SHOW_ON_WEBSITE, description=SHOWN_ON_WEBSITE)
 
 
 class ProductRecoverIn(ProductIn, ImageInCopyIn):
@@ -209,7 +218,7 @@ class ProductPatchIn(ProductRefIn, AllergensPatchIn):
     )
     description: Description | None = Field(None, description="New description.")
     tax_category_key: TaxKey | None = Field(
-        None, title=TAX_CATEGORY, description="Key of the new tax category; it cannot be emptied."
+        None, title=TAX_CATEGORY, description="Key of the new tax category; it cannot be emptied.", json_schema_extra=A_TAX_CATEGORY
     )
     is_active: bool | None = Field(
         None, description="Activate (true) or deactivate (false) it."
@@ -226,6 +235,7 @@ class ProductPatchIn(ProductRefIn, AllergensPatchIn):
     track_stock: bool | None = Field(
         None, description="Track (true) or stop tracking (false) its stock."
     )
+    show_on_website: bool | None = Field(None, title=SHOW_ON_WEBSITE, description=SHOWN_ON_WEBSITE)
     category_ids: list[Annotated[UUID, Field(json_schema_extra=A_CATEGORY)]] | None = Field(
         None,
         max_length=MAX_BATCH,
@@ -263,6 +273,7 @@ class ProductOut(AllergensOut):
     is_sold_out: bool = Field(
         description="Sold out («86»): still active, but the till does not offer it until it is back on sale."
     )
+    show_on_website: bool = Field(description=SHOWN_ON_WEBSITE)
     category_ids: list[UUID] = Field(description="Its categories.")
     image: str = Field(
         description="Its image: catalog:<folder>/<name> of the shared library, file:<name> of a photo of its own, "
@@ -285,6 +296,7 @@ class SaleProductOut(AllergensOut):
 
     id: UUID = Field(description="The product's id.")
     name: str = Field(description="Name, as the ticket and the kitchen read it.")
+    description: str = Field(description="Description, as the website's catalog shows it under the name.")
     sku: str = Field(description="SKU.")
     product_type: ProductType = Field(description="physical or service.")
     price: int = Field(
@@ -300,6 +312,7 @@ class SaleProductOut(AllergensOut):
     price_quantity: Decimal = Field(description="Quantity the price refers to.")
     pricing_unit: UnitCode = Field(description="Unit the price refers to.")
     tracks_stock: bool = Field(description="Whether a sale lowers its stock.")
+    show_on_website: bool = Field(description=SHOWN_ON_WEBSITE)
     image: str = Field(
         description="Its image: catalog:<folder>/<name> of the shared library, file:<name> of a photo of its own, "
         "or empty."

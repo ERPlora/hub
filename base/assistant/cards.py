@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pycountry
-from babel.dates import format_date, format_time, get_datetime_format
+from babel.dates import format_date, format_skeleton, format_time, get_datetime_format
 from django.utils import translation
 from django.utils.translation import pgettext_lazy
 from live import assistant as shared
@@ -143,7 +143,7 @@ class _Words:
         return {"kind": "money", "value": value, **({"money": money} if money else {})}
 
     def moment(self, value: str, kind: str) -> str | None:
-        return _moment(value, kind, self)
+        return moment(value, kind, self.language)
 
     def reference(self, value: Any, prop: dict) -> Any:
         return _reference(value, prop, self)
@@ -152,12 +152,15 @@ class _Words:
         return app_name(self.op)
 
 
-def _moment(value: str, kind: str, words: _Words) -> str | None:
-    """``value`` (ISO 8601: a day, a day and a time, or a time) as the person's language writes it — CLDR's medium day
-    and short time, as the screens' ``formatDateTime`` (@erplora/ui) says them —; an instant of another zone at the
-    business's hour, a wall-clock time as it is (the app books it at the business's hour). ``None``: it is none."""
-    locale = babel_locale(words.language)
+def moment(value: str, kind: str, language: str) -> str | None:
+    """``value`` (ISO 8601: a day, a day and a time, or a time) as ``language`` writes it — CLDR's medium day and short
+    time, as the screens' ``formatDateTime`` (@erplora/ui) says them —; an instant of another zone at the business's
+    hour, a wall-clock time as it is (the app books it at the business's hour). ``None``: it is none."""
+    locale = babel_locale(language)
     try:
+        if kind == "date" and value.startswith("--"):
+            # A day without its year (a birthday, as vCard writes it): its day and its month.
+            return format_skeleton("MMMMd", dt.date.fromisoformat(f"2000{value[1:]}"), locale=locale)
         if kind == "date":
             return format_date(dt.date.fromisoformat(value), "medium", locale=locale)
         if kind == "time":
@@ -267,6 +270,8 @@ BASE_SCREENS = {
     "app": "apps",
     "api_key": "employees",
     "approval": "employees",
+    # This month's messages of the assistant, which «Usage and plan» shows.
+    "assistant": "system",
     "blueprint": "settings",
     "business": "settings",
     # The shared image library opens from the form of a product, a service or a menu: no screen of the platform.
@@ -288,6 +293,7 @@ BASE_SCREENS = {
     "role": "employees",
     "setup": "home",
     "support": "report",
+    "support_access": "settings",
     "system": "system",
 }
 

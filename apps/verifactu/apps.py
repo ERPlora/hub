@@ -45,19 +45,19 @@ class VerifactuConfig(LiveAppConfig):
     # (VERIFACTU-F32), so its owner turns it on from Apps.
     verticals = []
     # Mandatory in Spain: the Home asks whoever runs a business there to turn it on while it is off
-    # (base.home.mandatory_steps). The platform never turns it on by itself: it binds the business to the AEAT until the
+    # (base.home.mandatory_apps.mandatory_steps). The platform never turns it on by itself: it binds the business to the AEAT until the
     # end of the calendar year and needs its authorisation, so its owner does, from Apps.
     mandatory = {"countries": [SPAIN], "platform_turns_on": False}
     # A record is born from an issued invoice, read from its row (a foreign key).
     requires = ["invoice"]
     default_auto_field = "django.db.models.BigAutoField"
-    permissions = [
-        "verifactu.view_record",
-        "verifactu.add_record",
-        "verifactu.transmit_record",
-        "verifactu.correct_record",
-        "verifactu.configure",
-    ]
+    permissions = {
+        "verifactu.view_record": _("View records, the queue, events and the chain, and verify the chain"),
+        "verifactu.add_record": _("Register an issued invoice"),
+        "verifactu.transmit_record": _("Send the queue to the AEAT, ask the AEAT and test the connection"),
+        "verifactu.correct_record": _("Fix and cancel records"),
+        "verifactu.configure": _("Upload the certificate, switch to production and recover the chain"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Receiving the account's
     # photo (``verifactu.sync_config``) is declared by no role: only the system holds it.
     role_permissions = {
@@ -99,7 +99,7 @@ class VerifactuConfig(LiveAppConfig):
     # The Home's step is done once the chosen way could carry the records to the AEAT's production environment
     # (VERIFACTU-F08), whatever the plan. Its level is base's: functional in testing, which files without it while the
     # till sells; ⛔ legal where the hub files in production, which refuses every sale without it
-    # (``base.home.LEGAL_IN_PRODUCTION``, on the row's ``environment``). Only a business in Spain is asked: outside it
+    # (``base.home.setup_steps.LEGAL_IN_PRODUCTION``, on the row's ``environment``). Only a business in Spain is asked: outside it
     # VeriFactu seals and sends nothing (``queries.country.outside_spain``), and a hub without a country (a demo,
     # ERPlora's own) is in Spain, base's reading (``base.business.country_or_market``). Each panel is refreshed by
     # the events live.py re-runs it on; the latest events are a component of the app, which names each event's

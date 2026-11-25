@@ -50,6 +50,20 @@ def test_the_instructions_ask_for_a_missing_datum_and_leave_the_yes_to_the_card(
     assert "If the request fits several records, ask which one." in text
 
 
+def test_the_instructions_say_a_write_that_ran_is_what_the_person_confirmed():
+    """hub#2209: asked to keep stock only for the bottled drinks, the assistant turned it off for the cheesecake, as
+    asked; the person confirmed its card; then it said «I made a mistake, I'll fix it» and drew a card to turn it back
+    on. The instructions told it how to read a write that was not confirmed or failed, never one that ran, and the
+    model took its own confirmed change for something it had done unasked. A write that comes back with its result ran
+    because the person said yes to its card: it is done as they asked, and undoing it is theirs to ask."""
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert (
+        "If it comes back with its result, the person said yes to its card and it ran: it is what they asked, never "
+        "a mistake of yours. Check that result against their request and say what is done; never offer or call a "
+        "write to undo it unless they ask."
+    ) in text
+
+
 def test_the_instructions_set_the_language_the_money_and_the_screens():
     text = assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={"/settings": "Ajustes"})
     # Off-topic questions (films, cinemas) would spend the business's allowance.
@@ -61,20 +75,32 @@ def test_the_instructions_set_the_language_the_money_and_the_screens():
     assert "Bar Pepe" in text
 
 
+def test_the_instructions_keep_the_persons_tu_or_usted_to_the_end():
+    """hub#2210: asked «Si no, créame "Punto de la carne"…», the assistant began with «tú» and ended with «Dígame…» and
+    «luego los vincula»; nothing in its instructions said how to address the person, so it switched in the middle of an
+    answer. It answers as it is addressed, with no sign of either the «tú» of the app's own screens, and never mixes."""
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert (
+        "In Spanish, address the person as they address you, «tú» or «usted» (with no sign of either, «tú», as the "
+        "app does), and keep it to the end: «dime, quieres, puedes» or «dígame, quiere, puede», never a mix."
+    ) in text
+
+
 @pytest.mark.parametrize(
     ("currency", "decimals", "example"),
     [("EUR", 2, "17.00 EUR → 1700"), ("JPY", 0, "17 JPY → 17"), ("KWD", 3, "17.000 KWD → 17000")],
 )
 def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currency, decimals, example):
-    """A tool's result gives its amounts with their
-    currency (``currency`` and ``currency_decimals``: an invoice keeps the one it was issued in) and the card paints them
-    in it, but the model was told to say every amount in the business's, with two decimals: its text and the card
-    disagreed. An amount goes in the minor unit of its currency (no cents in yen), said in the currency its result
-    gives, else in the business's."""
+    """A tool's result tells each amount in its own currency, as the screens write it (an invoice keeps the one it was
+    issued in), and the model says it as it comes: a result in cents read as euros said 360 as «360,00 €». What the
+    model sends still goes in the minor unit of its currency (no cents in yen); an amount of its own, in the
+    business's."""
     text = assistant.prompt.instructions(language="en", currency=currency, decimals=decimals, business="Bar Pepe", screens={})
     assert example in text
-    assert "`currency`" in text and "`currency_decimals`" in text
-    assert "two decimals" not in text
+    said = example.split(" → ")[0]
+    assert f'as the screens write it (`"{said}"`): say it as it comes' in text
+    assert f"in {currency} with {decimals} decimals" in text
+    assert "`currency_decimals`" not in text and "two decimals" not in text
 
 
 # ── Who asks: their role and what it may do (hub#585, BASE-F100) ─────────────────────────────────────────────────
@@ -123,24 +149,53 @@ def test_a_role_that_cannot_do_something_is_told_who_can_and_no_other_tool_is_tr
     says it is not available to them here, with both reasons, never that the role alone is to blame."""
     text = _said(role=role)
     assert (
-        "When they ask for something none of your tools does, do not try other tools for it and never tell the state "
-        "of something else instead: say plainly that it is not available to them here, because their role cannot do "
-        f"it or because its app is not on, and that {who} can, or on which screen it is done."
+        "When they ask for something your tools do not do and your searches do not find, do not try other tools for "
+        "it and never tell the state of something else instead: say plainly that it is not available to them here, "
+        f"because their role cannot do it or because its app is not on, and that {who} can, or on which screen it is "
+        "done."
     ) in text
 
 
 @pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.ADMIN])
 def test_the_owner_and_an_administrator_are_never_told_their_role_cannot(role):
-    """They hold every permission of every app: what no tool does is done on its screen, not someone else's."""
+    """They hold every permission of every app: what no tool does is done on its screen, not someone else's. Which
+    screen, after what, each caller of the instructions says (the chat, after its search: ``prompt.SEARCH_FIRST``)."""
     text = _said(role=role)
     assert "their role cannot" not in text
-    assert "If something cannot be done from here (you have no tool for it), say on which screen it is done." in text
+    assert "on which screen it is done" not in text
 
 
 @pytest.mark.parametrize("role", ["", "staff", None])
 def test_without_a_role_of_the_business_no_role_is_named(role):
     """An automation's step (``apps.flow``) or a session with no role here: nobody to name."""
     assert "You talk to the" not in _said(role=role)
+
+
+# ── A role of the business: its own name, and who can do what it cannot ──────────────────────────────────────────
+
+
+def _own(invitation) -> str:
+    return " ".join(assistant.prompt.own_role("Cajero sin anulaciones", invitation).split())
+
+
+def test_a_role_of_the_business_is_named_as_the_business_wrote_it():
+    assert (
+        "You talk to the «Cajero sin anulaciones» of this business: your tools are the ones this role may use, no more."
+    ) in _own(Membership.Role.EMPLOYEE)
+
+
+@pytest.mark.parametrize(
+    ("invitation", "who"),
+    [
+        (Membership.Role.EMPLOYEE, "a manager or the owner"),
+        (Membership.Role.MANAGER, "the owner or an administrator"),
+        (Membership.Role.ACCOUNTANT, "the owner or an administrator"),
+        # A role of the business may give an administrator less than all: above them there is only the owner.
+        (Membership.Role.ADMIN, "the owner"),
+    ],
+)
+def test_who_can_do_what_it_cannot_goes_by_the_rank_of_the_invitation(invitation, who):
+    assert f"and that {who} can, or on which screen it is done." in _own(invitation)
 
 
 def test_a_write_a_manager_approves_is_said_to_ask_for_that_approval():

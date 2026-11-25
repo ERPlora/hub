@@ -8,7 +8,7 @@ the Hub speaks today.
 import pytest
 from django.utils import translation
 
-from base.catalog import user_part
+from base.catalog.workbooks import user_part
 from base.tests.help_workbooks import (
     EN,
     EN_TABS,
@@ -19,10 +19,10 @@ from base.tests.help_workbooks import (
     ES,
     ES_TABS,
     ES_WORDS,
-    header_of,
     write_workbooks,
 )
 from base.workbook_help import SOURCE_LANGUAGE, Draft, Flow, Screen, flow_fields, is_done, parse, workbook, words
+from base.workbook_sections import marked
 
 
 def spanish():
@@ -163,6 +163,11 @@ class TestFlows:
         by_id = {flow.id: flow for flow in spanish().flows}
         assert by_id["TABLE-F03"].screens == ("floor_plan", "zones")
 
+    def test_a_tab_named_by_itself_and_by_its_window_is_one(self):
+        written = user_part(ES).replace("Pantalla: Cobrar mesa, Zonas", "Pantalla: Cobrar mesa, Plano de sala, Zonas")
+        by_id = {flow.id: flow for flow in parse(written, ES_TABS, ES_WORDS).flows}
+        assert by_id["TABLE-F03"].screens == ("floor_plan", "zones")
+
     def test_a_flow_without_what_happens_if_it_fails_has_it_empty(self):
         by_id = {flow.id: flow for flow in spanish().flows}
         assert (by_id["TABLE-F02"].steps, by_id["TABLE-F02"].failure) == ("1. Toca la mesa ocupada.\n2. Pulsa «Cobrar».", "")
@@ -199,6 +204,41 @@ class TestFlows:
         published = repr(spanish().flows)
         for internal in ("table.zone.created", "el nombre y el color", "responsable", "restaurante", "cobra la mesa 4"):
             assert internal not in published
+
+    def test_who_does_each_flow_published_or_not_goes_aside_as_the_file_names_them(self):
+        assert spanish().actors == {
+            "TABLE-F01": ("responsable",),
+            "TABLE-F02": ("empleado",),
+            "TABLE-F03": ("empleado",),
+            "TABLE-F04": ("responsable",),
+            "TABLE-F05": ("el sistema",),
+        }
+
+    @pytest.mark.parametrize(
+        ("actor", "named"),
+        [
+            ("Actor: propietario, administrador\n", ("propietario", "administrador")),
+            ("Actor: Empleado (la caja, a solas); por el asistente, todos\n", ("empleado", "por el asistente", "todos")),
+            ("Actor: propietario,\n  empleado\n", ("propietario", "empleado")),
+            ("", ()),
+        ],
+        ids=["several", "parentheses", "wrapped", "none"],
+    )
+    def test_it_is_cut_on_its_commas_without_what_goes_in_parentheses(self, actor, named):
+        flow = f"## Flujos\n\n### TABLE-F01 Crear una zona\nEstado: hecho\n{actor}Pantalla: Zonas\nPasos:\n1. Pulsa «+».\n"
+        assert parse(flow, ES_TABS, ES_WORDS).actors == {"TABLE-F01": named}
+
+    @pytest.mark.parametrize(
+        ("language", "key", "tab"), [("es", "Operaciones: ninguna", "Zonas"), ("en", "Operations: none", "Zones")]
+    )
+    def test_the_operations_a_flow_uses_are_not_published_nor_added_to_the_key_before(self, language, key, tab):
+        with translation.override(language):
+            vocabulary = words()
+        status, screen, failure = (vocabulary.keys[field] for field in ("status", "screen", "failure"))
+        lines = ["## F", "", "### TABLE-F01 X", f"{status}: {vocabulary.done}", f"{screen}: {tab}", f"{failure}: Nada.", key]
+        tabs = ES_TABS if language == "es" else EN_TABS
+        [read] = parse("\n".join(lines), tabs, vocabulary).flows
+        assert read == Flow("TABLE-F01", "X", ("zones",), "", "Nada.")
 
 
 class TestEveryFlow:
@@ -269,9 +309,9 @@ class TestWhichFile:
         write_workbooks(tmp_path, {"en": EN})
         assert workbook(tmp_path, SOURCE_LANGUAGE) == (SOURCE_LANGUAGE, user_part(ES))
 
-    @pytest.mark.parametrize(("language", "body"), [("en", EN), ("eo", EO)])
+    @pytest.mark.parametrize(("language", "body"), [("en", EN), ("eo", EN.replace("Flows", "Fluoj"))])
     def test_another_language_reads_its_own_file_while_it_is_current(self, tmp_path, language, body):
-        write_workbooks(tmp_path, {"en": EN, "eo": EO})
+        write_workbooks(tmp_path, {"en": EN, "eo": EN.replace("Flows", "Fluoj")})
         assert workbook(tmp_path, language) == (language, body)
 
     def test_a_regional_language_reads_its_own_file_else_its_base_language_s(self, tmp_path):
@@ -289,11 +329,11 @@ class TestWhichFile:
         assert workbook(tmp_path, "eo") == (SOURCE_LANGUAGE, user_part(ES))
 
     @pytest.mark.parametrize(
-        "first_line",
-        [header_of(ES.replace("sus zonas", "sus salas")), "## What it is for and who it is for", ""],
-        ids=["another-hash", "no-header", "empty"],
+        "text",
+        [marked(user_part(ES.replace("sus zonas", "sus salas")), EN), EN, ""],
+        ids=["another-source", "no-marks", "empty"],
     )
-    def test_a_file_that_is_not_current_with_the_source_reads_the_source(self, tmp_path, first_line):
+    def test_a_file_that_is_not_current_with_the_source_reads_the_source(self, tmp_path, text):
         write_workbooks(tmp_path, {})
-        (tmp_path / "WORKBOOK.en.md").write_text(f"{first_line}\n\n{EN}", encoding="utf-8")
+        (tmp_path / "WORKBOOK.en.md").write_text(text, encoding="utf-8")
         assert workbook(tmp_path, "en") == (SOURCE_LANGUAGE, user_part(ES))

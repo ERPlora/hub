@@ -58,18 +58,18 @@ class AppointmentConfig(LiveAppConfig):
             "huecos libres",
         ),
     )
-    permissions = [
-        "appointment.view_appointment",
-        "appointment.view_own_appointment",
-        "appointment.add_appointment",
-        "appointment.add_own_appointment",
-        "appointment.change_appointment",
-        "appointment.change_own_appointment",
-        "appointment.delete_appointment",
-        "appointment.view_schedule",
-        "appointment.manage_schedule",
-        "appointment.manage_settings",
-    ]
+    permissions = {
+        "appointment.view_appointment": _("View the whole appointment book"),
+        "appointment.view_own_appointment": _("View their own appointment book"),
+        "appointment.add_appointment": _("Book appointments for anyone"),
+        "appointment.add_own_appointment": _("Book appointments in their own appointment book"),
+        "appointment.change_appointment": _("Change any appointment: status, move, cancel, charge and series"),
+        "appointment.change_own_appointment": _("Change their own appointments"),
+        "appointment.delete_appointment": _("Delete appointments"),
+        "appointment.view_schedule": _("View availability and blocked time"),
+        "appointment.manage_schedule": _("Block time"),
+        "appointment.manage_settings": _("Change the settings"),
+    }
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). The employee sees
     # and manages their own diary; the manager everybody's; owner and admin also delete and set it up.
     role_permissions = {
@@ -108,7 +108,19 @@ class AppointmentConfig(LiveAppConfig):
             permission="appointment.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "iDYOJPslKLo", "en": "T9O2qIaHX38"},
+        flow_videos={
+            "APPOINTMENT-F01": {"es": ["7k8rDOavPPQ"], "en": ["jqE5frTxwIs"]},
+            "APPOINTMENT-F02": {"es": ["7k8rDOavPPQ"], "en": ["jqE5frTxwIs"]},
+            "APPOINTMENT-F03": {"es": ["JEZ7xwTUQRg"], "en": ["_IJqA5Llo58"]},
+            "APPOINTMENT-F04": {"es": ["3iicsBB4OJU"], "en": ["vti0BeNrB0A"]},
+            "APPOINTMENT-F07": {"es": ["SCCcOjjX0-Q"], "en": ["5RkcBExG2Sc"]},
+            "APPOINTMENT-F08": {"es": ["SCCcOjjX0-Q"], "en": ["5RkcBExG2Sc"]},
+            "APPOINTMENT-F09": {"es": ["lyPRKIKNyzE"], "en": ["_7B2JQ7NPCM"]},
+            "APPOINTMENT-F22": {"es": ["3iicsBB4OJU"], "en": ["vti0BeNrB0A"]},
+        },
+    )
     # The bell counts the customers' own bookings waiting for confirmation, on the query the agenda's «N to
     # confirm» reads (whoever sees an agenda counts her own, or everybody's when she sees them all).
     bell = [
@@ -159,38 +171,38 @@ class AppointmentConfig(LiveAppConfig):
 
     def recoverable_from_copy(self) -> list:
         """The platform asks (``base.tenancy.recovery``) what a separate copy of the business gives back when the staff
-        recovers from it: of the copy's appointments still to come and booked (``queries.appointments_in_copy``), each
+        recovers from it: of the copy's appointments still to come and booked (``recovery.appointments_in_copy``), each
         the business still holds deleted comes back the same, with its number, its history and its series
-        (``queries.appointments_deleted_in_business``, ``appointment.appointment.restore``), and each it no longer has
+        (``recovery.appointments_deleted_in_business``, ``appointment.appointment.restore``), and each it no longer has
         is created by ``appointment.appointment.create``, the agenda's own, for the business's card of its customer
-        (``queries.appointments_not_in_business``); what does not fit the agenda now (its time taken, outside the hours,
-        a customer, a service or a professional it no longer has) is refused with why, never booked over another.
+        (``recovery.appointments_not_in_business``); what does not fit the agenda now (its time taken, outside the
+        hours, a customer, a service or a professional it no longer has) is refused with why, never booked over another.
 
-        Then its series still booking (``queries.series_in_copy``), after the appointments so that none of their dates
+        Then its series still booking (``recovery.series_in_copy``), after the appointments so that none of their dates
         is booked twice: each the business holds deleted comes back the same, active, with the appointments it had
-        booked and booking nothing by itself (``queries.series_deleted_in_business``,
+        booked and booking nothing by itself (``recovery.series_deleted_in_business``,
         ``appointment.recurring.restore``), and each it no longer has is created by ``appointment.recurring.create``,
-        Repeating's own (``queries.series_not_in_business``); one made again since stays as it is."""
-        from apps.appointment import queries  # the models are not loaded yet when this module is
+        Repeating's own (``recovery.series_not_in_business``); one made again since stays as it is."""
+        from apps.appointment.queries import recovery  # the models are not loaded yet when this module is
         from base.recovery import Recoverable
 
         return [
             Recoverable(
                 label=self.verbose_name,
                 reads_since="0001_initial",
-                read=queries.appointments_in_copy,
-                missing=queries.appointments_not_in_business,
+                read=recovery.appointments_in_copy,
+                missing=recovery.appointments_not_in_business,
                 create="appointment.appointment.create",
-                deleted=queries.appointments_deleted_in_business,
+                deleted=recovery.appointments_deleted_in_business,
                 restore="appointment.appointment.restore",
             ),
             Recoverable(
                 label=_("Repeating appointments"),
                 reads_since="0001_initial",
-                read=queries.series_in_copy,
-                missing=queries.series_not_in_business,
+                read=recovery.series_in_copy,
+                missing=recovery.series_not_in_business,
                 create="appointment.recurring.create",
-                deleted=queries.series_deleted_in_business,
+                deleted=recovery.series_deleted_in_business,
                 restore="appointment.recurring.restore",
             ),
         ]

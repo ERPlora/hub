@@ -24,6 +24,7 @@ from apps.sale.schemas.fields import (
     MAX_PAYMENTS,
     ONE_SOURCE,
     OPEN_LINES,
+    SAY_WHAT_IS_ADDED,
     SAY_WHICH_METHOD,
     SERVICE_LINES,
     AttemptKey,
@@ -113,6 +114,22 @@ class PaymentIn(Closed):
     reference: _text(128) = Field(
         "", description="A free reference of the leg, e.g. the card's authorisation."
     )
+    extra: Cents = Field(
+        0,
+        description="Leave it out: only another app's own step at the charge sheet fills it, never what someone asks.",
+    )
+    extra_label: _text(60) = Field(
+        "", validate_default=True, description="Leave it out: the name of that app's added amount, filled by its step."
+    )
+
+    @field_validator("extra_label")
+    @classmethod
+    def _added_is_named(cls, label: str, info):
+        if not info.data.get("extra"):
+            return ""
+        if not label:
+            raise ValueError(str(SAY_WHAT_IS_ADDED))
+        return label
 
     @model_validator(mode="after")
     def _named(self):
@@ -141,7 +158,11 @@ class CompleteIn(ChargeLinesIn):
     document_type: DocumentType | None = Field(
         None, description="ticket or invoice; the settings' default when empty."
     )
-    customer_id: UUID | None = Field(None, description="The customer's card.", json_schema_extra=A_CUSTOMER)
+    customer_id: UUID | None = Field(
+        None,
+        description="The customer's card; charging a check without one, the sale is for the customer the check has.",
+        json_schema_extra=A_CUSTOMER,
+    )
     customer: _text(200, 1) | None = Field(
         None,
         description="The customer's name, phone or email, when the id is not known.",
@@ -199,8 +220,8 @@ class BreakdownOut(Schema):
         description="subject, subject_reverse, exempt, not_subject or not_subject_location.",
     )
     exempt_reason: str = Field("", description="The exemption cause (E1–E8) of an exempt key.")
-    base: int = Field(description="Taxable base of the key, in cents.")
-    tax: int = Field(description="Tax of this component of the key, in cents.")
+    base: int = Field(description="Taxable base of the key, in cents.", json_schema_extra={"money": True})
+    tax: int = Field(description="Tax of this component of the key, in cents.", json_schema_extra={"money": True})
 
 
 class PreviewLineOut(Schema):
@@ -208,7 +229,7 @@ class PreviewLineOut(Schema):
     name: str = Field(description="Name.")
     quantity: Decimal = Field(description="Quantity.")
     unit: str = Field(description="Unit.")
-    unit_price: int = Field(description="Frozen price in cents.")
+    unit_price: int = Field(description="Frozen price in cents.", json_schema_extra={"money": True})
     discount_percent: Decimal = Field(description="Line discount in %.")
     is_gift: bool = Field(description="A comp.")
     service_id: UUID | None = Field(description="Services' service, if it is one.")
@@ -219,9 +240,9 @@ class PreviewLineOut(Schema):
     )
     tax_category_key: str = Field(description="Tax category.")
     tax_rate: Decimal = Field(description="Rate applied.")
-    net_amount: int = Field(description="Base in cents.")
-    tax_amount: int = Field(description="Tax in cents.")
-    line_total: int = Field(description="Total in cents.")
+    net_amount: int = Field(description="Base in cents.", json_schema_extra={"money": True})
+    tax_amount: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
+    line_total: int = Field(description="Total in cents.", json_schema_extra={"money": True})
     modifiers: list[str] = Field(description="The options charged inside the line.")
     is_child: bool = Field(
         description="An option of another tax category, charged on a line of its own under its dish."
@@ -275,4 +296,17 @@ class PreviewOut(Schema):
     )
     limits_currency: str = Field(
         description="The currency (ISO 4217) the law writes both limits in, whatever the business charges in: EUR."
+    )
+
+
+class CheckoutStepOut(Schema):
+    key: str = Field(description="«<app>.<step>».")
+    app: str = Field(description="The app that adds the step.")
+    component: str = Field(description="The component of that app that paints the step, without .vue.")
+
+
+class CheckoutStepsOut(Schema):
+    steps: list[CheckoutStepOut] = Field(
+        description="What the apps on add to the charge, between the amount and the tenders, in their order; empty "
+        "when none does, and then a charge takes nothing added to its tenders."
     )
