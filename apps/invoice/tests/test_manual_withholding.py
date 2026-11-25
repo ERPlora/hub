@@ -1,39 +1,17 @@
 """The IRPF withholding of a manual invoice (INVOICE-F03): chosen from a closed list, over the whole base, it takes from what
-is collected and changes nothing of the invoice nor of what VeriFactu declares. The records are sealed in VeriFactu's
-testing environment and never sent: nothing here leaves the machine."""
+is collected and changes nothing of the invoice. The records are sealed in VeriFactu's testing environment and never sent:
+nothing here leaves the machine."""
 
-import contextlib
-import datetime as dt
-import re
 from decimal import Decimal
 
 import pytest
-from live.errors import Conflict
-from live.operations import atomic
 from pydantic import ValidationError
 
-from apps.invoice.models import Invoice, InvoiceSeries
-from apps.invoice.tests.conftest import HUB_DB, ctx_for, fields, run
-from apps.invoice.tests.manual import LINE, RECIPIENT, manual
-from apps.verifactu.models import Record
+from apps.invoice.models import Invoice
+from apps.invoice.tests.conftest import HUB_DB, fields, run
+from apps.invoice.tests.manual import HUNDRED, LINE, RECIPIENT, line, manual, page, refused, stored, withheld
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("issuer", "nothing_leaves")]
-
-NOON = ("Europe/Madrid", dt.datetime(2026, 11, 24, 11, 0, tzinfo=dt.UTC))
-HUNDRED = {**LINE, "unit_price": 10000}
-
-
-def line(price: int, rate="21", **more) -> dict:
-    return {**LINE, "unit_price": price, "tax_rate": rate, **more}
-
-
-def withheld(rate=15, *lines, **more):
-    """An invoice of 100 € + 21 % VAT with that withholding, unless ``lines`` say another thing."""
-    return manual(lines=list(lines) or [HUNDRED], withholding_rate=rate, **more)
-
-
-def stored(answer) -> Invoice:
-    return Invoice.objects.get(pk=answer.id)
 
 
 def figures(answer) -> tuple[int, int, int]:
@@ -97,12 +75,8 @@ def test_the_equivalence_surcharge_is_collected_and_never_withheld(equivalence_s
 
 
 def test_a_ticket_issued_by_hand_is_refused_under_its_field_and_spends_no_number():
-    before = sum(InvoiceSeries.objects.values_list("current_number", flat=True))
-    with pytest.raises(Conflict) as refused:
-        run("invoice.invoice.create", {"series_code": "TICKET", "lines": [LINE], "withholding_rate": 15})
-    assert (refused.value.code, set(refused.value.fields)) == ("invoice.withholding_on_ticket", {"withholding_rate"})
-    assert not Invoice.objects.exists()
-    assert sum(InvoiceSeries.objects.values_list("current_number", flat=True)) == before
+    error = refused(series_code="TICKET", withholding_rate=15)
+    assert (error.code, set(error.fields)) == ("invoice.withholding_on_ticket", {"withholding_rate"})
 
 
 def test_a_ticket_without_it_is_issued_as_ever():
@@ -147,63 +121,6 @@ def test_the_preview_of_the_rectification_says_what_it_gives_back():
     assert to_collect(run("invoice.invoice.rectify", data).invoice) == to_collect(preview)
 
 
-# What VeriFactu declares
-
-
-def record_of(answer) -> dict:
-    """Everything VeriFactu keeps and prints of a document: its record's columns, its XML, its fingerprint and its QR.
-    Only the ids of the rows are left out, new in each one; the chain is in the previous record's number and fingerprint."""
-    record = Record.objects.get(invoice_id=answer.id)
-    kept = {
-        field.attname: getattr(record, field.attname)
-        for field in Record._meta.concrete_fields
-        if field.attname not in ("id", "invoice_id", "previous_record_id")
-    }
-    qr = run("verifactu.record.by_invoice", {"invoice_id": str(answer.id)}).record
-    return {**kept, "qr_url": qr.qr_url, "qr_svg": qr.qr_svg}
-
-
-class Undo(Exception):
-    """Takes back what a block issued."""
-
-
-def undone(issue) -> dict:
-    """The record of what ``issue()`` issues, taken back afterwards: the next document gets the same number, the same
-    place in the chain and the same clock."""
-    record: dict = {}
-    with contextlib.suppress(Undo), atomic():
-        record = record_of(issue())
-        raise Undo
-    assert not Record.objects.exists()
-    return record
-
-
-def test_the_record_of_an_invoice_is_the_same_with_it_and_without_it(at):
-    at(NOON)
-    plain = undone(lambda: manual(lines=[HUNDRED, line(3333, "10")]))
-    assert not Invoice.objects.exists()
-    carried = undone(lambda: withheld(15, HUNDRED, line(3333, "10")))
-    assert carried == plain
-    # What is compared is the record in full: the amount, the chain and the QR are in it.
-    assert plain["total_amount"] == 15766
-    assert re.findall(r"<sum1:ImporteTotal>([^<]+)<", plain["xml"]) == ["157.66"]
-    assert len(plain["fingerprint"]) == 64
-    assert "importe=157.66" in plain["qr_url"]
-
-
-def test_the_record_of_its_rectification_is_the_same_too(at):
-    at(NOON)
-
-    def rectified(**more):
-        original = manual(lines=[HUNDRED], **more)
-        return run("invoice.invoice.rectify", {"number": original.number, "reason": "Wrong price"}).invoice
-
-    plain = undone(rectified)
-    assert undone(lambda: rectified(withholding_rate=15)) == plain
-    assert (plain["total_amount"], plain["previous_number"]) == (-12100, "FACT-2026-000001")
-    assert len(plain["previous_fingerprint"]) == 64
-
-
 # What a person reads
 
 
@@ -215,14 +132,11 @@ def test_the_record_of_its_rectification_is_the_same_too(at):
     ],
 )
 def test_the_printed_document_says_it_after_its_total(language, label, amount, due, payable):
-    def page(answer) -> str:
-        return run("invoice.invoice.document", {"invoice_id": str(answer.id)}, ctx_for(language=language)).html
-
-    html = page(withheld(15))
+    html = page(withheld(15), language)
     assert f'<td class="muted">{label}</td><td class="num">{amount}</td>' in html
     assert f'<tr class="grand"><td>{due}</td><td class="num">{payable}</td></tr>' in html
     assert html.index("TOTAL") < html.index(label) < html.index(due)
-    plain = page(manual(lines=[HUNDRED]))
+    plain = page(manual(lines=[HUNDRED]), language)
     assert label not in plain
     assert due not in plain
 
@@ -230,7 +144,7 @@ def test_the_printed_document_says_it_after_its_total(language, label, amount, d
 def test_the_printed_rectification_says_it_in_negative():
     original = withheld(15)
     rectification = run("invoice.invoice.rectify", {"number": original.number, "reason": "Wrong price"}).invoice
-    html = run("invoice.invoice.document", {"invoice_id": str(rectification.id)}).html
+    html = page(rectification)
     assert "€15.00" in html
     assert "-€15.00" not in html
     assert "-€106.00" in html

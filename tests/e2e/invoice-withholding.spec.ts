@@ -1,29 +1,21 @@
 // The IRPF withholding of a manual invoice in Chrome (apps/invoice/WORKBOOK.md): INVOICE-F03, 100 € + 21 % with 15 %
 // withheld; INVOICE-F17 and F18, its page and its A4 say the total, what is withheld and what is left to collect;
 // INVOICE-F08, its rectifying invoice gives it back; INVOICE-F24, the Excel says so too; a ticket is not asked for it.
-// The invoices go in a series of the run's own. What it creates is deleted.
+// What it creates is deleted.
 import { readFileSync } from 'node:fs';
 
 import { expect, type Page, test } from '@playwright/test';
 import readXlsxFile from 'read-excel-file/node';
 
-import { madridToday } from './assistant-setup';
 import { A, api, login, shown } from './helpers';
 import { cleanInvoices, flowShots, invoiceOf, issuedIds, openDialog, readyToInvoice } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 import { choose } from './task-helpers';
 
 const RUN = stamp();
-const SERIES = `E2E-${RUN}`.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20);
 const CUSTOMER = `e2e Retenida ${RUN}`;
 
-test.beforeAll(async ({ browser }) => {
-  const context = await readyToInvoice(browser);
-  const year = Number(madridToday(new Date()).slice(0, 4));
-  const series = await api(context, A, 'POST', '/invoice/series', { code: SERIES, invoice_type: 'F1', year, name: 'e2e withholding' });
-  expect(series.status, JSON.stringify(series.data)).toBe(201);
-  await context.close();
-});
+test.beforeAll(async ({ browser }) => (await readyToInvoice(browser)).close());
 
 test.afterAll(() => cleanInvoices());
 
@@ -38,9 +30,10 @@ test('INVOICE-F03, F17, F18, F08 and F24: an invoice with 15 % withheld says wha
   await login(page, A, '/invoice/invoices');
   await shown(page).locator('[data-testid=invoice-list-add]').click();
   const dialog = openDialog(page, 'invoice-create');
-  await choose(page, dialog.locator('[data-testid=invoice-create-series]'), 'TICKET — .*');
+  const series = dialog.locator('[data-testid=invoice-create-series]');
+  await choose(page, series, 'TICKET — .*');
   await expect(dialog.locator('[data-testid=invoice-create-withholding]')).toHaveCount(0);
-  await choose(page, dialog.locator('[data-testid=invoice-create-series]'), `${SERIES} — e2e withholding \\(F1\\)`);
+  await choose(page, series, 'FACT — .*');
   await dialog.locator('[data-testid=invoice-recipient-name] input').fill(CUSTOMER);
   await dialog.locator('[data-testid=invoice-recipient-tax-id] input').fill('B12345674');
   await dialog.locator('[data-testid=invoice-recipient-address] input').fill('Calle Luna 3');

@@ -60,11 +60,7 @@ describe('InvoiceCreateModal: the IRPF withholding', () => {
   it('Android Back asks once a rate is chosen, and no more once there is none', async () => {
     const s = await setup();
     await s.territory('vat', '21.00');
-    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormAsksBeforeClosing({
-      overlay: () => s.inDoc('invoice-create'),
-      change: () => ionValue(s.inDoc('invoice-create-withholding'), 15),
-      restore: () => ionValue(s.inDoc('invoice-create-withholding'), 0),
-    });
+    const withhold = (rate: number) => ionValue(s.inDoc('invoice-create-withholding'), rate);
+    await s.asksBeforeClosing(() => withhold(15), () => withhold(0));
   });
 });

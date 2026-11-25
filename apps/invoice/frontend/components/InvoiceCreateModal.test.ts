@@ -369,10 +369,8 @@ describe('InvoiceCreateModal: the day it is dated and the day it falls due', () 
   it('Android Back asks once a date is chosen, and no more once it is as it was', async () => {
     const s = await dates();
     await s.line('', '', { taxRate: '' });
-    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    const overlay = () => s.inDoc('invoice-create');
-    await expectUnsavedFormAsksBeforeClosing({ overlay, change: () => pick(s.issued(), '2026-11-23'), restore: () => pick(s.issued(), '2026-11-24') });
-    await expectUnsavedFormAsksBeforeClosing({ overlay, change: () => pick(s.due(), '2026-12-23'), restore: () => pick(s.due(), '') });
+    await s.asksBeforeClosing(() => pick(s.issued(), '2026-11-23'), () => pick(s.issued(), '2026-11-24'));
+    await s.asksBeforeClosing(() => pick(s.due(), '2026-12-23'), () => pick(s.due(), ''));
   });
 
   it('speaks Spanish', async () => {
@@ -404,27 +402,14 @@ describe('InvoiceCreateModal: Android Back with unsaved changes (hub#1020, BASE-
   it('as opened closes, also once the default rate arrives; notes or a line written ask; restored as opened closes again', async () => {
     const s = await setup();
     await s.territory('vat', '21.00');
-    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormAsksBeforeClosing({
-      overlay: () => s.inDoc('invoice-create'),
-      change: () => ionValue(s.inDoc('invoice-create-notes'), 'Paid by transfer', 'ionInput'),
-      restore: () => ionValue(s.inDoc('invoice-create-notes'), '', 'ionInput'),
-    });
-    await expectUnsavedFormAsksBeforeClosing({
-      overlay: () => s.inDoc('invoice-create'),
-      change: () => s.line('Course', '100'),
-      restore: () => s.line('', ''),
-    });
+    const notes = (text: string) => ionValue(s.inDoc('invoice-create-notes'), text, 'ionInput');
+    await s.asksBeforeClosing(() => notes('Paid by transfer'), () => notes(''));
+    await s.asksBeforeClosing(() => s.line('Course', '100'), () => s.line('', ''));
   });
 
   it('the series the select picks on opening is no change; another series chosen asks', async () => {
     const s = await setup();
     await s.choose('FACT', 'F1');
-    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormAsksBeforeClosing({
-      overlay: () => s.inDoc('invoice-create'),
-      change: () => s.choose('TICKET', 'F2'),
-      restore: () => s.choose('FACT', 'F1'),
-    });
+    await s.asksBeforeClosing(() => s.choose('TICKET', 'F2'), () => s.choose('FACT', 'F1'));
   });
 });

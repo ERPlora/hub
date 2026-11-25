@@ -1232,7 +1232,7 @@ configurar nada.
   alta manual de una F1 y su rectificativa): `withholding.py` da la lista cerrada de tipos y lo retenido, el tipo sobre
   `base_amount` entera, redondeado una vez. `payable_amount` es `total_amount` menos lo retenido y no se guarda. Ningún
   otro importe de la factura depende de ella: base, cuota, total y desglose se cierran antes, y VeriFactu lee solo esos
-  (`tests/test_manual_withholding.py` emite la misma factura con ella y sin ella, en el mismo número y a la misma hora, y
+  (`tests/test_withholding_verifactu.py` emite la misma factura con ella y sin ella, en el mismo número y a la misma hora, y
   compara el registro entero: columnas, XML, huella y QR; igual con su rectificativa). Un tique no la lleva (409
   `invoice.withholding_on_ticket`), así que la F3 que lo sustituye tampoco.
 - **El emisor** (`Issuer`, una fila) se copia en cada documento. `invoice.issuer.sync` lo guarda como sistema

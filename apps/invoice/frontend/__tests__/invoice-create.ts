@@ -57,5 +57,10 @@ export async function setup(locale: 'en' | 'es' = 'en', company: Partial<Busines
     await m.result(SETTINGS, settingsOf(tax));
     await m.result(DEFAULTS, { tax_rate: rate });
   }
-  return { ...m, call, choose, recipient, line, submit, editor, territory };
+  /** Android's Back asks before closing the window once `change` ran, and no more once `restore` did. */
+  async function asksBeforeClosing(change: () => Promise<void>, restore: () => Promise<void>) {
+    const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormAsksBeforeClosing({ overlay: () => m.inDoc('invoice-create'), change, restore });
+  }
+  return { ...m, call, choose, recipient, line, submit, editor, territory, asksBeforeClosing };
 }
