@@ -322,7 +322,7 @@ def test_the_plans_space_is_base_s_one_check_and_its_sentence_is_not_the_inbox_s
     # or of what it says would miss.
     asked = []
     monkeypatch.setattr(
-        files, "refuse_past_the_space", lambda store, hub, size, *, limit_bytes: asked.append((hub, size, limit_bytes))
+        files.space, "refuse_past_the_space", lambda store, hub, size, *, limit_bytes: asked.append((hub, size, limit_bytes))
     )
     plan_space(len(JPEG) - 1)
 

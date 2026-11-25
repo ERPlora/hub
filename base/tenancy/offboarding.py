@@ -5,7 +5,7 @@ The worker's data pass (``base.worker_data._data``), under the row's lease, take
 1. ``archiving``: its final copy (``base.tenancy.dumps``, ``offboarding``); it can still come back (``base.hub.restore``);
 2. ``dropping``: ``DROP DATABASE … WITH (FORCE)``, that database only (``base.tenancy.ops``), outside any transaction;
    from here it never comes back (``hub_purged``);
-   then its files, that business's prefix in the store and no other (``base.files.delete_hub_files``);
+   then its files, that business's prefix in the store and no other (``base.files.delete_hub.delete_hub_files``);
 3. ``purged``: ``base.hub.purge``, in one transaction of control, leaves the row as a tombstone.
 
 **A business with fiscal documents is dropped only once they are archived.** Its fiscal records and invoices must be
@@ -155,7 +155,7 @@ def _retire(hub: Hub, now: dt.datetime, cancelled: Callable[[], bool] | None) ->
     if dropping.db_name:
         tenancy_connections.close_hub_aliases(dropping)
         ops.drop_database(dropping.db_name, cluster=dropping.cluster)
-    files.delete_hub_files(storages["hub_files"], dropping.pk)
+    files.delete_hub.delete_hub_files(storages["hub_files"], dropping.pk)
     services.offboarding.hub_purge(system_context(registry.REGISTRY_SCOPE), HubGetIn(id=dropping.pk))
     logger.info("base.tenancy.offboarding.purged hub=%s database=%s", dropping.slug, dropping.db_name or "-")
 
@@ -180,7 +180,7 @@ def retire(hub_id, now: dt.datetime, cancelled: Callable[[], bool] | None = None
         _failed(hub, failed.code, failed)
     except ops.DatabaseOpsError as refused:
         _failed(hub, "drop_failed", refused)
-    except files.HubFilesNotDeleted as stayed:
+    except files.delete_hub.HubFilesNotDeleted as stayed:
         _failed(hub, "files_purge_failed", stayed)
     except names.InvalidDatabaseName as invalid:
         _failed(hub, "invalid_database_name", invalid)

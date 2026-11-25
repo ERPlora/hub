@@ -7,7 +7,7 @@ for every hub with its own database it serves (ready, or a business that left an
 - ``db_bytes``: ``pg_database_size`` of its database, read in the server's catalog through the migrator's maintenance
   connection of its cluster (``base.tenancy.ops.connect_ops``, the database ``postgres``): the hub's database is never
   opened. A database that is not there leaves its hub unmeasured (logged ``base.usage.not_measured``);
-- ``s3_bytes``: what its prefix holds in the file store (``base.files.used_bytes``: its files and its apps');
+- ``s3_bytes``: what its prefix holds in the file store (``base.files.space.used_bytes``: its files and its apps');
 - ``active_users_1d`` and ``active_users_30d``: the people with activity that day, and in the 30 days that end it
   (``control.HubVisit``, noted at every login and by what they do after it, ``base.meter``: a session open for days counts
   on each of them; the visits older than the window are forgotten after).
@@ -69,7 +69,7 @@ def measure(day: dt.date, *, now: dt.datetime | None = None) -> int | None:
             logger.warning("base.usage.not_measured hub=%s day=%s: its database %s is not on its server.", hub.slug, day, hub.db_name)
             continue
         try:
-            stored = files.used_bytes(storages["hub_files"], hub.pk)
+            stored = files.space.used_bytes(storages["hub_files"], hub.pk)
         except Exception:  # the store away: this hub stays unmeasured tonight, the others go on
             logger.exception("base.usage.not_measured hub=%s day=%s: its files could not be counted.", hub.slug, day)
             continue

@@ -351,7 +351,7 @@ def test_an_owner_uploads_and_lists_over_http(client, make_user):
 @HUB_DB
 def test_a_file_as_heavy_as_the_ceiling_goes_up_over_http(client, make_user, monkeypatch):
     # The body is the file in base64 and its JSON: more than Django's 2.5 MB for any other view.
-    monkeypatch.setattr(files, "MAX_FILE_BYTES", 3 * 1024 * 1024)
+    monkeypatch.setattr(files.create, "MAX_FILE_BYTES", 3 * 1024 * 1024)
     owner(client, make_user)
     heavy = b"x" * (3 * 1024 * 1024)
     body = json.dumps({"folder": "", "name": "big.bin", "content_base64": b64(heavy)})

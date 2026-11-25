@@ -132,6 +132,9 @@ def _product_cells(row: dict, line: int) -> dict:
         "ean13": _text(row, "ean13"),
         "description": _text(row, "description"),
         "unit": _text(row, "unit"),
+        "product_type": _text(row, "product_type"),
+        "price_quantity": _text(row, "price_quantity"),
+        "pricing_unit": _text(row, "pricing_unit"),
         "tax_category_key": _text(row, "tax_category_key"),
     } | blueprint_products.allergens_cell(row)
 
