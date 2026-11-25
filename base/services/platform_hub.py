@@ -10,7 +10,7 @@ from live.outbox import record_event
 from base import events
 from base.models import Hub
 from base.registry import hub_answer, internal_only
-from base.schemas.hub_registry import HubGetIn, HubOut
+from base.schemas.hub_registry import HubGetIn, HubOut, HubStateIn
 from base.services.address_change import address_changed
 
 
@@ -37,8 +37,15 @@ def platform_hub_rename(ctx: OperationContext, data: HubGetIn) -> dict:
     return hub_answer(hub)
 
 
+def people_only(data: HubStateIn) -> HubStateIn:
+    """erplora.com's photo of ERPlora's own hub with nothing but its people and its version: that hub has no plan nor
+    anything to pay there, so nothing else of a photo is kept or applied, whatever it says."""
+    kept = {"members": data.photo["members"]} if "members" in data.photo else {}
+    return HubStateIn(id=data.id, version=data.version, members=data.members, photo=kept)
+
+
 def refuse_platform_hub(hub: Hub) -> None:
-    """``Conflict`` for ERPlora's own hub: erplora.com never registers nor closes it, and nobody empties it."""
+    """``Conflict`` for ERPlora's own hub: erplora.com never registers, closes nor restores it, and nobody empties it."""
     if hub.is_platform:
         raise Conflict(
             gettext("ERPlora's own business is never changed, closed or emptied here."), code="base.platform_hub_kept"

@@ -161,7 +161,7 @@ id = "no-sibling-cycles"
 name = "No sibling modules import each other in a circle"
 type = "acyclic_siblings"
 ancestors = [
-    "base", "base.api", "base.blueprint", "base.models", "base.tenancy", "base.services", "base.queries",
+    "base", "base.api", "base.blueprint", "base.home", "base.models", "base.tenancy", "base.services", "base.queries",
     "base.schemas", "control", "control.services", "control.queries", "apps.*", "apps.*.services", "apps.*.queries",
     "apps.*.schemas",
 ]

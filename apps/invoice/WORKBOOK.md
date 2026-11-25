@@ -1039,7 +1039,7 @@ configurar nada.
   contadores de la campana:
   - `business_identity` («Los datos de tu negocio», orden 40, `BLOCKING_KEYS`):
     hecho con `configured` de `invoice.issuer.get`, la misma condición con la que `_configured_issuer` rechaza
-    emitir, así que «bloquea ⇔ la emisión se rechaza». El ⛔ lo pone `base` (`base.home.LEGAL_STEPS`), nunca la app;
+    emitir, así que «bloquea ⇔ la emisión se rechaza». El ⛔ lo pone `base` (`base.home.setup_steps.LEGAL_STEPS`), nunca la app;
     pendiente, también se le dice a quien no tiene `invoice.manage_issuer` (`actionable: false`, gh:hub#435). El
     domicilio también es obligatorio y el texto lo dice. Lleva a `/invoice/issuer`, la pantalla con el NIF a la
     vista, y se refresca con `invoice.issuer.updated`.

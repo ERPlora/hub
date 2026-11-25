@@ -17,7 +17,7 @@ from live.operations import Operation, registry
 
 from apps.flow import document
 from base.business import babel_locale, money_text
-from base.home import ISO_HOUR, moment
+from base.home.device_notices import ISO_HOUR, moment
 from base.operations import business_currency
 
 from .catalog import event_amounts, step_data

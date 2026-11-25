@@ -41,7 +41,7 @@ from base.schemas.hub_registry import (
 )
 from base.services.address_change import address_changed, forget_address
 from base.services.photo import _sync_verifactu, _sync_whatsapp
-from base.services.platform_hub import refuse_platform_hub
+from base.services.platform_hub import people_only, refuse_platform_hub
 from base.services.provisioning import holds_hub_lease, offboarding_due
 from base.services.sessions import _apply_members, _sync_hub_users, _wake_open_apps
 from base.tenancy import names as database_names
@@ -192,10 +192,13 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     too; a business whose database is still being made has its people there when its seeding applies the photo
     (:func:`apply_kept_photo`: the SaaS sends it right after the registration). Its modules and plan are read where they are kept: the right
     to a paid app (``base.entitlement``) and «Usage and plan» (``base.plan.usage``) follow this photo. Its
-    ``custom_domain`` is kept on the row whether it names one or not, as the photo is whole (HUBS-F17).
+    ``custom_domain`` is kept on the row whether it names one or not, as the photo is whole (HUBS-F17). Of ERPlora's own
+    hub's, only its people (``base.services.platform_hub.people_only``).
     """
     internal_only(ctx)
     hub = _locked_hub(data.id)
+    if hub.is_platform:
+        data = people_only(data)
     if hub.status in registry.DROPPED_STATUSES or data.version <= hub.state_version:
         # A late photo of a business whose database went: a tombstone keeps nothing of it (no error: the SaaS sent it
         # before it heard).
@@ -253,10 +256,12 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
     """Bring a cancelled hub back (``ready``, or ``requested`` again if its database was never finished, or never
     made: a business that shared a database and left before its cut is made one from nothing, as a sign-up), also while its
     final copy is being made (``archiving``: the worker sees it and leaves its database); a hub that never ended stays
-    as it is; a purged one, or one whose database is going (``dropping``), is ``hub_purged``."""
+    as it is; a purged one, or one whose database is going (``dropping``), is ``hub_purged``. ERPlora's own hub, which
+    nobody closes, is never restored."""
     internal_only(ctx)
     hub = _locked_hub(data.id)
     _refuse_purged(hub)
+    refuse_platform_hub(hub)
     if hub.status in LEFT_STATUSES:
         if not hub.db_name:
             hub.db_name, hub.ready_at = database_names.hub_db_name(control_name(), hub.id), None

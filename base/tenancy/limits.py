@@ -7,9 +7,9 @@ and each of them carries its plan's ``statement_timeout``: Free 1 and 5 s, Start
 logged once per photo. A newer photo (a greater ``state_version``) resizes the process's limiter at once, without a
 restart; an older or equal one changes nothing.
 
-ERPlora's own hub (``Hub.is_platform``) is nobody's customer: the SaaS does not know it, so it has no photo and never will,
-and its row says what it gets, :data:`PLATFORM`, whatever a photo said. :func:`hub_limits` is that rule, the one the limiter
-and ``base.plan.usage`` both follow.
+ERPlora's own hub (``Hub.is_platform``) is nobody's customer: its photo names its people and no plan, and its row says
+what it gets, :data:`PLATFORM`, whatever a photo said. :func:`hub_limits` is that rule, the one the limiter and
+``base.plan.usage`` both follow.
 
 No plan gets more at once than PgBouncer gives each database (``settings.PGBOUNCER_MAX_DB_CONNECTIONS``): 48 in prod and
 in pre, the highest plan's (Max; ERPlora/aws ``stacks/prod/apps.tf``), so every plan gets its own; without the setting

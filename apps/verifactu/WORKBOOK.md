@@ -1177,7 +1177,7 @@ llega a tiempo y queda «pendiente») y `test_notifications.py` (escribir en el 
 
 `setup` y `widgets` en `apps.py` (sin `bell`). **Paso** `verifactu.sending_route`
 («Set up VeriFactu» / «Configura VeriFactu», `required=True` → «Importante» en pruebas, gh:hub#1726; ⛔ «Necesario
-para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home.py`: el nivel
+para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PRODUCTION` de `base/home/setup_steps.py`: el nivel
 es de `base`), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
 production, scope)` sobre la vía que tendría en producción, `queries.route.sending_route`: certificado propio vigente que
 este servidor abre o, sin él, la vía ERPlora abierta en el servidor (`erplora_route.closed`) con el otorgamiento
