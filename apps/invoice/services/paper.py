@@ -13,9 +13,7 @@ from live.errors import AppInactive, Conflict, OperationError
 from live.operations import UnknownOperation, atomic, operation
 from live.operations import get as get_operation
 
-from apps.invoice.models import Invoice
-from apps.invoice.queries.documents import render_document
-from apps.invoice.queries.platform_invoices import VERIFACTU_BY_INVOICE
+from apps.invoice.queries.documents import qr_of, render_document
 from apps.invoice.queries.rows import find_invoice
 from apps.invoice.schemas.invoices import DocumentIn, PaperOut
 from apps.invoice.services.writes import logger
@@ -23,7 +21,6 @@ from apps.invoice.services.writes import logger
 PRINT_JOB = "printing.job.create"
 
 NO_PRINTER = _("No system printer takes this invoice: open it to print it or save it as PDF.")
-RECORD_UNREADABLE = _("Its VeriFactu record could not be read, and an invoice never prints without its QR.")
 
 
 class _Unprintable(Exception):
@@ -63,24 +60,6 @@ def _queued_job(ctx: OperationContext, request: dict):
     return job
 
 
-def _qr_of(ctx: OperationContext, invoice: Invoice) -> dict | None:
-    """VeriFactu's QR of ``invoice`` (``{"url", "svg"}``), read by name: none without VeriFactu or without a record
-    (the page goes without it, as on screen). A record that cannot be read keeps the page from the queue: never a
-    page without its QR (VERIFACTU-F19)."""
-    try:
-        op = get_operation(VERIFACTU_BY_INVOICE)
-    except UnknownOperation:
-        return None
-    try:
-        found = op(ctx, op.input.model_validate({"invoice_id": str(invoice.id)}))
-    except AppInactive:
-        return None
-    except OperationError as refused:
-        raise _not_printed(ctx, RECORD_UNREADABLE, "invoice.record_unreadable") from refused
-    record = found.record
-    return {"url": record.qr_url, "svg": record.qr_svg} if record is not None else None
-
-
 @operation(
     "invoice.invoice.print",
     kind="command",
@@ -108,7 +87,7 @@ def _qr_of(ctx: OperationContext, invoice: Invoice) -> dict | None:
 )
 def print_invoice(ctx: OperationContext, data: DocumentIn) -> dict:
     invoice = find_invoice(ctx, data.invoice_id, data.number)
-    qr = _qr_of(ctx, invoice)
+    qr = qr_of(ctx, invoice)
     with translation.override(ctx.language):
         html = render_document(invoice, duplicate=data.duplicate, qr=qr)
     return _queue_paper(

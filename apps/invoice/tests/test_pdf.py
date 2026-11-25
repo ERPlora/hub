@@ -16,7 +16,7 @@ from apps.invoice.models import Invoice
 from apps.invoice.queries.documents import render_document
 from apps.invoice.queries.pdf import printed
 from apps.invoice.services import issuing
-from apps.invoice.tests.conftest import B, HUB_DB, ISSUER, ctx_for, deliver, run
+from apps.invoice.tests.conftest import A, B, HUB_DB, ISSUER, ctx_for, deliver, run
 from apps.invoice.tests.manual import HUNDRED, LINE, NOON, RECIPIENT, line, manual, stored, withheld
 from apps.invoice.tests.printed import (
     A4,
@@ -88,7 +88,8 @@ def ticket(charge, product):
 
 
 def substitute(charge, product):
-    return run("invoice.invoice.substitute", {"number": ticket(charge, product).number, **RECIPIENT})
+    data = {"number": ticket(charge, product).number, **RECIPIENT}
+    return run("invoice.invoice.substitute", data).invoice
 
 
 def rectifying():
@@ -178,7 +179,7 @@ def test_every_figure_of_the_invoice_is_on_it(issuer, at, issued, kind):
 
 @pytest.mark.parametrize(("country", "total"), [("PL", "PLN 121.00"), ("JP", "¥12,100")])
 def test_an_invoice_in_another_currency_prints_in_it_and_without_a_spanish_qr(issuer, country, total):
-    Hub.objects.filter(slug="a").update(country=country)
+    Hub.objects.filter(slug=A.key).update(country=country)
     invoice = manual(lines=[HUNDRED])
 
     out = downloaded(invoice)
@@ -358,7 +359,8 @@ def test_what_is_written_of_a_customer_is_printed_as_it_was_written(issuer, wher
 def test_what_is_written_on_a_line_is_printed_as_it_was_written(issuer):
     invoice = manual(lines=[{**LINE, "description": INJECTED}])
 
-    assert INJECTED in on_paper(downloaded(invoice))
+    # A line's column is narrow: a long word of it goes on in the next line of the paper.
+    assert "".join(INJECTED.split()) in "".join(on_paper(downloaded(invoice)).split())
 
 
 def test_what_the_business_calls_itself_is_printed_as_it_was_written(issuer):
@@ -462,7 +464,7 @@ def test_it_changes_nothing_of_the_invoice(issuer):
 def test_whoever_sends_it_prints_the_same_file(issuer):
     """What attaches the invoice to an e-mail calls the function the download calls."""
     invoice = manual()
-    sent = dataclasses.replace(system_context(ctx_for().scope), language="es")
+    sent = dataclasses.replace(system_context(A), language="es")
 
     out = SimpleNamespace(content_base64=base64.b64encode(printed(sent, stored(invoice))))
 
