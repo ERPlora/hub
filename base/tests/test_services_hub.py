@@ -87,9 +87,20 @@ class TestErplorasOwnHub:
         assert (own.status, own.cancelled_at) == ("ready", None)
         assert events("base.hub.cancelled") == []
 
-    def test_a_business_is_still_registered_and_closed(self, own):
+    @pytest.mark.parametrize("status", ["ready", "cancelled", "archiving"])
+    def test_it_is_never_restored(self, own, status):
+        Hub.objects.filter(pk=HUB_ID).update(status=status)
+        with pytest.raises(Conflict) as refused:
+            hub_restore(SYSTEM, HubRestoreIn(id=HUB_ID))
+        assert refused.value.code == "base.platform_hub_kept"
+        own.refresh_from_db()
+        assert own.status == status
+        assert events("base.hub.restored") == []
+
+    def test_a_business_is_still_registered_closed_and_restored(self, own):
         assert register(id=str(OTHER_ID)).created
         assert hub_cancel(SYSTEM, HubCancelIn(id=OTHER_ID)).status == "cancelled"
+        assert hub_restore(SYSTEM, HubRestoreIn(id=OTHER_ID)).status == "requested"
 
 
 class TestRegister:
