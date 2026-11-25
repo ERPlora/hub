@@ -377,14 +377,6 @@ class TestUpdate:
         role.refresh_from_db()
         assert role.states == {"sale.view_sale": ON, "sale.take_payment": OFF}
 
-    def test_not_even_to_the_role_they_hold_themselves(self, client, rosa):
-        mine = BusinessRole.objects.get(name="People")
-        client.force_login(rosa)
-
-        response = post(client, "/roles/update", {"role": str(mine.pk), "states": {"base.administer_hub": "on"}})
-
-        assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
-
     def test_what_a_role_already_allows_does_not_stop_a_change_of_anything_else(self, client, rosa):
         role = a_role(sale__view_sale=OFF, sale__void_sale=ON, inventory__view_product=ON)
         client.force_login(rosa)
@@ -425,16 +417,6 @@ class TestUpdate:
         else:
             assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
             assert role.states["sale.void_sale"] == theirs
-
-    def test_nobody_lifts_the_no_of_their_own_role(self, client, rosa):
-        mine = BusinessRole.objects.get(name="People")
-        client.force_login(rosa)
-
-        response = post(client, "/roles/update", {"role": str(mine.pk), "states": {"sale.void_sale": "approval"}})
-
-        assert (response.status_code, code(response)) == (403, "base.role_beyond_editor")
-        mine.refresh_from_db()
-        assert "sale.void_sale" not in mine.states
 
     @pytest.mark.parametrize("state", ["on", "approval", "off"])
     def test_what_it_becomes_is_what_its_detail_answers(self, client, olga, state):
@@ -479,6 +461,70 @@ class TestUpdate:
         response = post(client, "/roles/update", {"role": str(role.pk), "states": {"sale.view_sale": "maybe"}})
 
         assert response.status_code == 422
+
+
+class TestTheRoleThatRulesOverWhoAsks:
+    """Nobody changes the role they hold themselves, not even to give it less: somebody else who manages roles does."""
+
+    @pytest.mark.parametrize(
+        "change",
+        [
+            {"states": {"base.administer_hub": "on"}},
+            {"states": {"sale.view_sale": "off"}},
+            {"states": {"sale.void_sale": "approval"}},
+            {"name": "Mine"},
+            {"description": "What I do"},
+        ],
+    )
+    def test_nobody_changes_their_own(self, client, rosa, change):
+        mine = BusinessRole.objects.get(name="People")
+        before = (mine.name, mine.description, dict(mine.states))
+        client.force_login(rosa)
+
+        response = post(client, "/roles/update", {"role": str(mine.pk), **change})
+
+        assert (response.status_code, code(response)) == (403, "base.role_own")
+        mine.refresh_from_db()
+        assert (mine.name, mine.description, mine.states) == before
+        assert facts(events.ROLE_UPDATED) == []
+
+    def test_somebody_else_who_manages_roles_changes_it(self, client, rosa, olga):
+        mine = BusinessRole.objects.get(name="People")
+        client.force_login(olga)
+
+        response = post(client, "/roles/update", {"role": str(mine.pk), "states": {"sale.view_sale": "off"}})
+
+        assert response.status_code == 200, response.content
+
+    def test_its_page_and_the_list_say_it_is_theirs(self, client, rosa, olga):
+        mine = BusinessRole.objects.get(name="People")
+        other = a_role("Till")
+        client.force_login(rosa)
+
+        listed = {role["key"]: role["mine"] for role in get(client, "/roles").json()["roles"]}
+
+        assert get(client, "/roles/detail", role=str(mine.pk)).json()["mine"] is True
+        assert get(client, "/roles/detail", role=str(other.pk)).json()["mine"] is False
+        assert get(client, "/roles/detail", role="hub_employee").json()["mine"] is False
+        assert [key for key, theirs in listed.items() if theirs] == [str(mine.pk)]
+        client.force_login(olga)
+        assert get(client, "/roles/detail", role=str(mine.pk)).json()["mine"] is False
+
+    def test_without_one_of_the_business_it_is_the_one_of_their_invitation(self, client, eva):
+        client.force_login(eva)
+
+        listed = {role["key"]: role["mine"] for role in get(client, "/roles").json()["roles"]}
+
+        assert [key for key, theirs in listed.items() if theirs] == ["hub_employee"]
+        assert get(client, "/roles/detail", role="hub_employee").json()["mine"] is True
+
+    def test_a_role_it_makes_or_saves_is_not_theirs(self, client, olga):
+        client.force_login(olga)
+
+        made = post(client, "/roles", {"based_on": "hub_employee", "name": "Till"}).json()
+        saved = post(client, "/roles/update", {"role": made["key"], "name": "Evening till"}).json()
+
+        assert (made["mine"], saved["mine"]) == (False, False)
 
 
 class TestDelete:
