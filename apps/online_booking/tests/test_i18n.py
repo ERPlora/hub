@@ -71,9 +71,9 @@ def test_spanish_texts_of_the_workbook():
         config = apps.get_app_config("online_booking")
         assert str(config.verbose_name) == "Reservas online"
         assert [str(nav.label) for nav in config.navigation] == ["Reservas", "Ajustes"]
-        assert str(queries.PAGE_DISABLED) == "Este negocio no acepta reservas online ahora mismo."
-        assert str(queries.BOOKING_NOT_FOUND) == "Esa reserva no existe o su enlace ya no es válido."
-        assert str(queries.DEFAULT_TITLE) == "Reserva tu cita"
+        assert str(queries.settings.PAGE_DISABLED) == "Este negocio no acepta reservas online ahora mismo."
+        assert str(queries.bookings.BOOKING_NOT_FOUND) == "Esa reserva no existe o su enlace ya no es válido."
+        assert str(queries.page.DEFAULT_TITLE) == "Reserva tu cita"
         assert str(services.TIME_TAKEN) == "Esa hora ya no está libre. Elige otra."
         assert str(services.DEFAULT_CONFIRMED) == "Tu reserva está confirmada. ¡Hasta pronto!"
 
