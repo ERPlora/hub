@@ -68,13 +68,16 @@ def test_a_number_taken_meanwhile_moves_to_the_following_one(monkeypatch):
     assert Product.objects.filter(name="Cheesecake").count() == 1
 
 
-def test_another_refusal_is_not_hidden_behind_a_new_number():
-    """A taken EAN-13 says so, the first time, under its own field."""
+def test_another_refusal_is_not_hidden_behind_a_new_number(monkeypatch):
+    """A taken EAN-13 says so the first time, under its own field: another number would not mend it."""
     create("Water", "WAT-1", ean13="8410000000009")
+    given = []
+    real = skus.next_sku
+    monkeypatch.setattr(skus, "next_sku", lambda: given.append(real()) or given[-1])
 
     exc = refused(Conflict, lambda: without_sku("Cheesecake", ean13="8410000000009"))
 
-    assert exc.code == "inventory.ean13_taken"
+    assert (exc.code, given) == ("inventory.ean13_taken", ["10000"])
     assert not Product.objects.filter(name="Cheesecake").exists()
 
 
