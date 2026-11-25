@@ -182,13 +182,25 @@ def test_a_product_the_business_already_has_keeps_its_own_mark(ctx):
     assert on_the_website(ctx) == ["HAM-01"]
 
 
-def test_a_file_of_several_pages_hides_only_the_product_it_names(ctx):
+def test_a_file_of_several_pages_hides_only_the_products_it_names(ctx):
     rows = [{**OLD_ROW, "name": f"Tapa {number}", "sku": f"TAP-{number:03}"} for number in range(103)]
-    rows[101]["show_on_website"] = False
+    rows[3]["show_on_website"] = rows[101]["show_on_website"] = False
 
     assert products_report(load(ctx, rows))["created"] == 103
 
-    assert list(Product.objects.filter(show_on_website=False).values_list("sku", flat=True)) == ["TAP-101"]
+    hidden = Product.objects.filter(show_on_website=False).order_by("sku")
+    assert list(hidden.values_list("sku", flat=True)) == ["TAP-003", "TAP-101"]
+
+
+def test_a_page_the_import_refuses_is_told_row_by_row_and_the_next_page_loads(ctx):
+    rows = [{**OLD_ROW, "name": f"Tapa {number}", "sku": f"TAP-{number:03}"} for number in range(101)]
+    rows[1]["name"], rows[2]["description"] = "", "x" * 5000
+
+    report = products_report(load(ctx, rows))
+
+    assert (report["created"], report["failed"]) == (1, 100)
+    assert [problem.split(":")[0] for problem in report["problems"][:3]] == ["«Tapa 0»", "«TAP-001»", "«Tapa 2»"]
+    assert list(Product.objects.values_list("sku", flat=True)) == ["TAP-100"]
 
 
 def test_what_the_import_does_not_take_loads_by_the_products_own_change(ctx):
