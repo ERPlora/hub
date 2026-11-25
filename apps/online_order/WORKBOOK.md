@@ -1,6 +1,6 @@
 # Workbook — Pedidos online (app)
 Prefijo: ONLINE_ORDER
-Alcance MVP: restaurante (en la tienda; no viene en ninguna plantilla)
+Alcance MVP: restaurante (no viene en ninguna plantilla; entra en la tienda cuando tenga pantalla)
 Estado de la app: en construcción — hoy, el código de cada mesa y su regeneración por la API y el asistente
 
 > Manual de usuario y especificación de la app `online_order`. Se escribe **antes** que el código: no se

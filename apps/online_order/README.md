@@ -12,8 +12,8 @@ cocina; el cobro sigue en el TPV.
 
 | Qué | Valor |
 |---|---|
-| `LiveAppConfig` | `kind = "app"`, icono `ion:qr-code-outline`, categoría `restaurant`, gratuita (`premium = False`), en la tienda |
-| Verticales | ninguna: está en la tienda y no viene en ninguna plantilla |
+| `LiveAppConfig` | `kind = "app"`, icono `ion:qr-code-outline`, categoría `restaurant`, gratuita (`premium = False`), fuera de la tienda (`listed = False`) hasta que tenga pantalla |
+| Verticales | ninguna: no viene en ninguna plantilla; el negocio la enciende cuando quiere que sus clientes pidan solos |
 | `requires` | `table` (con Mesas llegan Ventas y Clientes); lee las mesas con `table.table.list` y `table.table.get` |
 | Permisos | `online_order.view_qr_code` y `online_order.change_qr_code` (propietario, administrador y responsable; el empleado, ninguno) |
 | Pantallas | ninguna todavía |

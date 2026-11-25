@@ -21,8 +21,10 @@ class OnlineOrderConfig(LiveAppConfig):
         "order of a table without a check waits for an employee to accept it. Payment stays at the POS. If a QR "
         "should stop working, regenerate it and print the new one."
     )
-    # In no vertical's template: a restaurant turns it on from the store when it wants its customers to order alone.
+    # In no vertical's template: a restaurant turns it on itself when it wants its customers to order alone.
     verticals = []
+    # Out of the store until it has a screen: a business that turned it on today would get nothing to use.
+    listed = False
     # The tables (and, through them, Sales and Customers): it reads them by Tables' operations.
     requires = ["table"]
     default_auto_field = "django.db.models.BigAutoField"

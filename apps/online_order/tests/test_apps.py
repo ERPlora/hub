@@ -19,10 +19,11 @@ def test_online_order_is_a_restaurant_module_that_requires_tables():
     # It reads only Tables' operations today; Sales comes with Tables.
     assert config.requires == ["table"]
     assert config.category is Category.RESTAURANT
-    # Sold in the store, never turned on by a template (a vertical lists only what every hub of it turns on).
+    # Never turned on by a template (a vertical lists only what every hub of it turns on).
     assert config.verticals == []
     assert config.premium is False
-    assert config.listed is True
+    # Out of the store while it has no screen: a business that turned it on would get nothing to use.
+    assert config.listed is False
     assert 0 < len(str(config.summary)) <= 120
     assert str(config.description)
     # No screen yet: the QR sheet is the next step.
