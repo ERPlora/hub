@@ -1001,6 +1001,7 @@
         "token": "Token",
         "permissions": "Permissions",
         "state": "State",
+        "createdBy": "Created by",
         "created": "Created",
         "lastUsed": "Last use",
         "limit": "Limit"
@@ -1008,12 +1009,13 @@
       "modes": {
         "full": "Full access",
         "read": "Read only",
-        "write": "Write only",
-        "per_app": "Per app"
+        "write": "Write only"
       },
-      "kinds": {
+      "actions": {
         "read": "Read",
-        "write": "Write"
+        "create": "Create",
+        "update": "Update",
+        "delete": "Delete"
       },
       "short": {
         "read": "R",
@@ -1038,10 +1040,11 @@
         "rate": "Requests per minute",
         "rateHint": "From 1 to 10,000.",
         "mode": "What this key may do",
-        "generalHint": "The general modes cover every app of your business, also the ones you add later.",
+        "chooseApps": "Choose apps",
+        "allAppsHint": "Every app of your business, also the ones you add later.",
         "perAppHint": "Tick what the key may do on each app.",
         "app": "App",
-        "noApps": "No app publishes its API yet."
+        "noApps": "There is no app you may give access to."
       },
       "token": {
         "title": "API key created",

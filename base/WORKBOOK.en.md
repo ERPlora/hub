@@ -2642,7 +2642,7 @@ and nothing is downloaded.
 Involved: BASE-F84, BASE-F100, BASE-F128, SALE-F30, SALE-F31, BASE-F112 (inside the app)
 
 ### BASE-F86 Create an API key and copy its token
-<!-- from WORKBOOK.md sha256:22135d71b36c -->
+<!-- from WORKBOOK.md sha256:b7bbe1160003 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
@@ -2650,23 +2650,26 @@ Steps:
   1. In **Employees › API keys**: "A key lets another system (your accountant's, your online shop) read or write
      this business's data through its API." and "New API key".
   2. In "New API key", the "Name" ("Accountant — invoices"), the "Requests per minute" ("From 1 to 10,000.") and
-     "What this key may do": "Full access", "Read only", "Write only" or "Per app", ticking "Read" and "Write" on
-     each app; only the box of what whoever makes it may do on that app shows.
+     "What this key may do": "Choose apps" or "All apps", with the boxes "Read", "Create", "Update" and "Delete" of
+     each app or, on "All apps", only once for all of them ("Every app of your business, also the ones you add
+     later."). Only the box of what whoever makes it may give shows: the rest has a dash, and the app they may give
+     nothing on does not show, nor "All apps" if they may give nothing on all of them. "Create key" takes what is
+     ticked on the chosen option.
   3. They tap "Create key": "API key created" shows with "Copy the token now", "This is the only time the whole
      secret is shown. Keep it somewhere safe: it will not be shown again." and "Copy" (for two seconds it says
      "Copied"). "Done" closes it.
   4. What a key may do is four actions, on every app (also the ones added later) or app by app: read, create,
-     update and delete. "Read" is reading and "Write" creating, updating and deleting, of what whoever makes it may
-     give; "Full access", the four on every app. Through the API each action is chosen on its own: a key that only
-     reads and creates in Inventory.
+     update and delete, each on its own. A key with "Read" on Inventory reads its products; creating, updating or
+     deleting one, or opening another app, answers 403 `base.api_key_scope`.
   5. A key is never given more than whoever makes it may do: on an app, an action they may do in none of its calls;
      on every app, an action they may not do on some app that publishes it.
 In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised, and who made it, which sets its ceiling
 (BASE-F125). Event `base.api_key.created`.
-If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That app
-does not publish what the key would do on it.", "A key may not do more than you may do yourself." or "It could not be
-copied to the clipboard.".
+If it fails: with no name or no box ticked, "Create key" cannot be tapped; with no app to give anything on, "There is
+no app you may give access to.". "The API key could not be created.", "Choose at least one app and what the key may do
+on it.", "That app does not publish what the key would do on it.", "A key may not do more than you may do yourself."
+or "It could not be copied to the clipboard.".
 Involved: BASE-F89, BASE-F90, BASE-F119, BASE-F125
 
 ### BASE-F87 Rotate an API key
@@ -2701,22 +2704,23 @@ If it fails: "The API key could not be revoked.".
 Involved: BASE-F89
 
 ### BASE-F89 See the API keys and what each one may do
-<!-- from WORKBOOK.md sha256:6a048ed2a1f5 -->
+<!-- from WORKBOOK.md sha256:d4d99d2ecb4a -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
 Steps:
   1. In **Employees › API keys** (the tab exists only for whoever runs the business), a row per key: "Name",
-     "Token" (only its start), "Permissions", "State" ("Active" or "Revoked"), "Created", "Last use" ("Never" if
-     unused) and "Limit". "Permissions" says "Full access", "Read only" or "Write only" if the key is so on every
-     app; if not, its actions on "All apps" and app by app, by their initial: R (read), C (create), U (update) and
-     D (delete), as "Online shop R/C · Taxes R".
+     "Token" (only its start), "Permissions", "State" ("Active" or "Revoked"), "Created by", "Created", "Last use"
+     ("Never" if unused) and "Limit". "Permissions" says "Full access", "Read only" or "Write only" if the key is so
+     on every app; if not, its actions on "All apps" and app by app, by their initial: R (read), C (create), U
+     (update) and D (delete), as "Online shop R/C · Taxes R". "Created by" says the name of whoever made it, never
+     their email address.
   2. They search with "Search API key…". At the bottom, a link leads to the API documentation.
 In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.
 If it fails: "Your API keys could not be loaded." with "Retry"; with none, "No API keys yet. Create one so that
 another system can read or write your business's data.".
-Involved: BASE-F86, BASE-F87, BASE-F88
+Involved: BASE-F86, BASE-F87, BASE-F88, BASE-F125
 
 ### BASE-F90 Read the API documentation
 <!-- from WORKBOOK.md sha256:06bbdedbe93f -->
