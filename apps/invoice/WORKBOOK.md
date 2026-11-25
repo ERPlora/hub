@@ -1654,9 +1654,11 @@ se publican en esa pestaña. Lo que esas partes dejaron de decir, y quien mantie
     - **Una función, dos puertas**: `printed(ctx, factura)` devuelve los bytes; la usan la descarga y el archivo fiscal, y
       es la que llama quien adjunte la factura a un correo.
     - **Con WeasyPrint, que ya estaba en la imagen** (0 MB más): fpdf2 (1,5 MB) y ReportLab (5 MB) obligan a escribir otra
-      maqueta. Medido en la imagen arm64 con medio procesador: 0,2 s una factura de 10 líneas y 1,3 s una de 200; la
-      primera de cada proceso, 1,6 s, con unos 60 MB de memoria que se quedan. Se hace en la petición, dentro de la
-      lectura, como el Excel; quien imprima muchas, o detrás de un envío, lo hace fuera de la transacción (`base/pdf.py`).
+      maqueta. Medido en la imagen arm64 con medio procesador: 0,2 s una factura de 10 líneas y 1,3 s una de 200 (con el
+      equipo muy cargado, de 0,4 a 2,5 s y de 3,2 a 4,3 s); la primera de cada proceso carga la librería y tarda 1,6 s, con
+      unos 60 MB de memoria que se quedan. Se hace en la petición, dentro de la lectura, como el Excel: mientras tanto
+      ocupa una de las transacciones a la vez del plan. Quien imprima muchas, o antes de esperar un envío, lo hace fuera de
+      la transacción (`base/pdf.py`).
     - **Fuera de Automatizaciones**: es un fichero con el nombre y el NIF de un cliente, para que lo baje una persona.
 
     | Producto | Cómo lo resuelve | Fuente |
