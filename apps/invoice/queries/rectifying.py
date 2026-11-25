@@ -14,6 +14,7 @@ from apps.invoice.models import Invoice
 from apps.invoice.queries.rows import find_invoice, remaining_of
 from apps.invoice.queries.series import RECTIFYING, next_number_of
 from apps.invoice.schemas.rectifying import RectificationPreviewIn, RectificationPreviewOut
+from apps.invoice.withholding import columns
 from apps.tax.queries.jurisdiction import business_today
 
 CANNOT_RECTIFY_RECTIFICATION = _("A rectifying invoice cannot be rectified.")
@@ -164,6 +165,7 @@ def rectification_preview(
     )
     base = sum(item["base"] for item in entries)
     tax = sum(item["quota"] + item["surcharge_quota"] for item in entries)
+    withholding = columns(base, original.withholding_rate)
     return {
         "original": {
             "invoice_id": original.id,
@@ -183,6 +185,8 @@ def rectification_preview(
         "base_amount": base,
         "tax_amount": tax,
         "total_amount": base + tax,
+        **withholding,
+        "payable_amount": base + tax - withholding["withholding_amount"],
         "currency": original.currency,
         "currency_decimals": get_currency_precision(original.currency),
         "lines": [

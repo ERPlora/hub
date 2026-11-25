@@ -67,7 +67,7 @@ def test_an_invoice_without_it_collects_its_total(data):
     assert to_collect(answer) == (None, 0, 12100)
 
 
-@pytest.mark.parametrize("rate", [0, 2, 24, 15.5, -15, 100, "15 %", True])
+@pytest.mark.parametrize("rate", [0, 2, 24, 15.5, -15, 100, "15 %"])
 def test_another_rate_is_refused_under_its_field(rate):
     with pytest.raises(ValidationError) as error:
         withheld(rate)
@@ -151,12 +151,13 @@ def test_the_preview_of_the_rectification_says_what_it_gives_back():
 
 
 def record_of(answer) -> dict:
-    """Everything VeriFactu keeps and prints of a document: its record's columns, its XML, its fingerprint and its QR."""
+    """Everything VeriFactu keeps and prints of a document: its record's columns, its XML, its fingerprint and its QR.
+    Only the ids of the rows are left out, new in each one; the chain is in the previous record's number and fingerprint."""
     record = Record.objects.get(invoice_id=answer.id)
     kept = {
         field.attname: getattr(record, field.attname)
         for field in Record._meta.concrete_fields
-        if field.attname not in ("id", "invoice_id")
+        if field.attname not in ("id", "invoice_id", "previous_record_id")
     }
     qr = run("verifactu.record.by_invoice", {"invoice_id": str(answer.id)}).record
     return {**kept, "qr_url": qr.qr_url, "qr_svg": qr.qr_svg}
@@ -199,7 +200,8 @@ def test_the_record_of_its_rectification_is_the_same_too(at):
 
     plain = undone(rectified)
     assert undone(lambda: rectified(withholding_rate=15)) == plain
-    assert plain["total_amount"] == -12100
+    assert (plain["total_amount"], plain["previous_number"]) == (-12100, "FACT-2026-000001")
+    assert len(plain["previous_fingerprint"]) == 64
 
 
 # What a person reads

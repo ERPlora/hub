@@ -292,6 +292,13 @@ class Invoice(UUIDModel):
     base_amount = models.BigIntegerField(_("taxable base"))
     tax_amount = models.BigIntegerField(_("tax"))
     total_amount = models.BigIntegerField(_("total"))
+    # What the customer withholds of the base: it takes from what is collected, never from the total.
+    withholding_rate = models.DecimalField(
+        pgettext_lazy("invoice", "IRPF withholding (%)"), null=True, blank=True, **RATE
+    )
+    withholding_amount = models.BigIntegerField(
+        pgettext_lazy("invoice", "IRPF withholding"), default=0, db_default=0
+    )
     # One entry per fiscal key (WORKBOOK «Para quien lo mantiene»).
     tax_breakdown = models.JSONField(
         _("tax breakdown"), default=list, blank=True, encoder=DjangoJSONEncoder
@@ -421,6 +428,11 @@ class Invoice(UUIDModel):
     def is_simplified(self) -> bool:
         """A ticket (F2) or the rectification of one (R5): it identifies no customer."""
         return self.invoice_type in SIMPLIFIED_TYPES
+
+    @property
+    def payable_amount(self) -> int:
+        """What is collected: the total without what the customer withholds."""
+        return self.total_amount - self.withholding_amount
 
 
 class InvoiceLine(UUIDModel):

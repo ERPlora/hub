@@ -25,6 +25,7 @@ from apps.invoice.services.issuing import VERBATIM, _issue, _settle_rectified
 from apps.invoice.services.numbering import series_of_year
 from apps.invoice.services.recipient import _recipient_of
 from apps.invoice.services.writes import _now, _result, _today
+from apps.invoice.withholding import columns
 from apps.sale.models import Refund, Sale
 from apps.sale.queries.sales import find_sale
 from apps.tax.models import TaxRule
@@ -77,6 +78,7 @@ def _rectify(  # noqa: PLR0913
         source_refund=source_refund,
         rectifies=original,
         rectification_kind=Invoice.RectificationKind.DIFFERENCES,
+        **columns(sum(item["base"] for item in entries), original.withholding_rate),
         description=reason[:500],
         currency=original.currency,
     )
