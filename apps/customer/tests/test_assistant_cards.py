@@ -6,19 +6,13 @@ card shows it — a yes or no in the person's language, a day as the card writes
 
 import pytest
 from live.assistant import NAMED
-from live.operations import get
 
 from apps.customer.models import Customer, CustomField
-from base import assistant
 
 from .conftest import HUB_DB, ctx_for
+from .test_assistant_card_records import fields_of
 
 UPDATE = "customer.customer.update"
-
-
-def fields_of(write: str, arguments: dict, language: str = "en", ctx=None) -> dict:
-    card = assistant.cards.card(get(write), arguments, language, ctx or ctx_for(language=language))
-    return {field["name"]: field for field in card["fields"]}
 
 
 def values_of(field_type: str, *values: str, language: str = "en", ctx=None, **more) -> dict:
