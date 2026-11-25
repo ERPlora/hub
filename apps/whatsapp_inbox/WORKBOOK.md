@@ -1257,10 +1257,10 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   carpeta), de donde la hoja y «Enviar una plantilla» pintan su miniatura (`HeaderFilePreview.vue`: `<img>`, o
   `<video preload="metadata">` con el primer fotograma; `'self'` en la CSP); una plantilla lo referencia con
   `PROTECT`.
-  Topes: los de Meta para foto (5 MB) y vídeo (16 MB) y el del Hub para un PDF (`base.files.MAX_FILE_BYTES`,
+  Topes: los de Meta para foto (5 MB) y vídeo (16 MB) y el del Hub para un PDF (`base.files.create.MAX_FILE_BYTES`,
   25 MB; Meta admite 100). Un archivo nuevo cabe en el espacio del plan: lo comprueba el ayudante único de
   `base` (`base.queries.files.refuse_past_the_plans_space`, el mismo de Archivos y de la web), sin copia en la app ni
-  en su catálogo: el `plan.max_storage_bytes` de la foto del SaaS frente a `base.files.used_bytes`, que ya
+  en su catálogo: el `plan.max_storage_bytes` de la foto del SaaS frente a `base.files.space.used_bytes`, que ya
   cuenta `whatsapp_inbox/`; fuera de él, 409 `base.file_no_space` con el texto de Archivos (catálogo de `base`)
   en el idioma de quien llama. El mismo archivo otra vez no ocupa más y no se mide. Si el almacén no contesta al
   medir, el 503 de Archivos (`base.file_store_unavailable`) y no se guarda nada.

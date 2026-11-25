@@ -118,7 +118,7 @@ max-statements = 50
 "apps/whatsapp_inbox/schemas/templates.py" = ["B905"]
 "base/access.py" = ["B905"]
 "base/auth.py" = ["F401"]
-"base/files.py" = ["B911"]
+"base/files/delete_hub.py" = ["B911"]
 "base/metrics.py" = ["B027"]
 "base/tenancy/tests/test_business.py" = ["F401"]
 "base/tenancy/tests/test_concurrency.py" = ["F401"]
@@ -160,7 +160,7 @@ id = "no-sibling-cycles"
 name = "No sibling modules import each other in a circle"
 type = "acyclic_siblings"
 ancestors = [
-    "base", "base.api", "base.blueprint", "base.catalog", "base.home", "base.models", "base.tenancy", "base.tenancy.migrator",
+    "base", "base.api", "base.blueprint", "base.catalog", "base.files", "base.home", "base.models", "base.tenancy", "base.tenancy.migrator",
     "base.services", "base.queries", "base.schemas", "base.ws_print", "control", "control.services", "control.queries",
     "apps.*", "apps.*.services", "apps.*.queries", "apps.*.schemas",
 ]
