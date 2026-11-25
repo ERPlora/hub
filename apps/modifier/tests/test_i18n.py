@@ -54,7 +54,7 @@ def test_spanish_texts_of_the_workbook():
         config = apps.get_app_config("modifier")
         assert str(config.verbose_name) == "Suplementos"
         assert str(config.navigation[0].label) == "Suplementos"
-        assert str(queries.GROUP_NOT_FOUND) == "Este grupo no existe."
+        assert str(queries.reads.GROUP_NOT_FOUND) == "Este grupo no existe."
         assert (
             str(selection.OPTION_NOT_OFFERED)
             == "Esta opción no se ofrece con este producto."

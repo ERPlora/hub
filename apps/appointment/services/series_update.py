@@ -18,11 +18,8 @@ from apps.appointment.queries.booking import check_member, lines_for, resolve_se
 from apps.appointment.queries.business import now
 from apps.appointment.queries.reads import MOVABLE
 from apps.appointment.queries.series import find_series, load_series, pattern_of
-from apps.appointment.schemas import (
-    END_BEFORE_START,
-    RecurringUpdatedOut,
-    RecurringUpdateIn,
-)
+from apps.appointment.schemas.fields import END_BEFORE_START
+from apps.appointment.schemas.series import RecurringUpdatedOut, RecurringUpdateIn
 from apps.appointment.services.moving import _move
 from apps.appointment.services.series import (
     RECURRING_NO_STAFF,
