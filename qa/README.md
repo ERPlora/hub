@@ -104,18 +104,21 @@ no es uno de los tres.
 - Con `--assistant` dice, por flujo hecho con pantalla, su grupo, lo que se espera al pedirlo hablando y las operaciones
   que lo respaldan, con las que son herramientas del asistente marcadas (`tool`). No hay lista escrita a mano: las
   operaciones de un flujo son las de las filas que lo nombran en la columna `Flujos` de las tablas de servicios de los
-  WORKBOOK, y qué es herramienta lo dice el registro de operaciones.
+  WORKBOOK, y qué es herramienta lo dice el registro de operaciones. La columna cita una operación en los flujos en los
+  que la ejecuta quien los hace: una escritura del sistema va en el flujo del sistema, no en la consulta que enseña lo
+  que dejó. Un flujo que no usa ninguna operación lo dice con la clave `Operaciones: ninguna`, debajo de `Pantalla:`.
 
 | Grupo | Cuándo | Qué se espera al pedirlo hablando |
 |---|---|---|
 | `can` | alguna de sus escrituras es herramienta, o solo lee y todas sus lecturas lo son | lo hace, y se comprueba en pantalla o en los datos |
 | `assistant only` | `Pantalla:` nombra solo al asistente | lo mismo, y no hay otro camino |
-| `cannot` | cualquier otro | dice que no lo hace él y en qué pantalla se hace |
+| `cannot` | cualquier otro, también el que dice `Operaciones: ninguna` | dice que no lo hace él y en qué pantalla se hace |
 
 Después da lo que queda por escribir en los WORKBOOK, en tres listas: los flujos sin decidir, porque no se conoce
-ninguna de sus operaciones; los que se contradicen, y las herramientas que no cita ningún flujo. Un flujo se contradice
-si `Actor:` nombra al asistente y ninguna de sus operaciones es herramienta, o si lo nombra `Pantalla:` y las que se
-conocen no son herramientas ni las del propio panel del asistente. Que el asistente pueda hacerlo y `Actor:` no lo nombre
+ninguna de sus operaciones ni dicen que no usen ninguna; los que se contradicen, y las herramientas que no cita ningún
+flujo. Un flujo se contradice si `Actor:` nombra al asistente y ninguna de sus operaciones es herramienta, si lo nombra
+`Pantalla:` y las que se conocen no son herramientas ni las del propio panel del asistente, o si dice `Operaciones:
+ninguna` y una tabla lo cita. Que el asistente pueda hacerlo y `Actor:` no lo nombre
 no es una contradicción: lo dice su grupo.
 
 ## Cómo se mantiene

@@ -221,8 +221,8 @@ solo el elemento del id (hub#1272).
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Los elementos, con búsqueda por nombre, filtro de estado y páginas (hasta 100 por página) | ver | F01–F05 | `demo.item.list` |
-| La ficha de un elemento con sus líneas | ver | F02–F05 | `demo.item.detail` |
+| Los elementos, con búsqueda por nombre, filtro de estado y páginas (hasta 100 por página) | ver | F01–F06 | `demo.item.list` |
+| La ficha de un elemento con sus líneas | ver | F02–F06 | `demo.item.detail` |
 | Las cifras: total, abiertos, hechos y líneas | gestionar | F05 | `demo.item.stats` |
 | Cuántos elementos siguen abiertos (el contador de la campana) | ver | F05 | `demo.item.open_count` |
 
@@ -233,7 +233,7 @@ solo el elemento del id (hub#1272).
 | Crea un elemento | gestionar | F01 | `demo.item.create` |
 | Cambia un elemento (solo lo enviado) | gestionar | F02 | `demo.item.update` |
 | Borra un elemento y sus líneas | gestionar | F03 | `demo.item.delete` |
-| Añade una línea; repetir con el mismo identificador no la duplica | gestionar | F04 | `demo.item.add_line` |
+| Añade una línea; repetir con el mismo identificador no la duplica | gestionar | F04, F06 | `demo.item.add_line` |
 
 ### Lo que avisa
 

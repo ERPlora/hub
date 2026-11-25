@@ -76,6 +76,18 @@ def test_the_card_names_the_lines_of_a_manual_invoice():
     assert labels(assistant.cards.card(create, {"lines": lines}, "en")) == ["Lines"]
 
 
+@pytest.mark.parametrize(
+    ("language", "named", "said"),
+    [
+        ("es", ["Fecha de emisión", "Vencimiento"], {"issue_date": "23 nov 2026", "due_date": "23 dic 2026"}),
+        ("en", ["Issue date", "Due date"], {"issue_date": "Nov 23, 2026", "due_date": "Dec 23, 2026"}),
+    ],
+)
+def test_the_card_of_a_manual_invoice_says_its_two_dates(language, named, said):
+    card = assistant.cards.card(get("invoice.invoice.create"), {"issue_date": "2026-11-23", "due_date": "2026-12-23"}, language)
+    assert (labels(card), values(card)) == (named, said)
+
+
 def test_the_card_names_a_series_next_number_as_its_form_does():
     for name in ("invoice.series.create", "invoice.series.update"):
         assert labels(assistant.cards.card(get(name), {"next_number": 120}, "es")) == [SCREENS["series"]["form"]["nextNumber"]]

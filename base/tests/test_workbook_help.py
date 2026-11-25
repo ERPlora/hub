@@ -201,6 +201,19 @@ class TestFlows:
             assert internal not in published
 
 
+    @pytest.mark.parametrize(
+        ("language", "key", "tab"), [("es", "Operaciones: ninguna", "Zonas"), ("en", "Operations: none", "Zones")]
+    )
+    def test_the_operations_a_flow_uses_are_not_published_nor_added_to_the_key_before(self, language, key, tab):
+        with translation.override(language):
+            vocabulary = words()
+        status, screen, failure = (vocabulary.keys[field] for field in ("status", "screen", "failure"))
+        lines = ["## F", "", "### TABLE-F01 X", f"{status}: {vocabulary.done}", f"{screen}: {tab}", f"{failure}: Nada.", key]
+        tabs = ES_TABS if language == "es" else EN_TABS
+        [read] = parse("\n".join(lines), tabs, vocabulary).flows
+        assert read == Flow("TABLE-F01", "X", ("zones",), "", "Nada.")
+
+
 class TestEveryFlow:
     """What another reader takes from every flow of a customer's part, published or not: the QA's coverage does."""
 

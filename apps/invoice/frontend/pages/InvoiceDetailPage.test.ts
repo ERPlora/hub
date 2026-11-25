@@ -112,6 +112,16 @@ describe('InvoiceDetailPage: what it shows', () => {
     expect(s.find('invoice-missing-tax-id').exists()).toBe(false);
   });
 
+  it('says when it falls due, if it does, and «Overdue» instead of «Issued» once it has passed', async () => {
+    const s = await setup();
+    await s.show(INVOICE);
+    expect(s.find('invoice-detail-due-date').exists()).toBe(false);
+    await s.show({ ...INVOICE, due_date: '2026-11-13', overdue: true });
+    expect([s.field('due-date'), s.field('status')]).toEqual(['11/13/2026', 'Overdue']);
+    expect(s.find('invoice-detail-status').attributes('data-tone')).toBe('warning');
+    expect(s.find('invoice-detail-due-date').element.previousElementSibling?.textContent).toBe('Due date');
+  });
+
   it('names the issuer with the tax ID its document prints: the EU VAT number of one in the ROI', async () => {
     const s = await setup();
     await s.show({ ...INVOICE, issuer_vat_number: 'ESB12345674' });

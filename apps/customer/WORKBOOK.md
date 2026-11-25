@@ -1034,9 +1034,9 @@ nada y sale la tarjeta nueva.
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Da de alta una ficha | gestionar | F01, F18, F25, F26 | `customer.customer.create` |
-| Cambia la ficha (solo lo enviado) y sus campos personalizados | gestionar | F04 | `customer.customer.update` |
-| Crea hasta 50 fichas de un CSV, fila a fila | gestionar | F08 | `customer.customer.import` |
+| Da de alta una ficha | gestionar | F01, F11, F18, F25, F26 | `customer.customer.create` |
+| Cambia la ficha (solo lo enviado) y sus campos personalizados | gestionar | F04, F11 | `customer.customer.update` |
+| Crea hasta 50 fichas de un CSV, fila a fila | gestionar | F08, F11 | `customer.customer.import` |
 | Sustituye los grupos de una ficha | gestionar | F06 | `customer.customer.set_groups` |
 | Sustituye las etiquetas de una ficha | gestionar | F06 | `customer.customer.set_tags` |
 | Elimina una ficha (conserva sus datos) | eliminar | F07 | `customer.customer.delete` |
