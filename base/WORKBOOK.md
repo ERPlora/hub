@@ -4154,7 +4154,7 @@ Implicados: BASE-F97, BASE-F100
   tarjeta nombra la app por su nombre entero, nunca por su id. Tests: `base/tests/test_app_activation.py`,
   `test_app_activation_tables.py` y `test_api.py`.
 - Las apps no activadas en el asistente (BASE-F24 paso 6, hub#2178; `base/assistant/apps_not_on.py`): el catálogo de
-  un turno sigue siendo solo de las apps activas. `named` nombra una app no activada de `home.shown_modules` cuando las
+  un turno sigue siendo solo de las apps activas. `named` nombra una app no activada de `home.shown_modules.shown_modules` cuando las
   palabras de la petición abierta o las búsquedas del modelo dicen su nombre en el idioma de la persona (`_names`: las
   raíces de su `verbose_name`, comparadas con las palabras tal como se dicen, sin el vocabulario de `live`, que haría
   de «precio» una palabra de Tarifas) y tiene una herramienta en los `PLACES` puestos de ese turno contra el catálogo
