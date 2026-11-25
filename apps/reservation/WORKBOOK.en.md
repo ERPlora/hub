@@ -738,14 +738,14 @@ whoever confirms cannot see (for example, the card of a customer, without permis
 does not show on the card.
 
 ### What it offers: queries (they read and change nothing)
-<!-- from WORKBOOK.md sha256:aedd08dfa41e -->
+<!-- from WORKBOOK.md sha256:bcede70f38e1 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The reservations of some days (or of the whole book when searching), with filters, order and pages (up to 100) | view reservations | F05–F12 | `reservation.reservation.list` |
+| The reservations of some days (or of the whole book when searching), with filters, order and pages (up to 100) | view reservations | F05–F12, F17, F18 | `reservation.reservation.list` |
 | A reservation, with the words it is named with | view reservations | F08, F19 | `reservation.reservation.get` |
-| A day: covers, reservations, blocks, business hours and occupancy of each slot | view reservations | F05 | `reservation.availability.day` |
-| The free tables for a date, time, duration and party | view reservations | F23 | `reservation.availability.tables` |
+| A day: covers, reservations, blocks, business hours and occupancy of each slot | view reservations | F05, F17 | `reservation.availability.day` |
+| The free tables for a date, time, duration and party | view reservations | F17, F23 | `reservation.availability.tables` |
 | The time slots, with filters and pages | view slots | F01 | `reservation.time_slot.list` |
 | A slot, by its id or by its weekday and its start, with the words it is named with | view slots | F01 | `reservation.time_slot.get` |
 | The blocked dates, with filters and pages | view blocks | F02 | `reservation.blocked_date.list` |
@@ -764,13 +764,13 @@ date uses. They are those of the reservation as it was noted down, on the busine
 shifting with the time zone.
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:b8f92b6dc1be -->
+<!-- from WORKBOOK.md sha256:edac72da358f -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
-| Notes down a reservation (`overbook` knowingly fills a full slot, the staff only) | add reservations | F06 | `reservation.reservation.create` |
-| Changes a reservation | change reservations | F08 | `reservation.reservation.update` |
-| Confirms, seats, completes, cancels or marks a no-show | change reservations | F07, F09–F12 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` |
+| Notes down a reservation (`overbook` knowingly fills a full slot, the staff only) | add reservations | F06, F17 | `reservation.reservation.create` |
+| Changes a reservation | change reservations | F08, F18 | `reservation.reservation.update` |
+| Confirms, seats, completes, cancels or marks a no-show | change reservations | F07, F09–F12, F18 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` |
 | Deletes a reservation | delete reservations | F20 | `reservation.reservation.delete` |
 | Releases the overdue pending ones | change reservations | F13 | `reservation.reservation.release_unconfirmed` |
 | Creates or removes a slot | change slots | F01 | `reservation.time_slot.create`, `.delete` |
@@ -801,12 +801,12 @@ For the platform only (without a route in the API, as the system): `reservation.
 numbers. Tables does not listen to these notices: it receives the hold through the call of Reservations in the same transaction (TABLE-F25–F28).
 
 ### What it reacts to
-<!-- from WORKBOOK.md sha256:aa4f9e20a267 -->
+<!-- from WORKBOOK.md sha256:91a2d7a1f30b -->
 
-| Notice | From | What it does | Service |
-|---|---|---|---|
-| `customer.customer.merged` | Customers | Moves their reservations and entries to the card that remains (F21) | `reservation.customer.reassign` |
-| `customer.customer.erased` | Customers | Erases their personal data from reservations and entries (F22) | `reservation.customer.erase` |
+| Notice | From | What it does | Flows | Service |
+|---|---|---|---|---|
+| `customer.customer.merged` | Customers | Moves their reservations and entries to the card that remains | F21 | `reservation.customer.reassign` |
+| `customer.customer.erased` | Customers | Erases their personal data from reservations and entries | F22 | `reservation.customer.erase` |
 
 ### What it needs from other apps
 <!-- from WORKBOOK.md sha256:801f3d1cb777 -->

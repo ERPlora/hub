@@ -223,24 +223,24 @@ deleted, the assistant says so. If the item comes by its id beside another one's
 shows that name, which the action does not use: it says only the item of the id (hub#1272).
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
-<!-- from WORKBOOK.md sha256:f77d2977c760 -->
+<!-- from WORKBOOK.md sha256:f71456703706 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The items, with search by name, a status filter and pages (up to 100 per page) | view | F01–F05 | `demo.item.list` |
-| An item's page with its lines | view | F02–F05 | `demo.item.detail` |
+| The items, with search by name, a status filter and pages (up to 100 per page) | view | F01–F06 | `demo.item.list` |
+| An item's page with its lines | view | F02–F06 | `demo.item.detail` |
 | The figures: total, open, done and lines | manage | F05 | `demo.item.stats` |
 | How many items are still open (the bell's counter) | view | F05 | `demo.item.open_count` |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:bdc4298c137c -->
+<!-- from WORKBOOK.md sha256:91a4b9caba25 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
 | Creates an item | manage | F01 | `demo.item.create` |
 | Changes an item (only what is sent) | manage | F02 | `demo.item.update` |
 | Deletes an item and its lines | manage | F03 | `demo.item.delete` |
-| Adds a line; repeating with the same identifier does not duplicate it | manage | F04 | `demo.item.add_line` |
+| Adds a line; repeating with the same identifier does not duplicate it | manage | F04, F06 | `demo.item.add_line` |
 
 ### What it announces
 <!-- from WORKBOOK.md sha256:73c68c5f7051 -->

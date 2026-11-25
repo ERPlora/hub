@@ -1017,15 +1017,15 @@ when splitting by its name. What the person cannot see (the Sales check, without
 not show.
 
 ### What it offers: queries (they read and change nothing)
-<!-- from WORKBOOK.md sha256:c76c32487833 -->
+<!-- from WORKBOOK.md sha256:018ff97c6240 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The zones with their tables and the free ones, search, filters, order and pages (up to 100) | view zones | F01, F06 | `table.zone.list` |
 | A zone | view zones | F06 | `table.zone.get` |
-| The tables with their live status (guests, since when, server, customer, booking), in natural order, with search, filters and pages | view tables | F02, F09 | `table.table.list` |
+| The tables with their live status (guests, since when, server, customer, booking), in natural order, with search, filters and pages | view tables | F02, F09, F18, F20, F33, F34 | `table.table.list` |
 | A table with its open checks and its name with the zone, like 5 (Terrace) | view tables | F09–F17 | `table.table.get` |
-| The checks of the room (open, closed, all), with charged, filters and pages | view checks | F22 | `table.session.list` |
+| The checks of the room (open, closed, all), with charged, filters and pages | view checks | F18–F20, F22 | `table.session.list` |
 | A table check and where it is: its table with the zone, or "Parked" | view checks | F21, F22 | `table.session.get` |
 | The table checks of a Sales check (for the till: the table of the check on screen) | view checks | F12, F13, F24 | `table.session.by_order` |
 | A line of the Sales check of a table, with its name and its quantity, as "Split check" lists them | view checks | F17 | `table.session.line` |

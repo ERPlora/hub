@@ -1348,11 +1348,11 @@ name that matches several, draws no card: before asking for the yes, Inventory l
 assistant says which one is not there (in a goods receipt, on which line) or asks which one it is.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:ae37849e6e2f -->
+<!-- from WORKBOOK.md sha256:7a66b54910a8 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
-| The products with their stock and whether they are sold out, with search, filters (name, SKU, price, stock, status, sold out) and pages; "on sale" gives what the till offers | view products | F03, F05, F27, F29 | `inventory.product.list` |
+| The products with their stock and whether they are sold out, with search, filters (name, SKU, price, stock, status, sold out) and pages; "on sale" gives what the till offers | view products | F03, F05, F27, F29, F32, F33, F36 | `inventory.product.list` |
 | A product's full card (by its id, its SKU or its name) | view products | F02, F25 | `inventory.product.get` |
 | The whole sales catalog: products on sale (active and not sold out) with price, cost (empty for whoever does not see the costs), tax category, unit, allergens, description, photo and whether they have stock control | view products | F27 | `inventory.product.list_for_sale` |
 | The products at their threshold or below, from the one with least to the one with most | view products | F17 | `inventory.product.list_low_stock` |
@@ -1369,21 +1369,21 @@ assistant says which one is not there (in a goods receipt, on which line) or ask
 | Up to five library images for a product's photo, by its name and titled in the language of whoever asks; it sets none | view products | F30 | `inventory.product.suggest_image` |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:fe41a94ba24b -->
+<!-- from WORKBOOK.md sha256:eee28c6eb191 -->
 
 | What it does | Who can | Confirmation in the assistant | Flows | Service |
 |---|---|---|---|---|
-| Creates a product, with its categories, its allergens and its initial stock | create products | one tap | F01, F20, F26, F35 | `inventory.product.create` |
-| Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09, F35 | `inventory.product.bulk_create` |
-| Changes a product: data, allergens, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F20, F35 | `inventory.product.update` |
+| Creates a product, with its categories, its allergens and its initial stock | create products | one tap | F01, F20, F26, F35, F36 | `inventory.product.create` |
+| Creates many products at once and says which row went in, which was skipped and which failed | import products | one tap | F09, F12, F33, F35 | `inventory.product.bulk_create` |
+| Changes a product: data, allergens, active or inactive, stock control and categories | change products | one tap | F02, F03, F05, F08, F12, F20, F35, F36 | `inventory.product.update` |
 | Deletes a product | delete products | type to confirm | F04 | `inventory.product.delete` |
 | Gives a deleted product back to the catalog, as it was (the system only, when recovering from a separate copy) | system | not the assistant's: only the platform does it | F34 | `inventory.product.restore` |
 | Marks a product as sold out or puts it back on sale | change products | one tap | F29 | `inventory.product.set_sold_out` |
-| Sets a product's photo, from the library, or removes it | change products | one tap | F30 | `inventory.product.set_image` |
-| Uploads a product's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | change products | not the assistant's: the file is chosen on the card | F31 | `inventory.product.upload_image` |
+| Sets a product's photo, from the library, or removes it | change products | one tap | F12, F30, F33 | `inventory.product.set_image` |
+| Uploads a product's own photo (JPG, PNG or WebP of up to 2 MB; kept as a 512 × 512 WebP) | change products | not the assistant's: the file is chosen on the card | F31, F33 | `inventory.product.upload_image` |
 | Adds a product to a category (also the platform, when recovering a deleted category from a separate copy with the products the business keeps) | change products | one tap | F08, F07 | `inventory.product_category.add` |
 | Removes a product from a category | change products | one tap | F08 | `inventory.product_category.remove` |
-| Creates a category | create categories | one tap | F06 | `inventory.category.create` |
+| Creates a category | create categories | one tap | F06, F12 | `inventory.category.create` |
 | Creates many categories at once, with a report per row | create categories | one tap | F10 | `inventory.category.bulk_create` |
 | Changes a category | change categories | one tap | F06 | `inventory.category.update` |
 | Deletes a category and unlinks its products | delete categories | type to confirm | F07 | `inventory.category.delete` |

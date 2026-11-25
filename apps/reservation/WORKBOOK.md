@@ -695,10 +695,10 @@ sale en la tarjeta.
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Las reservas de unos días (o de todo el libro buscando), con filtros, orden y páginas (hasta 100) | ver reservas | F05–F12 | `reservation.reservation.list` |
+| Las reservas de unos días (o de todo el libro buscando), con filtros, orden y páginas (hasta 100) | ver reservas | F05–F12, F17, F18 | `reservation.reservation.list` |
 | Una reserva, con las palabras con que se nombra | ver reservas | F08, F19 | `reservation.reservation.get` |
-| Un día: cubiertos, reservas, bloqueos, horario del negocio y ocupación de cada franja | ver reservas | F05 | `reservation.availability.day` |
-| Las mesas libres para una fecha, hora, duración y grupo | ver reservas | F23 | `reservation.availability.tables` |
+| Un día: cubiertos, reservas, bloqueos, horario del negocio y ocupación de cada franja | ver reservas | F05, F17 | `reservation.availability.day` |
+| Las mesas libres para una fecha, hora, duración y grupo | ver reservas | F17, F23 | `reservation.availability.tables` |
 | Las franjas horarias, con filtros y páginas | ver franjas | F01 | `reservation.time_slot.list` |
 | Una franja, por su id o por su día de la semana y su inicio, con las palabras con que se nombra | ver franjas | F01 | `reservation.time_slot.get` |
 | Las fechas bloqueadas, con filtros y páginas | ver bloqueos | F02 | `reservation.blocked_date.list` |
@@ -719,9 +719,9 @@ los de la reserva tal como se apuntó, en el reloj del negocio, sin correrse por
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| Apunta una reserva (`overbook` llena a sabiendas una franja llena, solo el personal) | apuntar reservas | F06 | `reservation.reservation.create` |
-| Cambia una reserva | cambiar reservas | F08 | `reservation.reservation.update` |
-| Confirma, sienta, completa, cancela o marca no presentada | cambiar reservas | F07, F09–F12 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` |
+| Apunta una reserva (`overbook` llena a sabiendas una franja llena, solo el personal) | apuntar reservas | F06, F17 | `reservation.reservation.create` |
+| Cambia una reserva | cambiar reservas | F08, F18 | `reservation.reservation.update` |
+| Confirma, sienta, completa, cancela o marca no presentada | cambiar reservas | F07, F09–F12, F18 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` |
 | Borra una reserva | borrar reservas | F20 | `reservation.reservation.delete` |
 | Libera las pendientes vencidas | cambiar reservas | F13 | `reservation.reservation.release_unconfirmed` |
 | Crea o quita una franja | cambiar franjas | F01 | `reservation.time_slot.create`, `.delete` |
@@ -753,10 +753,10 @@ transacción (TABLE-F25–F28).
 
 ### A qué reacciona
 
-| Aviso | De | Qué hace | Servicio |
-|---|---|---|---|
-| `customer.customer.merged` | Clientes | Pasa sus reservas y entradas a la ficha que queda (F21) | `reservation.customer.reassign` |
-| `customer.customer.erased` | Clientes | Borra sus datos personales de reservas y entradas (F22) | `reservation.customer.erase` |
+| Aviso | De | Qué hace | Flujos | Servicio |
+|---|---|---|---|---|
+| `customer.customer.merged` | Clientes | Pasa sus reservas y entradas a la ficha que queda | F21 | `reservation.customer.reassign` |
+| `customer.customer.erased` | Clientes | Borra sus datos personales de reservas y entradas | F22 | `reservation.customer.erase` |
 
 ### Lo que necesita de otras apps
 

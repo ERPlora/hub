@@ -870,9 +870,9 @@ Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F0
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
-| El tablero: las comandas en marcha y las listas, por estación, con sus platos, las estaciones que salen en ellas y los contadores | ver comandas | F10, F13, F31 | `kitchen.ticket.board` |
+| El tablero: las comandas en marcha y las listas, por estación, con sus platos, las estaciones que salen en ellas y los contadores | ver comandas | F06, F07, F10, F13, F31, F32 | `kitchen.ticket.board` |
 | Lo que queda por cocinar, sumado por plato y estación | ver comandas | F15 | `kitchen.ticket.all_day` |
-| Las comandas, con búsqueda, filtros y páginas | ver comandas | F21 | `kitchen.ticket.list` |
+| Las comandas, con búsqueda, filtros y páginas | ver comandas | F21, F32 | `kitchen.ticket.list` |
 | Una comanda por id, número o etiqueta («la mesa 4») | ver comandas | F21 | `kitchen.ticket.get` |
 | Las comandas de una cuenta de Ventas | ver comandas | F19 | `kitchen.ticket.by_order` |
 | Las comandas nuevas de las últimas 24 horas para el aviso del dispositivo, también las aún no guardadas | ver comandas | F05, F16 | `kitchen.ticket.notices` |
@@ -888,7 +888,7 @@ Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F0
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Envía a cocina lo pendiente de una cuenta (por Ventas) y abre la comanda, normal o urgente | enviar | F18 | `kitchen.ticket.send` |
-| Abre la comanda de una ronda ya enviada (la reacción al envío y lo que Ventas llama por nombre) | enviar | F05 | `kitchen.ticket.receive` |
+| Abre la comanda de una ronda ya enviada (la reacción al envío y lo que Ventas llama por nombre) | enviar | F05–F07, F32 | `kitchen.ticket.receive` |
 | Crea una comanda a mano | enviar | F23 | `kitchen.ticket.create` |
 | Lanza, marca lista, recupera una comanda | cambiar comandas | F21 | `kitchen.ticket.start`, `.ready`, `.recall` |
 | Marca servida una comanda | entregar | F13 | `kitchen.ticket.serve` |
@@ -896,7 +896,7 @@ Implicados: SALE-F20, SALE-F40, SALE-F41, INVENTORY-F35, KITCHEN-F05, KITCHEN-F0
 | Reimprime una comanda | cambiar comandas | F09 | `kitchen.ticket.reprint` |
 | Cancela una comanda (riesgo alto) | cancelar | F22 | `kitchen.ticket.cancel` |
 | Borra una comanda a mano (riesgo alto) | borrar | F24 | `kitchen.ticket.delete` |
-| Marca listos o recupera platos | cambiar comandas | F11, F12 | `kitchen.item.bump`, `kitchen.item.recall` |
+| Marca listos o recupera platos | cambiar comandas | F06, F11, F12 | `kitchen.item.bump`, `kitchen.item.recall` |
 | Crea, cambia y elimina estaciones (eliminar, riesgo alto) | gestionar estaciones | F01–F03 | `kitchen.station.create`, `.update`, `.delete` |
 | Enruta y quita el enrutado | gestionar estaciones | F04 | `kitchen.routing.set`, `kitchen.routing.clear` |
 | Guarda los ajustes | ajustes | F26 | `kitchen.settings.update` |

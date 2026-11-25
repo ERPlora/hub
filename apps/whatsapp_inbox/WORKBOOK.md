@@ -1126,7 +1126,7 @@ Del sistema (sin ruta pública):
 |---|---|---|
 | `whatsapp_inbox.message.receive` | erplora.com, por `/internal` | F03, F04, F08, F38 |
 | `whatsapp_inbox.message.update_status` | erplora.com, por `/internal` | F34 |
-| `whatsapp_inbox.channel.sync` | erplora.com, por `/internal` | F01, F02, F13, F27, F28 |
+| `whatsapp_inbox.channel.sync` | erplora.com, por `/internal` | F01, F02, F28 |
 | `whatsapp_inbox.message.claim_delivery`, `whatsapp_inbox.message.record_delivery` | las entregas | F32, F33 |
 | `whatsapp_inbox.conversation.claim_erasure`, `whatsapp_inbox.conversation.record_erasure` | las entregas | F10, F11 |
 | `whatsapp_inbox.template.claim_submit`, `whatsapp_inbox.template.record_submit` | las entregas | F29, F30 |
@@ -1155,6 +1155,15 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
   `customer.customer.restored` (la ficha eliminada que vuelve desde la copia aparte, CUSTOMER-F33) las une otra
   vez, como una ficha nueva (F04); `customer.customer.erased` las borra (F11). Lee las fichas por número y el consentimiento de
   marketing por WhatsApp; crea fichas solo con `customer.customer.create`.
+
+| De | Para qué | Flujos | Servicio |
+|---|---|---|---|
+| Automatizaciones | Si una respuesta automática está encendida y si trae una versión mejor | F14, F15, F17, F18 | `flow.recipe.list` |
+| Automatizaciones | Encender una respuesta automática | F14, F15 | `flow.recipe.enable` |
+| Automatizaciones | Ponerla en pausa, también al encender la otra | F14, F15, F17 | `flow.recipe.disable` |
+| Automatizaciones | Volverla a la versión que trae la app | F18 | `flow.recipe.restore` |
+| Citas | Si las citas se confirman solas | F16 | `appointment.settings.get`, `.update` |
+| Reservas | Si las reservas se confirman solas | F16 | `reservation.settings.get`, `.update` |
 
 ### Quién la usa
 
