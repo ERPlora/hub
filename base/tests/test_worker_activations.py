@@ -3,7 +3,7 @@
 ``base.app.enable`` leaves the app ``creating`` and rings the hub's ``hub_due``; each tick the worker takes the hubs
 rung (and, every ``ACTIVATION_SWEEP_SECONDS``, every ready hub with its own database, so a ring lost is found again),
 reads in each one what is due (``creating``, or ``failed`` past its next try) and makes those apps' tables with
-``migrator.ensure_schema(hub, add=…)``, under the hub's schema lock; then ``base.app.activation_settle`` turns them on
+``migrator.schema.ensure_schema(hub, add=…)``, under the hub's schema lock; then ``base.app.activation_settle`` turns them on
 (``base.app.enabled``, its live notice) or ``failed`` with why, tried again at 1, 5 and 15 minutes and then every hour.
 A schema held by another run puts it off 30 s; a request of a newer code than the worker's waits for a worker of that
 code (+60 s). Turned off meanwhile, it stays off with its tables. Another hub's database is never opened.
@@ -71,13 +71,13 @@ def no_visit_outlives_its_test(django_db_setup, django_db_blocker):
 @pytest.fixture(scope="module")
 def platform_template(django_db_setup, django_db_blocker):
     """A template with the platform's tables alone: what a hub's template is for an app ported after it was made. The
-    real ones carry every portable app (``migrator.templates``), so turning on an app they have
+    real ones carry every portable app (``migrator.hub_templates.templates``), so turning on an app they have
     is on at once; this one makes every app one whose tables its hubs lack."""
     with django_db_blocker.unblock():
         name = names.template_db_name(tenancy_connections.control_name(), VERTICAL)
         hubs.drop_database(name)
         hubs.create_database(name)
-        migrator.ensure_template(migrator.Template(db_name=name, apps=migrator.platform_apps()))
+        migrator.hub_templates.ensure_template(migrator.hub_templates.Template(db_name=name, apps=migrator.app_sets.platform_apps()))
     yield name
     with django_db_blocker.unblock():
         hubs.drop_database(name)
@@ -178,9 +178,9 @@ def run_pass_at(at: dt.datetime) -> None:
 
 def tables_failing(monkeypatch) -> Callable[[], None]:
     """Making the tables raises ``RuntimeError("boom")`` until the function returned puts the real one back."""
-    real = migrator.ensure_schema
-    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
-    return lambda: monkeypatch.setattr(migrator, "ensure_schema", real)
+    real = migrator.schema.ensure_schema
+    monkeypatch.setattr(migrator.schema, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    return lambda: monkeypatch.setattr(migrator.schema, "ensure_schema", real)
 
 
 # ── What is due in a hub ────────────────────────────────────────────────────────────────────────────────────────
@@ -329,14 +329,14 @@ def test_a_schema_held_by_another_run_puts_it_off_30_seconds(business):
 def test_two_workers_at_once_on_one_hub_never_collide_and_it_goes_on_once(business, monkeypatch):
     a = business("a")
     turn_on(a)
-    real = migrator.ensure_schema
+    real = migrator.schema.ensure_schema
     both_in = threading.Barrier(2)
 
     def together(hub, **kwargs):
         both_in.wait(timeout=10)
         return real(hub, **kwargs)
 
-    monkeypatch.setattr(migrator, "ensure_schema", together)
+    monkeypatch.setattr(migrator.schema, "ensure_schema", together)
     monkeypatch.setattr(worker_activations, "ACTIVATION_LOCK_WAIT", 30.0)
     failures: list[BaseException] = []
 
@@ -365,13 +365,13 @@ def test_two_workers_at_once_on_one_hub_never_collide_and_it_goes_on_once(busine
 def test_turned_off_while_its_tables_are_made_it_stays_off_with_them(business, monkeypatch):
     a = business("a")
     turn_on(a)
-    real = migrator.ensure_schema
+    real = migrator.schema.ensure_schema
 
     def turned_off_meanwhile(hub, **kwargs):
         turn_off(a)
         return real(hub, **kwargs)
 
-    monkeypatch.setattr(migrator, "ensure_schema", turned_off_meanwhile)
+    monkeypatch.setattr(migrator.schema, "ensure_schema", turned_off_meanwhile)
 
     run_pass()
 
@@ -403,7 +403,7 @@ def test_the_request_names_the_codes_leaf_of_what_it_asks_for(business):
     a = business("a")
     turn_on(a, "sale")
 
-    leaves = migrator.code_migrations().leaves
+    leaves = migrator.app_sets.code_migrations().leaves
     assert {label: row(a, label).target for label in ("sale", "tax", "customer")} == {
         label: leaves[label] for label in ("sale", "tax", "customer")
     }
@@ -654,10 +654,10 @@ def test_migrate_hubs_brings_xs_new_migration_to_a_and_never_opens_b(business, o
     )
     opened_at.clear()
 
-    result = migrator.migrate_hubs_behind(workers=1)
+    result = migrator.hubs_pass.migrate_hubs_behind(workers=1)
 
     assert a.slug in result.migrated and b.slug not in result.migrated
-    assert fresh(a).schema_apps[APP] == migrator.code_migrations().leaves[APP]
+    assert fresh(a).schema_apps[APP] == migrator.app_sets.code_migrations().leaves[APP]
     assert not [name for _host, name in opened_at if name == b.db_name]
     assert APP not in recorded(b)
 

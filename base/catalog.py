@@ -14,7 +14,7 @@ customer's part of ``WORKBOOK.md`` (Spanish) and of ``WORKBOOK.en.md`` (its vers
 
 This module is the only one that imports ``shared.models`` and names the ``shared`` alias: the
 explicit exception to «only ``services.py`` and ``queries.py`` touch the ORM», as
-``base/tenancy/migrator.py`` is for the DDL (``base/tests/test_shared_lint.py``). It is no
+``base/tenancy/migrator/`` is for the DDL (``base/tests/test_shared_lint.py``). It is no
 ``@operation``: it runs for no hub and no user, with the ``hub_shared`` role, which may only
 ``SELECT``, ``INSERT`` and ``UPDATE`` those two tables.
 """

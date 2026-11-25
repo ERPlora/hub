@@ -146,7 +146,7 @@ class TestTwoWorkers:
     def test_its_lease_is_renewed_while_its_schema_is_migrated(self, moves, monkeypatch):
         hub = moves.hub(to=moves.cluster())
         leases: list[tuple[dt.datetime, dt.datetime]] = []
-        real = move.migrator.ensure_schema
+        real = move.migrator.schema.ensure_schema
 
         def ensure(moving, *, heartbeat=None, **kwargs):
             # A migration that takes a while beats the heart: the hub's lease (claimed at AT) moves on to now's.
@@ -155,7 +155,7 @@ class TestTwoWorkers:
             leases.append((before, HubDue.objects.get(pk=hub.pk).lease_until))
             return real(moving, heartbeat=heartbeat, **kwargs)
 
-        monkeypatch.setattr(move.migrator, "ensure_schema", ensure)
+        monkeypatch.setattr(move.migrator.schema, "ensure_schema", ensure)
 
         run()
 

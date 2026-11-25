@@ -625,7 +625,7 @@ def test_the_apps_that_answer_and_never_one_whose_records_reach_the_tax_authorit
 def test_each_declaration_names_a_migration_of_its_app_and_an_operation_of_its_app():
     from base.tenancy import migrator
 
-    code = migrator.code_migrations()
+    code = migrator.app_sets.code_migrations()
     for label, declared in recovery.recoverable_apps().items():
         for one in declared:
             assert (label, one.reads_since) in code.nodes

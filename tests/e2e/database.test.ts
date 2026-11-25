@@ -78,7 +78,7 @@ describe('prepareDatabase', () => {
   });
 
   it("makes the platform's template that db-bootstrap makes in production, which migrate_hubs never creates", () => {
-    // An e2e database of before: migrate_hubs clones each vertical's template from it (base/tenancy/migrator.py).
+    // An e2e database of before: migrate_hubs clones each vertical's template from it (base/tenancy/migrator/hub_templates.py).
     const postgres = fakePostgres(['hub_e2e_8030']);
 
     expect(prepareDatabase('hub_e2e_8030', { sql: postgres.sql, ...fakeManage() })).toEqual({ created: false });

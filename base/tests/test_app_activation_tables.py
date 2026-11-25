@@ -1,5 +1,5 @@
 """An app's tables made when a hub with its own database turns it on: ``base.app.enable`` answers 202 ``creating`` and
-rings the hub's ``hub_due``; the worker makes the tables (``base.tenancy.migrator.ensure_schema(hub, add=[app,
+rings the hub's ``hub_due``; the worker makes the tables (``base.tenancy.migrator.schema.ensure_schema(hub, add=[app,
 *requires])``) and turns it ``on`` (its event and live notice), or ``failed`` with why, tried again at 1, 5 and 15
 minutes and then every hour, or by hand (``base.app.retry``). An app whose tables the hub has is on at once (200), and
 turning one off never drops them. A hub without its own database is never entered: no app goes on there.
