@@ -695,8 +695,8 @@ Pasos:
    con importe fijo, «Se aprueba: Descontar 5,00 € de la cuenta»), y un responsable lo aprueba con su
    PIN (o su placa) en ese mismo dispositivo. La cuenta guarda quién lo autorizó y al cobrar no se
    vuelve a pedir; si al cobrar el descuento pasa del máximo sin autorizar, se pregunta igual, con «Se
-   aprueba: Cobrar con un descuento por encima del máximo». Empleados › Aprobaciones guarda lo aprobado
-   con su cifra.
+   aprueba: Cobrar con un descuento por encima del máximo». Empleados › Aprobaciones guarda con su cifra lo
+   aprobado y también el que da por su cuenta quien puede darlo.
 Entra: «Permitir descuentos» y el descuento máximo de los ajustes. El asistente solo lo pone en una cuenta de la
 que se le habla (su mesa o su nombre): el descuento que un producto o una categoría lleva en todas las ventas es
 una regla de Tarifas (PRICING-F11).
@@ -1210,9 +1210,10 @@ anularla.»; anulada desde otro dispositivo a la vez, «Esta venta ya está anul
 dentro de la ventana, que sigue abierta. Si en «Hace falta una aprobación» se pulsa «Cancelar», no se
 anula nada y la ventana dice «Esto necesita la aprobación de un encargado.». La anulación aprobada hace
 lo mismo que la del responsable, una sola vez: la rectificativa en la misma anulación, las sesiones de
-bono que vuelven, el stock y la ficha del cliente; quién la aprobó queda en **Empleados › Aprobaciones**. Si el rol pasa
-a «No» con la ventana abierta, la anulación se rechaza y no se anula nada, aunque un responsable ya la hubiera aprobado.
-Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84
+bono que vuelven, el stock y la ficha del cliente; quién la aprobó, o que la hizo por su cuenta quien puede, queda en
+**Empleados › Aprobaciones**. Si el rol pasa a «No» con la ventana abierta, la anulación se rechaza y no se
+anula nada, aunque un responsable ya la hubiera aprobado.
+Implicados: INVENTORY-F23, CUSTOMER-F21, INVOICE-F07, BASE-F84, BASE-F85
 
 ### SALE-F31 Devolver una venta (toda, una parte o por otro medio)
 Estado: hecho
@@ -1253,9 +1254,10 @@ marcadas ya se devolvió en otra devolución. Vuelve a abrir la devolución para
 el Hub no contesta, volver a pulsar no devuelve dos veces. Si en «Hace falta una aprobación»
 se pulsa «Cancelar», no se devuelve nada y la ventana dice «Esto necesita la aprobación de un
 encargado.». La devolución aprobada es la misma, una sola vez, con su rectificativa y las sesiones de
-bono que vuelven; quién la aprobó queda en **Empleados › Aprobaciones**. Si el rol pasa a «No» con la ventana abierta, la
-devolución se rechaza y no se devuelve nada, aunque un responsable ya la hubiera aprobado.
-Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84
+bono que vuelven; quién la aprobó, o que la hizo por su cuenta quien puede, queda en **Empleados › Aprobaciones**.
+Si el rol pasa a «No» con la ventana abierta, la devolución se rechaza y no se devuelve nada, aunque un
+responsable ya la hubiera aprobado.
+Implicados: INVENTORY-F24, CUSTOMER-F22, INVOICE-F09, INVOICE-F10, BASE-F84, BASE-F85
 Clientes resta lo devuelto del gasto de la ficha al oír «venta devuelta» (CUSTOMER-F22) e Inventario
 repone las unidades que vuelven (INVENTORY-F24), una vez por devolución.
 
@@ -1758,8 +1760,8 @@ con su PIN o su placa («Hace falta una aprobación», BASE-F84), una vez y para
 y devolver una venta, anular una línea enviada a cocina, eliminar una cuenta con algo pedido, vender a
 precio libre y los descuentos por encima del máximo. La acción aprobada hace todo lo que hace la del
 responsable (también lo que mueven Facturación y Servicios: la rectificativa y las sesiones de bono que
-vuelven) y queda en **Empleados › Aprobaciones** (BASE-F85). Ver las ventas de todos, las cifras de todo
-el negocio, los ajustes y crear medios de pago no se aprueban.
+vuelven) y queda en **Empleados › Aprobaciones**, como la que el responsable hace por su cuenta (BASE-F85). Ver las
+ventas de todos, las cifras de todo el negocio, los ajustes y crear medios de pago no se aprueban.
 
 La gestoría (`hub_accountant`) solo lee: «Ver ventas, cuentas, ajustes del TPV, secciones y notas rápidas», «Ver
 los medios de pago» y «Ver las ventas de todos». No monta cuentas, no cobra, no anula ni devuelve, nadie le aprueba

@@ -39,8 +39,7 @@
 742 apps/printing/queries/__init__.py ERPlora/erplora-next#74
 578 apps/printing/schemas/__init__.py ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
-1030 apps/reservation/queries.py ERPlora/erplora-next#74
-891 apps/reservation/schemas.py ERPlora/erplora-next#74
+1023 apps/reservation/queries.py ERPlora/erplora-next#74
 1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
 713 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
 604 apps/sale/frontend/composables/pos/useTill.test.ts ERPlora/erplora-next#74
@@ -83,7 +82,6 @@
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
 616 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
 508 base/tenancy/bootstrap.py ERPlora/erplora-next#74
-835 base/tenancy/migrator.py ERPlora/erplora-next#74
 777 base/tenancy/move.py ERPlora/erplora-next#74
 849 base/ws_print.py ERPlora/erplora-next#74
 625 control/models.py ERPlora/erplora-next#74

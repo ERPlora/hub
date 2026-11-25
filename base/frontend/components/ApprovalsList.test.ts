@@ -37,7 +37,7 @@ describe('ApprovalsList', () => {
     const m = await open({ locale: 'es' });
     expect(m.client.stream.subscriptions('base.approval.list').map((sub) => sub.params)).toEqual([{}]);
     expect(m.wrapper.text()).toContain(
-      'Cada acción que necesitó el PIN de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo ni borrarlo.',
+      'Cada acción que puede necesitar la autorización de un encargado: quién la hizo, quién la autorizó y con qué. Nadie, tampoco un administrador, puede editarlo ni borrarlo.',
     );
   });
 
@@ -52,10 +52,48 @@ describe('ApprovalsList', () => {
     expect(rows[0].text()).not.toContain('sale.sale.void');
     expect(rows[0].text()).toContain('Adam');
     expect(rows[0].text()).toContain('Eva');
-    expect(rows[0].find('[data-testid="approvals-way"]').text()).toBe('PIN');
-    expect(rows[1].find('[data-testid="approvals-way"]').text()).toBe('Placa');
-    expect(rows[0].find('[data-testid="approvals-used"]').text()).toBe('Usada');
-    expect(rows[1].find('[data-testid="approvals-used"]').text()).toBe('Sin usar');
+    expect(rows[0].text()).toContain('PIN');
+    expect(rows[1].text()).toContain('Placa');
+    expect(rows[0].find('[data-testid="approvals-used"]').text()).toBe('Hecha');
+    expect(rows[1].find('[data-testid="approvals-used"]').text()).toBe('Sin hacer');
+  });
+
+  it.each([
+    ['en', 'Their role', 'Done'],
+    ['es', 'Su rol', 'Hecha'],
+  ] as const)('what somebody did by their role names who did it and nobody who approved it (%s)', async (locale, way, state) => {
+    const m = await open({ locale });
+    await m.result(m.call, 'base.approval.list', {
+      approvals: [approval({ requested_by: 'Mario', approved_by: '', way: 'role' })],
+    });
+    const row = m.wrapper.get('[data-testid="approvals-row"]');
+    expect(row.text()).toContain('Mario');
+    expect(row.text()).not.toContain('Adam');
+    expect(row.text()).toContain(way);
+    expect(row.get('[data-testid="approvals-used"]').text()).toBe(state);
+  });
+
+  it('is read by its columns: when, what, who approved it, who, how and whether it was done', async () => {
+    const m = await open({ locale: 'es' });
+    await m.result(m.call, 'base.approval.list', { approvals: [approval()] });
+    // DataTable is generic: its props are read as a plain record.
+    const props = m.wrapper.getComponent(DataTable).props() as Record<string, unknown>;
+    expect((props.columns as { label: string }[]).map((column) => column.label)).toEqual([
+      'Cuándo',
+      'Acción',
+      'Autorizado por',
+      'Quién',
+      'Con',
+      'Estado',
+    ]);
+  });
+
+  it('leaves its widths to the table, which gives each column what its text takes', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.approval.list', { approvals: [approval()] });
+    // DataTable is generic: its props are read as a plain record.
+    const props = m.wrapper.getComponent(DataTable).props() as Record<string, unknown>;
+    expect((props.columns as { key: string; width?: string }[]).filter((column) => column.width).map((column) => column.key)).toEqual([]);
   });
 
   it('shows each row with its figure and offers each action once, without figures, behind the funnel', async () => {
@@ -116,6 +154,7 @@ describe('ApprovalsList', () => {
           options: [
             { value: 'pin', label: 'PIN' },
             { value: 'badge', label: 'Placa' },
+            { value: 'role', label: 'Su rol' },
           ],
         },
       ],
@@ -124,8 +163,8 @@ describe('ApprovalsList', () => {
         {
           type: 'select',
           options: [
-            { value: 'true', label: 'Usada' },
-            { value: 'false', label: 'Sin usar' },
+            { value: 'true', label: 'Hecha' },
+            { value: 'false', label: 'Sin hacer' },
           ],
         },
       ],
@@ -148,10 +187,10 @@ describe('ApprovalsList', () => {
     expect([props.search, props.filters]).toEqual([' eva ', { at_from: '2026-10-01', way: 'pin', used: 'false' }]);
   });
 
-  it('none yet says nobody had to approve anything', async () => {
+  it('none yet says nothing of the kind was done', async () => {
     const m = await open({ locale: 'es' });
     await m.result(m.call, 'base.approval.list', { approvals: [] });
-    expect(m.wrapper.text()).toContain('Todavía nadie ha tenido que autorizar nada en este negocio.');
+    expect(m.wrapper.text()).toContain('Todavía no hay ninguna acción de este tipo en este negocio.');
   });
 
   it('a record that cannot be read says so with «Retry», never «nobody»', async () => {
@@ -159,7 +198,7 @@ describe('ApprovalsList', () => {
     m.call.push(errorFrame(subId(m.client, 'base.approval.list'), 'internal_error'));
     await flush();
     expect(m.wrapper.text()).toContain('Could not load the record of approvals.');
-    expect(m.wrapper.text()).not.toContain('Nobody has had to approve anything');
+    expect(m.wrapper.text()).not.toContain('There is no action of this kind');
     expect(m.wrapper.find('[data-testid="approvals-retry"]').exists()).toBe(true);
   });
 });

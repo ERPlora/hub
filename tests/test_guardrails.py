@@ -12,7 +12,7 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
 (b) No alias chosen by hand: no ``using=``, ``.using(`` or ``connections[``; no session
     ``pg_advisory_lock(`` (PgBouncer) and no ``ATOMIC_REQUESTS`` (the transaction is
     ``@operation``'s). Single exceptions: ``.using(<schema_editor>.connection.alias)`` in a migration
-    (``RunPython``), ``base/tenancy/migrator.py`` and ``base/catalog.py`` (the ``shared`` alias).
+    (``RunPython``), the modules of ``base/tenancy/migrator/`` and ``base/catalog.py`` (the ``shared`` alias).
 (c) No ``GenericForeignKey``: a hub's models only reference what lives in the same hub database.
 (d) Hub aliases (``hub_<hex>``, ``hub_<hex>__ddl``, ``demo_…``, ``hub_template…``) go through PgBouncer in
     transaction mode: no ``pool``, ``CONN_MAX_AGE`` 0, no server-side cursors and no prepared statements; no alias
@@ -80,6 +80,15 @@ TENANCY_IDENTITY_REASON = (
     "use_hub reads base_hub_identity on the hub's own alias once per process before serving anything from it: "
     "a database that says it is another hub is refused; outside any operation by design."
 )
+#: The schema migrator, a package: each of its modules that reaches the database by hand.
+MIGRATOR_ORM_REASON = (
+    "The only function that changes a hub's schema, through its direct __ddl "
+    "connection and the schema lock."
+)
+MIGRATOR_ALIAS_REASON = (
+    "The schema migrator opens hub_<hex>__ddl itself and takes the session "
+    "pg_advisory_lock of the schema."
+)
 ORM_EXCEPTIONS: dict[str, str] = {
     "base/permissions.py": (
         "The context builder reads Membership, the role the business gave the person and a fresh copy of the user "
@@ -91,10 +100,11 @@ ORM_EXCEPTIONS: dict[str, str] = {
         "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations."
     ),
     "base/approval_spend.py": APPROVAL_SPEND_REASON,
-    "base/tenancy/migrator.py": (
-        "The only function that changes a hub's schema, through its direct __ddl "
-        "connection and the schema lock."
-    ),
+    "base/tenancy/migrator/control_database.py": MIGRATOR_ORM_REASON,
+    "base/tenancy/migrator/hub_templates.py": MIGRATOR_ORM_REASON,
+    "base/tenancy/migrator/hubs_pass.py": MIGRATOR_ORM_REASON,
+    "base/tenancy/migrator/schema.py": MIGRATOR_ORM_REASON,
+    "base/tenancy/migrator/servers.py": MIGRATOR_ORM_REASON,
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
     "base/tenancy/connections.py": TENANCY_ALIASES_REASON,
@@ -164,10 +174,11 @@ ALIAS_EXCEPTIONS: dict[str, str] = {
         "so it cannot go through one; read only, one indexed lookup; its writes are base.services' operations."
     ),
     "base/approval_spend.py": APPROVAL_SPEND_REASON,
-    "base/tenancy/migrator.py": (
-        "The schema migrator opens hub_<hex>__ddl itself and takes the session "
-        "pg_advisory_lock of the schema."
-    ),
+    "base/tenancy/migrator/__init__.py": MIGRATOR_ALIAS_REASON,
+    "base/tenancy/migrator/control_database.py": MIGRATOR_ALIAS_REASON,
+    "base/tenancy/migrator/hub_templates.py": MIGRATOR_ALIAS_REASON,
+    "base/tenancy/migrator/schema.py": MIGRATOR_ALIAS_REASON,
+    "base/tenancy/migrator/servers.py": MIGRATOR_ALIAS_REASON,
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
     "base/tenancy/identity.py": TENANCY_IDENTITY_REASON,

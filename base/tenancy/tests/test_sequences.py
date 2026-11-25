@@ -4,7 +4,7 @@ PostgreSQL writes a sequence to the WAL 32 values ahead and hands out the next o
 TEMPLATE`` copies that page from the template, so those values were written only in the template's WAL: once the clone's
 page is rebuilt from its own (a crash; on Aurora, the page leaving the cache), its counter goes back to the value it was
 cloned at and hands out again ids its rows already have. The counter of ``django_migrations`` that went back in hubs
-cloned before this is put right by the migrator (``test_migrator.py``).
+cloned before this is put right by the migrator (``test_migrator_schema.py``).
 """
 
 import uuid

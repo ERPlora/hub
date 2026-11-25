@@ -38,5 +38,5 @@ def test_an_app_the_database_has_goes_on_at_once(business):
 
 
 def test_its_row_is_not_behind_the_code(business):
-    assert APP in migrator.portable_apps()
-    assert not migrator.is_behind(business)
+    assert APP in migrator.app_sets.portable_apps()
+    assert not migrator.hubs_pass.is_behind(business)
