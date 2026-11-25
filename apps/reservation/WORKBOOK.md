@@ -721,7 +721,8 @@ los de la reserva tal como se apuntó, en el reloj del negocio, sin correrse por
 |---|---|---|---|
 | Apunta una reserva (`overbook` llena a sabiendas una franja llena, solo el personal) | apuntar reservas | F06, F17 | `reservation.reservation.create` |
 | Cambia una reserva | cambiar reservas | F08, F18 | `reservation.reservation.update` |
-| Confirma, sienta, completa, cancela o marca no presentada | cambiar reservas | F07, F09–F12, F18 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` |
+| Confirma, sienta, completa o marca no presentada | cambiar reservas | F07, F10–F12 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.no_show` |
+| Cancela una reserva | cambiar reservas | F09, F18 | `reservation.reservation.cancel` |
 | Borra una reserva | borrar reservas | F20 | `reservation.reservation.delete` |
 | Libera las pendientes vencidas | cambiar reservas | F13 | `reservation.reservation.release_unconfirmed` |
 | Crea o quita una franja | cambiar franjas | F01 | `reservation.time_slot.create`, `.delete` |

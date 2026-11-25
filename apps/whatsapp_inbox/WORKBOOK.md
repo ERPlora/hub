@@ -1086,7 +1086,7 @@ diría de quién es. Contesta eligiendo la conversación. Ordenar por el teléfo
 | `whatsapp_inbox.conversation.summary` | Abiertas, sin leer y esperando respuesta, y si el tope del mes está gastado | F09, F13 |
 | `whatsapp_inbox.conversation.count_awaiting_reply` | Cuántos clientes esperan respuesta (abiertas con el último mensaje del cliente o marcadas «Necesita atención»): lo cuenta la campana | F09 |
 | `whatsapp_inbox.conversation.notices` | Los clientes que esperan respuesta, del más reciente al más antiguo, con quién, lo último que escribió y cuándo: los avisos del dispositivo | F09 |
-| `whatsapp_inbox.message.list` | Los mensajes de una conversación, del más reciente al más antiguo | F05, F06 |
+| `whatsapp_inbox.message.list` | Los mensajes de una conversación, del más reciente al más antiguo | F05, F06, F34 |
 | `whatsapp_inbox.message.get` | Un mensaje por su id (el que puso en marcha una automatización): qué dice, quién y cuándo, el número internacional exacto de su conversación, cómo llamar al cliente, si ahora se le puede escribir y lo último que el negocio le escribió desde el Hub en las 24 horas anteriores (la lista que puede estar contestando, F19) | F19–F22, F24, F25 |
 | `whatsapp_inbox.note.list` | Las notas internas de una conversación | F36 |
 | `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta | F27, F28, F33 |
@@ -1125,7 +1125,7 @@ Del sistema (sin ruta pública):
 | Operación | Quién la llama | Flujos |
 |---|---|---|
 | `whatsapp_inbox.message.receive` | erplora.com, por `/internal` | F03, F04, F08, F38 |
-| `whatsapp_inbox.message.update_status` | erplora.com, por `/internal` | F34 |
+| `whatsapp_inbox.message.update_status` | erplora.com, por `/internal` | — |
 | `whatsapp_inbox.channel.sync` | erplora.com, por `/internal` | F01, F02, F28 |
 | `whatsapp_inbox.message.claim_delivery`, `whatsapp_inbox.message.record_delivery` | las entregas | F32, F33 |
 | `whatsapp_inbox.conversation.claim_erasure`, `whatsapp_inbox.conversation.record_erasure` | las entregas | F10, F11 |

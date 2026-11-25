@@ -1104,7 +1104,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 (FLOW-F12), so its notices and answers by WhatsApp keep reading the number.
 
 ### What it offers: reads (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:a1b29bfbc584 -->
+<!-- from WORKBOOK.md sha256:296bc2fdb552 -->
 
 | Operation | What it returns | Flows |
 |---|---|---|
@@ -1114,7 +1114,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 | `whatsapp_inbox.conversation.summary` | Open, unread and waiting for an answer, and whether the month's cap is spent | F09, F13 |
 | `whatsapp_inbox.conversation.count_awaiting_reply` | How many customers are waiting for an answer (open with the customer's last message or marked "Needs attention"): the bell counts it | F09 |
 | `whatsapp_inbox.conversation.notices` | The customers waiting for an answer, from the newest to the oldest, with who, what they last wrote and when: the device's notifications | F09 |
-| `whatsapp_inbox.message.list` | A conversation's messages, from the newest to the oldest | F05, F06 |
+| `whatsapp_inbox.message.list` | A conversation's messages, from the newest to the oldest | F05, F06, F34 |
 | `whatsapp_inbox.message.get` | A message by its id (the one that started an automation): what it says, who and when, the exact international number of its conversation, what to call the customer, whether they can be written to now and the last thing the business wrote them from the Hub in the 24 hours before (the list they may be answering, F19) | F19–F22, F24, F25 |
 | `whatsapp_inbox.note.list` | A conversation's internal notes | F36 |
 | `whatsapp_inbox.template.list` | The templates (filters by status, category, language, name and whether they can be sent), with their way to Meta | F27, F28, F33 |
@@ -1126,7 +1126,7 @@ would tell whose it is. They answer by choosing the conversation. Sorting by the
 | `whatsapp_inbox.agent.list` | The business's people a conversation can be assigned to | F07 |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:b4068b81f3cd -->
+<!-- from WORKBOOK.md sha256:85ab6a2bff11 -->
 
 | Operation | What it does | Flows |
 |---|---|---|
@@ -1154,7 +1154,7 @@ The system's (with no public route):
 | Operation | Who calls it | Flows |
 |---|---|---|
 | `whatsapp_inbox.message.receive` | erplora.com, through `/internal` | F03, F04, F08, F38 |
-| `whatsapp_inbox.message.update_status` | erplora.com, through `/internal` | F34 |
+| `whatsapp_inbox.message.update_status` | erplora.com, through `/internal` | — |
 | `whatsapp_inbox.channel.sync` | erplora.com, through `/internal` | F01, F02, F28 |
 | `whatsapp_inbox.message.claim_delivery`, `whatsapp_inbox.message.record_delivery` | the deliveries | F32, F33 |
 | `whatsapp_inbox.conversation.claim_erasure`, `whatsapp_inbox.conversation.record_erasure` | the deliveries | F10, F11 |

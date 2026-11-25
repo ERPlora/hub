@@ -764,13 +764,14 @@ date uses. They are those of the reservation as it was noted down, on the busine
 shifting with the time zone.
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:edac72da358f -->
+<!-- from WORKBOOK.md sha256:2cbdaf8c3b48 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
 | Notes down a reservation (`overbook` knowingly fills a full slot, the staff only) | add reservations | F06, F17 | `reservation.reservation.create` |
 | Changes a reservation | change reservations | F08, F18 | `reservation.reservation.update` |
-| Confirms, seats, completes, cancels or marks a no-show | change reservations | F07, F09–F12, F18 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.cancel`, `.no_show` |
+| Confirms, seats, completes or marks a no-show | change reservations | F07, F10–F12 | `reservation.reservation.confirm`, `.seat`, `.complete`, `.no_show` |
+| Cancels a reservation | change reservations | F09, F18 | `reservation.reservation.cancel` |
 | Deletes a reservation | delete reservations | F20 | `reservation.reservation.delete` |
 | Releases the overdue pending ones | change reservations | F13 | `reservation.reservation.release_unconfirmed` |
 | Creates or removes a slot | change slots | F01 | `reservation.time_slot.create`, `.delete` |

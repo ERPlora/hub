@@ -345,8 +345,13 @@ class TestWhetherAFlowContradictsItself:
 
     @pytest.mark.parametrize(
         ("actor", "operations", "contradicts"),
-        [("responsable", [], False), ("responsable", [WRITE], True), ("responsable, asistente", [], True)],
-        ids=["none-cited", "one-cited", "the-assistant-named"],
+        [
+            ("responsable", [], False),
+            ("responsable", [WRITE], True),
+            ("responsable", [READ], True),
+            ("responsable, asistente", [], True),
+        ],
+        ids=["none-cited", "a-write-cited", "a-read-cited", "the-assistant-named"],
     )
     def test_it_does_when_it_says_it_uses_no_operation_and_one_is_cited(self, actor, operations, contradicts):
         assert qa_assistant.asked(flow(actor=actor, no_operations=True), operations).contradicts is contradicts
