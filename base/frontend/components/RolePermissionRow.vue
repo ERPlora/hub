@@ -5,6 +5,7 @@ import { IonItem, IonLabel, IonSegment, IonSegmentButton, IonToggle } from '@ion
 
 import { useBaseI18n } from '../lib/i18n';
 import type { RolePermission, RoleState } from '../operations/people';
+import '../settings.css';
 
 const STATES: readonly RoleState[] = ['on', 'approval', 'off'];
 
@@ -48,12 +49,13 @@ function pick(value: unknown): void {
       </span>
     </ion-toggle>
   </ion-item>
-  <template v-else>
-    <ion-item
-      lines="none"
-      :data-testid="`role-permission-${line.permission}`"
-    >
-      <ion-label class="ion-text-wrap">
+  <div
+    v-else
+    class="settings-card__field"
+    :data-testid="`role-permission-${line.permission}`"
+  >
+    <ion-item lines="none">
+      <span class="ion-text-wrap">
         {{ line.phrase }}
         <StatusPill
           v-if="line.to_review"
@@ -62,23 +64,22 @@ function pick(value: unknown): void {
           data-testid="role-to-review"
           :label="t('base.roles.toReview')"
         />
-      </ion-label>
+      </span>
     </ion-item>
-    <ion-item>
-      <ion-segment
-        :data-testid="`role-states-${line.permission}`"
-        :aria-label="line.phrase"
-        :value="state"
-        @ion-change="pick($event.detail.value)"
+    <ion-segment
+      scrollable
+      :data-testid="`role-states-${line.permission}`"
+      :aria-label="line.phrase"
+      :value="state"
+      @ion-change="pick($event.detail.value)"
+    >
+      <ion-segment-button
+        v-for="option in STATES"
+        :key="option"
+        :value="option"
       >
-        <ion-segment-button
-          v-for="option in STATES"
-          :key="option"
-          :value="option"
-        >
-          <ion-label>{{ t(`base.role.state.${option}`) }}</ion-label>
-        </ion-segment-button>
-      </ion-segment>
-    </ion-item>
-  </template>
+        <ion-label>{{ t(`base.role.state.${option}`) }}</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+  </div>
 </template>

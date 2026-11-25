@@ -915,7 +915,7 @@
       "columns": {
         "role": "Rol",
         "origin": "Tipo",
-        "members": "Miembros",
+        "members": "Personas",
         "permissions": "Permisos"
       },
       "basic": "Básico",

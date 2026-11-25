@@ -3,7 +3,7 @@
 import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
-import { IonInput, IonNote, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { ref, watch } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
@@ -83,8 +83,8 @@ const canDismiss = useUnsavedFormOnOpen('role-new', () => ({ name: name.value, b
         fill="outline"
         interface="popover"
         label-placement="floating"
-        class="ion-margin-bottom"
         :label="t('base.roles.add.basedOn')"
+        :helper-text="t('base.roles.add.help')"
       >
         <ion-select-option
           v-for="role in roles"
@@ -94,7 +94,6 @@ const canDismiss = useUnsavedFormOnOpen('role-new', () => ({ name: name.value, b
           {{ roleName(role, t) }}
         </ion-select-option>
       </ion-select>
-      <ion-note>{{ t('base.roles.add.help') }}</ion-note>
     </template>
   </FormModal>
 </template>

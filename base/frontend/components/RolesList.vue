@@ -33,9 +33,9 @@ const openRole = (key: string) => void router.push(`/employees/roles/${key}`);
 
 const columns = computed<DataTableColumn<HubRoleRow>[]>(() => [
   { key: 'key', label: t('base.roles.columns.role'), format: (_, row) => roleName(row, t), width: 'minmax(10rem,2fr)' },
-  { key: 'origin', label: t('base.roles.columns.origin'), cell: 'origin', width: '14rem', sortable: false },
-  { key: 'members', label: t('base.roles.columns.members'), cell: 'members', align: 'right', width: '8rem' },
-  { key: 'permissions', label: t('base.roles.columns.permissions'), cell: 'permissions', align: 'right', width: '8rem', priority: 'low' },
+  { key: 'origin', label: t('base.roles.columns.origin'), cell: 'origin', width: '12rem', sortable: false },
+  { key: 'members', label: t('base.roles.columns.members'), cell: 'members', align: 'right', width: '7rem' },
+  { key: 'permissions', label: t('base.roles.columns.permissions'), cell: 'permissions', align: 'right', width: '7rem', priority: 'low' },
 ]);
 
 const basic = (row: HubRoleRow) => row.origin === 'basic';
