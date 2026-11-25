@@ -45,7 +45,7 @@ watch(
   { immediate: true },
 );
 
-const stateOf = (permission: string, held: RoleForm | null = form.value): RoleState => held?.[permission] as RoleState;
+const stateOf = (permission: string): RoleState => form.value?.[permission] as RoleState;
 
 async function save(changes: RoleForm): Promise<RoleDetail> {
   const { name, description, ...allowed } = changes;
