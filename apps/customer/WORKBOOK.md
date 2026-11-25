@@ -1182,8 +1182,8 @@ asistente.
   asistente (`ai=INTERNAL`) y su permiso, `customer.restore`, no lo declara ninguna app: solo lo tiene el sistema.
   Lee desde `0001_initial`; una migración que quite o renombre una de sus columnas, de las fichas, los grupos, las
   etiquetas o los campos, cambia también `recoverable_cards_in_copy` y su `reads_since`. Tests:
-  `tests/test_recovery.py` (también de punta a punta, con la base del negocio y su copia), `tests/test_services.py`
-  (las operaciones) y `base/tenancy/tests/test_recovery_customers.py`.
+  `tests/test_recovery.py` (también de punta a punta, con la base del negocio y su copia),
+  `tests/test_services_recovery.py` (las operaciones) y `base/tenancy/tests/test_recovery_customers.py`.
 - Las reacciones a Venta (`events.REACTIONS`, `events.react`) las entrega el relay del outbox del
   worker en cada pasada (`base.relay`); `base/tests/test_relay.py` recorre el cobro, la anulación y la
   devolución hasta la ficha.
