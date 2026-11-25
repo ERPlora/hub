@@ -2,7 +2,7 @@
 
 from django.apps import apps
 from django.conf import settings
-from live.meta import Category, LiveAppConfig, module_configs, permissions_for_role
+from live.meta import Category, CheckoutStep, LiveAppConfig, module_configs, permissions_for_role
 from live.operations import registry
 
 from base.tests.shell_icons import shell_icon_registry
@@ -61,12 +61,18 @@ def test_its_operations_are_the_ones_of_this_layer():
         "tip.sale.void",
         "tip.settings.get",
         "tip.settings.update",
+        "tip.suggestion.get",
         "tip.tip.add",
         "tip.tip.get",
         "tip.tip.list",
         "tip.tip.update",
         "tip.tip.void",
     ]
+
+
+def test_it_adds_its_step_to_the_charge_for_whoever_records_tips():
+    # Sales mounts it between the amount and the tenders without knowing Tips (SALE-F39, TIP-F02).
+    assert config().checkout == [CheckoutStep(key="tip", component="TipStep", permission="tip.add_tip")]
 
 
 def test_every_operation_is_described_for_the_assistant():

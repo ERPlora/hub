@@ -13,7 +13,7 @@ from live.operations import operation
 from apps.sale.models import PaymentMethod
 from apps.sale.schemas.fields import EmptyIn
 from apps.tip.models import Settings, Tip
-from apps.tip.schemas import SettingsOut, TipListIn, TipOut, TipPage, TipRefIn
+from apps.tip.schemas import SettingsOut, SuggestionIn, SuggestionOut, TipListIn, TipOut, TipPage, TipRefIn
 from base.business import business_zone
 from base.operations import call
 
@@ -69,6 +69,41 @@ def settings_row(settings: Settings) -> dict:
 )
 def get_settings(ctx: OperationContext, params: EmptyIn) -> dict:
     return settings_row(current_settings())
+
+
+def _tip_of(suggestion: dict, total: int) -> dict:
+    """``suggestion`` as the tip it comes to on ``total``: a percentage rounded to the money's unit, half up."""
+    percent = suggestion["percent"]
+    amount = (total * percent + 50) // 100 if percent is not None else suggestion["amount"]
+    return {"percent": percent, "amount": amount}
+
+
+@operation(
+    "tip.suggestion.get",
+    kind="query",
+    permission="tip.add_tip",
+    input=SuggestionIn,
+    output=SuggestionOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": ("what tips would a 40 € card payment suggest?", "how much is each suggested tip on a 25 € bill in cash?"),
+            "es": ("¿qué propinas sugiere un cobro de 40 € con tarjeta?", "¿cuánto sale cada propina sugerida en una cuenta de 25 € en efectivo?"),
+        },
+        "description": "The tips the charge proposes for a payment method and the check's total before discounts, in "
+        "cents: its three suggestions, each with the tip it comes to (a percentage rounded half up), which one comes "
+        "chosen (0: «No tip») and whether another amount is allowed. With tips off, none.",
+    },
+)
+def get_suggestions(ctx: OperationContext, params: SuggestionIn) -> dict:
+    settings = current_settings()
+    suggestions = settings.suggestions.get(str(params.method_id), FACTORY_SUGGESTIONS) if settings.enabled else []
+    return {
+        "enabled": settings.enabled,
+        "allow_custom": settings.allow_custom,
+        "preselected": settings.preselected,
+        "suggestions": [_tip_of(suggestion, params.total) for suggestion in suggestions],
+    }
 
 
 def tips() -> QuerySet[Tip]:

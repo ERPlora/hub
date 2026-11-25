@@ -118,6 +118,15 @@ def without_cash_register(monkeypatch):
 DECLARED_STEP = {"key": "demo.tip", "app": "demo", "component": "TipStep"}
 
 
+@pytest.fixture(autouse=True)
+def only_the_reference_app_adds_a_step(monkeypatch):
+    """Sales' tests stand for an app that adds a step to the charge with the reference app (``a_step_at_the_charge``):
+    the steps the real apps declare (Tips, on in the test businesses) are taken away, so Sales is tested on its own."""
+    for config in all_live_app_configs():
+        if config.label != "demo" and config.checkout:
+            monkeypatch.setattr(config, "checkout", [])
+
+
 @pytest.fixture
 def a_step_at_the_charge(monkeypatch):
     """An app on adds a step to the charge, as Tips does with its tip, so what it adds to a tender is taken (SALE-F39):

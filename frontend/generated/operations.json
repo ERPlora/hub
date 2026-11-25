@@ -2775,6 +2775,10 @@
     "method": "post",
     "path": "/api/tip/settings"
   },
+  "tip.suggestion.get": {
+    "method": "get",
+    "path": "/api/tip/suggestions"
+  },
   "tip.tip.list": {
     "method": "get",
     "path": "/api/tip/tips"
