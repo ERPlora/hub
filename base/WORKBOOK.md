@@ -494,7 +494,7 @@ Pasos:
   1. Entra en el Inicio. En «Termina de configurar tu negocio» ve cuántos pasos lleva hechos y una barra.
   2. Debajo, los pasos que faltan: primero los que impiden facturar («Necesario para facturar», en rojo) y
      luego los «Importante», cada grupo en el orden que fijan las apps, también en el móvil, donde solo caben
-     dos filas. Los «Recomendado» salen plegada solo si no queda otra cosa. «Ver todo» enseña todos los pasos,
+     dos filas. Los «Recomendado» salen plegados solo si no queda otra cosa. «Ver todo» enseña todos los pasos,
      también los hechos, en el orden que fijan las apps.
   3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio; Impuestos, con la que nace todo
      negocio, no cuenta, porque con ella sola el TPV no tiene nada que vender) y «Tu equipo» (añadir a las personas

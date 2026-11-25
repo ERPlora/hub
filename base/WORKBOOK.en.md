@@ -523,7 +523,7 @@ On the Employees screens and the API documentation:
 | BASE-F131 | See in the bell the roles to review | partial |
 
 ### BASE-F01 See what the business still has to set up
-<!-- from WORKBOOK.md sha256:40df7e74b30e -->
+<!-- from WORKBOOK.md sha256:ed75c3653f5d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary, The "You cannot issue invoices yet" notice
