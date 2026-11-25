@@ -167,7 +167,7 @@ class TestTheOperationsOfAFlow:
     @pytest.mark.parametrize(
         ("header", "row"),
         [
-            ("| Aviso de | Qué hace | Flujos | Servicio que escucha |", "| Ventas | Baja | F01 | `sale.sale.completed` |"),
+            ("| Aviso de | Flujos | Servicio que escucha |", "| Ventas | F01 | `sale.sale.completed` |"),
             ("| Pieza | Flujos que la usan | Servicio |", "| El formulario | F01 | `sample.item.create` |"),
             ("| Qué da | Servicio |", "| Las cosas (F01) | `sample.item.list` |"),
         ],
@@ -253,8 +253,16 @@ class TestTheGroupOfAFlow:
 
     @pytest.mark.parametrize(
         "screen",
-        ["asistente", "Asistente", "el asistente", "asistente o API", "asistente y API", "asistente (en el chat)",
-         "Tarjeta de confirmación del asistente", "API; asistente"],
+        [
+            "asistente",
+            "Asistente",
+            "el asistente",
+            "asistente o API",
+            "asistente y API",
+            "API; asistente",
+            "asistente (en el chat)",
+            "Tarjeta de confirmación del asistente",
+        ],
     )
     @pytest.mark.parametrize("operations", [[WRITE], [READ], []], ids=["write", "read", "none"])
     def test_it_is_only_the_assistants_when_its_screen_is_no_other(self, screen, operations):
@@ -262,8 +270,19 @@ class TestTheGroupOfAFlow:
 
     @pytest.mark.parametrize(
         "screen",
-        ["Lista; asistente", "Bonos y paquetes, asistente", "Fichar (o el asistente)", "asistente; admin del Hub",
-         "Pantalla (también el asistente: «marca lista la mesa 4»)", "API", "Sala de asistentes", ""],
+        [
+            "Lista; asistente",
+            "Lista, asistente",
+            "Lista y asistente",
+            "Lista o el asistente",
+            "asistente; admin del Hub",
+            "Bonos y paquetes, asistente",
+            "Fichar (o el asistente)",
+            "Pantalla (también el asistente: «marca lista la mesa 4»)",
+            "Sala de asistentes",
+            "API",
+            "",
+        ],
     )
     def test_it_is_not_only_the_assistants_with_another_screen(self, screen):
         assert qa_assistant.asked(flow(screen=screen), [WRITE]).group == Group.CAN

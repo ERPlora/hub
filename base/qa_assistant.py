@@ -159,7 +159,7 @@ def _operation_names(services: str) -> Iterator[str]:
 
 
 def _flow_ids(flows: str, prefix: str) -> Iterator[str]:
-    """The ids a flows cell names: «F01» is of the app of the WORKBOOK and «F14–F17», every flow from one to the other."""
+    """The ids a flows cell names: «F01» is of the WORKBOOK's app and «F14–F17», every flow from one to the other."""
     for app, first, last in _FLOWS.findall(flows):
         for number in range(int(first), int(last or first) + 1):
             yield f"{app or prefix}-F{number:02d}"

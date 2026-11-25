@@ -69,8 +69,8 @@ class Command(BaseCommand):
             self.stdout.write(f"  the ledger names flows in no WORKBOOK of the Hub: {', '.join(unknown)}")
 
     def _write_assistant(self, report: qa_assistant.Report) -> None:
-        """What to expect of each flow when it is asked for by talking, and then what is left to write: the flows with no
-        group, the ones that contradict themselves and the tools no flow cites."""
+        """What to expect of each flow when it is asked for by talking, and then what is left to write: the flows with
+        no group, the ones that contradict themselves and the tools no flow cites."""
         groups = Counter(one.group for one in report.flows)
         counts = [f"{groups[group]} {group}" for group in qa_assistant.Group]
         self.stdout.write(f"assistant: {', '.join(counts)}, {groups[None]} undecided")
