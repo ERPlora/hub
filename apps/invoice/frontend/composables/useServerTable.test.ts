@@ -78,6 +78,16 @@ describe('useServerTable: the query', () => {
     expect(s.table.filtered.value).toBe(false);
   });
 
+  it('says what the list keeps, its filters and its search, without its sort or its page', async () => {
+    const s = await setup();
+    expect(s.table.filterParams.value).toEqual({});
+    await s.change(() => (s.table.search.value = '  sin sal '));
+    expect(s.table.filterParams.value).toEqual({ search: 'sin sal' });
+    await s.change(() => s.table.goToPage(1));
+    await s.change(() => s.table.setSort({ sort: 'name', dir: 'desc' }));
+    expect(s.table.filterParams.value).toEqual({ search: 'sin sal' });
+  });
+
   it('a new sort goes back to the first page', async () => {
     const s = await setup();
     await s.change(() => s.table.goToPage(3));

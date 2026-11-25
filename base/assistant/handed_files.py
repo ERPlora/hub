@@ -1,5 +1,5 @@
-"""The files a read hands the person in the chat (the CSV of an export): the panel offers each to download, as the
-screen's button saves it, and the model hears its name.
+"""The files a read hands the person in the chat (the CSV or the Excel of an export): the panel offers each to download,
+as the screen's button saves it, and the model hears its name.
 
 A read whose output marks the datum that holds its file ``A_HANDED_FILE`` writes a file for the person, not words for
 the model: pasted into the answer, the person had to copy it by hand, and the model said it had exported a file the chat

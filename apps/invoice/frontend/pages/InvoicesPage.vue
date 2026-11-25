@@ -8,7 +8,8 @@
 // cards (on a phone, cards titled by the number). A row, or «View», opens its invoice. «Mark as paid» only
 // on an issued invoice and for whoever may issue; «Rectify» only where it applies and for whoever may
 // rectify; «+» opens «New manual invoice». A refused row action is said above the table. Issued, rectified
-// and paid invoices come back through the stream by themselves: nothing here refetches.
+// and paid invoices come back through the stream by themselves: nothing here refetches. «Download in Excel», for whoever
+// sees everyone's invoices, saves what the list keeps (its search and its filters, whatever page it shows).
 import {
   type DataTableAction,
   type DataTableColumn,
@@ -19,6 +20,7 @@ import {
   InlineFeedback,
   StatusPill,
 } from '@erplora/ui/components';
+import { useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 import { useRouter } from 'vue-router';
@@ -33,14 +35,18 @@ import { amountFilterErrors, formatDate, formatMoney, moneyOf, useBusinessMoney 
 import { SOURCE_CODES, STATUS_CODES, statusTone, TYPE_CODES } from '../lib/invoice';
 import { filterQuery, filtersInUse, reversedDates, TOTAL_ENDS } from '../lib/invoiceFilters';
 import type { InvoiceListIn, InvoiceRowOut } from '../operations';
+import ExportButton from '../../../../base/frontend/components/ExportButton.vue';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+import { base64ToBlob } from '../../../../base/frontend/lib/data';
 
 const tabs = useAppTabs('invoice');
 
 const session = useSession();
 const canAdd = computed(() => session.can('invoice.add_invoice'));
 const canRectify = computed(() => session.can('invoice.rectify_invoice'));
+const canExport = computed(() => session.can('invoice.view_all_invoices'));
 const router = useRouter();
+const client = useLiveClient();
 const t = useT();
 const locale = useLocale();
 
@@ -119,6 +125,12 @@ const filterFields = computed<DataTableFilterField[]>(() => [
   { type: 'text', key: 'series_code', label: t('invoice.filters.series'), maxlength: SERIES_MAX },
   { type: 'select', key: 'source_type', label: t('invoice.filters.source'), options: SOURCE_CODES.map((code) => ({ value: code, label: t(`invoice.sources.${code}`) })) },
 ]);
+
+/** The Excel of what the list keeps, as the server writes it. */
+async function exportFile(): Promise<{ filename: string; blob: Blob }> {
+  const file = await client.api.call('invoice.invoice.export', table.filterParams.value);
+  return { filename: file.filename, blob: base64ToBlob(file.content_base64, file.content_type) };
+}
 
 const paid = useMarkPaid();
 
@@ -223,6 +235,19 @@ function onAction({ actionId, row }: { actionId: string; row: InvoiceRowOut }): 
           :tone="statusTone(row.status)"
           :label="$t(`invoice.status.${row.status}`)"
           data-testid="invoice-list-status"
+        />
+      </template>
+      <template
+        v-if="canExport"
+        #toolbar
+      >
+        <ExportButton
+          testid="invoice-export"
+          :label="$t('invoice.list.export.button')"
+          :pending-label="$t('invoice.list.export.pending')"
+          :failed="(reason: string) => $t('invoice.list.export.failed', { reason })"
+          :load="exportFile"
+          :disabled="!result?.total"
         />
       </template>
       <template #empty>

@@ -1259,6 +1259,10 @@
     "method": "get",
     "path": "/api/invoice/invoices"
   },
+  "invoice.invoice.export": {
+    "method": "get",
+    "path": "/api/invoice/invoices/export"
+  },
   "invoice.invoice.get": {
     "method": "get",
     "path": "/api/invoice/invoices/detail"

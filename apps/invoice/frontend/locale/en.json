@@ -86,7 +86,12 @@
         "markPaid": "Mark as paid",
         "rectify": "Rectify"
       },
-      "noResultsMessage": "Nothing matches your search or filters."
+      "noResultsMessage": "Nothing matches your search or filters.",
+      "export": {
+        "button": "Download in Excel",
+        "pending": "Preparing…",
+        "failed": "The invoices could not be downloaded: {reason}"
+      }
     },
     "filters": {
       "series": "Series",

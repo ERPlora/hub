@@ -16,6 +16,7 @@ from config.api import api
 
 ROUTES = {
     ("GET", "/invoice/invoices", "invoice.invoice.list"),
+    ("GET", "/invoice/invoices/export", "invoice.invoice.export"),
     ("GET", "/invoice/invoices/detail", "invoice.invoice.get"),
     ("GET", "/invoice/invoices/by_source", "invoice.invoice.by_source"),
     ("GET", "/invoice/invoices/document", "invoice.invoice.document"),
