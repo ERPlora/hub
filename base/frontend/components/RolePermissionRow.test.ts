@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ionChecked, ionValue, mountBase, words } from '../__tests__/mount-base';
+import { ionChecked, ionValue, mountBase } from '../__tests__/mount-base';
 import type { RolePermission } from '../operations/people';
 import RolePermissionRow from './RolePermissionRow.vue';
 
@@ -33,7 +33,8 @@ describe('RolePermissionRow', () => {
     const m = await open(permission({ permission: 'sale.void_sale', phrase: 'Anular una venta', state: 'approval', approvable: true }));
     const segment = m.wrapper.get('[data-testid="role-states-sale.void_sale"]');
     expect(segment.attributes('aria-label')).toBe('Anular una venta');
-    expect(segment.findAll('ion-segment-button').map((button) => words(button.element))).toEqual(['Permitido', 'Con aprobación', 'No']);
+    expect(segment.html().match(/Permitido|Con aprobación|\bNo\b/g)).toEqual(['Permitido', 'Con aprobación', 'No']);
+    expect(segment.findAll('ion-segment-button')).toHaveLength(3);
     expect((segment.element as unknown as { value: string }).value).toBe('approval');
     expect(m.wrapper.find('ion-toggle').exists()).toBe(false);
     await ionValue(segment.element, 'off');
