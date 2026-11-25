@@ -70,7 +70,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     cache every process shares (``base.cache``)."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     demo = bool(hub and hub.is_demo)
-    configs = home.shown_modules(demo_hub=demo)
+    configs = home.shown_modules.shown_modules(demo_hub=demo)
     shown = {config.label for config in configs}
     blocked = entitlement.blocked_apps(ctx.scope)
     rights = entitlement.entitlements(None if hub is None or hub.is_demo else hub.state, now=timezone.now())
@@ -109,7 +109,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                 {
                     "id": config.label,
                     "name": str(config.verbose_name),
-                    "icon": home.shell_icon(config),
+                    "icon": home.shown_modules.shell_icon(config),
                     "category": config.category,
                     "category_label": str(Category(config.category).label),
                     "summary": str(config.summary),
@@ -126,7 +126,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                     "along_said": app_switch.switch_said(
                         config.label, current, graph, kept, language=ctx.language
                     ),
-                    "mandatory": home.mandatory_in(config, country),
+                    "mandatory": home.mandatory_apps.mandatory_in(config, country),
                 }
                 for config in configs
             ],
@@ -155,7 +155,7 @@ def find_app(said: str, *, demo: bool, language: str) -> Any:
     beside it); else the only one with a word of its name that starts so («booking»). 404 when none (the platform is no
     app); 409 ``base.app_ambiguous`` naming them, in ``language``, when several (``reserva``): the person says which,
     as the apps' ``find_*`` of a table or a zone do."""
-    configs = home.shown_modules(demo_hub=demo)
+    configs = home.shown_modules.shown_modules(demo_hub=demo)
     plain = _plain(said)
     found = [config for config in configs if config.label == said.strip()]
     if not found and plain:
@@ -216,7 +216,7 @@ def app_get(ctx: OperationContext, data: AppRefIn) -> dict:
             "name": str(config.verbose_name),
             "summary": str(config.summary),
             "state": state,
-            "mandatory": home.mandatory_in(config, hub.country if hub else ""),
+            "mandatory": home.mandatory_apps.mandatory_in(config, hub.country if hub else ""),
         }
 
 

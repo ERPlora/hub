@@ -506,7 +506,7 @@ def an_app_meter(monkeypatch):
 
     def declare(used=None, limit=None, *, available=True):
         monkeypatch.setattr(
-            "base.home.plan_meters", lambda ctx, configs: [whatsapp_meter(used, limit, available=available)]
+            "base.home.plan_meters.plan_meters", lambda ctx, configs: [whatsapp_meter(used, limit, available=available)]
         )
 
     return declare

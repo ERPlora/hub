@@ -1,7 +1,7 @@
 """``base.app.list``: the Apps screen.
 
-Every module of the deployment the scope shows (``home.shown_modules``), from its ``LiveAppConfig`` in this process
-(never the SaaS): name, icon, category, one line, whether it is paid and where its right comes from
+Every module of the deployment the scope shows (``home.shown_modules.shown_modules``), from its ``LiveAppConfig`` in
+this process (never the SaaS): name, icon, category, one line, whether it is paid and where its right comes from
 (``base.entitlement``), its state (``on``, or ``blocked`` without the right), the first screen this person may open,
 what it needs and what needs it, and erplora.com's Store of this business's modules. Re-run when the SaaS's photo
 changes (``base.hub.state_applied``): a module bought there turns up here without reloading.
