@@ -1,7 +1,7 @@
 # Workbook — Pedidos online (app)
 Prefijo: ONLINE_ORDER
-Alcance MVP: restaurante (no viene en ninguna plantilla; entra en la tienda cuando tenga pantalla)
-Estado de la app: en construcción — hoy, el código de cada mesa y su regeneración por la API y el asistente
+Alcance MVP: restaurante (no viene en ninguna plantilla; entra en la tienda cuando el cliente pueda pedir)
+Estado de la app: en construcción — hoy, el código de cada mesa, su regeneración y la hoja de QR; falta la página de la mesa en la que pide el cliente
 
 > Manual de usuario y especificación de la app `online_order`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor y
@@ -51,12 +51,40 @@ interiores; volver a generar el QR de una mesa es la salida cuando uno ya no se 
 3. Cada mesa recibe su código la primera vez que se genera su QR; desde entonces el mismo código vale hasta que se
    regenera.
 
+## Pantallas
+
+El menú **Pedidos online** tiene una pestaña: **Códigos QR**. Solo la ven quienes pueden ver los QR de las mesas
+(el propietario, el administrador y el responsable); los botones para generar y regenerar, solo quienes pueden
+regenerarlos.
+
+### Códigos QR
+Aquí tienes todas las mesas del local, en el orden del plano de sala, cada una con la dirección que abre su QR y
+cuándo se generó. Desde aquí imprimes la hoja con el QR de cada mesa para recortarlo y dejarlo en ella, imprimes el de
+una sola mesa y, si un QR ya no debe valer, lo regeneras.
+
+#### Detalle
+Menú **Pedidos online → Códigos QR**. Lista: Mesa, Zona («Sin zona» si no tiene), Dirección y Generado («Sin QR
+todavía» en una mesa sin código), en vista tabla o tarjetas. Arriba, **Imprimir hoja**: abre el diálogo de impresión
+del aparato con una tarjeta por mesa con QR, tres por fila, cada una con «Escanea para pedir», el QR, «Mesa 4» y su
+zona, y su borde discontinuo para recortarla; en la app instalada va a su pantalla de imprimir. Por fila, **Imprimir
+QR** (solo esa mesa) y **Regenerar QR**, que pide confirmación («¿Regenerar el QR de la mesa 4 (Terraza)?»), o
+**Generar QR** en una mesa que aún no tiene. Si hay mesas sin QR, un aviso dice cuántas no salen en la hoja, con
+**Generar los QR que faltan**. El QR se dibuja en el propio aparato: la hoja no pide nada a internet.
+
+## Estados de cada pantalla
+
+| Pantalla | Cargando | Vacío | Error |
+|---|---|---|---|
+| Códigos QR | La lista en carga; **Imprimir hoja**, apagado hasta tener todas las mesas | «Aún no hay mesas», con **Ir a Mesas** a quien puede añadirlas | El de la lista con «Reintentar»; el de generar o regenerar, en un aviso efímero con su motivo; «No se ha podido imprimir la hoja.» |
+
+«Reconectando…» mientras se recupera la conexión en vivo (lo pintado se queda).
+
 ## Flujos
 
 | ID | Flujo | Estado |
 |---|---|---|
-| ONLINE_ORDER-F01 | Generar o regenerar el QR de una mesa | parcial — por la API y el asistente; falta el botón en la hoja de QR |
-| ONLINE_ORDER-F02 | Ver e imprimir la hoja de QR de las mesas | parcial — la lista de mesas con su código, por la API y el asistente; falta la hoja |
+| ONLINE_ORDER-F01 | Generar o regenerar el QR de una mesa | hecho |
+| ONLINE_ORDER-F02 | Ver e imprimir la hoja de QR de las mesas | hecho |
 | ONLINE_ORDER-F03 | El cliente abre la carta desde el QR de su mesa | no hecho |
 | ONLINE_ORDER-F04 | El cliente pide desde su mesa | no hecho |
 | ONLINE_ORDER-F05 | Aceptar o rechazar el primer pedido de una mesa | no hecho |
@@ -65,33 +93,40 @@ interiores; volver a generar el QR de una mesa es la salida cuando uno ya no se 
 | ONLINE_ORDER-F08 | La cuenta dice que el pedido es online | no hecho |
 
 ### ONLINE_ORDER-F01 Generar o regenerar el QR de una mesa
-Estado: parcial — se hace por la API y con el asistente; falta el botón «Regenerar QR» de la hoja de QR
+Estado: hecho
 Actor: propietario, administrador o responsable; el asistente, con la sesión de quien habla
-Pantalla: ninguna todavía (llegará en la hoja de QR de las mesas)
+Pantalla: Códigos QR
 Pasos:
-1. Elige la mesa, por su número y, si el número se repite, por su zona («la 4 de la terraza»).
-2. Pide regenerar su QR: el asistente enseña su tarjeta con la mesa y avisa de que el QR impreso dejará de valer.
-3. Al confirmar, la mesa recibe un código nuevo: el anterior deja de abrir la página de la mesa en ese momento. Una
-   mesa que aún no tenía código recibe el primero.
+1. Elige la mesa en **Códigos QR** o, hablando con el asistente, por su número y, si el número se repite, por
+   su zona («la 4 de la terraza»).
+2. Pulsa **Regenerar QR**: la confirmación nombra la mesa y avisa de que el QR impreso deja de valer en ese momento.
+   El asistente enseña lo mismo en su tarjeta.
+3. Al confirmar, la mesa recibe un código nuevo: el anterior deja de abrir la página de la mesa en ese momento, y un
+   aviso pide imprimir el nuevo (**Imprimir QR**, ONLINE_ORDER-F02).
+4. Una mesa que aún no tiene código recibe el primero con **Generar QR**, sin confirmación, porque no hay nada impreso
+   que deje de valer; **Generar los QR que faltan** se lo da, una tras otra, a todas las que aún no tienen.
 Entra: la mesa, de Mesas.
 Sale: el código nuevo de la mesa, la dirección de su página y cuándo se generó; el aviso de que se ha regenerado.
-Si falla: no cambia nada. La mesa no existe o está borrada («Esa mesa no existe en este negocio.»); el número se repite en
-varias zonas y no se dice cuál (Mesas pide la zona); quien lo pide no puede cambiar los QR de las mesas («No tienes
-permiso»).
+Si falla: no cambia nada en esa mesa, y el aviso dice el motivo. La mesa no existe o está borrada («Esa mesa no existe
+en este negocio.»); el número se repite en varias zonas y no se dice cuál (Mesas pide la zona); quien lo pide no puede
+cambiar los QR de las mesas («No tienes permiso»; en pantalla no le salen los botones). **Generar los QR que faltan** se
+para en la primera mesa que falla: las anteriores ya tienen su QR.
 Implicados: TABLE-F02, TABLE-F04
 
 ### ONLINE_ORDER-F02 Ver e imprimir la hoja de QR de las mesas
-Estado: parcial — la lista de las mesas con su código y su dirección se lee por la API y con el asistente; falta la hoja que se imprime desde el navegador
-Actor: propietario, administrador o responsable
-Pantalla: ninguna todavía (llegará como la hoja de QR de las mesas)
+Estado: hecho
+Actor: propietario, administrador o responsable; el asistente, con la sesión de quien habla, da la lista
+Pantalla: Códigos QR
 Pasos:
-1. Abre la lista de las mesas: cada una con su número, su zona y, si ya tiene código, la dirección de su página y
-   cuándo se generó. Las mesas salen en el orden del plano de sala (la 2 antes que la 10).
-2. Imprime la hoja: un QR por mesa con su número y su zona, para recortar y dejar en cada mesa.
+1. Abre **Pedidos online → Códigos QR**: cada mesa con su número, su zona y, si ya tiene código, la dirección de
+   su página y cuándo se generó. Las mesas salen en el orden del plano de sala (la 2 antes que la 10).
+2. Pulsa **Imprimir hoja**: el diálogo de impresión del aparato trae un QR por mesa con su número y su zona, para
+   recortar y dejar en cada mesa. Las mesas que aún no tienen QR no salen, y la pantalla dice cuántas son.
+3. Para una sola mesa (la del QR regenerado), **Imprimir QR** en su fila trae solo la suya.
 Entra: las mesas y sus zonas, de Mesas.
-Sale: nada; solo se lee.
-Si falla: sin mesas dadas de alta, la lista sale vacía; quien no puede ver los QR de las mesas no la ve («No tienes
-permiso»).
+Sale: nada; solo se lee y se imprime.
+Si falla: sin mesas dadas de alta, «Aún no hay mesas», con **Ir a Mesas**; si el aparato no imprime, «No se ha podido
+imprimir la hoja.»; quien no puede ver los QR de las mesas no ve la pestaña («No tienes permiso» por la API).
 Implicados: TABLE-F02, WEBSITE-F09
 
 ### ONLINE_ORDER-F03 El cliente abre la carta desde el QR de su mesa
@@ -179,9 +214,9 @@ Implicados: SALE-F19, KITCHEN-F05
 
 ## Servicios: lo que entra y lo que sale
 
-Todo se puede pedir por la API y el asistente (por voz o por texto, con la sesión de quien habla), con las mismas
-reglas y permisos; las pantallas llegarán con la hoja de QR. Una mesa se nombra por su id o como la dice una persona:
-su número y, si se repite, su zona.
+Todo se puede pedir por la pantalla, la API y el asistente (por voz o por texto, con la sesión de quien habla), con
+las mismas reglas y permisos. Una mesa se nombra por su id o como la dice una persona: su número y, si se repite, su
+zona.
 
 ### Lo que ofrece: consultas
 
@@ -233,6 +268,11 @@ Las mesas las lee Mesas con el permiso de quien pregunta: hace falta el de esta 
   de la mesa comprobará que la mesa sigue existiendo.
 - El aviso `online_order.qr_code.regenerated` no lleva el código: los avisos llegan a Automatizaciones y al
   registro, y el código abre la página de la mesa.
+- La pantalla lee todas las mesas de una vez, en ventanas de 100 (`base/frontend/lib/live-all-rows.ts`), porque la
+  hoja las imprime todas. El QR se dibuja en el navegador con `qrcode` (como el QR de la factura del tique) desde la
+  dirección que da `online_order.qr_code.list`, así que no hace falta otra lectura; la hoja se imprime con
+  `base/frontend/lib/print.ts`, que en la app instalada la manda a su pantalla de imprimir. «Generar los QR que
+  faltan» llama a `online_order.qr_code.regenerate` una vez por mesa, en orden.
 
 ## Lo que queda fuera
 
