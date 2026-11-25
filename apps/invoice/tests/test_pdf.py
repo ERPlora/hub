@@ -151,31 +151,76 @@ def test_it_says_what_the_a4_says_word_for_word_with_its_qr(issuer, at, issued, 
     assert qr_urls(out) == [record_url(invoice)] == [Record.objects.get(invoice_id=invoice.id).qr_url]
 
 
+def money(cents) -> str:
+    return f"{'-' if cents < 0 else ''}€{abs(cents) / 100:,.2f}"
+
+
+def price(cents) -> str:
+    """A unit price: up to two decimals more than an amount, which a price without VAT may need."""
+    whole, _point, decimals = f"{cents / 100:,.4f}".partition(".")
+    return f"€{whole}.{decimals[:2]}{decimals[2:].rstrip('0')}"
+
+
+def percent(rate) -> str:
+    return f"{float(rate):g}%"
+
+
+def day(date) -> str:
+    return f"{date:%m/%d/%Y}"
+
+
+def row_of(item) -> str:
+    """A line as its row is read: what it is, how many, its price without VAT, its discount if any, its rate, its base."""
+    discount = [money(item.discount_amount)] if item.discount_amount else []
+    figures = [f"{float(item.quantity):g}", price(item.unit_price), *discount, percent(item.tax_rate), money(item.base_amount)]
+    return " ".join([item.description, *figures])
+
+
+def taxes_of(invoice) -> list[str]:
+    """The rows of the breakdown, one per tax and one more for its surcharge."""
+    rows = []
+    for entry in invoice.tax_breakdown:
+        exempt = entry["qualification"] == "exempt"
+        label = f"Exempt ({entry['exempt_reason']})" if exempt else f"VAT {percent(entry['rate'])}"
+        rows.append(f"{label} ({money(entry['base'])}) {money(entry['quota'])}")
+        if float(entry["surcharge_rate"]):
+            surcharge = f"Equivalence surcharge {percent(entry['surcharge_rate'])}"
+            rows.append(f"{surcharge} ({money(entry['base'])}) {money(entry['surcharge_quota'])}")
+    return rows
+
+
+TITLES = {"F1": "INVOICE F1", "F2": "SIMPLIFIED INVOICE F2", "F3": "INVOICE F3"}
+
+
 @pytest.mark.parametrize("kind", KINDS)
-def test_every_figure_of_the_invoice_is_on_it(issuer, at, issued, kind):
-    """The figures as the invoice keeps them, not as its page wrote them."""
+def test_each_datum_of_the_invoice_is_in_its_place(issuer, at, issued, kind):
+    """What the invoice keeps, read row by row: nothing of the page it was printed from is trusted here."""
     at(NOON)
     invoice = stored(issued(kind))
+    type_ = invoice.invoice_type
 
     paper = on_paper(downloaded(invoice))
 
-    def money(cents: int) -> str:
-        return f"{'-' if cents < 0 else ''}€{abs(cents) / 100:,.2f}"
-
-    told = [money(invoice.base_amount), money(invoice.total_amount)]
-    for entry in invoice.tax_breakdown:
-        told += [money(entry["base"]), money(entry["quota"]), money(entry["surcharge_quota"])]
-    for item in invoice.lines.all():
-        told += [item.description, money(item.base_amount)]
-        told += [money(item.discount_amount)] if item.discount_amount else []
+    head = f"{TITLES.get(type_, f'RECTIFYING INVOICE {type_}')} No. {invoice.number} Date {day(invoice.issue_date)}"
+    if invoice.due_date:
+        head += f" Due date {day(invoice.due_date)}"
+    parties = f"{invoice.issuer_name} {invoice.issuer_address} Tax ID: {invoice.issuer_tax_id}"
+    if invoice.customer_name:
+        customer = f"{invoice.customer_name} {invoice.customer_address} Tax ID: {invoice.customer_tax_id}"
+    else:
+        customer = ""
+    totals = [f"Tax base {money(invoice.base_amount)}", *taxes_of(invoice), f"TOTAL {money(invoice.total_amount)}"]
     if invoice.withholding_rate is not None:
-        told += [money(-invoice.withholding_amount), money(invoice.payable_amount)]
-    absent = [figure for figure in told if figure not in paper and figure != money(0)]
-    assert absent == []
-    for said in (invoice.number, invoice.issuer_name, invoice.issuer_tax_id, invoice.issuer_address):
-        assert said in paper
-    for said in (invoice.customer_name, invoice.customer_tax_id, invoice.customer_address):
-        assert said in paper
+        totals.append(f"IRPF withholding {percent(invoice.withholding_rate)} {money(-invoice.withholding_amount)}")
+        totals.append(f"Amount due {money(invoice.payable_amount)}")
+    if invoice.rectifies_id:
+        note = f"Rectifies invoice {invoice.rectifies.number}. Reason: {invoice.description}"
+    else:
+        note = invoice.notes
+    rows = [row_of(item) for item in invoice.lines.all()]
+    expected = [head, parties, customer, *rows, " ".join([*totals, note]).strip()]
+    assert [said for said in expected if said not in paper] == []
+    assert ("BILL TO" in paper) is bool(invoice.customer_name)
 
 
 @pytest.mark.parametrize(("country", "total"), [("PL", "PLN 121.00"), ("JP", "¥12,100")])
