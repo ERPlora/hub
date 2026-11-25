@@ -1,4 +1,4 @@
-"""A manager's approvals: the list, its export and who may approve (``base.approval.*``)."""
+"""The record of approvals, its export and who may approve (``base.approval.*``)."""
 
 import csv
 import io
@@ -51,8 +51,9 @@ def approval_action(operation: str, figures: dict | None = None, currency: str |
     output=ApprovalListOut,
     ai=AI(
         description=(
-            "Lists the actions a manager approved with their PIN or badge, the newest first: when, what in words, who "
-            "asked, who approved, how, and whether the approval was used."
+            "Lists the actions that need a manager's approval, the newest first, the ones approved with a PIN or badge "
+            "and the ones done by somebody who needed no approval: when, what in words, who, who approved it, how, and "
+            "whether it was done."
         ),
         asks={
             "en": (
@@ -69,7 +70,7 @@ def approval_action(operation: str, figures: dict | None = None, currency: str |
     ),
 )
 def approval_list(ctx: OperationContext, data: ApprovalListIn) -> dict:
-    """Employees › Approvals: the record of approvals, read only."""
+    """Employees › Approvals: the record, read only."""
     rows = list(Approval.objects.order_by("-created_at", "-id")[:APPROVALS_SHOWN])
     currency = approval_rules.currency_of(ctx.scope) if any(row.figures for row in rows) else None
     return {
@@ -140,8 +141,8 @@ def _approval_cell(text: str) -> str:
     ai=AI(
         description=(
             "Exports the record of approvals as a CSV file, the newest first, with the search and the filters of "
-            "Employees › Approvals (days, action, PIN or badge, used or not): when, what in words, who approved, who "
-            "asked, how and whether it was used. It names people of the business."
+            "Employees › Approvals (days, action, PIN, badge or no approval needed, done or not): when, what in words, "
+            "who approved it, who, how and whether it was done. It names people of the business."
         ),
         asks={
             "en": ("show me last month's manager approvals", "list the approvals made with a badge this week"),
@@ -150,8 +151,8 @@ def _approval_cell(text: str) -> str:
     ),
 )
 def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
-    """Employees › Approvals › «Export CSV» (BASE-F85): every approval the list's search and filters keep, not only the
-    newest it shows, in words and in the person's language."""
+    """Employees › Approvals › «Export CSV» (BASE-F85): all the list's search and filters keep, not only the newest it
+    shows, in words and in the person's language."""
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
     writer.writerow(
@@ -159,7 +160,7 @@ def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
             pgettext("approvals export", "When"),
             pgettext("approvals export", "Action"),
             pgettext("approvals export", "Approved by"),
-            pgettext("approvals export", "Asked by"),
+            pgettext("approvals export", "Who"),
             pgettext("approvals export", "With"),
             pgettext("approvals export", "State"),
         ]
@@ -174,7 +175,7 @@ def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
                 _approval_cell(row.approved_by_name),
                 _approval_cell(row.requested_by_name),
                 str(Approval.Way(row.way).label),
-                pgettext("approvals export", "Used") if row.used_at else pgettext("approvals export", "Not used"),
+                pgettext("approvals export", "Done") if row.used_at else pgettext("approvals export", "Not done"),
             ]
         )
         count += 1

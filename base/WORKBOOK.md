@@ -284,7 +284,8 @@ Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key�
 enlace a la documentación de la API.
 
 ### Empleados · Aprobaciones
-El registro de lo que se aprobó con el PIN de un responsable, solo de lectura.
+El registro, solo de lectura, de las acciones que pueden necesitar la aprobación de un responsable: quién la hizo y
+quién se la aprobó, o que la hizo por su cuenta alguien a quien su rol se lo permite.
 
 ### Ficha de una persona
 Desde una fila de **Empleados › Personal**, para quien administra, con el botón de volver: «Sus datos» (con «Abrir
@@ -1607,6 +1608,7 @@ Implicados: ninguno
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes, Ajustes · Impresión
+Operaciones: ninguna
 Pasos:
   1. Pulsa «Ajustes» en el menú lateral, o llega desde un enlace de otra pantalla.
   2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias», cada una solo para quien puede usar
@@ -1708,6 +1710,7 @@ Implicados: BASE-F13
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Acceso
+Operaciones: ninguna
 Pasos:
   1. En erplora.com, con la sesión abierta, pulsa entrar en su negocio.
   2. El negocio se abre con la persona ya dentro, en **Inicio**, sin pasar por ninguna pantalla de entrada.
@@ -1859,6 +1862,7 @@ Implicados: BASE-F55, BASE-F56
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: El menú de usuario
+Operaciones: ninguna
 Pasos:
   1. Abre la tarjeta de usuario arriba del menú lateral (en el móvil, primero el menú con el botón de la barra).
   2. Pulsa «Cerrar sesión».
@@ -1895,6 +1899,7 @@ Implicados: BASE-F55
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Estamos preparando tu negocio
+Operaciones: ninguna
 Pasos:
   1. Abre la dirección de un negocio que erplora.com aún está preparando (recién creado).
   2. Sale «Estamos preparando tu negocio» — «Tarda unos segundos. Esta página se actualiza sola.».
@@ -2471,10 +2476,13 @@ Pasos:
      la sesión (BASE-F13). Una app que se encendió después de guardar el rol pregunta como el rol básico del que salió;
      un permiso que una app añadió después está en «No» hasta que se revisa (BASE-F131). Al propietario no se le pregunta
      nunca.
+  6. Quien puede hacerla por su rol no ve la pregunta: la hace y queda anotada como hecha por él, sin que nadie la
+     apruebe (BASE-F85).
   También desde el asistente: el «sí» de su tarjeta abre el mismo diálogo, con las cifras de lo que se le pidió.
 Entra: el nombre y el PIN, o la placa, de quien aprueba.
 Sale: una aprobación que vale para esa acción, de esa persona, una sola vez y durante dos minutos; queda anotada en
-**Empleados › Aprobaciones**. Eventos `base.approval.granted` y `base.approval.used`. Se gasta junto con la acción:
+**Empleados › Aprobaciones** (BASE-F85). Eventos `base.approval.granted` y `base.approval.used`; el de una acción hecha
+por quien puede, `base.approval.noted`. La aprobación se gasta junto con la acción:
 si la acción falla por un motivo del negocio, la aprobación sigue sin usar y la misma acción, repetida en esos dos
 minutos, pasa con ella; si salió bien, no se repite; dos a la vez con la misma, solo pasa una. Lo que la acción
 aprobada hace por el camino en otras apps (la factura rectificativa de una anulación, las sesiones de bono que
@@ -2493,23 +2501,31 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Aprobaciones
 Pasos:
-  1. En **Empleados › Aprobaciones** (la pestaña solo existe para quien administra): «Cada acción que necesitó el PIN
-     de un encargado: quién la pidió, quién la autorizó y para qué. Nadie, tampoco un administrador, puede editarlo
-     ni borrarlo.».
-  2. Una fila por aprobación, la última primero: «Cuándo», «Acción» (en palabras y en su idioma; con las cifras de
-     lo que se hizo con ella, cuando la app las da: una aprobación sin usar no hizo nada y no lleva cifras),
-     «Autorizado por», «Lo pidió», «Con» («PIN» o «Placa») y «Estado» («Usada» o «Sin usar»).
-  3. Busca con «Buscar por persona o acción…» (también por sus cifras) y, en «Filtros» (el embudo), filtra por
+  1. En **Empleados › Aprobaciones** (la pestaña solo existe para quien administra): «Cada acción que puede necesitar la
+     autorización de un encargado: quién la hizo, quién la autorizó y con qué. Nadie, tampoco un administrador, puede
+     editarlo ni borrarlo.».
+  2. Una fila por acción, la última primero: «Cuándo», «Acción» (en palabras y en su idioma; con las cifras de lo que
+     se hizo, cuando la app las da: una aprobación que nadie usó no hizo nada y no lleva cifras), «Autorizado por»,
+     «Quién» (quien la hizo, o la pidió), «Con» («PIN», «Placa» o «Su rol») y «Estado» («Hecha», o «Sin hacer» si la
+     aprobación no se usó).
+  3. Las que hizo por su cuenta alguien a quien su rol se lo permite salen también: el encargado que anula una venta o da
+     un descuento por encima del máximo, el propietario, quien lo tiene «Permitido» en su rol propio (BASE-F128) y lo
+     mismo pedido al asistente, con quien dijo que sí (BASE-F100). Dicen «Su rol» en «Con» y dejan vacío «Autorizado
+     por». Una fila por acción: no sale la que se rechazó o falló, ni el reintento de una que ya se hizo, ni la que no
+     cambió nada, ni lo que hace el sistema o una automatización.
+  4. Busca con «Buscar por persona o acción…» (también por sus cifras) y, en «Filtros» (el embudo), filtra por
      «Cuándo» (un día o unos días seguidos), «Acción» (las que hay en el registro, cada una una vez y sin cifras),
      «Con» y «Estado».
-  4. «Exportar CSV» descarga un archivo con las aprobaciones que dejan la búsqueda y los filtros, también las más
-     antiguas que la lista ya no enseña, con las mismas columnas en su idioma; mientras tanto dice «Exportando…».
+  5. «Exportar CSV» descarga un archivo con las acciones que dejan la búsqueda y los filtros, también las más antiguas
+     que la lista ya no enseña (las 500 últimas), con las mismas columnas en su idioma; mientras tanto dice
+     «Exportando…».
 Entra: el registro de aprobaciones.
-Sale: nada; es solo lectura (el archivo exportado no cambia nada). Se pone al día sola con cada aprobación.
-Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía nadie ha tenido
-que autorizar nada en este negocio.» (y el archivo exportado trae solo la cabecera). Si no se puede exportar, un aviso
-lo dice con su motivo y no se descarga nada.
-Implicados: BASE-F84, BASE-F112 (dentro de la app)
+Sale: nada; es solo lectura (el archivo exportado no cambia nada). Se pone al día sola con cada aprobación y con cada
+acción.
+Si falla: «No se pudo cargar el registro de aprobaciones.» con «Reintentar»; sin ninguna, «Todavía no hay ninguna acción
+de este tipo en este negocio.» (y el archivo exportado trae solo la cabecera). Si no se puede exportar, un aviso lo dice
+con su motivo y no se descarga nada.
+Implicados: BASE-F84, BASE-F100, BASE-F128, SALE-F30, SALE-F31, BASE-F112 (dentro de la app)
 
 ### BASE-F86 Crear una llave de API y copiar su token
 Estado: hecho
@@ -2623,7 +2639,7 @@ En las pantallas de Empleados y en la Documentación de la API:
 | Estado | Qué ve la persona |
 |---|---|
 | Cargando | La tabla en gris en «Personal», «Roles», «API keys» y «Aprobaciones»; «Cargando…» en la ficha de una persona; «Cargando lo que permite este rol…» en «Qué permite»; las caras en gris en «Hace falta una aprobación»; «Cargando la documentación…». |
-| Vacío | «Todavía no hay nadie en este negocio.», «Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.», «Todavía nadie ha tenido que autorizar nada en este negocio.», «Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.» y «Ninguna app de este negocio publica todavía su API.». |
+| Vacío | «Todavía no hay nadie en este negocio.», «Aún no hay API keys. Crea una para que un sistema externo pueda leer o escribir datos de tu negocio.», «Todavía no hay ninguna acción de este tipo en este negocio.», «Aquí nadie puede aprobarlo con un PIN. Quien pueda hacerlo puede pasar su placa.» y «Ninguna app de este negocio publica todavía su API.». |
 | Error | «No se pudo cargar el personal de este negocio.», «No se pudo cargar el catálogo de roles.», «No se pudieron cargar tus API keys.», «No se pudo cargar el registro de aprobaciones.», «No se pudo abrir a esta persona.», «No se pudo cargar lo que permite este rol.», «No se pudo cargar quién puede aprobarlo.» y «No se pudo cargar la documentación.», cada uno con «Reintentar»; nunca la lista vacía. |
 | Sin permiso | Quien no administra no tiene las pestañas «API keys» ni «Aprobaciones» (su dirección abre «Personal»), no ve el email de nadie ni abre la ficha de una persona; en Ajustes, «Solo quien administra el negocio puede cambiarlo.». Con la documentación oculta: «La documentación de la API está oculta en este negocio.». |
 
@@ -2974,11 +2990,12 @@ Pasos:
   5. Lo que el asistente cuenta (listas, cifras) es lo que esa persona puede leer.
 Entra: la sesión de quien pregunta, que firma cada acción; para lo que aprueba un responsable, su PIN o su placa.
 Sale: la acción hecha con esa persona como autora. La aprobación vale para esa acción de esa conversación, una sola
-vez y durante dos minutos, y se gasta junto con la acción (BASE-F84).
+vez y durante dos minutos, y se gasta junto con la acción (BASE-F84). La que un responsable podría aprobar y la persona
+puede hacer por su rol queda también anotada, a su nombre (BASE-F85).
 Si falla: si el permiso se pierde entre ofrecer la acción y hacerla, su app la rechaza y el recibo lo dice. Una
 aprobación ya usada o caducada no deja pasar la acción: el recibo dice «No se hizo, falló: …» y el asistente lo
 cuenta.
-Implicados: BASE-F13, BASE-F84, BASE-F97, BASE-F130
+Implicados: BASE-F13, BASE-F84, BASE-F85, BASE-F97, BASE-F130
 
 ### BASE-F101 Pedirle varias cosas seguidas
 Estado: hecho
@@ -3130,6 +3147,7 @@ Implicados: BASE-F93, BASE-F102, BASE-F104
 Estado: hecho
 Actor: el equipo de QA de ERPlora
 Pantalla: todas las de la plataforma del hub
+Operaciones: ninguna
 Pasos:
   1. El equipo crea en erplora.com, con una cuenta nueva, un negocio de su tipo (un restaurante): el hub lo recibe
      con su sector y en «Datos y copias» le ofrece primero la plantilla de ese sector, que deja el negocio con su
@@ -3221,6 +3239,7 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
 Estado: hecho (la dirección y lo que sirve; conectar el dominio es HUBS-F17 de erplora.com, que lo enseña en el panel)
 Actor: cualquiera, sin cuenta
 Pantalla: La página pública del negocio (WEBSITE-F10), en su dominio
+Operaciones: ninguna
 Pasos:
   1. Alguien abre el dominio del negocio (por ejemplo, www.minegocio.es) en un móvil, una tableta o un ordenador.
   2. Se ve la página publicada del negocio, con sus fotos, en el idioma del navegador.
@@ -3239,6 +3258,7 @@ Implicados: HUBS-F17, WEBSITE-F10
 Estado: hecho
 Actor: cualquier persona del negocio en el Hub, en la web o en la app, y cualquier programa conectado por la API
 Pantalla: cualquiera del Hub, Página «Volvemos enseguida»
+Operaciones: ninguna
 Pasos:
   1. La persona abre una pantalla o guarda algo mientras la base de datos se corta unos segundos: un reinicio, un
      mantenimiento de AWS o el cambio de versión.
@@ -3776,6 +3796,7 @@ Implicados: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · General
+Operaciones: ninguna
 Pasos:
   1. En la app de ERPlora de un ordenador, **Ajustes › General** lleva en «Este dispositivo» el interruptor
      «Arrancar al iniciar sesión» («Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre
@@ -4918,6 +4939,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `frontend/main.ts`). Para decirlo antes de empezar, `useAccess(permiso)` de `base/frontend/lib/use-access.ts` da
   `allowed`, `approval` o `no` desde `permissions` y `approvable` de `base.session.me`, que se vuelve a leer al cambiar el
   rol; lo usa Ventas (SALE-F30, SALE-F31). El registro es `base.models.approvals.Approval` (`base.approval.list`).
+  Lo que hizo quien ya podía lo anota `base.approval_note.note`, que live llama dentro de la transacción de cada orden
+  cuando su cuerpo ha contestado (`LIVE["after_command"]`): una fila con `way = "role"`, sin pase, sin límite de tiempo y
+  sin quien la apruebe, y el evento `base.approval.noted`. No anota lo que dejó pasar un pase ni lo que la orden
+  aprobada llama por el camino, una orden que no registró ningún evento (la respuesta repetida de una clave de
+  reintento), ni a quien no es una persona o una API key (la plataforma, una automatización). Ninguna orden aprobable
+  se publica hoy en la API; si una app publica una, la llave queda con su nombre («API · …»).
 - Documentación de la API: `base/api_docs.py` recorta el OpenAPI de ninja a las rutas `expose_api` de las apps que
   tiene el negocio, con la llave como `bearer` y solo los esquemas que usan (`base.api_doc.get`, pedido una vez y no
   en vivo: con todas las apps pasa de 1 MB, más que el tope de un resultado vivo). Cada esquema llega al documento
@@ -5131,34 +5158,38 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
 
 ### Operaciones y sus flujos
 
-Cada operación de la plataforma con los flujos que la usan; las que no usa ningún flujo del Hub dicen quién las llama.
+Cada operación de la plataforma, y la de otra app que pide un flujo de la plataforma, con los flujos que la usan; las que no
+usa ningún flujo del Hub dicen quién las llama.
 
 | Servicios | Flujos |
 |---|---|
 | `base.setup.status` | F01, F03, F04, F12, F103 |
 | `base.health.list` | F02 |
 | `base.widget.list` | F06, F07, F08 |
-| `base.bell.counters` | F10, F40, F117 |
-| `base.notice.list` | F113, KITCHEN-F16, APPOINTMENT-F28, WHATSAPP_INBOX-F09 |
-| `base.session.me` | F05, F13 |
+| `base.bell.counters` | F10, F117 |
+| `base.notice.list` | F113, KITCHEN-F16 |
+| `base.session.me` | F05, F13, F118 |
+| `base.session.access` | F13 |
+| `base.access.grantors` | F118 |
 | `base.saas_pass.create` | F11 |
-| `base.hub.state_apply` | F13, F20, F40, F117 |
-| `base.session.revoke` | F13 |
-| `base.app.list` | F14–F17, F22, F26, F27 |
+| `base.hub.state_apply` | ninguno: erplora.com, cada vez que cambia algo del negocio |
+| `base.session.revoke` | ninguno: erplora.com, al cerrar las sesiones de una persona |
+| `base.app.list` | F14–F17, F19, F20, F22, F26, F27 |
 | `base.app.get` | F18, F21, F23, F24, F97 |
-| `base.app.enable` | F18, F24, F31 |
+| `base.app.enable` | F18, F19, F24, F31, VERIFACTU-F01 |
 | `base.app.retry` | F21 |
-| `base.app.activation_settle` | F22 |
-| `base.app.disable` | F23, F25 |
-| `base.blueprint.list` | F29, F38 |
-| `base.blueprint.inspect` | F30, F31 |
-| `base.blueprint.import` | F31, F33, F38, F94 |
+| `base.app.activation_settle` | ninguno: el worker, al terminar de preparar los datos de una app |
+| `base.app.disable` | F23, F25, VERIFACTU-F32 |
+| `base.blueprint.list` | F29, F38, INVENTORY-F12, INVENTORY-F33 |
+| `base.blueprint.inspect` | F30, F31, INVENTORY-F12, INVENTORY-F33 |
+| `base.blueprint.import` | F31, F33, F38, F94, INVENTORY-F12, INVENTORY-F33 |
 | `base.import.list` | F32, F33, F34, F38 |
 | `base.import.detail` | F33, F34, F97 |
 | `base.import.undo` | F34 |
-| `base.blueprint.export` | F35, F36 |
+| `base.blueprint.export` | F35, F36, INVENTORY-F33 |
 | `base.dataset.list` | F36 |
-| `base.hub.reset`, `base.hub.reset_apply`, `base.hub.dumps`, `base.hub.dump_link` | F37 |
+| `base.hub.reset`, `base.hub.dumps`, `base.hub.dump_link` | F37 |
+| `base.hub.reset_apply` | ninguno: el worker, al vaciar lo que pidió un restablecimiento |
 | `base.system.cards` | F39 |
 | `base.plan.usage` | F40, F77 |
 | `base.assistant.usage` | F40, F104 |
@@ -5170,12 +5201,12 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.failed_event.discard` | F46 |
 | `base.failed_event.detail` | F44, F46, F97 |
 | `base.business.get` | F49, F50, F51 |
-| `base.access.door` | F52, F55, F56 |
-| `base.hub_user.sync` | F13, F52 |
+| `base.access.door` | F52, F55, F56, F57, F58, F59 |
+| `base.hub_user.sync` | ninguno: erplora.com, al mandar las personas del negocio |
 | `base.pin.set` | F54, F65 |
 | `base.access.faces` | F60 |
 | `base.device.current`, `base.device.mode_set` | F62 |
-| `base.hub.register` | F63 |
+| `base.hub.register` | ninguno: erplora.com, al crear el negocio |
 | `base.profile.get` | F54, F64, F65 |
 | `base.profile.update`, `base.profile.preferences_set`, `base.profile.avatar_set`, `base.profile.avatar_remove` | F64 |
 | `base.access.settings`, `base.access.settings_update` | F66, F67 |
@@ -5189,7 +5220,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.file.read` | F74 |
 | `base.file.move`, `base.file.rename` | F75 |
 | `base.file.delete` | F76 |
-| `base.person.list` | F77, F80, F81 |
+| `base.person.list` | F77, F80, F81, F119 |
 | `base.person.detail` | F78, F79 |
 | `base.person.pin_remove` | F78 |
 | `base.person.badge_set`, `base.person.badge_remove` | F79 |
@@ -5215,20 +5246,25 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.assistant.transcribe` | F94 |
 | `base.assistant.report` | F105 |
 | `base.support.report` | F108 |
-| `base.hub.cancel` | F109, HUBS-F18, HUBS-F20 |
+| `base.hub.cancel` | ninguno: erplora.com, al eliminar un negocio o darlo de baja por impago |
 | `base.hub.purge` | F109 |
 | `base.help.get` | F115 |
 | `base.release_note.list` | F116 |
-| `base.hub.restore` | HUBS-F19 |
-| `base.hub.dump_list` | HUBS-F18 |
-| `base.hub.get` | HUBS-F21 |
-| `base.usage.list` | HUBS-F22 |
-| `base.demo.create`, `base.demo.code_create` | PUBLIC-F28 |
-| `base.demo.expire` | PUBLIC-F33 |
-| `base.demo.get`, `base.demo.purge` | PUBLIC-F34 |
+| `base.hub.restore` | ninguno: erplora.com, al recuperar un negocio eliminado |
+| `base.hub.dump_list` | ninguno: erplora.com, al enseñar las copias de un negocio |
+| `base.hub.get` | ninguno: erplora.com, al esperar a que el negocio esté listo y al enseñar su estado |
+| `base.usage.list` | ninguno: erplora.com, cada noche |
+| `base.demo.create`, `base.demo.code_create` | ninguno: erplora.com, al crear una demo y entrar en ella |
+| `base.demo.expire` | ninguno: el admin de Hubs y `manage.py demo_expire` |
+| `base.demo.get` | ninguno: `manage.py demo_expire` |
+| `base.demo.purge` | ninguno: el worker, al retirar una demo vencida |
 | `base.catalog_image.search`, `base.catalog_image.get` | INVENTORY-F30, SERVICE-F34, COMBO-F14 |
+| `control.hub.restore`, `control.hub.restore_aside`, `control.copy.recover` | F114 |
+| `sale.sale.list` | F09 |
+| `sale.sale.stats` | F119 |
+| `inventory.product.export`, `inventory.category.export`, `customer.customer.export`, `invoice.invoice.export` | F112 |
 | `base.hub_user.get` | F97, en las tarjetas de Personal y de la Bandeja de WhatsApp |
-| `base.location.list` | ninguno: solo el asistente y la API |
+| `base.location.list` | F93 |
 | `base.hub.cut_finish` | ninguno: `manage.py cut_shared_hubs` y el migrador, al dar a un negocio su propia base de datos |
 | `base.hub.by_slugs`, `base.hub.seed_local` | ninguno: `manage.py seed_local_hubs`, solo en desarrollo |
 | `base.hub.platform_rename` | ninguno: `manage.py create_platform_hub --rename`, el nombre del negocio propio de ERPlora |

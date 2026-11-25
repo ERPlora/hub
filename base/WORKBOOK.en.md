@@ -303,8 +303,9 @@ The keys with which another system calls the business's API: "New API key", the 
 link to the API's documentation.
 
 ### Employees · Approvals
-<!-- from WORKBOOK.md sha256:5b086a34c109 -->
-The record of what was approved with a manager's PIN, read only.
+<!-- from WORKBOOK.md sha256:099748e4ae1e -->
+The read-only record of the actions that can need a manager's approval: who did it and who approved it for them, or that
+somebody whose role allows it did it by themselves.
 
 ### A person's page
 <!-- from WORKBOOK.md sha256:b88b0da10ded -->
@@ -387,7 +388,7 @@ On the Employees screens and the API documentation:
 | State | What the person sees |
 |---|---|
 | Loading | The table in grey in "Staff", "Roles", "API keys" and "Approvals"; "Loading…" on a person's page; "Loading what this role allows…" in "What it allows"; the faces in grey in "An approval is needed"; "Loading the documentation…". |
-| Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "Nobody has had to approve anything in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
+| Empty | "Nobody is in this business yet.", "No API keys yet. Create one so that another system can read or write your business's data.", "There is no action of this kind in this business yet.", "Nobody here can approve this with a PIN. Somebody who may do it can swipe their badge." and "None of this business’s apps publishes its API yet.". |
 | Error | "The people of this business could not be loaded.", "The roles could not be loaded.", "Your API keys could not be loaded.", "Could not load the record of approvals.", "This person could not be opened.", "Could not load what this role allows.", "Could not load who can approve it." and "Could not load the documentation.", each with "Retry"; never the empty list. |
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
@@ -1686,10 +1687,11 @@ with more than 30 reports a minute from the same person, the hub does not note i
 Involved: none
 
 ### BASE-F48 Open Settings and move through its tabs
-<!-- from WORKBOOK.md sha256:e19f0083066d -->
+<!-- from WORKBOOK.md sha256:b417d11c61dc -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings, Settings · Printing
+Operations: none
 Steps:
   1. Tap "Settings" in the side menu, or arrive from a link on another screen.
   2. At the bottom, the tabs "General", "Business", "Printing" and "Data and backups", each one only for whoever can
@@ -1794,10 +1796,11 @@ hub"); the business keeps nothing until it comes back with the person identified
 Involved: BASE-F13
 
 ### BASE-F53 Enter from the erplora.com panel without typing the password again
-<!-- from WORKBOOK.md sha256:2e95f6ff2428 -->
+<!-- from WORKBOOK.md sha256:3ff821a2583d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
+Operations: none
 Steps:
   1. At erplora.com, with the session open, they tap enter their business.
   2. The business opens with the person already in, on **Home**, without going through any sign-in screen.
@@ -1953,10 +1956,11 @@ try again.".
 Involved: BASE-F55, BASE-F56
 
 ### BASE-F61 Sign out
-<!-- from WORKBOOK.md sha256:b623040eecce -->
+<!-- from WORKBOOK.md sha256:0a4ca1b69bbc -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
+Operations: none
 Steps:
   1. They open the user card at the top of the side menu (on a phone, first the menu with the bar's button).
   2. They tap "Sign out".
@@ -1991,10 +1995,11 @@ connection: "Could not change this device. Check the connection and try again.".
 Involved: BASE-F55
 
 ### BASE-F63 Open a hub that is not set up yet
-<!-- from WORKBOOK.md sha256:07cd646f0aa9 -->
+<!-- from WORKBOOK.md sha256:514223787757 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Your business is being prepared
+Operations: none
 Steps:
   1. They open the address of a business erplora.com is still preparing (just created).
   2. "Your business is being prepared" shows — "It takes a few seconds. This page refreshes by itself.".
@@ -2575,7 +2580,7 @@ the last it knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Approve with a manager's PIN
-<!-- from WORKBOOK.md sha256:f5aca9f7e571 -->
+<!-- from WORKBOOK.md sha256:e79b94167921 -->
 Status: done
 Actor: employee, manager
 Screen: An approval is needed
@@ -2596,11 +2601,13 @@ Steps:
      it through, nor an approval they had already been given. If the role changes, it counts from the next action on,
      without closing the session (BASE-F13). An app turned on after the role was saved asks as the basic role it came
      from; a permission an app added later is "No" until it is reviewed (BASE-F131). The owner is never asked.
+  6. Whoever may do it by their role does not see the question: they do it and it is recorded as done by them, with
+     nobody's approval (BASE-F85).
   From the assistant too: the "yes" of its card opens the same dialog, with the figures of what it was asked.
 In: the name and the PIN, or the badge, of whoever approves.
 Out: an approval valid for that action, of that person, once and for two minutes; it is recorded in
-**Employees › Approvals**. Events `base.approval.granted` and `base.approval.used`. It is spent together with the
-action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
+**Employees › Approvals** (BASE-F85). Events `base.approval.granted` and `base.approval.used`; that of an action done by
+whoever may do it, `base.approval.noted`. The approval is spent together with the action: if the action fails for a reason of the business, the approval stays unused and the same action, repeated
 within those two minutes, goes through with it; if it went through, it is not repeated; two at once with the same one,
 only one goes through. What the approved action does on the way in other apps (the rectifying invoice of a void, the
 voucher sessions it gives back) goes with the approval, as when the manager does it themselves; nothing more: not what
@@ -2615,28 +2622,35 @@ with a PIN. Somebody who may do it can swipe their badge.". "Cancel" hands the a
 Involved: BASE-F85, BASE-F55, BASE-F56, BASE-F100, BASE-F128, BASE-F130, SALE-F30, SALE-F31
 
 ### BASE-F85 Look up who approved what
-<!-- from WORKBOOK.md sha256:a356799e6ecb -->
+<!-- from WORKBOOK.md sha256:9fa5acdb0b25 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Approvals
 Steps:
-  1. In **Employees › Approvals** (the tab exists only for whoever runs the business): "Each action that needed a
-     manager's PIN: who asked for it, who approved it and what for. Nobody, not even an administrator, can edit or
+  1. In **Employees › Approvals** (the tab exists only for whoever runs the business): "Each action that can need a
+     manager's approval: who did it, who approved it and with what. Nobody, not even an administrator, can edit or
      delete it.".
-  2. A row per approval, the latest first: "When", "Action" (in words and in their language; with the figures of
-     what was done with it, when the app gives them: an unused approval did nothing and has no figures), "Approved
-     by", "Asked by", "With" ("PIN" or "Badge") and "State" ("Used" or "Not used").
-  3. They search with "Search by person or action…" (by its figures too) and, in "Filters" (the funnel), filter by
+  2. A row per action, the latest first: "When", "Action" (in words and in their language; with the figures of what was
+     done, when the app gives them: an approval nobody used did nothing and has no figures), "Approved by", "Who" (who
+     did it, or asked to), "With" ("PIN", "Badge" or "Their role") and "State" ("Done", or "Not done" if the approval
+     was not used).
+  3. Those done by somebody whose role allows it, by themselves, show too: the manager who voids a sale or gives a
+     discount above the maximum, the owner, whoever has it "Allowed" in their role of your own (BASE-F128), and the same
+     asked of the assistant, with whoever said yes (BASE-F100). They say "Their role" in "With" and leave "Approved by"
+     empty. A row per action: one that was refused or failed does not show, nor the retry of one already done, nor one
+     that changed nothing, nor what the system or an automation does.
+  4. They search with "Search by person or action…" (by its figures too) and, in "Filters" (the funnel), filter by
      "When" (a day or a few days in a row), "Action" (the ones on the record, each once and without figures), "With"
      and "State".
-  4. "Export CSV" downloads a file with the approvals the search and the filters keep, also the older ones the list
-     no longer shows, with the same columns in their language; meanwhile it says "Exporting…".
+  5. "Export CSV" downloads a file with the actions the search and the filters keep, also the older ones the list no
+     longer shows (the last 500), with the same columns in their language; meanwhile it says "Exporting…".
 In: the record of approvals.
-Out: nothing; it is read only (the exported file changes nothing). It updates by itself with each approval.
-If it fails: "Could not load the record of approvals." with "Retry"; with none, "Nobody has had to approve
-anything in this business yet." (and the exported file brings its header alone). If it cannot export, a notice says
-so with its reason and nothing is downloaded.
-Involved: BASE-F84, BASE-F112 (inside the app)
+Out: nothing; it is read only (the exported file changes nothing). It updates by itself with each approval and each
+action.
+If it fails: "Could not load the record of approvals." with "Retry"; with none, "There is no action of this kind in this
+business yet." (and the exported file brings its header alone). If it cannot export, a notice says so with its reason
+and nothing is downloaded.
+Involved: BASE-F84, BASE-F100, BASE-F128, SALE-F30, SALE-F31, BASE-F112 (inside the app)
 
 ### BASE-F86 Create an API key and copy its token
 <!-- from WORKBOOK.md sha256:344d74567f12 -->
@@ -2736,7 +2750,7 @@ nothing published, "None of this business’s apps publishes its API yet.".
 Involved: BASE-F91, BASE-F86, BASE-F112 (inside the app)
 
 ### BASE-F91 Show or hide the API documentation
-<!-- from WORKBOOK.md sha256:00fe8590da8a -->
+<!-- from WORKBOOK.md sha256:f12852ff479d -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -3084,7 +3098,7 @@ anything, it is that action that has to say so. If the turn ends in an error, th
 Involved: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
-<!-- from WORKBOOK.md sha256:10089937bc9a -->
+<!-- from WORKBOOK.md sha256:6782ed15c886 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3111,11 +3125,12 @@ Steps:
   5. What the assistant tells (lists, figures) is what that person may read.
 In: the session of whoever asks, which signs each action; for what a manager approves, their PIN or their badge.
 Out: the action done with that person as its author. The approval is good for that action of that conversation, once
-and for two minutes, and it is spent together with the action (BASE-F84).
+and for two minutes, and it is spent together with the action (BASE-F84). One a manager could approve and the person may
+do by their role is recorded too, in their name (BASE-F85).
 If it fails: if the permission is lost between offering the action and doing it, its app refuses it and the receipt
 says so. An approval already used or expired does not let the action through: the receipt reads "Not done, it
 failed: …" and the assistant tells it.
-Involved: BASE-F13, BASE-F84, BASE-F97, BASE-F130
+Involved: BASE-F13, BASE-F84, BASE-F85, BASE-F97, BASE-F130
 
 ### BASE-F101 Ask it for several things in a row
 <!-- from WORKBOOK.md sha256:b63066914a0f -->
@@ -3269,10 +3284,11 @@ If it fails: a failure with nothing written leaves no empty bubble: only the sen
 Involved: BASE-F93, BASE-F102, BASE-F104
 
 ### BASE-F107 Pass the master QA of the Hub
-<!-- from WORKBOOK.md sha256:b261e41b4306 -->
+<!-- from WORKBOOK.md sha256:94bcd34257d5 -->
 Status: done
 Actor: ERPlora's QA team
 Screen: every screen of the hub's platform
+Operations: none
 Steps:
   1. The team creates on erplora.com, with a new account, a business of its kind (a restaurant): the hub receives it
      with its sector and in "Data and backups" offers that sector's template first, which leaves the business with
@@ -3365,10 +3381,11 @@ Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, 
 (each invoice's A4 that goes to the archive)
 
 ### BASE-F110 Open the business's website on its own domain
-<!-- from WORKBOOK.md sha256:70c3053e9c2d -->
+<!-- from WORKBOOK.md sha256:6525baba0e5d -->
 Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
 Actor: anyone, without an account
 Screen: The business's public page (WEBSITE-F10), on its domain
+Operations: none
 Steps:
   1. Someone opens the business's domain (for example, www.minegocio.es) on a phone, a tablet or a computer.
   2. The business's published page shows, with its photos, in the browser's language.
@@ -3383,10 +3400,11 @@ published page, the domain says there is nothing there. A business being prepare
 Involved: HUBS-F17, WEBSITE-F10
 
 ### BASE-F111 Wait for the database when it is cut for a moment
-<!-- from WORKBOOK.md sha256:1fae342a6c05 -->
+<!-- from WORKBOOK.md sha256:391a10311b47 -->
 Status: done
 Actor: anyone of the business in the Hub, on the web or in the app, and any program connected through the API
 Screen: any of the Hub, Page «We will be back soon»
+Operations: none
 Steps:
   1. The person opens a screen or saves something while the database is cut for a few seconds: a restart, an AWS
      maintenance or the change of version.
@@ -3933,10 +3951,11 @@ do, 403 `base.api_key_scope`, and past its requests a minute, 429 `base.api_key_
 Involved: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 
 ### BASE-F120 Start ERPlora on signing in to the computer
-<!-- from WORKBOOK.md sha256:ae3493013f65 -->
+<!-- from WORKBOOK.md sha256:f60b081b5d71 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · General
+Operations: none
 Steps:
   1. In the ERPlora app on a computer, **Settings › General** carries under "This device" the switch "Start on
      login" ("Open ERPlora when you sign in to this computer, so tickets always have somewhere to print."), off

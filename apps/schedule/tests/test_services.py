@@ -32,7 +32,7 @@ from apps.schedule.schemas import (
     SpecialDayRefIn,
 )
 
-from apps.staff.tests.test_services import _race
+from apps.staff.tests.conftest import _race
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, ctx_for, make_override, make_special_day

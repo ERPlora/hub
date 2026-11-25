@@ -115,18 +115,20 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await snap(page, 'BASE-G146', width);
     await tab(page, 'approvals');
     await expect(page).toHaveURL(/\/employees#approvals$/);
-    await expect(shown(page).getByText('Each action that needed a manager')).toBeVisible();
-    await expect(shown(page).getByText('Nobody has had to approve anything in this business yet.')).toBeVisible();
-    // BASE-F85: the record filters by day, action, how and whether it was used, behind its funnel (as the old hub's).
+    await expect(shown(page).getByText('Each action that can need a manager')).toBeVisible();
+    // BASE-F85: the record filters by day, action, how and whether it was done, behind its funnel (as the old hub's).
     await expect(shown(page).locator('[data-testid=approvals-filters-toggle]')).toBeVisible();
-    // BASE-F85: «Export CSV» downloads what the search and the filters keep, in the person's language: here, nobody has
-    // approved anything yet, its header alone.
+    // BASE-F85: «Export CSV» downloads what the search and the filters keep, in the person's language: here, a search
+    // nothing answers, its header alone. What it keeps when something does is base-approvals-record.spec.ts's.
+    await shown(page).locator('[data-testid=approvals-search] input').fill('e2e nothing on the record says this');
+    await expect(shown(page).locator('.data-table__empty')).toBeVisible();
     const [download] = await Promise.all([
       page.waitForEvent('download'),
       shown(page).locator('[data-testid=approvals-export]').click(),
     ]);
     expect(download.suggestedFilename()).toBe('approvals.csv');
-    expect(readFileSync(await download.path(), 'utf8')).toBe('\ufeffWhen,Action,Approved by,Asked by,With,State\r\n');
+    expect(readFileSync(await download.path(), 'utf8')).toBe('\ufeffWhen,Action,Approved by,Who,With,State\r\n');
+    await shown(page).locator('[data-testid=approvals-search] input').fill('');
     await snap(page, 'BASE-G145', width);
     await noProblems(problems);
     await context.close();

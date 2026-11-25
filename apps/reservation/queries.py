@@ -1,7 +1,7 @@
 """Read operations of the reservation app (``READ ONLY``): the reservations, one reservation, a day's
 figures and slots, the free tables, the slots, the blocked dates, the waitlist and the rules. A read by id
 (a reservation, a waitlist entry, a slot, a blocked date) also answers its ``label``: the words the book's
-screens name it by, which the assistant's card says instead of the id (schemas.py, ``names``).
+screens name it by, which the assistant's card says instead of the id (schemas/fields.py, ``names``).
 
 Shared with services.py, inside the command's own transaction: the business's clock, the rules, the
 lookups of a reservation, a waitlist entry, a slot or a blocked date as a person says it, and everything the gate (engine.py)
@@ -32,30 +32,23 @@ from apps.reservation.models import (
     WaitlistEntry,
     weekday_name,
 )
-from apps.reservation.schemas import (
+from apps.reservation.schemas.availability import DayIn, DayOut, FreeTablesOut, TablesIn
+from apps.reservation.schemas.blocked_dates import (
     BlockedDateDetailOut,
     BlockedDateListIn,
     BlockedDatePage,
     BlockedDateRefIn,
-    DayIn,
-    DayOut,
-    FreeTablesOut,
-    NoIn,
+)
+from apps.reservation.schemas.fields import NoIn
+from apps.reservation.schemas.reservations import (
     ReservationDetailOut,
     ReservationListIn,
     ReservationPage,
     ReservationRefIn,
-    SettingsOut,
-    TablesIn,
-    TimeSlotDetailOut,
-    TimeSlotListIn,
-    TimeSlotPage,
-    TimeSlotRefIn,
-    WaitlistDetailOut,
-    WaitlistListIn,
-    WaitlistPage,
-    WaitlistRefIn,
 )
+from apps.reservation.schemas.settings import SettingsOut
+from apps.reservation.schemas.slots import TimeSlotDetailOut, TimeSlotListIn, TimeSlotPage, TimeSlotRefIn
+from apps.reservation.schemas.waitlist import WaitlistDetailOut, WaitlistListIn, WaitlistPage, WaitlistRefIn
 from apps.schedule.queries import day_label, get_week, hours_for_range
 from apps.schedule.schemas import HoursRangeIn, NoParamsIn
 from apps.table.models import Table

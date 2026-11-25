@@ -368,13 +368,13 @@ def test_the_migrators_role_on_a_cluster_with_its_secret_is_that_secrets(secrets
     """``migrate_hubs`` (``base.tenancy.migrator``) reaches a cluster with its own secret as that secret's migrator."""
     from base.tenancy import migrator
 
-    assert migrator.migrator_credentials(cluster()) == ("hub_migrator", "migrator-secret")
+    assert migrator.servers.migrator_credentials(cluster()) == ("hub_migrator", "migrator-secret")
     assert secrets.reads == [MIGRATOR_SECRET]
 
     credentials.forget()
     secrets.secrets[MIGRATOR_SECRET] = RuntimeError("AccessDeniedException")
-    with pytest.raises(migrator.MigratorCredentialsMissing, match=MIGRATOR_SECRET):
-        migrator.migrator_credentials(cluster())
+    with pytest.raises(migrator.servers.MigratorCredentialsMissing, match=MIGRATOR_SECRET):
+        migrator.servers.migrator_credentials(cluster())
 
 
 

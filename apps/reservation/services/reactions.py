@@ -9,7 +9,8 @@ from live.outbox import record_event
 from apps.customer.services.writes import lock_customers
 from apps.reservation import events
 from apps.reservation.models import Reservation, WaitlistEntry
-from apps.reservation.schemas import ChangedOut, CustomerEventIn, MergedIn
+from apps.reservation.schemas.fields import ChangedOut
+from apps.reservation.schemas.reactions import CustomerEventIn, MergedIn
 
 #: The platform's own writes (reactions): the system has «*»; no role is given this one.
 SYSTEM = "reservation.system"

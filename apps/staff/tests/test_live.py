@@ -8,7 +8,7 @@ from apps.sale import events as sale_events
 from apps.staff import events, services
 
 EVENTS_SOURCE = Path(events.__file__).read_text()
-SERVICES_SOURCE = Path(services.__file__).read_text()
+SERVICES_SOURCE = "".join(path.read_text() for path in sorted(Path(services.__file__).parent.glob("*.py")))
 
 MEMBER = [
     events.MEMBER_CREATED,
