@@ -2,7 +2,8 @@
 // «New manual invoice» (INVOICE-F03; the old create panel of the table, now a dialog): the «Series» (the
 // active invoice and ticket series), the «Date» (today on the business's clock, or an earlier day: left as it is,
 // the server dates it), the «Due date», if any, the recipient (a card of Customers or typed: name, country, tax ID,
-// address), «Notes» and the lines (description, quantity, price WITHOUT the tax, rate %). The rate is named by
+// address), «Notes», the lines (description, quantity, price WITHOUT the tax, rate %) and, except on a ticket, the «IRPF
+// withholding», none to begin with. The rate is named by
 // the tax of the business's territory, as Taxes publishes it (`useTaxKind`, `tax.settings.get`), and starts at
 // its general rate (`invoice.invoice.line_defaults`); both followed live (TAX-F11): «VAT %» and 21 on the
 // peninsula, «IGIC %» in the Canary Islands, «IPSI %» in Ceuta and Melilla, blank when the territory has no
@@ -27,6 +28,7 @@ import { todayIn, useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useTaxKind } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import { typedRate, useBusinessMoney } from '../lib/format';
+import type { WithholdingRate } from '../invoice-withholding';
 import { type Recipient, recipientComplete, recipientFrom, recipientPayload } from '../lib/recipient';
 import { refusal } from '../lib/refusal';
 import type { InvoiceOut, InvoiceType } from '../operations';
@@ -34,6 +36,7 @@ import InvoiceLinesEditor from './InvoiceLinesEditor.vue';
 import { blankLine, type DraftLine, linePayload, linesReady, unreadablePrice } from './lines';
 import RecipientFields from './RecipientFields.vue';
 import SeriesSelect from './SeriesSelect.vue';
+import WithholdingSelect from './WithholdingSelect.vue';
 
 const open = defineModel<boolean>('open', { required: true });
 const emit = defineEmits<{ created: [invoice: InvoiceOut] }>();
@@ -58,6 +61,7 @@ const issueDate = shallowRef('');
 const dueDate = shallowRef('');
 const notes = shallowRef('');
 const lines = shallowRef<DraftLine[]>([blankLine(1)]);
+const withholding = shallowRef<WithholdingRate | null>(null);
 /** The form's own refusal (a price that is not an amount), before anything is sent. */
 const local = shallowRef<string | null>(null);
 
@@ -71,6 +75,7 @@ watch(
     dueDate.value = '';
     notes.value = '';
     lines.value = [blankLine(1, defaultRate.value)];
+    withholding.value = null;
     local.value = null;
     command.error.value = null;
   },
@@ -103,6 +108,7 @@ const opened = () => ({
   recipient: recipientFrom(null),
   notes: '',
   lines: [blankLine(1, defaultRate.value)],
+  withholding: null,
 });
 const written = () => ({
   series: seriesCode.value,
@@ -111,6 +117,7 @@ const written = () => ({
   recipient: recipient.value,
   notes: notes.value,
   lines: lines.value,
+  withholding: withholding.value,
 });
 const canDismiss = useUnsavedForm(
   'invoice-create',
@@ -118,12 +125,12 @@ const canDismiss = useUnsavedForm(
   opened,
 );
 
-/** An invoice (F1) names its recipient whole; a ticket (F2) may name nobody. */
-const needsRecipient = computed(() => invoiceType.value !== 'F2');
+/** An invoice (F1) names its recipient whole and may be withheld; a ticket (F2) may name nobody and never is. */
+const full = computed(() => invoiceType.value !== 'F2');
 // No price is read before the business answers its money: until then «12,50 zł» is not an amount and «1234»
 // would be read with two decimals, whatever its currency counts (hub#907).
 const ready = computed(
-  () => !!money.value && linesReady(lines.value) && (!needsRecipient.value || recipientComplete(recipient.value)),
+  () => !!money.value && linesReady(lines.value) && (!full.value || recipientComplete(recipient.value)),
 );
 const error = computed<FormModalError | null>(() => {
   if (local.value) return { message: local.value };
@@ -146,6 +153,7 @@ async function issue(): Promise<void> {
       ...(issueDate.value ? { issue_date: issueDate.value } : {}),
       ...(dueDate.value ? { due_date: dueDate.value } : {}),
       ...recipientPayload(recipient.value),
+      ...(full.value && withholding.value ? { withholding_rate: withholding.value } : {}),
       notes: notes.value.trim(),
       lines: lines.value.map((line) => linePayload(line, business)),
     });
@@ -220,6 +228,11 @@ async function issue(): Promise<void> {
           :field-errors="fieldErrors"
           :tax="tax"
           :default-rate="defaultRate"
+        />
+        <WithholdingSelect
+          v-if="full"
+          v-model="withholding"
+          :error-text="fieldErrors.withholding_rate"
         />
       </div>
     </template>

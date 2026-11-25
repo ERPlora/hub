@@ -48,7 +48,7 @@ describe('InvoiceCreateModal', () => {
     const s = await setup();
     await s.choose('FACT', 'F1');
     await s.recipient();
-    await s.line('Course', '12,50', '2', '21');
+    await s.line('Course', '12,50', { quantity: '2' });
     await ionValue(s.inDoc('invoice-create-notes'), ' Thanks ', 'ionInput');
     s.answer(201, CREATED);
     await click(s.submit());
@@ -245,7 +245,7 @@ describe('InvoiceCreateModal', () => {
   it('opened again, a fresh line starts at the territory’s rate already known', async () => {
     const s = await setup();
     await s.territory('igic', '7.00');
-    await s.line('Course', '10', '1', '3');
+    await s.line('Course', '10', { taxRate: '3' });
     await s.wrapper.setProps({ open: false });
     await s.wrapper.setProps({ open: true });
     expect(s.editor().props('modelValue')).toEqual([{ uid: 1, description: '', quantity: '1', price: '', taxRate: '7' }]);
@@ -256,18 +256,18 @@ describe('InvoiceCreateModal', () => {
     await s.territory('ipsi', null);
     expect(s.editor().props('modelValue')[0].taxRate).toBe('');
     await s.choose('TICKET', 'F2');
-    await s.line('Coffee', '1,50', '1', '');
+    await s.line('Coffee', '1,50', { taxRate: '' });
     expect(s.submit().disabled).toBe(true);
-    await s.line('Coffee', '1,50', '1', '4');
+    await s.line('Coffee', '1,50', { taxRate: '4' });
     expect(s.submit().disabled).toBe(false);
   });
 
   it('a rate already typed is kept when the territory’s answer arrives or changes', async () => {
     const s = await setup();
-    await s.line('Course', '10', '1', '3');
+    await s.line('Course', '10', { taxRate: '3' });
     await s.territory('igic', '7.00');
     expect(s.editor().props('modelValue')[0].taxRate).toBe('3');
-    await s.line('Course', '10', '1', '7');
+    await s.line('Course', '10', { taxRate: '7' });
     await s.result(DEFAULTS, { tax_rate: '9.50' }, {}, 2);
     expect(s.editor().props('modelValue')[0].taxRate).toBe('9.5');
   });
@@ -279,7 +279,7 @@ describe('InvoiceCreateModal', () => {
     expect(s.inDoc('invoice-create-error')?.textContent).toContain('Could not read the business’s tax territory: type the rate of each line.');
     expect(s.editor().props('tax')).toBeUndefined();
     await s.choose('TICKET', 'F2');
-    await s.line('Coffee', '1,50', '1', '7');
+    await s.line('Coffee', '1,50', { taxRate: '7' });
     expect(s.submit().disabled).toBe(false);
   });
 
@@ -368,7 +368,7 @@ describe('InvoiceCreateModal: the day it is dated and the day it falls due', () 
 
   it('Android Back asks once a date is chosen, and no more once it is as it was', async () => {
     const s = await dates();
-    await s.line('', '', '1', '');
+    await s.line('', '', { taxRate: '' });
     const { expectUnsavedFormAsksBeforeClosing } = await import('../../../../base/frontend/__tests__/unsaved-form');
     const overlay = () => s.inDoc('invoice-create');
     await expectUnsavedFormAsksBeforeClosing({ overlay, change: () => pick(s.issued(), '2026-11-23'), restore: () => pick(s.issued(), '2026-11-24') });
@@ -412,8 +412,8 @@ describe('InvoiceCreateModal: Android Back with unsaved changes (hub#1020, BASE-
     });
     await expectUnsavedFormAsksBeforeClosing({
       overlay: () => s.inDoc('invoice-create'),
-      change: () => s.line('Course', '100', '1', '21'),
-      restore: () => s.line('', '', '1', '21'),
+      change: () => s.line('Course', '100'),
+      restore: () => s.line('', ''),
     });
   });
 

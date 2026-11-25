@@ -44,7 +44,7 @@ export async function setup(locale: 'en' | 'es' = 'en', company: Partial<Busines
     m.wrapper.findComponent(RecipientFields).vm.$emit('update:modelValue', value);
     await m.wrapper.vm.$nextTick();
   }
-  async function line(description: string, price: string, quantity = '1', taxRate = '21') {
+  async function line(description: string, price: string, { quantity = '1', taxRate = '21' } = {}) {
     m.wrapper.findComponent(InvoiceLinesEditor).vm.$emit('update:modelValue', [{ uid: 1, description, quantity, price, taxRate }]);
     await m.wrapper.vm.$nextTick();
   }
