@@ -66,6 +66,7 @@ const canDismiss = useUnsavedFormOnOpen('role-new', () => ({ name: name.value, b
     <template #default="{ fieldErrors }">
       <ion-input
         v-model="name"
+        name="name"
         data-testid="role-new-name"
         mode="md"
         fill="outline"
