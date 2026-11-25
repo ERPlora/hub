@@ -71,7 +71,7 @@ def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
         description=(
             "Finds the tools for a task when none of the tools you were given does it: describe the task in a few "
             "words («list the products of a category», «create a product», «change an employee's schedule»). Returns "
-            f"up to {assistant.relevance.FOUND} tools, best first, with what each does; from your next step you can "
+            f"up to {shared.FOUND} tools, best first, with what each does; from your next step you can "
             "call them. Search before you say that something cannot be done here; if none fits, search again in other "
             "words."
         ),
