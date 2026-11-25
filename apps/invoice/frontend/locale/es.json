@@ -119,6 +119,7 @@
         "pending": "Preparando…",
         "failed": "No se ha podido descargar el PDF: {reason}"
       },
+      "emailButton": "Enviar por correo",
       "missingTaxId": "Esta factura no tiene el NIF del cliente: la impresora de tiques no puede sacarla como factura completa.",
       "fields": {
         "type": "Tipo",
@@ -137,6 +138,7 @@
         "substitutedBy": "Sustituida por",
         "rectifications": "Rectificativas",
         "paidAt": "Pagada el",
+        "emailed": "Correo",
         "notes": "Notas"
       },
       "lines": {
@@ -162,6 +164,21 @@
         "rectify": "Rectificar",
         "substitute": "Factura completa"
       }
+    },
+    "email": {
+      "title": "Enviar por correo",
+      "to": "Correo del cliente",
+      "help": "La factura {number} va adjunta en PDF. Las respuestas llegan al correo del propietario del negocio.",
+      "submit": "Enviar",
+      "failed": "No se ha podido enviar la factura",
+      "onItsWay": "Enviando la factura a {to}…",
+      "sentTo": "Enviada a {to} el {date}",
+      "sent": "Enviada el {date}",
+      "sendingTo": "Enviando a {to}…",
+      "sending": "Enviando…",
+      "notSentTo": "No enviada a {to}",
+      "notSent": "No enviada",
+      "unsent": "La factura no se ha enviado por correo"
     },
     "verifactu": {
       "heading": "Justificante VeriFactu",

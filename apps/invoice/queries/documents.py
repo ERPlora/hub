@@ -92,6 +92,13 @@ def _withholding(invoice: Invoice, language: str) -> dict | None:
     }
 
 
+def document_title(invoice: Invoice) -> str:
+    """What a document calls itself, in the active language."""
+    if invoice.is_rectification:
+        return str(DOC_RECTIFYING)
+    return str(DOC_SIMPLIFIED if invoice.invoice_type == "F2" else DOC_INVOICE)
+
+
 def document_note(invoice: Invoice) -> str:
     """The note of a document in the reader's language: a rectifying one names the invoice it rectifies
     and its reason (composed here: the database keeps no sentence); any other, its own notes."""
@@ -126,12 +133,6 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
     (``{"url", "svg"}``), VeriFactu's QR on top, as the AEAT asks (Orden HAC/1177/2024, art. 21)."""
     invoice = _loaded(invoice)
     language = translation.get_language() or "en"
-    if invoice.is_rectification:
-        title = DOC_RECTIFYING
-    elif invoice.invoice_type == "F2":
-        title = DOC_SIMPLIFIED
-    else:
-        title = DOC_INVOICE
     money = lambda cents: _money(cents, invoice.currency, language)  # noqa: E731
     lines = list(invoice.lines.all())
     discounted = any(line.discount_amount for line in lines)
@@ -139,7 +140,7 @@ def render_document(invoice: Invoice, *, duplicate: bool = False, qr: dict | Non
         "invoice": invoice,
         "issuer_vat_number": document_issuer(invoice)["issuer_vat_number"],
         "language": language,
-        "title": title,
+        "title": document_title(invoice),
         "duplicate": duplicate,
         "copy_label": DOC_COPY,
         "issue_date": date_format(invoice.issue_date, "SHORT_DATE_FORMAT"),

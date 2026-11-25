@@ -9,6 +9,7 @@
   (full that substitutes a ticket) and R1–R5 (rectifying, by differences, with negative amounts). It
   copies its issuer and its recipient; only ``status`` and ``paid_at`` ever change.
 - ``InvoiceLine`` is one concept of a document, its money squared (base + tax = total).
+- ``InvoiceEmail`` (``models_email.py``) is one email of a document, kept beside it.
 
 Money is in whole cents with a sign (a rectifying document is negative); quantities have three
 decimals, as the sale's.
@@ -22,6 +23,8 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
+
+from apps.invoice.models_email import InvoiceEmail as InvoiceEmail
 
 QUANTITY = {"max_digits": 15, "decimal_places": 3}
 RATE = {"max_digits": 6, "decimal_places": 2}
