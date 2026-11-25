@@ -385,7 +385,7 @@ rechaza. Si no se puede leer el territorio fiscal, el tipo se llama «Imp. %», 
 pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; la factura se emite igual,
 con el impuesto del territorio. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emitir factura» se enciende.
-Implicados: TAX-F18, CUSTOMER-F17, TAX-F11, INVOICE-F16, INVOICE-F17, INVOICE-F18
+Implicados: TAX-F18, CUSTOMER-F17, TAX-F11, INVOICE-F16, INVOICE-F17, INVOICE-F18, INVOICE-F23
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
 Estado: hecho
@@ -844,7 +844,7 @@ Implicados: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
 Estado: hecho
 Actor: sistema (la cuenta de ERPlora)
-Pantalla: ninguna (nadie entra en el hub de plataforma)
+Pantalla: ninguna (la emite la cuenta; se ve en Facturas)
 Pasos:
 1. Antes de cobrar con dinero real, la cuenta pregunta al hub de plataforma si está listo: lo está con su emisor
    y VeriFactu y, en producción, solo mientras el envío real a la AEAT está abierto en el servidor
@@ -861,6 +861,11 @@ Pasos:
    «aceptada con errores» o «rechazada» cuando contesta (con su código y su mensaje).
 5. El PDF es el mismo A4 de INVOICE-F18 en el idioma del pagador, con el QR de VeriFactu («QR
    tributario:», «VERI*FACTU») solo cuando la AEAT ya lo aceptó, como en la cuenta antigua.
+6. En el negocio de ERPlora, `ERP` y `ERPR` son solo de la cuenta: nadie numera en ellas a mano, las crea ni las
+   cambia (INVOICE-F12, INVOICE-F13), y no salen al hacer una factura (INVOICE-F03), en **Series** ni al preguntar
+   por la numeración (INVOICE-F14). Las ventas y las facturas hechas a mano van en las series del negocio («TICKET»,
+   «FACT», «RECT» o las que cree), en la misma cadena de VeriFactu. Una factura de la cuenta se corrige en la cuenta,
+   con su abono: aquí no se ofrece «Rectificar» (INVOICE-F08) ni «Factura completa» (INVOICE-F05).
 Entra: la factura de la cuenta: su número, su fecha, sus importes, cómo tributa, el pagador, sus líneas
 (cada una con su descuento) y, en un abono, la factura que corrige.
 Sale: la factura, con la referencia de la cuenta (avisa `invoice.invoice.issued`; un abono, además,
@@ -869,8 +874,12 @@ Si falla: la misma factura otra vez (o dos entregas a la vez) contesta lo que ya
 un abono de una factura que no llegó se rechaza; por encima de 400 € sin el NIF del pagador se rechaza; una
 factura que no sigue el contrato se rechaza con su motivo; un rechazo de VeriFactu deshace la factura
 entera; en producción con el envío real a la AEAT cerrado, «no listo»: «El envío real a la AEAT está cerrado en
-este servidor: las facturas de ERPlora no le llegarían.», y la cuenta no cobra.
-Implicados: VERIFACTU-F13
+este servidor: las facturas de ERPlora no le llegarían.», y la cuenta no cobra. Por la ventana, la API, el
+asistente o una automatización, elegir, crear o cambiar una de esas dos series, o dar a otra un prefijo o un formato
+que imprima sus números (`ERP-2026-00123`), «Las series ERP y ERPR las numera erplora.com: usa otra serie.»;
+rectificar o sustituir una factura de la cuenta, «Esta factura la emitió erplora.com y allí se corrige, en su serie
+ERPR: aquí no se puede corregir a mano.». No se escribe nada ni se gasta número.
+Implicados: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14
 
 ### INVOICE-F24 Descargar en Excel las facturas emitidas
 Estado: hecho
@@ -1153,6 +1162,15 @@ configurar nada.
     con el formato del SaaS (`{prefix}-{year}-{seq:05d}`) y su contador no se usa. Dos entregas a la vez
     se ponen en cola en el bloqueo de esa serie y la segunda contesta lo de la primera (test con hilos);
     `platform_ref` es único en la base de datos.
+  - **Series cerradas a mano** (`platform_series.py`; solo en el negocio de plataforma, `is_platform_hub`): las
+    rechaza cada operación que elige, crea o cambia una serie, con 409 `invoice.platform_series_closed`
+    (`refuse_platform_series`); `refuse_platform_number` rechaza otra serie que imprimiría un número con la forma de
+    los de la cuenta, porque llevaría el de una factura suya. `business_series` (`queries/series.py`) son las del
+    negocio: la lista, el estado de la numeración y la predeterminada leen de ahí. Lo emitido por la cuenta
+    (`platform_ref`) no se rectifica ni se sustituye a mano: 409 `invoice.platform_invoice_closed`, y `can_rectify` y
+    `can_substitute` son falsos. TICKET, FACT y RECT no son códigos de la cuenta, así que el TPV, el canje de un tique y las
+    devoluciones no cambian. La numeración y la emisión de la cuenta no se tocan. En el admin de la plataforma la
+    serie se puede editar, pero lo emitido a mano no la usa.
   - **Entorno**: el registro va al entorno de la AEAT del despliegue (`ERPLORA_ENVIRONMENT=prod` →
     producción; `pre` → pruebas; `verifactu.queries.route.effective_environment`), y su interruptor está fijo
     (409 `verifactu.platform_fixed`).

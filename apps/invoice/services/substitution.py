@@ -9,6 +9,7 @@ from live.operations import operation
 
 from apps.invoice import fiscal
 from apps.invoice.models import Invoice
+from apps.invoice.platform_series import refuse_platform_invoice
 from apps.invoice.queries.rows import find_invoice
 from apps.invoice.queries.series import FULL
 from apps.invoice.schemas.invoices import IssueOut, SubstituteIn
@@ -60,6 +61,7 @@ TICKET_RECTIFIED = _(
 def substitute(ctx: OperationContext, data: SubstituteIn) -> dict:
     card = _chosen_card(ctx, data)
     ticket = find_invoice(ctx, data.invoice_id, data.number, lock=True)
+    refuse_platform_invoice(ticket)
     if ticket.invoice_type != "F2":
         raise Conflict(str(NOT_A_TICKET), code="invoice.not_a_ticket")
     existing = Invoice.objects.filter(substitutes=ticket).first()
