@@ -1192,7 +1192,7 @@ puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una
 tope de apps del plan, una app que el plan no incluye) se queda desactivada, no carga nada y el informe dice
 por qué; el resto se carga. Un fichero no se guarda: si una de sus apps aún se está preparando, su fila dice «Se está
 preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para traer sus datos.».
-Implicados: BASE-F22, INVENTORY-F12, INVENTORY-F36, VERIFACTU-F01, BASE-F32
+Implicados: BASE-F22, INVENTORY-F01, INVENTORY-F12, INVENTORY-F26, INVENTORY-F36, VERIFACTU-F01, BASE-F32
 
 ### BASE-F32 Leer el informe de la importación
 Estado: hecho
@@ -1291,7 +1291,7 @@ Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un no
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
 exporta igual que el propietario: lo que es solo del propietario son las copias completas que ERPlora guarda antes de
 restablecer.
-Implicados: BASE-F112 (dentro de la app), BASE-F37, INVENTORY-F33, INVENTORY-F36, BASE-F36
+Implicados: BASE-F112 (dentro de la app), BASE-F37, INVENTORY-F01, INVENTORY-F26, INVENTORY-F33, INVENTORY-F36, BASE-F36
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 Estado: hecho
@@ -4503,7 +4503,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `tests/e2e/base-access.spec.ts` (dos personas, dos dispositivos, plan Gratis, una cuenta de Ventas abierta durante
   el cambio de usuario).
 - Archivos (BASE-F72…F76) no tiene modelo ni tabla: lista el almacén `STORAGES["hub_files"]` (`base/storage.py`: S3
-  con bucket, si no disco bajo `MEDIA_ROOT`) bajo `hub-<hex>/files/<ruta>` con `base/files.py` (sin ORM: nombres y
+  con bucket, si no disco bajo `MEDIA_ROOT`) bajo `hub-<hex>/files/<ruta>` con `base/files/` (sin ORM: nombres y
   rutas, el `.keep` de una carpeta vacía, listar, subir, carpeta, renombrar, mover, borrar y `file_response`). Las
   operaciones, todas con `ai=`: `base.file.list` y `base.file.read` (`queries.py`, `base.view_files`), y en
   `services.py` `base.file.upload`, `create_folder` y `rename` (`base.upload_files`), `move` (`base.delete_files` y
@@ -4523,12 +4523,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
   enseña; antes de guardar uno nuevo pasa por la misma comprobación del espacio que Archivos,
   `base.queries.files.refuse_past_the_plans_space(ctx, store, size)` (el plan del hub de `ctx`, en su idioma): el límite, el
-  409 `base.file_no_space` y su frase viven solo en `base.files.refuse_past_the_space`, nunca copiados en una app.
+  409 `base.file_no_space` y su frase viven solo en `base.files.space.refuse_past_the_space`, nunca copiados en una app.
   Pantalla: `pages/FilesPage.vue`, `components/{FileTree,FilePreview}.vue` y `lib/{files,pdf}.ts` (pdf.js en el
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
   `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A) y
   `tests/e2e/fix-base-plan-space-check.spec.ts` (el tope en español: Archivos y la web dicen la misma frase).
-- Al purgar un hub, `base.files.delete_hub_files` borra su prefijo entero (`base.storage.hub_prefix`) y ningún otro: lo
+- Al purgar un hub, `base.files.delete_hub.delete_hub_files` borra su prefijo entero (`base.storage.hub_prefix`) y ningún otro: lo
   llaman `base.services.demos.purge_demo_data` (demo, PUBLIC-F34) y `base.tenancy.offboarding` (baja, BASE-F109), siempre tras el
   `DROP` (PLAN-DB §6 «Baja», paso 4), fuera de toda transacción y antes de la fila. Un fallo es `HubFilesNotDeleted`, también
   las claves que `DeleteObjects` rechaza dentro de un 200: el hub sigue `dropping` con el error en `last_error`
@@ -4538,7 +4538,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `test_provision_demos.py`.
 - Lo que dejaron las purgas de antes de hub#781 (una fila `purged` no vuelve a pasar por la purga) se borra una vez con
   `manage.py delete_leftover_hub_files` (hub#785): busca en el almacén las carpetas de arriba con forma de prefijo de hub
-  (`base.files.hubs_in_store`, `hub-<hex>`) y, después de listarlas, lee el registro (`base.services.demos.gone_hubs`): solo
+  (`base.files.delete_hub.hubs_in_store`, `hub-<hex>`) y, después de listarlas, lee el registro (`base.services.demos.gone_hubs`): solo
   cuenta un hub `purged` o sin fila (la lápida de una demo, olvidada a los `DEMO_TOMBSTONE_DAYS`) cuyo prefijo aún guarda
   claves. Cualquier otro estado conserva sus ficheros, `shared/`, `_inventory/` y lo que no es un prefijo de hub no se
   miran, y no abre la base de datos de ningún hub. Sin `--delete` solo lista (prefijo, motivo, claves y bytes); con él

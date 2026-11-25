@@ -4,7 +4,7 @@ sample and where the Hub keeps it in the hub file store (``storages["hub_files"]
 Meta reviews such a template only with a sample of that file, which erplora.com uploads for it (door 8). The file is
 told by its first bytes, never by its name or the type the browser declares (``sniff``): a JPEG or PNG photo and an
 MP4 video up to Meta's limits (5 and 16 MB), and a PDF document up to the Hub's ceiling for a file it keeps
-(``base.files.MAX_FILE_BYTES``, 25 MB; Meta takes up to 100 MB). Its key is
+(``base.files.create.MAX_FILE_BYTES``, 25 MB; Meta takes up to 100 MB). Its key is
 ``hub-<hex>/whatsapp_inbox/samples/<first 16 hex of its sha256>.<ext>``: under its hub's prefix and named by its
 content, as the website keeps its images, so the same file chosen twice is one object. Nothing here is public:
 ``/p/media/`` serves this folder only to a session of the hub (``members_media`` in ``apps.py``, ``base.media``), at
@@ -14,7 +14,7 @@ content, as the website keeps its images, so the same file chosen twice is one o
 
 import uuid
 
-from base.files import MAX_FILE_BYTES
+from base.files.create import MAX_FILE_BYTES
 from base.storage import hub_prefix, media_url
 
 MB = 1024 * 1024

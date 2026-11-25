@@ -1,7 +1,7 @@
 """``manage.py delete_leftover_hub_files``: the files left in the store by hubs purged before a purge deleted a hub's
 files, deleted once.
 
-A purge deletes the hub's files after its database (``base.files.delete_hub_files``, BASE-F109 and PUBLIC-F34), but a
+A purge deletes the hub's files after its database (``base.files.delete_hub.delete_hub_files``, BASE-F109 and PUBLIC-F34), but a
 row already ``purged`` never goes through the purge again, so whatever it kept from before stayed. This finds each
 top folder of the hub file store named as a hub's prefix (``hub-<hex>``) whose hub is gone for good: ``purged``, or with
 no row in the registry any more (a demo's tombstone, forgotten after its days; ``base.services.demos.gone_hubs``). Every
@@ -10,7 +10,7 @@ into, and no hub's database is opened. A prefix that holds no key is left out: i
 deleted may still list for its delete markers.
 
 By default it only lists them, each with its keys and bytes, and deletes nothing; ``--delete`` deletes them, one prefix
-at a time, each with ``base.files.delete_hub_files``. The store is listed before the registry is read: a hub's row exists
+at a time, each with ``base.files.delete_hub.delete_hub_files``. The store is listed before the registry is read: a hub's row exists
 before its first file, so a hub made in between is never taken for gone. A store that cannot be listed deletes
 nothing; a prefix that fails is said and the others go on, and the run ends in an error naming it (running it again
 finishes it). In the versioned bucket each key leaves a delete marker, and its old version goes with the bucket's
@@ -39,11 +39,11 @@ class Command(BaseCommand):
     def handle(self, *args, delete=False, **options):
         store = storages["hub_files"]
         try:
-            in_store = files.hubs_in_store(store)
+            in_store = files.delete_hub.hubs_in_store(store)
             with use_control():
                 gone = demos.gone_hubs(in_store)
             # Only a prefix that still holds keys: in a versioned bucket a deleted one keeps its delete markers.
-            left = {hub_id: kept for hub_id in gone if (kept := files.scan(store, hub_prefix(hub_id)))}
+            left = {hub_id: kept for hub_id in gone if (kept := files.store.scan(store, hub_prefix(hub_id)))}
         except OperationError as error:
             raise CommandError(f"{error.code}: the file store did not answer, nothing was deleted.") from error
         self.stdout.write(f"Hubs with files in the store: {len(in_store)}; gone for good: {len(left)}")
@@ -58,8 +58,8 @@ class Command(BaseCommand):
         failed = []
         for hub_id in left:
             try:
-                files.delete_hub_files(store, hub_id)
-            except files.HubFilesNotDeleted as error:
+                files.delete_hub.delete_hub_files(store, hub_id)
+            except files.delete_hub.HubFilesNotDeleted as error:
                 failed.append(str(error))
                 self.stdout.write(f"{hub_prefix(hub_id)}: not deleted: {error}")
                 continue

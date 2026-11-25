@@ -686,7 +686,7 @@ class TestReaper:
 
         def keep(hub: Hub) -> list:
             storages["hub_files"].save(f"{hub_prefix(hub.id)}/files/menu.pdf", ContentFile(b"bytes"))
-            return files.scan(storages["hub_files"], hub_prefix(hub.id))
+            return files.store.scan(storages["hub_files"], hub_prefix(hub.id))
 
         return keep
 
@@ -695,7 +695,7 @@ class TestReaper:
         hub = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="expired")
         assert kept(hub)
         purge_demo_data(hub)
-        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == []
+        assert files.store.scan(storages["hub_files"], hub_prefix(hub.id)) == []
 
     def test_a_demo_whose_row_names_another_database_keeps_its_files(self, kept, monkeypatch):
         monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: None)
@@ -704,7 +704,7 @@ class TestReaper:
         hub.db_name = names.hub_db_name(control_name(), hub.id)
         with pytest.raises(names.InvalidDatabaseName, match="not the demo"):
             purge_demo_data(hub)
-        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
+        assert files.store.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
 
     def test_a_business_handed_here_by_mistake_keeps_its_files(self, kept):
         # Even without a database named: only a demo's purge deletes a demo's files.
@@ -712,7 +712,7 @@ class TestReaper:
         stored = kept(hub)
         with pytest.raises(names.InvalidDatabaseName, match="not the demo"):
             purge_demo_data(hub)
-        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
+        assert files.store.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
 
 
 class TestTombstones:
