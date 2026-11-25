@@ -3,8 +3,8 @@
 Per test session (and xdist worker), next to its control database ``<control>``:
 
 - ``<control>_template_test``: created here and migrated as ``migrate_hubs`` migrates a template
-  (``base.tenancy.migrator.ensure_template``), with every hub app whose tables only reference the hub's own
-  (``migrator.portable_apps``);
+  (``base.tenancy.migrator.hub_templates.ensure_template``), with every hub app whose tables only reference the hub's own
+  (``migrator.app_sets.portable_apps``);
 - ``<control>_<hex of HUB_A_ID>`` and ``<control>_<hex of HUB_B_ID>``: cloned from it with
   ``CREATE DATABASE … TEMPLATE``, each with its identity row (``base_hub_identity``).
 
@@ -175,7 +175,7 @@ TEMPLATE_GRANTEE = "pg_monitor"
 def bootstrap_template(name: str, *, control: str | None = None) -> None:
     """Make ``name`` as ``bootstrap_databases`` leaves a platform's template (``base.tenancy.bootstrap``): empty, no
     access for PUBLIC, ``CONNECT, TEMPORARY`` for one role and default privileges in ``public`` for it. The migrator
-    never makes one (``migrator.TemplateMissing``)."""
+    never makes one (``migrator.hub_templates.TemplateMissing``)."""
     identifier = names.identifier(name, control=tenancy_connections.control_name() if control is None else control)
     grantee = sql.Identifier(TEMPLATE_GRANTEE)
     with _maintenance() as conn:
@@ -214,7 +214,7 @@ def forget_aliases(before: dict) -> None:
     """
     for alias in set(connections.settings) - set(before):
         connections[alias].close()
-        # And this thread's connection object, as ``migrator._forget_alias`` does: a later registration of the same
+        # And this thread's connection object, as ``migrator.servers._forget_alias`` does: a later registration of the same
         # alias (another role, another server) would get the old object back, its old settings with it.
         try:
             del connections[alias]
@@ -245,14 +245,14 @@ def _build() -> HubDatabases:
         template=names.template_db_name(control, TEMPLATE_VERTICAL),
         a=names.hub_db_name(control, HUB_A_ID),
         b=names.hub_db_name(control, HUB_B_ID),
-        apps=migrator.portable_apps(),
+        apps=migrator.app_sets.portable_apps(),
     )
     with _maintenance() as conn:
         for name in (hubs.a, hubs.b, hubs.template):
             _drop(conn, name, control)
         conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(hubs.template, control=control)))
     # Migrated as migrate_hubs migrates a template: nobody stays connected to it afterwards, so it can be cloned.
-    migrator.ensure_template(migrator.Template(db_name=hubs.template, apps=hubs.apps))
+    migrator.hub_templates.ensure_template(migrator.hub_templates.Template(db_name=hubs.template, apps=hubs.apps))
     with _maintenance() as conn:
         for name in (hubs.a, hubs.b):
             conn.execute(
@@ -273,7 +273,7 @@ def _build() -> HubDatabases:
 def _noted_at_sign_up(hub_id: uuid.UUID, name: str) -> dict[str, str]:
     """What a sign-up notes of the database ``name`` once cloned: the migrator's run, here with nothing to apply."""
     hub = Hub(id=hub_id, db_name=name)
-    migrator.ensure_schema(hub)
+    migrator.schema.ensure_schema(hub)
     return hub.schema_apps
 
 
@@ -369,7 +369,7 @@ def assert_only_alias(alias: str) -> Iterator[dict[str, list[str]]]:
     assert not shared, f"Control's database was asked for the old shared data of a hub's tables: {shared}"
 
 
-# ── For the migrator's tests (base/tenancy/tests/test_migrator.py, base/tests/test_migrate_hubs.py) ───────────────
+# ── For the migrator's tests (base/tenancy/tests/test_migrator*.py, base/tests/test_migrate_hubs.py) ──────────────
 
 
 @pytest.fixture

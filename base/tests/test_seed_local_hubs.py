@@ -29,8 +29,8 @@ def fresh(settings, monkeypatch):
     before making any: their own databases are ``base/tenancy/tests/test_provision_own_database.py``'s, on real ones."""
     settings.DEBUG = True
     Hub.objects.filter(slug__in=["a", "b"]).delete()
-    portable = tuple(label for label in migrator.portable_apps() if label != "staff")
-    monkeypatch.setattr(migrator, "portable_apps", lambda: portable)
+    portable = tuple(label for label in migrator.app_sets.portable_apps() if label != "staff")
+    monkeypatch.setattr(migrator.app_sets, "portable_apps", lambda: portable)
 
 
 def seed() -> str:
@@ -42,7 +42,7 @@ def seed() -> str:
 @pytest.mark.usefixtures("fresh")
 def test_refuses_while_some_app_cannot_live_in_a_hub_s_own_database():
     """There is no shared database to leave a and b on: while some app cannot live in a hub's own database
-    (``migrator.portable_apps``; here ``staff``), it refuses and writes nothing. Every real app can (hub#474): the
+    (``migrator.app_sets.portable_apps``; here ``staff``), it refuses and writes nothing. Every real app can (hub#474): the
     command then makes their databases (``base/tenancy/tests/test_provision_own_database.py``, on real ones)."""
     with pytest.raises(CommandError, match="staff"):
         seed()

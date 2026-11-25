@@ -430,7 +430,7 @@ def _cut(hub_id, mode: str, dump: str, started: float) -> Outcome:
         renew()
         ddl = tenancy_connections.register_ddl_alias(hub.db_name, cluster=hub.cluster)
         identity.write(ddl, hub.id)
-        migrator.ensure_schema(hub, add=["base", *provision.vertical_apps(hub.vertical)], heartbeat=renew)
+        migrator.schema.ensure_schema(hub, add=["base", *provision.vertical_apps(hub.vertical)], heartbeat=renew)
         renew()
         copied = copy_rows(hub, heartbeat=renew) if mode == COPY_ALL else {}
         _seed_and_finish(hub, mode, copied, dump, renew)

@@ -1,4 +1,4 @@
-"""The schema migrator: ``migrate_control`` (``aws`` README, «Contrato app ↔ infra»), and a hub's own database.
+"""``migrate_control``, the control database's migration (``aws`` README, «Contrato app ↔ infra»).
 
 The control database migrates under a session advisory lock on its own connection, so two
 ``hub-migrate`` tasks of overlapping deploys never migrate at once: the second waits, then finds
@@ -15,7 +15,7 @@ import pytest
 from django.db import DatabaseError, connection
 from django.db.migrations.recorder import MigrationRecorder
 
-from base.tenancy import migrator
+from base.tenancy.migrator import control_database
 
 WAIT = 10
 
@@ -38,10 +38,10 @@ def lock_is_free() -> bool:
 
     def attempt():
         with connection.cursor() as cursor:
-            cursor.execute("SELECT pg_try_advisory_lock(%s)", [migrator.LOCK_KEY])
+            cursor.execute("SELECT pg_try_advisory_lock(%s)", [control_database.LOCK_KEY])
             taken = cursor.fetchone()[0]
             if taken:
-                cursor.execute("SELECT pg_advisory_unlock(%s)", [migrator.LOCK_KEY])
+                cursor.execute("SELECT pg_advisory_unlock(%s)", [control_database.LOCK_KEY])
         return taken
 
     return on_another_connection(attempt)
@@ -49,7 +49,7 @@ def lock_is_free() -> bool:
 
 def sessions_waiting_for_the_lock() -> int:
     """Sessions blocked on the lock: a bigint key is (classid, objid) = its high and low 32 bits."""
-    unsigned = migrator.LOCK_KEY & 0xFFFF_FFFF_FFFF_FFFF
+    unsigned = control_database.LOCK_KEY & 0xFFFF_FFFF_FFFF_FFFF
 
     def count():
         with connection.cursor() as cursor:
@@ -66,7 +66,7 @@ def sessions_waiting_for_the_lock() -> int:
 def test_the_lock_key_is_the_blake2b_of_its_name():
     digest = hashlib.blake2b(b"erplora.migrate_hubs", digest_size=8).digest()
 
-    assert migrator.LOCK_KEY == int.from_bytes(digest, "big", signed=True)
+    assert control_database.LOCK_KEY == int.from_bytes(digest, "big", signed=True)
 
 
 @pytest.mark.django_db
@@ -76,10 +76,10 @@ def test_migrates_the_control_database_while_holding_the_lock(monkeypatch):
     def fake_migrate(*args, **kwargs):
         calls.append((args, kwargs, lock_is_free()))
 
-    monkeypatch.setattr(migrator, "call_command", fake_migrate)
+    monkeypatch.setattr(control_database, "call_command", fake_migrate)
 
     assert lock_is_free()
-    assert migrator.migrate_control() == 0
+    assert control_database.migrate_control() == 0
 
     [(args, kwargs, free_while_migrating)] = calls
     assert args == ("migrate",)
@@ -94,9 +94,9 @@ def test_counts_the_migrations_it_applied(monkeypatch):
     def fake_migrate(*args, **kwargs):
         MigrationRecorder(connection).record_applied("demo", "9999_made_up")
 
-    monkeypatch.setattr(migrator, "call_command", fake_migrate)
+    monkeypatch.setattr(control_database, "call_command", fake_migrate)
 
-    assert migrator.migrate_control() == 1
+    assert control_database.migrate_control() == 1
 
 
 @pytest.mark.django_db
@@ -104,10 +104,10 @@ def test_releases_the_lock_when_the_migration_fails(monkeypatch):
     def broken_migrate(*args, **kwargs):
         raise DatabaseError("relation already exists")
 
-    monkeypatch.setattr(migrator, "call_command", broken_migrate)
+    monkeypatch.setattr(control_database, "call_command", broken_migrate)
 
     with pytest.raises(DatabaseError, match="relation already exists"):
-        migrator.migrate_control()
+        control_database.migrate_control()
 
     assert lock_is_free()
 
@@ -125,11 +125,11 @@ def test_a_second_run_waits_until_the_first_one_ends(monkeypatch):
             first_may_end.wait(WAIT)
         order.append(f"{name}:end")
 
-    monkeypatch.setattr(migrator, "call_command", fake_migrate)
+    monkeypatch.setattr(control_database, "call_command", fake_migrate)
 
     def run():
         try:
-            migrator.migrate_control()
+            control_database.migrate_control()
         finally:
             connection.close()
 
@@ -153,34 +153,3 @@ def test_a_second_run_waits_until_the_first_one_ends(monkeypatch):
 
     assert order == ["first:start", "first:end", "second:start", "second:end"]
     assert lock_is_free()
-
-
-# ── A hub's database migrates only its own apps, through its __ddl alias ─────────────────────────────────────────
-
-
-def test_migrate_apps_refuses_an_alias_that_is_no_migrators():
-    with pytest.raises(ValueError, match="__ddl"):
-        migrator.migrate_apps("default", ["demo"])
-
-
-def test_the_template_has_the_hub_tables_of_its_apps_and_nothing_of_controls(hub_databases):
-    """A hub's database has exactly the tables of base and of its created apps."""
-    from base.tenancy.tests import hubs
-
-    assert hubs.table_names(hub_databases.template) == hubs.hub_tables(hub_databases.apps) | {"django_migrations"}
-    assert "base_hub" not in hubs.table_names(hub_databases.a)
-    assert "auth_user" not in hubs.table_names(hub_databases.a)
-
-
-def test_migrate_apps_with_nothing_pending_applies_nothing(hub_databases, django_db_blocker):
-    """A clone of the template is at the code's leaf: nothing to apply, and ``migrate`` is not even called."""
-    from django.db import connections as django_connections
-
-    from base.tenancy import connections
-
-    with django_db_blocker.unblock():
-        alias = connections.register_ddl_alias(hub_databases.a)
-        try:
-            assert migrator.migrate_apps(alias, hub_databases.apps) == []
-        finally:
-            django_connections[alias].close()

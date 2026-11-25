@@ -233,7 +233,7 @@ del Hub» de erplora-next.
   (`base/tenancy/tests/test_provision_own_database.py`) impide crear un hub en `base/services/` sin ella, también
   `a`/`b`: `seed_local_hubs` les da su BD (clonada de
   `<control>_template`, con las tablas de todas las apps y todas encendidas) y se niega si alguna app no puede vivir en
-  una (`migrator.portable_apps`). Un negocio de la fase 1 que aún tiene `db_name` vacío no se sirve: su host da 503
+  una (`migrator.app_sets.portable_apps`). Un negocio de la fase 1 que aún tiene `db_name` vacío no se sirve: su host da 503
   `base.hub_maintenance` y el worker lo nombra al arrancar (`ERROR base.worker.hub_without_database`) sin tocarlo, hasta
   que **`manage.py cut_shared_hubs`** le da su BD (`base/tenancy/cut.py`; ya se corrió en prod, PLAN-DB ronda
   2026-11-01c): `--copy-all <slug>` (una vez, un negocio:
@@ -278,7 +278,7 @@ del Hub» de erplora-next.
   transacción: sin pool, `CONN_MAX_AGE` 0, sin cursores de servidor ni sentencias preparadas) sin mutar
   `connections.settings`; su `base_hub_identity` se comprueba una vez por proceso (otra identidad → 503
   `base.hub_unavailable`, no se sirve nada). `migrate` solo acepta `default` (y `shared`); el esquema de un hub lo
-  cambia solo el migrador (`base/tenancy/migrator.py`, abajo).
+  cambia solo el migrador (`base/tenancy/migrator/`, abajo).
 - **El migrador.** `ensure_schema(hub, add=())` es la única función que cambia el esquema de un hub: abre su alias
   directo `<db_name>__ddl` (sin PgBouncer, como el migrador del servidor del hub: el del settings o el de su
   `Cluster`), con `lock_timeout` 5 s y `statement_timeout`/`idle_in_transaction_session_timeout` 5 min, toma en esa BD
@@ -292,7 +292,7 @@ del Hub» de erplora-next.
   personas del negocio son suyas, `base.HubUser`); si una volviera a enlazar un modelo de control, `add=` la rechazaría
   (`AppNotPortable`) y las plantillas la dejarían fuera, y el lint «(h)» de `tests/test_guardrails.py` lo impide antes.
 - **Las plantillas**, en cada servidor donde viven hubs (`CREATE DATABASE … TEMPLATE` solo clona dentro de uno):
-  `<control>_template`, con la plataforma y todas las apps portables (`migrator.templates`, PLAN-DB ronda 2026-11-01),
+  `<control>_template`, con la plataforma y todas las apps portables (`migrator.hub_templates.templates`, PLAN-DB ronda 2026-11-01),
   y una `<control>_template_<vertical>` por vertical de `base/catalog.py`, clonada de la anterior (las apps de su
   vertical, `template_apps`, ya están en ella) y todo apagado (ninguna `AppActivation`). La de la plataforma la crea
   **solo** `bootstrap_databases` (roles, `vector`, privilegios por defecto, sin acceso para PUBLIC); si falta en un servidor, `migrate_hubs` para con `TemplateMissing` («run
@@ -302,7 +302,7 @@ del Hub» de erplora-next.
   `node tests/e2e/database.ts` crea la `<BD>_template` de cada BD de e2e (y `--drop` borra sus plantillas); para la
   `hub` de desarrollo, `createdb hub_template` en el Postgres de compose (o `bootstrap_databases`).
 - **`manage.py migrate_hubs`** (la tarea `hub-migrate` de cada despliegue): 1) control, bajo su lock; 2) las
-  plantillas de cada servidor (con todas las apps portables, también en S3, `migrator.templates`; nunca se reconstruyen:
+  plantillas de cada servidor (con todas las apps portables, también en S3, `migrator.hub_templates.templates`; nunca se reconstruyen:
   el primer despliegue que les añade las portables migra cada una en caliente, cerca de un minuto, y un alta en ese rato
   cae en `clone_failed` y se reintenta a los 60 s; `clusters_to_migrate`: sin
   filas de `Cluster`, el del settings; con ellas, los abiertos
@@ -319,14 +319,14 @@ del Hub» de erplora-next.
   credenciales del migrador son `DB_MIGRATOR_USER`/`DB_MIGRATOR_PASSWORD`; sin ellas falla
   (`MigratorCredentialsMissing`), nunca usa las de `default` (`hub_app` en el web y el worker), salvo en local con
   `DEBUG` (un solo rol); los tests las fijan en `config/settings_pytest.py`. Las de cada cluster se enchufan en
-  `migrator.migrator_credentials`.
+  `migrator.servers.migrator_credentials`.
 - **Quién abre el contexto**: `HubDatabaseMiddleware` (cada petición: el hub del host; en `hubs.localhost`, el hub
   elegido en el admin o control, donde el admin solo enseña los modelos de control, `base/admin_site.py`), `HubContextBuilder.enter` (cada re-ejecución viva, en el hilo del ejecutor),
   `/ws/print`, las puertas de `/internal`, el worker y los comandos. Una sesión vale solo en el host donde se abrió
   (`SessionHostMiddleware`): la de B en el host de A es anónima (401).
 - **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
   propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
-  La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
+  La plantilla de test lleva todas las apps del hub (`migrator.app_sets.portable_apps()`, `base/tests/test_hub_user_links.py`).
   Todos los tests corren como producción: la BD de control de test tiene solo las tablas de control (los mismos routers
   que producción) y un modelo de hub sin contexto falla (`HubContextMissing`). Las pruebas del corte y de
   `control/0007`, que leen las tablas de las apps en control como estaban antes del corte, las crean ellas mismas
@@ -347,7 +347,7 @@ de una app que su plantilla no traía (una portada después) se crean **la prime
   migración de la app en el código que la pidió (`AppActivation.target`).
 - **El worker** (`_activations`, también con `--databases-only`) toma cada tick los hubs llamados (`hub_due` vencido y
   libre); en cada uno, lo debido (`creating`, o `failed` cuyo próximo intento llegó) se crea con
-  `migrator.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y `base.app.activation_settle` lo enciende
+  `migrator.schema.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y `base.app.activation_settle` lo enciende
   (`base.app.enabled`, aviso vivo: Apps y el menú de todos los dispositivos cambian sin recargar) o lo deja `failed` con
   `attempts`, `last_error` y `next_attempt_at` (1, 5, 15 min y después cada hora; `base.app.activation_failed`), y mueve
   la llamada del hub a lo siguiente que espera (o la quita). Esquema ocupado por otra ejecución: +30 s. Una petición de un
