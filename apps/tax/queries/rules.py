@@ -4,7 +4,6 @@
 from decimal import Decimal
 from uuid import UUID
 
-from babel.numbers import format_percent
 from django.db.models import Case, CharField, F, Q, QuerySet, Value, When
 from django.db.models.functions import Coalesce
 from django.utils import translation
@@ -14,7 +13,6 @@ from live.errors import NotFound
 from live.operations import INTERNAL, operation
 
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxCategory, TaxRule
-from apps.tax.queries.calculation import _HUNDRED
 from apps.tax.queries.jurisdiction import business_jurisdiction, business_today
 from apps.tax.queries.naming import category_by_reference
 from apps.tax.queries.resolution import _in_force
@@ -30,7 +28,7 @@ from apps.tax.schemas.rules import (
     RuleStatusIn,
     RuleStatusOut,
 )
-from base.business import babel_locale, country_name
+from base.business import country_name, percent_text
 from base.ordering import list_order
 
 RULE_NOT_FOUND = _("This tax rule no longer exists.")
@@ -70,8 +68,8 @@ def rule_label(rule: TaxRule) -> str:
     place = country_name(rule.country_code, language)
     if rule.region_code:
         place = f"{place} ({rule.region_code})"
-    rate = format_percent(rule.rate_pct.normalize() / _HUNDRED, locale=babel_locale(language), decimal_quantization=False)
-    return " · ".join(part for part in (rule.category.display_name, rule.component_label, place, rate) if part)
+    parts = (rule.category.display_name, rule.component_label, place, percent_text(rule.rate_pct))
+    return " · ".join(part for part in parts if part)
 
 
 @operation(
