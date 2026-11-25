@@ -4,11 +4,12 @@ from live.context import OperationContext
 from live.operations import AI, operation
 from live.outbox import record_event
 
-from apps.customer import assistant_cards, events
+from apps.customer import events
 from apps.customer.models import Customer
 from apps.customer.queries.cards import load_detail
 from apps.customer.queries.reads import find_customer
 from apps.customer.schemas.cards import CustomerDetailOut, CustomerIn, CustomerPatchIn
+from apps.customer.services import assistant_cards
 from apps.customer.services.field_values import _apply_field_values, _validated_field_values
 from apps.customer.services.writes import _changes, _e164
 
