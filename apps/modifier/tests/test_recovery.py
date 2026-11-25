@@ -33,7 +33,8 @@ from apps.inventory.tests.test_recovery import (
 )
 from apps.modifier import queries
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
-from apps.modifier.services import OPTION_LEFT, TAX_CATEGORY_UNKNOWN
+from apps.modifier.services.options import TAX_CATEGORY_UNKNOWN
+from apps.modifier.services.recovery import OPTION_LEFT
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of
 from base.tenancy.context import current_alias, use_hub

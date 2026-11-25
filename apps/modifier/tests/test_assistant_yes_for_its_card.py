@@ -432,7 +432,7 @@ def test_the_yes_to_a_link_that_comes_by_its_id_lets_only_it_go_whatever_id_come
 
 # ── A product or a category said by its name, when a group is applied or let go (hub#1291) ───────────────────────────
 # Applying a group or letting it go finds a product by its id, else by its SKU or its name, and a category by its id,
-# else by its name (``services._target``): the card reads them by what was said, as the write will find them, and
+# else by its name (``services.links._target``): the card reads them by what was said, as the write will find them, and
 # says them as said when it cannot. Beside the id the write takes its record by instead (the product's or the
 # category's or, letting a group go, the link's), the card neither reads nor shows the name, which the write does not
 # use.
