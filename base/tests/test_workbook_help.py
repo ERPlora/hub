@@ -163,6 +163,11 @@ class TestFlows:
         by_id = {flow.id: flow for flow in spanish().flows}
         assert by_id["TABLE-F03"].screens == ("floor_plan", "zones")
 
+    def test_a_tab_named_by_itself_and_by_its_window_is_one(self):
+        written = user_part(ES).replace("Pantalla: Cobrar mesa, Zonas", "Pantalla: Cobrar mesa, Plano de sala, Zonas")
+        by_id = {flow.id: flow for flow in parse(written, ES_TABS, ES_WORDS).flows}
+        assert by_id["TABLE-F03"].screens == ("floor_plan", "zones")
+
     def test_a_flow_without_what_happens_if_it_fails_has_it_empty(self):
         by_id = {flow.id: flow for flow in spanish().flows}
         assert (by_id["TABLE-F02"].steps, by_id["TABLE-F02"].failure) == ("1. Toca la mesa ocupada.\n2. Pulsa «Cobrar».", "")
