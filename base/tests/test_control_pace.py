@@ -420,7 +420,7 @@ def test_the_second_of_two_moves_asked_is_taken_at_the_tick_after_the_first_ende
     """``move.worker_pass.run_due`` moves one hub a pass (a copy takes a while): the one asked after it starts at the
     next tick, as it did when the moves' pass started on every tick, not at the moves' look ten minutes later."""
     queue, moved = [], []
-    monkeypatch.setattr(worker_data.move, "run_due", lambda now, cancelled=None: 1 if queue and not moved.append((queue.pop(0), now)) else 0)
+    monkeypatch.setattr(worker_data.move.worker_pass, "run_due", lambda now, cancelled=None: 1 if queue and not moved.append((queue.pop(0), now)) else 0)
 
     run_the_worker(A_MINUTE, Counter(), between=asked_after_the_second_tick(queue, "first", "second"))
 
@@ -455,7 +455,7 @@ def test_a_moves_pass_that_failed_starts_again_at_the_next_tick(at_rest, monkeyp
             raise RuntimeError(f"the database went away during the {queue.pop()} move")
         return 0
 
-    monkeypatch.setattr(worker_data.move, "run_due", run_due)
+    monkeypatch.setattr(worker_data.move.worker_pass, "run_due", run_due)
 
     run_the_worker(A_MINUTE, Counter(), between=asked_after_the_second_tick(queue, "first"))
 

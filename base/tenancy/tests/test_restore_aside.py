@@ -456,7 +456,7 @@ class TestTheCopyGoesThroughTheBucket:
     def test_a_worker_that_stops_while_it_fills_the_copy_leaves_it_to_the_next_one(self, asides, monkeypatch):
         hub, aside = a_hub_with_its_copy(asides)
 
-        run(asides, cancelled=s3.stopping_as(monkeypatch, move, "_restore_command"))
+        run(asides, cancelled=s3.stopping_as(monkeypatch, move.bucket, "_restore_command"))
 
         # Not a failure: nothing noted and its lease let go; the next worker makes the copy anew over what was left.
         left = fresh(aside)

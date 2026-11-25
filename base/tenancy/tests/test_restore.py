@@ -352,10 +352,10 @@ class TestAFailurePutsItsOwnBack:
     @pytest.mark.parametrize(
         ("where", "step"),
         [
-            (move, "_dump_to_bucket"),
-            (move, "_restore_from_bucket"),
-            (move, "_verify_identity"),
-            (move, "_ensure_schema"),
+            (move.bucket, "_dump_to_bucket"),
+            (move.bucket, "_restore_from_bucket"),
+            (move.destination, "_verify_identity"),
+            (move.destination, "_ensure_schema"),
             (restore, "_finish"),
         ],
     )
@@ -767,7 +767,7 @@ class TestTheCopyGoesThroughTheBucket:
     ):
         source = restores.cluster()
         hub = restores.hub(source=source)
-        where, step = (dumps, "_pg_dump_command") if stops_in == "the dump" else (move, "_restore_command")
+        where, step = (dumps, "_pg_dump_command") if stops_in == "the dump" else (move.bucket, "_restore_command")
 
         run(restores, cancelled=s3.stopping_as(monkeypatch, where, step))
 
