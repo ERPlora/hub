@@ -46,6 +46,8 @@ class WorkbookFlow:
     app: str
     done: bool
     on_screen: bool
+    actor: str
+    screen: str
 
     @property
     def walkable(self) -> bool:
@@ -84,16 +86,26 @@ def workbook_flows(root: Path) -> dict[str, WorkbookFlow]:
     with translation.override(workbook_help.SOURCE_LANGUAGE):
         vocabulary = workbook_help.words()
     flows: dict[str, WorkbookFlow] = {}
-    for path in sorted(found for pattern in WORKBOOKS for found in root.glob(pattern)):
+    for path in workbooks(root):
         markdown = catalog.user_part(path.read_text(encoding="utf-8"))
         for flow_id, _title, fields in workbook_help.flow_fields(markdown, vocabulary):
-            done = workbook_help.is_done(" ".join(fields.get("status", [])), vocabulary)
-            flows[flow_id] = WorkbookFlow(flow_id, path.parent.name, done, _on_screen(fields.get("screen", [])))
+            done = workbook_help.is_done(_text(fields, "status"), vocabulary)
+            actor, screen = _text(fields, "actor"), _text(fields, "screen")
+            flows[flow_id] = WorkbookFlow(flow_id, path.parent.name, done, _on_screen(screen), actor, screen)
     return flows
 
 
-def _on_screen(screen: list[str]) -> bool:
-    first = " ".join(screen).split(maxsplit=1)
+def workbooks(root: Path) -> list[Path]:
+    """The source WORKBOOKs under ``root``."""
+    return sorted(found for pattern in WORKBOOKS for found in root.glob(pattern))
+
+
+def _text(fields: Mapping[str, list[str]], key: str) -> str:
+    return " ".join(" ".join(fields.get(key, [])).split())
+
+
+def _on_screen(screen: str) -> bool:
+    first = screen.split(maxsplit=1)
     return not first or first[0].strip(";,.:").casefold() != NO_SCREEN
 
 

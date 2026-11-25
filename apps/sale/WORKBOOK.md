@@ -1004,16 +1004,17 @@ Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
 1. En la agenda de Citas, «Cobrar» abre la cuenta de la cita (con una línea por servicio, a su precio
-   reservado y con la profesional) y lleva a **Vender** con esa cuenta en pantalla.
+   reservado y con la profesional), ya a nombre de la clienta de la cita, y lleva a **Vender** con esa
+   cuenta en pantalla.
 2. Se cobra como siempre; si se aparca y se recupera, la cuenta sigue atada a la cita.
 3. Pulsar «Cobrar» otra vez (o en otro dispositivo a la vez) vuelve a la misma cuenta abierta: una cita
    tiene una sola cuenta abierta, nunca dos.
 Entra: la cita, de Citas.
-Sale: la venta con la cita y la profesional (avisa: venta cobrada y venta nacida de una cita, con la
-cita, quién atendió y el total).
+Sale: la venta con la cita, la clienta y la profesional, y la compra en la ficha de la clienta (avisa:
+venta cobrada y venta nacida de una cita, con la cita, quién atendió y el total).
 Si falla: si la cuenta de la cita ya no está abierta (se cobró o se anuló), el TPV lo dice («Esa cuenta
 ya no está abierta…») y sigue como estaba.
-Implicados: APPOINTMENT-F17
+Implicados: APPOINTMENT-F17, CUSTOMER-F19
 
 ### SALE-F27 Pagar una línea con un bono
 Estado: hecho

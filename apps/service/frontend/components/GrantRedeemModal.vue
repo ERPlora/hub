@@ -183,7 +183,6 @@ async function spend(): Promise<void> {
         interface="popover"
         :value="service"
         :label="t('service.redeem.service')"
-        :placeholder="t('service.redeem.servicePlaceholder')"
         label-placement="floating"
         fill="outline"
         mode="md"

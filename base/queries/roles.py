@@ -118,8 +118,11 @@ def signed_in_role_held(ctx: OperationContext) -> RoleHeld | None:
 
 
 def role_label(held: RoleHeld) -> str:
-    """How the role that rules is named: as the business wrote it, or the basic one in the active language."""
-    return str(Membership.Role(held.invitation).label) if held.own is None else held.own.name
+    """How the role that rules is named: as the business wrote it, or the membership's one in the active language
+    (a basic role, or ERPlora's support)."""
+    if held.own is not None:
+        return held.own.name
+    return str(dict(Membership._meta.get_field("role").flatchoices)[held.invitation])
 
 
 def approvable_of(ctx: OperationContext, held: RoleHeld) -> list[str]:

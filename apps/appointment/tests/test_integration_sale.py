@@ -95,6 +95,63 @@ def test_a_voucher_of_the_customer_pays_a_service_of_the_check_opened_from_the_a
     assert Appointment.objects.get(pk=booked.id).status == "completed"
 
 
+# ── The appointment's customer is the check's (F17): the sale is hers and counts on her card ─────────────────
+
+
+def test_the_check_opened_from_the_agenda_is_the_customers_and_so_is_its_sale(booked):
+    from apps.customer import events as customer_events
+    from apps.customer.models import Customer
+    from apps.customer.queries.orders import linked_customer_id
+    from apps.sale.models import Sale
+
+    opened = run("appointment.appointment.charge", {"id": str(booked.id)})
+    assert linked_customer_id(opened.order_id) == booked.customer_id
+    # The till names no customer at the charge: the one on the check is the sale's.
+    sale = run(
+        "sale.sale.complete",
+        {"idempotency_key": "appointment-test-0005", "order_id": str(opened.order_id), "payments": [{"method": "card"}]},
+    )
+    assert Sale.objects.get(pk=sale.id).customer_id == booked.customer_id
+    completed = OutboxEvent.objects.filter(name="sale.sale.completed").latest("id")
+    customer_events.react(A, completed.name, completed.payload)
+    card = Customer.objects.get(pk=booked.customer_id)
+    assert (card.total_purchases, card.total_spent) == (1, 6500)
+
+
+def test_going_back_to_the_open_check_leaves_its_customer_as_the_till_left_it(booked):
+    from apps.customer.queries.orders import linked_customer_id
+
+    opened = run("appointment.appointment.charge", {"id": str(booked.id)})
+    run("customer.order.link", {"order_id": str(opened.order_id), "customer_id": None})
+    run("appointment.appointment.charge", {"id": str(booked.id)})
+    assert linked_customer_id(opened.order_id) is None
+
+
+@pytest.mark.parametrize("why", ["card deleted", "no right to put a customer on a check"])
+def test_a_customer_who_cannot_go_on_the_check_leaves_it_without_one_and_it_still_opens(booked, why):
+    from apps.customer.models import Customer, OrderLink
+
+    ctx = {}
+    if why == "card deleted":
+        Customer.objects.filter(pk=booked.customer_id).update(deleted_at=timezone.now())
+    else:
+        admin = ctx_for("hub_admin").permissions
+        ctx["permissions"] = {name for name in admin if name != "customer.manage"}
+    opened = run("appointment.appointment.charge", {"id": str(booked.id)}, **ctx)
+    assert Order.objects.get(pk=opened.order_id).lines.count() == 2
+    assert not OrderLink.objects.exists()
+
+
+def test_the_customer_goes_on_the_check_of_her_own_business_only(hub_a, hub_b, booked):
+    from apps.customer.models import OrderLink
+    from base.tenancy.context import use_hub
+
+    opened = run("appointment.appointment.charge", {"id": str(booked.id)})
+    assert list(OrderLink.objects.values_list("order_id", "customer_id")) == [(opened.order_id, booked.customer_id)]
+    with use_hub(hub_b):
+        assert not OrderLink.objects.exists()
+
+
 def test_a_service_without_a_fixed_price_is_charged_at_the_price_booked(db):
     generic = TaxCategory.objects.get(key="service.generic")
     make_service("Highlights", price=6000, duration=90, tax=generic, pricing_type="from", min_price=5000, max_price=9000)

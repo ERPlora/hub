@@ -68,7 +68,8 @@ aparte para el asistente: `journeys/assistant.md` prueba su propio panel. Cuando
   sin nombrar herramientas, pantallas ni campos.
 - **Con la frase a medias, lo correcto es que el asistente pregunte** lo que falta antes de hacer nada.
 - **En un flujo que el asistente no hace, lo correcto es que lo diga** y mande a la pantalla donde se hace; quien prueba
-  lo hace entonces en pantalla, para que el recorrido siga.
+  lo hace entonces en pantalla, para que el recorrido siga. Qué hace el asistente en cada flujo lo dice
+  `manage.py qa_coverage --assistant` (más abajo).
 - **El resultado se comprueba en pantalla o en los datos**, nunca en lo que contesta el asistente.
 
 ## La cobertura
@@ -76,6 +77,7 @@ aparte para el asistente: `journeys/assistant.md` prueba su propio panel. Cuando
 ```bash
 uv run python manage.py qa_coverage
 uv run python manage.py qa_coverage --ledger ~/qa/walks.csv
+uv run python manage.py qa_coverage --assistant
 ```
 
 - Sin opciones dice, por app, qué flujos hechos con pantalla están en algún recorrido, cuáles en ninguno y cuáles
@@ -98,6 +100,23 @@ uv run python manage.py qa_coverage --ledger ~/qa/walks.csv
 
 El comando se para si al registro le falta una columna y, diciendo la línea, si una fecha no es `AAAA-MM-DD` o un canal
 no es uno de los tres.
+
+- Con `--assistant` dice, por flujo hecho con pantalla, su grupo, lo que se espera al pedirlo hablando y las operaciones
+  que lo respaldan, con las que son herramientas del asistente marcadas (`tool`). No hay lista escrita a mano: las
+  operaciones de un flujo son las de las filas que lo nombran en la columna `Flujos` de las tablas de servicios de los
+  WORKBOOK, y qué es herramienta lo dice el registro de operaciones.
+
+| Grupo | Cuándo | Qué se espera al pedirlo hablando |
+|---|---|---|
+| `can` | alguna de sus escrituras es herramienta, o solo lee y todas sus lecturas lo son | lo hace, y se comprueba en pantalla o en los datos |
+| `assistant only` | `Pantalla:` nombra solo al asistente | lo mismo, y no hay otro camino |
+| `cannot` | cualquier otro | dice que no lo hace él y en qué pantalla se hace |
+
+Después da lo que queda por escribir en los WORKBOOK, en tres listas: los flujos sin decidir, porque no se conoce
+ninguna de sus operaciones; los que se contradicen, y las herramientas que no cita ningún flujo. Un flujo se contradice
+si `Actor:` nombra al asistente y ninguna de sus operaciones es herramienta, o si lo nombra `Pantalla:` y las que se
+conocen no son herramientas ni las del propio panel del asistente. Que el asistente pueda hacerlo y `Actor:` no lo nombre
+no es una contradicción: lo dice su grupo.
 
 ## Cómo se mantiene
 

@@ -1,0 +1,10 @@
+{% extends "base/gate.html" %}{% load i18n %}
+{% comment %}
+403 of /auth/callback when ERPlora's support comes into a business that does not let support in (base.auth_views).
+{% endcomment %}
+{% block title %}{% translate "This business does not let support in" %}{% endblock %}
+{% block content %}
+    <h1>{% translate "This business does not let support in" %}</h1>
+    <p>{% translate "The owner or an administrator of this business has to turn on ERPlora's support access before you can come in. Ask them to, then try again." %}</p>
+    <p><a href="{{ retry_url }}">{% translate "Try again" %}</a></p>
+{% endblock %}
