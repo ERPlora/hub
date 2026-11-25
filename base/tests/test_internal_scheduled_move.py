@@ -89,7 +89,7 @@ def test_it_says_the_move_next_to_the_platform_freeze(client, db, target):
 def test_once_the_worker_starts_the_move_it_says_none(client, db, target):
     ask_for_tonight(target)
     with use_control():
-        assert provisioning.claim_hub(HUB_ID, TONIGHT, move.LEASE, owner="a:1") is not None
+        assert provisioning.claim_hub(HUB_ID, TONIGHT, move.moving.LEASE, owner="a:1") is not None
         assert control_services.start_scheduled_move(HUB_ID, TONIGHT, owner="a:1") is True
 
     assert poll(client)["move_scheduled_for"] is None
