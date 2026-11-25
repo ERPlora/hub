@@ -95,6 +95,11 @@ describe('NewRoleModal', () => {
 
     expect(m.inDoc('role-new-error')?.textContent).toContain(message);
     expect(m.wrapper.emitted('created')).toBeUndefined();
+
+    await m.wrapper.setProps({ open: false });
+    await m.wrapper.setProps({ open: true });
+    await settle();
+    expect(m.inDoc('role-new-error')).toBeNull();
   });
 
   it('opens clean every time', async () => {

@@ -44,6 +44,8 @@ describe('RolePermissionRow', () => {
   it('it paints the state the form holds, not the saved one', async () => {
     const m = await open(permission({ state: 'on' }), 'off');
     expect((m.wrapper.get('ion-toggle').element as unknown as { checked: boolean }).checked).toBe(false);
+    const approvable = await open(permission({ approvable: true, state: 'approval' }), 'on');
+    expect((approvable.wrapper.get('ion-segment').element as unknown as { value: string }).value).toBe('on');
   });
 
   it('one left to review is marked, of either kind; the others are not', async () => {

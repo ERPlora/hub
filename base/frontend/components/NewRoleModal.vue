@@ -37,7 +37,6 @@ watch(
 );
 
 async function create(): Promise<void> {
-  if (!name.value.trim()) return;
   let role: HubRoleRow;
   try {
     role = await run({ name: name.value.trim(), based_on: basedOn.value });

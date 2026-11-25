@@ -136,6 +136,7 @@ describe('RoleEditor', () => {
     await ionValue(el(m, 'role-description'), '', 'ionInput');
     await save(m);
     expect(bodies(m)).toEqual([{ role: KEY, description: '' }]);
+    expect((el(m, 'role-description') as unknown as { value: string }).value).toBe('');
   });
 
   it('with new permissions says so and may be saved as it is, which leaves them reviewed', async () => {

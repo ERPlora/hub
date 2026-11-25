@@ -60,7 +60,7 @@ async function save(changes: RoleForm): Promise<RoleDetail> {
     ...app,
     permissions: app.permissions.map((line) => ({ ...line, state: states[line.permission] })),
   }));
-  return { ...role, label: row.label, description: row.description, to_review: row.to_review, apps };
+  return { ...role, ...row, apps };
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));

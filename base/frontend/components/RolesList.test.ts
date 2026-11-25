@@ -1,7 +1,7 @@
 import { offeredRowActions, pressRowAction } from '@erplora/ui/testing/data-table';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, OWNER, settle, subId, tap } from '../__tests__/mount-base';
+import { click, EMPLOYEE, errorFrame, flush, installedApp, ionValue, leaveInstalledApp, mountBase, OWNER, settle, subId, tap } from '../__tests__/mount-base';
 import type { HubRoleRow } from '../operations/people';
 import RolesList from './RolesList.vue';
 
@@ -157,6 +157,18 @@ describe('RolesList', () => {
     expect(chosen()).toBe('hub_employee');
   });
 
+  it('the role just made opens to adjust it', async () => {
+    const m = await managed();
+    const made = '0199aaaa-0000-7000-8000-000000000002';
+    m.answerBy({ '/api/roles': [200, cashier({ key: made, label: 'Caja de tarde' })] });
+    await pressRowAction(m.wrapper, 'hub_employee', 'duplicate');
+    await settle();
+    await ionValue(m.inDoc('role-new-name'), 'Caja de tarde', 'ionInput');
+    await click(m.inDoc('role-new-submit'));
+    await flush();
+    expect(m.router.currentRoute.value.path).toBe(`/employees/roles/${made}`);
+  });
+
   it('«Edit» opens the role, as its row does', async () => {
     const m = await managed();
     await pressRowAction(m.wrapper, OWN, 'edit');
@@ -176,6 +188,7 @@ describe('RolesList', () => {
 
     expect(m.sent().map((call) => [call.path, call.body])).toEqual([['/api/roles/delete', { role: OWN }]]);
     expect(toasts.toastSuccess).toHaveBeenCalledWith('Rol Cajero borrado');
+    expect(m.inDoc('role-delete-submit')).toBeNull();
   });
 
   it('one somebody has is refused in the question, which stays; asked again, it is clean', async () => {
