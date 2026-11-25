@@ -18,7 +18,7 @@ from base import qa_assistant, qa_coverage
 from base.qa_assistant import Contradiction, Group
 from base.qa_coverage import WorkbookFlow
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 COUNTS = re.compile(r"^assistant: (\d+) can, (\d+) assistant only, (\d+) cannot, (\d+) undecided$")
 
 MANUAL = """\
