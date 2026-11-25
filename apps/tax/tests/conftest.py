@@ -1,5 +1,5 @@
 """Fixtures of the tax tests: contexts per role and scope, users with a role on a host, a raw DSN, and the helpers
-the tests of the tax reads share.
+the tests of the tax reads and writes share.
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it, with its
@@ -7,16 +7,20 @@ own factory catalogue; a test of B asks for ``hub_b`` and enters it.
 """
 
 import datetime as dt
+import json
 from datetime import date
 from decimal import Decimal
 
+import psycopg
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
+from live.outbox import channel_for
 from psycopg.conninfo import make_conninfo
 
 from apps.invoice.tests.conftest import catalog_of, in_hubs
@@ -25,7 +29,7 @@ from apps.tax.models import TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas.aliases import AliasListIn, AliasResolveIn
 from apps.tax.schemas.calculation import CalculateIn
 from apps.tax.schemas.categories import CategoryListIn
-from apps.tax.schemas.rules import RuleListIn
+from apps.tax.schemas.rules import RuleIn, RuleListIn
 from base.models import Membership
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
@@ -113,10 +117,22 @@ def db_dsn(django_db_setup):
 
 
 TODAY = date(2026, 6, 27)
+WAIT = 1.0
+QUIET = 0.3
 
 
-def run(name, data, role="hub_admin", language="en"):
-    return get(name)(ctx_for(role, language=language), data)
+def run(name, data, role="hub_admin", scope=A, language="en"):
+    return get(name)(ctx_for(role, scope, language=language), data)
+
+
+def outbox():
+    return list(OutboxEvent.objects.values_list("name", "scope_key", "payload"))
+
+
+def refused(error, make):
+    with pytest.raises(error) as excinfo:
+        make()
+    return excinfo.value
 
 
 def category(key="product.generic", name=None, system=False, description=""):
@@ -133,6 +149,16 @@ def rule(cat, rate="21", country="ES", region="", **fields):
         rate_pct=Decimal(rate),
         **fields,
     )
+
+
+def create_rule(role="hub_admin", scope=A, **fields):
+    data = {
+        "country_code": "ES",
+        "tax_category_key": "product.generic",
+        "rate_pct": "21",
+        **fields,
+    }
+    return run("tax.rule.create", RuleIn(**data), role, scope)
 
 
 def resolve(key="product.generic", country="ES", region=None, on=TODAY):
@@ -176,3 +202,25 @@ def food_and_book_aliases():
 
 def keep_region(region):
     TaxSettings.objects.update_or_create(singleton=True, defaults={"region_code": region})
+
+
+@pytest.fixture
+def listen(db_dsn):
+    sessions = []
+
+    def open_session(scope):
+        session = psycopg.connect(db_dsn, autocommit=True)
+        sessions.append(session)
+        session.execute(f"LISTEN {channel_for(scope)}")
+        return session
+
+    yield open_session
+    for session in sessions:
+        session.close()
+
+
+def received(session, timeout=WAIT, stop_after=None):
+    return [
+        (note.channel, json.loads(note.payload))
+        for note in session.notifies(timeout=timeout, stop_after=stop_after)
+    ]

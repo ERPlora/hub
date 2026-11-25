@@ -45,7 +45,7 @@ class InvoiceConfig(LiveAppConfig):
     permissions = {
         "invoice.view_invoice": _("View and print invoices, series, numbering and the issuer"),
         "invoice.view_all_invoices": _("View everyone's invoices"),
-        "invoice.add_invoice": _("Issue invoices, invoice a sale, replace a receipt and mark invoices paid"),
+        "invoice.add_invoice": _("Issue and email invoices, invoice a sale, replace a receipt and mark invoices paid"),
         "invoice.rectify_invoice": _("Issue corrective invoices"),
         "invoice.manage_series": _("Create and change invoice series"),
         "invoice.manage_issuer": _("Set up the issuer"),
@@ -69,6 +69,15 @@ class InvoiceConfig(LiveAppConfig):
         "hub_employee": ["invoice.view_invoice", "invoice.add_invoice"],
         "hub_accountant": ["invoice.view_invoice", "invoice.view_all_invoices"],
     }
+    # The worker hands over again the emails nobody took, and tells the ones that stopped half-way (cron in UTC).
+    scheduled_tasks = [
+        {
+            "name": "resume_emails",
+            "operation": "invoice.email.resume",
+            "cron": "*/5 * * * *",
+            "catch_up": "collapse",
+        }
+    ]
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with
     # `icon =` as the module's own icon. Registered icons only: the old `document-text-outline` and
     # `bookmark-outline` wait in UI-REQUESTS.md.

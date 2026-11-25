@@ -54,6 +54,8 @@ class RolePermissionOut(Schema):
     permission: str
     phrase: str = Field(description="What the permission lets a person do, in business words and the reader's language.")
     state: State = Field(description=STATE)
+    approvable: bool = Field(description="A manager can approve it there and then, so a role may leave it to approval.")
+    to_review: bool = Field(description="The business's own: the role was saved before this permission was there to look at.")
 
 
 class RoleAppOut(Schema):

@@ -14,7 +14,7 @@ from apps.invoice import events
 from apps.invoice.tests.conftest import A, HUB_DB, deliver, run
 from apps.sale.models import Sale
 
-PAST_FACT = re.compile(r"^invoice\.[a-z_]+\.([a-z_]+ed|paid)$")
+PAST_FACT = re.compile(r"^invoice\.[a-z_]+\.([a-z_]+ed|paid|sent)$")
 
 
 def declared():
@@ -33,6 +33,9 @@ def test_the_events_of_the_workbook():
         "SERIES_CREATED": "invoice.series.created",
         "SERIES_UPDATED": "invoice.series.updated",
         "ISSUER_UPDATED": "invoice.issuer.updated",
+        "EMAIL_REQUESTED": "invoice.email.requested",
+        "EMAIL_SENT": "invoice.email.sent",
+        "EMAIL_FAILED": "invoice.email.failed",
     }
 
 
@@ -42,11 +45,12 @@ def test_every_event_is_app_entity_fact_in_the_past():
         assert PAST_FACT.match(value), value
 
 
-def test_it_reacts_to_the_charge_the_refund_and_the_void_of_a_sale():
+def test_it_reacts_to_the_charge_the_refund_and_the_void_of_a_sale_and_to_an_erased_customer():
     assert events.REACTIONS == {
         "sale.sale.completed": "invoice.invoice.create_from_sale",
         "sale.sale.refunded": "invoice.invoice.rectify_from_refund",
         "sale.sale.voided": "invoice.invoice.rectify_from_void",
+        "customer.customer.erased": "invoice.email.forget_customer",
     }
     for operation in events.REACTIONS.values():
         assert registry[operation].kind == "command"

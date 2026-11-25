@@ -1,13 +1,14 @@
 <script setup lang="ts">
-// «What it allows» of a role, read only: a panel per app that is on, each permission with its phrase and what the role
-// does with it.
+// «What it allows» of a role, a panel per app that is on, each permission with its phrase and what the role does with it.
+// Read only, save one the business made for who manages the roles, who adjusts it here.
 import { InlineFeedback, StatusPill, type StatusPillTone } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { AppPage } from '@erplora/ui/shell';
+import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonNote, IonSpinner } from '@ionic/vue';
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 
+import RoleEditor from '../components/RoleEditor.vue';
 import { useBaseI18n } from '../lib/i18n';
 import { roleName } from '../lib/people';
 import type { RolePermission } from '../operations/people';
@@ -17,6 +18,7 @@ const TONES: Record<RolePermission['state'], StatusPillTone> = { on: 'success', 
 
 const { t, locale } = useBaseI18n();
 const route = useRoute();
+const session = useSession();
 
 const roleId = computed(() => String(route.params.role ?? ''));
 const { data, status, error, refresh } = useLive('base.role.detail', computed(() => ({ role: roleId.value })));
@@ -24,6 +26,7 @@ const { data, status, error, refresh } = useLive('base.role.detail', computed(()
 const role = computed(() => data.value);
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 const notFound = computed(() => failed.value && error.value?.code === 'base.role_not_found');
+const adjustable = computed(() => role.value?.origin === 'own' && session.can('base.manage_roles'));
 const members = computed(() => new Intl.NumberFormat(locale.value).format(role.value?.members ?? 0));
 </script>
 
@@ -65,6 +68,11 @@ const members = computed(() => new Intl.NumberFormat(locale.value).format(role.v
         </ion-button>
       </template>
     </InlineFeedback>
+    <RoleEditor
+      v-else-if="role && adjustable"
+      :key="role.key"
+      :role="role"
+    />
     <template v-else-if="role">
       <section class="settings-card">
         <p class="settings-card__intro">

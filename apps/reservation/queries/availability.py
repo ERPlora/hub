@@ -12,7 +12,8 @@ from apps.reservation.queries.gate import blocks_of, booked_windows, counted, ho
 from apps.reservation.queries.reads import blocked_out
 from apps.reservation.schemas.availability import DayIn, DayOut, FreeTablesOut, TablesIn
 from apps.table.models import Table
-from apps.table.queries import floor, natural_key
+from apps.table.queries import floor
+from apps.table.queries.tables import natural_key
 from base.business import zone_name
 
 
