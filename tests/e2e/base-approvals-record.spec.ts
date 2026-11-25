@@ -30,8 +30,10 @@ let itemId = '';
 
 const rows = () => shown(page).locator('[data-testid="approvals-row"], [data-testid="approvals-card"]');
 
+/** The record just opened: a goto to the same address with a hash would keep what was searched and filtered. */
 async function open(): Promise<void> {
   await page.goto(`${A}/employees#approvals`);
+  await page.reload();
   await expect(testid(page, 'approvals-search')).toBeVisible();
 }
 
