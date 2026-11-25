@@ -29,6 +29,7 @@ KEYS = {
     "vertical": pgettext_lazy("workbook", "Vertical"),
     "actor": pgettext_lazy("workbook", "Actor"),
     "screen": pgettext_lazy("workbook", "Screen"),
+    "operations": pgettext_lazy("workbook", "Operations"),
     "steps": pgettext_lazy("workbook", "Steps"),
     "in": pgettext_lazy("workbook", "In"),
     "out": pgettext_lazy("workbook", "Out"),

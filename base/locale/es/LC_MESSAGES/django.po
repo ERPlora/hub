@@ -2363,6 +2363,11 @@ msgstr "Pantalla"
 
 #: workbook_help.py
 msgctxt "workbook"
+msgid "Operations"
+msgstr "Operaciones"
+
+#: workbook_help.py
+msgctxt "workbook"
 msgid "Steps"
 msgstr "Pasos"
 

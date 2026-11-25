@@ -46,8 +46,9 @@ EXPECTED = {
 
 @dataclass(frozen=True)
 class Asked:
-    """A flow asked for by talking; its group is ``None`` while none of its operations is known, and it contradicts
-    itself when it names the assistant and no tool backs it."""
+    """A flow asked for by talking; its group is ``None`` while none of its operations is known and it does not say it
+    uses none, and it contradicts itself when it names the assistant and no tool backs it or when it says it uses no
+    operation and one is cited."""
 
     flow: WorkbookFlow
     operations: tuple[Operation, ...]
@@ -86,7 +87,7 @@ def _group(flow: WorkbookFlow, operations: Sequence[Operation]) -> Group | None:
     if _only_the_assistant(flow.screen):
         return Group.ASSISTANT_ONLY
     if not operations:
-        return None
+        return Group.CANNOT if flow.no_operations else None
     writes = [op for op in operations if op.kind == "command"]
     can = any(map(is_tool, writes)) if writes else all(map(is_tool, operations))
     return Group.CAN if can else Group.CANNOT
@@ -100,8 +101,10 @@ def _only_the_assistant(screen: str) -> bool:
 
 
 def _contradicts(flow: WorkbookFlow, operations: Sequence[Operation]) -> bool:
-    """Whether ``flow`` names the assistant with no tool behind it; as its screen, only against operations that are not
-    its panel's: the panel is also where its own flows are done."""
+    """Whether ``flow`` says it uses no operation and has some, or names the assistant with no tool behind it; as its
+    screen, only against operations that are not its panel's: the panel is also where its own flows are done."""
+    if flow.no_operations and operations:
+        return True
     if any(map(is_tool, operations)):
         return False
     of_another_screen = bool(operations) and not any(op.name.startswith(PANEL) for op in operations)
