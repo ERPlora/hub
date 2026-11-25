@@ -42,6 +42,21 @@ def _check_number(scope: Scope, series: InvoiceSeries, *, blame: str) -> None:
     refuse_platform_number(scope, first, field=blame)
 
 
+def _asked_as(field: str) -> str:
+    return "next_number" if field == "current_number" else field
+
+
+def _refuse_locked(series: InvoiceSeries, changes: dict) -> None:
+    """Once the series has issued, the shape of its numbers and its counter change no more."""
+    frozen = sorted(set(changes) & {"prefix", "format", "current_number"})
+    if frozen and series_started(series):
+        raise Conflict(
+            str(SERIES_LOCKED),
+            code="invoice.series_locked",
+            fields={_asked_as(field): str(SERIES_LOCKED) for field in frozen},
+        )
+
+
 def _demote_defaults(year: int, keep: UUID | None = None) -> None:
     InvoiceSeries.objects.filter(year=year, is_default=True).exclude(pk=keep).update(
         is_default=False
@@ -148,16 +163,7 @@ def update_series(ctx: OperationContext, data: SeriesUpdateIn) -> dict:
         for field, value in wanted.items()
         if value is not None and getattr(series, field) != value
     }
-    frozen = sorted(set(changes) & {"prefix", "format", "current_number"})
-    if frozen and series_started(series):
-        field_names = [
-            "next_number" if field == "current_number" else field for field in frozen
-        ]
-        raise Conflict(
-            str(SERIES_LOCKED),
-            code="invoice.series_locked",
-            fields={f: str(SERIES_LOCKED) for f in field_names},
-        )
+    _refuse_locked(series, changes)
     for field, value in changes.items():
         setattr(series, field, value)
     if "prefix" in changes or "format" in changes:
@@ -174,10 +180,7 @@ def update_series(ctx: OperationContext, data: SeriesUpdateIn) -> dict:
                 "id": str(series.id),
                 "code": series.code,
                 "year": series.year,
-                "fields": sorted(
-                    "next_number" if field == "current_number" else field
-                    for field in changes
-                ),
+                "fields": sorted(_asked_as(field) for field in changes),
             },
         )
     return series_row(series)
