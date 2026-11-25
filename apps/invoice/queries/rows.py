@@ -29,14 +29,18 @@ def with_links(invoices):
 def _flags(invoice: Invoice, *, substituted: bool, rectified: bool) -> dict:
     """What can still be done to a document, and whether it is overdue: the row and the detail ask the same questions."""
     ordinary = not invoice.is_rectification
+    # erplora.com corrects the ones it issued.
+    by_hand = invoice.platform_ref is None
     return {
         "substituted": substituted,
         "overdue": is_overdue(invoice, substituted=substituted),
         "can_mark_paid": ordinary and invoice.status == Invoice.Status.ISSUED,
-        "can_rectify": ordinary
+        "can_rectify": by_hand
+        and ordinary
         and invoice.status != Invoice.Status.CANCELLED
         and not substituted,
-        "can_substitute": invoice.invoice_type == "F2"
+        "can_substitute": by_hand
+        and invoice.invoice_type == "F2"
         and invoice.status != Invoice.Status.CANCELLED
         and not substituted
         and not rectified,

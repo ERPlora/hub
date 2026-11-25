@@ -7,8 +7,9 @@ from django.db.models.functions import Lag
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.invoice.models import Invoice, InvoiceSeries
+from apps.invoice.models import Invoice
 from apps.invoice.queries.rows import _page
+from apps.invoice.queries.series import business_series
 from apps.invoice.schemas.numbering import (
     AllocationPage,
     AllocationsIn,
@@ -46,7 +47,8 @@ from apps.tax.queries.jurisdiction import business_today
 )
 def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
     year = business_today().year
-    this_year = InvoiceSeries.objects.filter(year=year)
+    own = business_series(ctx)
+    this_year = own.filter(year=year)
     ordinary = this_year.filter(invoice_type__in=("F1", "F2", "F3")).count()
     rectifying = this_year.filter(invoice_type__startswith="R").count()
     return {
@@ -54,7 +56,7 @@ def numbering_status(ctx: OperationContext, params: NumberingStatusIn) -> dict:
         "ordinary_series": ordinary,
         "rectifying_series": rectifying,
         "default_series": this_year.filter(is_default=True).count(),
-        "total_series": InvoiceSeries.objects.count(),
+        "total_series": own.count(),
         "configured": ordinary > 0 and rectifying > 0,
     }
 

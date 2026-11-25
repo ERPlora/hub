@@ -271,7 +271,14 @@ def test_no_series_prints_the_numbers_of_erplora_com(platform_hub, numbering, fi
 
 
 @HUB_DB
-@pytest.mark.parametrize("prefix", ["ERPLORA", "ERP2", "XERP", "WEB"])
+def test_nor_one_left_without_a_prefix(platform_hub, today):
+    web = run("invoice.series.create", {"code": "WEB", "invoice_type": "F1", "year": today.year})
+    numbering = {"prefix": "", "format": "{prefix}ERP-{year}-{seq:05d}"}
+    assert code_of(lambda: run("invoice.series.update", {"series_id": str(web.id), **numbering})) == CLOSED
+
+
+@HUB_DB
+@pytest.mark.parametrize("prefix", ["ERPLORA", "ERP2", "XERP", "ERP-WEB", "WEB"])
 def test_a_prefix_that_only_resembles_them_is_the_businesss_own(platform_hub, prefix, today):
     run("invoice.series.create", {"code": "WEB", "invoice_type": "F1", "year": today.year, "prefix": prefix})
     assert manual(series_code="WEB").number == f"{prefix}-{today.year}-000001"
@@ -348,6 +355,13 @@ def test_its_credit_note_still_rectifies_it(original):
     assert code_of(lambda: run("invoice.invoice.rectify", {"number": credit.number, "reason": "x"})) == KEPT
 
 
+@pytest.fixture
+def served(born, hub_a):
+    """ERPlora's own business answers at its address: its row is the platform's."""
+    hub_a.is_platform = True
+    hub_a.save(update_fields=["is_platform"])
+
+
 # ── Every door ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -375,7 +389,7 @@ def post(client, path: str, data: dict, **headers):
 
 @HUB_DB
 @pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager"])
-def test_the_api_refuses_it_to_whoever_signs_in_and_says_why_in_their_language(born, client, make_user, role):
+def test_the_api_refuses_it_to_whoever_signs_in_and_says_why_in_their_language(served, client, make_user, role):
     client.force_login(make_user("boss", role=role))
     before = rows()
     for operation, data in attempts():
@@ -386,7 +400,7 @@ def test_the_api_refuses_it_to_whoever_signs_in_and_says_why_in_their_language(b
 
 
 @HUB_DB
-def test_an_api_key_issues_and_changes_nothing_there(born, client, make_user):
+def test_an_api_key_issues_and_changes_nothing_there(served, client, make_user):
     client.force_login(make_user("boss", role="hub_owner"))
     made = post(client, "/api/keys", {"name": "Integration", "rate_per_minute": 60, "scopes": {"*": ["read", "create", "update"]}})
     assert made.status_code == 200, made.content
