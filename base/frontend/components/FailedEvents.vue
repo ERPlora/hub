@@ -306,7 +306,6 @@ async function confirmDiscard(): Promise<void> {
 
 .failed-event-route,
 .failed-event-stuck {
-  margin: 0;
   font-size: 0.875rem;
 }
 
