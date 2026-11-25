@@ -63,19 +63,21 @@ async function withRole(page: Page, name: string, use: (role: Role) => Promise<v
   }
 }
 
-/** Who may be given a role: the employee, who exists in the business once they have signed in. */
-async function employeeOf(browser: Browser): Promise<string> {
-  const { context } = await hostPage(browser, A, { credentials: EMPLOYEE });
-  await context.close();
-  return psql(`select username from auth_user where email = '${EMPLOYEE.email}'`);
-}
-
 /** Employees › Roles as the owner opens it in Spanish. */
 async function ownerRoles(browser: Browser, viewport: ViewportSize) {
   const { context, page } = await spanishPerson(browser, viewport);
   await page.goto(`${A}${ROLES}`);
   await expect(rows(page)).toHaveCount(5);
   return { context, page };
+}
+
+/** The same, and how they give the employee a role: they are in the business once they have signed in. */
+async function ownerGiving(browser: Browser, viewport: ViewportSize) {
+  const employee = await hostPage(browser, A, { credentials: EMPLOYEE });
+  await employee.context.close();
+  const person = psql(`select username from auth_user where email = '${EMPLOYEE.email}'`);
+  const owner = await ownerRoles(browser, viewport);
+  return { ...owner, give: (role: string) => api(owner.context, A, 'POST', '/roles/assign', { person, role }) };
 }
 
 for (const size of SIZES) {
@@ -147,9 +149,7 @@ for (const size of SIZES) {
   });
 
   test(`BASE-F129: a role somebody has is not deleted, and the question says why at ${size.width}`, async ({ browser }) => {
-    const person = await employeeOf(browser);
-    const { context, page } = await ownerRoles(browser, size);
-    const give = (role: string) => api(context, A, 'POST', '/roles/assign', { person, role });
+    const { context, page, give } = await ownerGiving(browser, size);
     await withRole(page, 'Cajero', async (role) => {
       expect((await give(role.key)).status).toBe(200);
       try {
@@ -198,9 +198,7 @@ for (const size of SIZES) {
   });
 
   test(`BASE-F128: nobody lets a role do more than they may do themselves, said next to «Save» at ${size.width}`, async ({ browser }) => {
-    const person = await employeeOf(browser);
-    const { context, page } = await ownerRoles(browser, size);
-    const give = (role: string) => api(context, A, 'POST', '/roles/assign', { person, role });
+    const { context, page, give } = await ownerGiving(browser, size);
     await withRole(page, 'Cajero', async (role) => {
       await withRole(
         page,
