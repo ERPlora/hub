@@ -396,7 +396,7 @@ If it fails: a region that has no taxes of its own in the business's country is 
 ("This region has no taxes of its own in your business's country: choose one of its tax territories, or
 none."); a category without a rule of its region is never charged at the national VAT, just like a category
 without any rule: the till does not let it be charged ("… cannot be charged: no tax rule applies to its tax
-category … here."), the invoice refuses it below its line ("No tax rule applies today to the tax category
+category … here."), the invoice refuses it below its line ("No tax rule applies that day to the tax category
 …") and Categories and the sections of Sales show no rate for it; it is fixed by creating its rule (step 2).
 With "Whole country (VAT)", the regional rules are never used. Whoever only views taxes sees the region, but
 does not change it.
@@ -559,7 +559,7 @@ In: what is already saved in Rules and Categories.
 Out: what the sale line freezes: category, combined rate, country, region and rule. A line with a category
 and without a rule of the business's country is refused (in a business of another country, Spain's rules
 never apply), it never falls to 0 %: the till says "… cannot be charged: no tax rule
-applies to its tax category … here." and the invoice, "No tax rule applies today to the tax category …"
+applies to its tax category … here." and the invoice, "No tax rule applies that day to the tax category …"
 (TAX-F11). What to do with a line without a category is up to Sales.
 If it fails: the cashier does not charge with a guessed rate.
 Involved: COMBO-F09, INVENTORY-F01, INVENTORY-F02, INVOICE-F01, INVOICE-F03, MODIFIER-F07, SALE-F01,

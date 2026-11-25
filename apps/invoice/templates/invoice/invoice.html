@@ -82,6 +82,7 @@
         <span class="k">{% translate "No." %}</span><span class="v">{{ invoice.number }}</span>
         <span class="k">{% translate "Date" %}</span><span class="v">{{ issue_date }}</span>
         {% if operation_date %}<span class="k">{% translate "Operation date" %}</span><span class="v">{{ operation_date }}</span>{% endif %}
+        {% if due_date %}<span class="k">{% translate "Due date" context "invoice" %}</span><span class="v">{{ due_date }}</span>{% endif %}
       </div>
     </div>
   </div>

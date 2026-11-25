@@ -385,7 +385,7 @@ Si falla: un territorio que no tiene impuestos propios en el país del negocio s
 territorios fiscales, o ninguno.»); una categoría sin regla de su territorio no se cobra nunca al IVA
 nacional, igual que una categoría sin ninguna regla: el TPV no deja cobrarla («… no se puede cobrar:
 ninguna regla fiscal se aplica aquí a su categoría fiscal …»), la factura la rechaza debajo de su línea
-(«Ninguna regla fiscal se aplica hoy a la categoría fiscal …») y Categorías y las secciones de Ventas no le
+(«Ninguna regla fiscal se aplica ese día a la categoría fiscal …») y Categorías y las secciones de Ventas no le
 enseñan tipo; se arregla creando su regla (paso 2). Con «Todo el
 país (IVA)», las reglas regionales no se usan nunca. Quien solo consulta impuestos ve el
 territorio, pero no lo cambia.
@@ -541,7 +541,7 @@ Entra: lo que ya está guardado en Reglas y Categorías.
 Sale: lo que la línea de venta congela: categoría, tipo combinado, país, región y regla. Una línea con
 categoría y sin regla del país del negocio se rechaza (en un negocio de otro país, las reglas de España no
 se aplican nunca), nunca cae al 0 %: el TPV dice «… no se puede cobrar: ninguna regla
-fiscal se aplica aquí a su categoría fiscal …» y la factura, «Ninguna regla fiscal se aplica hoy a la
+fiscal se aplica aquí a su categoría fiscal …» y la factura, «Ninguna regla fiscal se aplica ese día a la
 categoría fiscal …» (TAX-F11). Qué hacer con una línea sin categoría es cosa de Ventas.
 Si falla: el cajero no cobra con un tipo supuesto.
 Implicados: COMBO-F09, INVENTORY-F01, INVENTORY-F02, INVOICE-F01, INVOICE-F03, MODIFIER-F07, SALE-F01,
