@@ -6,7 +6,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { aMonday } from './appointment-helpers';
-import { cutInPicker, dayIn, openPicker } from './date-time-fields';
+import { cutInPicker, dayIn, openPicker, spin } from './date-time-fields';
 import { A, capture, psql, settled } from './helpers';
 import { cast, keepTheBusiness } from './online-booking-helpers';
 import { ownerPage } from './service-helpers';
@@ -134,35 +134,40 @@ test('with the keyboard: the calendar opens, a day is taken with Enter and the f
   }
 });
 
-test('moving through the months and the years takes no day until one is tapped, and Done keeps the same day of another month', async ({ browser }) => {
+test('moving through the months and the years takes no day until one is tapped, and Done keeps the same day of another year', async ({ browser }) => {
   const [size] = SIZES;
   const { context: owner } = await ownerPage(browser, '/online_booking/bookings');
-  const day = aMonday(SIZES.length + 1);
+  // The wheel of years offers up to this one; the first of a month exists in every year.
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = `${year}-${month}-01`;
   try {
-    const who = await cast(owner, named('months'), day);
+    const who = await cast(owner, named('months'), aMonday(SIZES.length + 1));
     const { context, page } = await bookingPage(browser, size, who.service.id, SIZES.length + 1);
     try {
       const field = dayField(page);
       const value = field.locator('input');
       let picker = await openPicker(page, field, 'date');
+      const shownMonth = picker.locator('.calendar-month-year-toggle');
+      const opened = (await shownMonth.textContent()) ?? '';
       await picker.locator('.calendar-next-prev ion-button').nth(1).click();
-      await expect(picker).toBeVisible();
+      await expect(shownMonth).not.toHaveText(opened);
       await expect(value).toHaveValue('');
       await (await dayIn(picker, day)).click();
       await expect(picker).toBeHidden();
 
       picker = await openPicker(page, field, 'date');
-      await picker.locator('.calendar-month-year-toggle').click();
-      const years = picker.locator('ion-picker-column[aria-label="Select a year"]');
-      const before = Number(day.slice(0, 4));
-      await years.locator('ion-picker-column-option').filter({ hasText: new RegExp(`^${before - 1}$`) }).click();
-      await expect(years.locator('ion-picker-column-option.option-active[part~="active"]')).toHaveText(String(before - 1));
+      await shownMonth.click();
+      // A wheel tapped while it opens keeps the year it had.
+      await settled(page);
+      await spin(picker, 'Select a year', String(year - 1));
       await expect(picker).toBeVisible();
       await expect(value).toHaveValue(asShown(day, size));
-      await picker.locator('.calendar-month-year-toggle').click();
+      await shownMonth.click();
       await picker.locator('#confirm-button').click();
       await expect(picker).toBeHidden();
-      await expect(value).toHaveValue(asShown(`${before - 1}${day.slice(4)}`, size));
+      await expect(value).toHaveValue(asShown(`${year - 1}-${month}-01`, size));
 
       picker = await openPicker(page, field, 'date');
       await picker.locator('#clear-button').click();
