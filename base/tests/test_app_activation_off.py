@@ -176,9 +176,10 @@ def test_an_app_born_on_is_listed_on_and_takes_nothing_of_the_plans_limit():
 
 @HUB_DB
 def test_the_counter_counts_only_the_apps_this_business_shows(settings):
-    """The reference app is no app of a customer's hub: it never counts against its limit."""
+    """An app out of the store (the reference app, and Tips until its screens exist) is no app of a customer's hub: it
+    never counts against its limit. This business has every app on: of its 17 roots, those two are not shown."""
     settings.SHOW_UNLISTED_MODULES = False
-    assert app_list()["enabled"] == 16
+    assert app_list()["enabled"] == 15
 
 
 def test_the_list_the_menu_and_the_home_follow_every_change():

@@ -1414,7 +1414,14 @@
       "website__site__publish": "Publicar la página web",
       "website__site__save": "Guardar el borrador de la página web",
       "website__site__unpublish": "Desconectar la página web",
-      "invoice__public__ticket": "Leer el tique que abre un código de tique"
+      "invoice__public__ticket": "Leer el tique que abre un código de tique",
+      "tip__settings__get": "Consultar los ajustes de propinas",
+      "tip__settings__update": "Cambiar los ajustes de propinas",
+      "tip__tip__list": "Buscar propinas",
+      "tip__tip__add": "Anotar una propina",
+      "tip__tip__update": "Ajustar una propina",
+      "tip__tip__void": "Anular una propina",
+      "tip__tip__get": "Consultar una propina"
     },
     "facts": {
       "created": "alta",
@@ -2778,7 +2785,20 @@
       "issued": "Emitida ahora",
       "aeat_proof": "AEAT de pruebas",
       "aeat_proof_detail": "Por qué lo ha rechazado la AEAT de pruebas",
-      "steps": "Pasos"
+      "steps": "Pasos",
+      "enabled": "Propina al cobrar",
+      "allow_custom": "Otra cantidad permitida",
+      "preselected": "Sugerencia marcada",
+      "methods": "Formas de pago",
+      "suggestions": "Sugerencias",
+      "pool": "Al bote",
+      "attempt_key": "Clave del intento",
+      "adjusted_at": "Fecha del ajuste",
+      "adjusted_by": "Ajustada por",
+      "adjust_reason": "Motivo del ajuste",
+      "tip_id": "Propina",
+      "before": "Antes",
+      "after": "Después"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {

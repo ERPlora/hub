@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.modifier",
     "apps.website",
     "apps.online_order",
+    "apps.tip",
 ]
 
 MIDDLEWARE = [
