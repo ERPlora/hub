@@ -2,7 +2,7 @@
 said of an invoice and asked of the list, never kept: an overdue invoice stays issued until it is paid or rectified. A
 ticket replaced by a full invoice is not: what is owed is the invoice that replaced it."""
 
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Q
 
 from apps.invoice.models import Invoice
 from apps.tax.queries.jurisdiction import business_today
@@ -22,5 +22,4 @@ def is_overdue(invoice: Invoice, *, substituted: bool) -> bool:
 
 def overdue() -> Q:
     """The overdue invoices, to filter by."""
-    replaced = Exists(Invoice.objects.filter(substitutes=OuterRef("pk")))
-    return Q(status=Invoice.Status.ISSUED, due_date__lt=business_today()) & ~replaced
+    return Q(status=Invoice.Status.ISSUED, due_date__lt=business_today(), substitutions__isnull=True)
