@@ -1,7 +1,7 @@
 """The help window's route (``base/api_help.py``): ``GET /api/help`` calls ``base.help.get``, mounted on the hub's API."""
 
 import pytest
-from live.meta import module_configs
+from live.meta import all_live_app_configs
 
 from base import api_help
 from base.tenancy.tests.business import HOST, HUB_DB, A, in_business_a
@@ -38,9 +38,31 @@ def test_a_stranger_gets_no_help_and_an_employee_gets_a_module_s_in_their_langua
 
 
 @HUB_DB
-@pytest.mark.parametrize("app", ["table", "nope"])
+@pytest.mark.parametrize(
+    ("language", "home", "settings_data"),
+    [("es", "Inicio · Resumen", "Ajustes · Datos y copias"), ("en", "Home · Summary", "Settings · Data and backups")],
+)
+def test_the_hub_s_own_screens_go_to_each_role_in_their_language_without_those_it_cannot_see(
+    client, make_user, language, home, settings_data
+):
+    def titles(role: str) -> list[str]:
+        client.force_login(make_user(role, host=A.key, role=role))
+        response = client.get("/api/help?app=base", HTTP_HOST=HOST, HTTP_ACCEPT_LANGUAGE=language)
+        assert response.status_code == 200, response.content
+        assert response.json()["language"] == language
+        return [screen["title"] for screen in response.json()["screens"]]
+
+    owner, employee = titles("hub_owner"), titles("hub_employee")
+
+    assert home in owner and home in employee
+    assert settings_data in owner and settings_data not in employee
+    assert set(employee) < set(owner)
+
+
+@HUB_DB
+@pytest.mark.parametrize("app", ["table", "base", "nope"])
 def test_a_module_without_its_help_ready_answers_404_with_its_code(client, make_user, monkeypatch, app):
-    for config in module_configs():
+    for config in all_live_app_configs():
         monkeypatch.setattr(config, "help", None)
     client.force_login(make_user("ana", host=A.key, role="hub_employee"))
     response = client.get(f"/api/help?app={app}", HTTP_HOST=HOST)

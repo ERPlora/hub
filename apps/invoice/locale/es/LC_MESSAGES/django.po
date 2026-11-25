@@ -1030,3 +1030,63 @@ msgstr "Configurar el emisor"
 
 msgid "Request the full invoice of a receipt on the public page"
 msgstr "Pedir la factura completa de un tique en la página pública"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "invoices"
+msgstr "facturas"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Invoices"
+msgstr "Facturas"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Number"
+msgstr "Número"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Date"
+msgstr "Fecha"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Customer"
+msgstr "Cliente"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Tax ID"
+msgstr "NIF"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Taxable base"
+msgstr "Base imponible"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Rate %"
+msgstr "Tipo %"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Tax"
+msgstr "Cuota"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Surcharge rate %"
+msgstr "Tipo de recargo %"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Surcharge"
+msgstr "Cuota de recargo"
+
+#: queries/export.py
+msgctxt "invoice export"
+msgid "Total"
+msgstr "Total"

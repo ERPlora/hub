@@ -79,13 +79,13 @@ def refusal(hub, name: str, data: dict) -> str:
 def charged(hub) -> tuple:
     """What 100.00 of a generic product is charged in ``hub``'s business: ``(country, tax)``."""
     with use_hub(hub):
-        result = queries.calculate_tax(amount=HUNDRED, category_key=GENERIC)
+        result = queries.calculation.calculate_tax(amount=HUNDRED, category_key=GENERIC)
     return result["tax_country_code"], result["tax"]
 
 
 def jurisdiction(hub) -> tuple:
     with use_hub(hub):
-        return queries.business_jurisdiction()
+        return queries.jurisdiction.business_jurisdiction()
 
 
 def status(hub, **asked) -> tuple:
@@ -106,7 +106,7 @@ def test_spain_and_a_business_without_a_country_are_charged_spanish_vat(portugal
     registered(hub_b, country)
     assert charged(hub_b) == ("ES", 2_100)
     with use_hub(portugal), pytest.raises(Conflict) as refused:
-        queries.calculate_tax(amount=HUNDRED, category_key=GENERIC)
+        queries.calculation.calculate_tax(amount=HUNDRED, category_key=GENERIC)
     assert refused.value.code == "tax.no_rate"
 
 

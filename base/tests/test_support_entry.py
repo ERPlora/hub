@@ -20,7 +20,7 @@ from django.utils import timezone
 from live.context import Scope, system_context
 from live.models import OutboxEvent
 
-from apps.staff.queries import list_accounts
+from apps.staff.queries.accounts import list_accounts
 from apps.staff.schemas.accounts import AccountListIn
 from apps.whatsapp_inbox.queries.agents import team_roles
 from base import access as access_rules
@@ -120,7 +120,9 @@ class TestWithTheAccessOn:
     def test_support_comes_in_as_an_administrator_who_does_not_own_the_business(self, client, fake_saas, hub_b):
         response = support_enters(client, fake_saas, next_path="/inventory")
         assert (response.status_code, response["Location"]) == (302, "/inventory")
-        permissions = me(client)["permissions"]
+        session = me(client)
+        permissions = session["permissions"]
+        assert session["role"] == "ERPlora support"
         assert permissions == sorted(permissions_of_role(Membership.Role.ADMIN))
         assert "base.administer_hub" in permissions and "base.own_business" not in permissions
         copy = get_user_model().objects.get(username=SUPPORT_COPY)

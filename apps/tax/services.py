@@ -20,20 +20,12 @@ from live.outbox import record_event
 
 from apps.tax import events
 from apps.tax.models import ACTOR_MAX_LENGTH, TaxAlias, TaxCategory, TaxRule, TaxSettings
-from apps.tax.queries import (
-    CATEGORY_NOT_FOUND,
-    RULE_NOT_FOUND,
-    alias_row,
-    business_jurisdiction,
-    business_today,
-    category_by_reference,
-    category_row,
-    load_rule,
-    parent_candidates,
-    rule_row,
-    settings_row,
-    tax_kind_of,
-)
+from apps.tax.queries.aliases import alias_row
+from apps.tax.queries.categories import CATEGORY_NOT_FOUND, category_row
+from apps.tax.queries.jurisdiction import business_jurisdiction, business_today, tax_kind_of
+from apps.tax.queries.naming import category_by_reference
+from apps.tax.queries.rules import RULE_NOT_FOUND, load_rule, parent_candidates, rule_row
+from apps.tax.queries.settings import settings_row
 from apps.tax.schemas import (
     REGION_NOT_AVAILABLE,
     TAX_REGIONS,
@@ -271,7 +263,7 @@ def _created(ctx: OperationContext, rule: TaxRule) -> None:
 
 def _coherent_parent(data: RuleIn, category: TaxCategory) -> TaxRule:
     """The root a component hangs from: a root of the same slot, which charges tax if it carries a rate."""
-    # The predicate the «Root rule» picker shows too (queries.parent_candidates).
+    # The predicate the «Root rule» picker shows too (queries.rules.parent_candidates).
     parent = (
         parent_candidates(data.country_code, data.region_code, category, data.rate_pct)
         .filter(pk=data.parent_id)

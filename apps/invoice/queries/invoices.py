@@ -15,6 +15,7 @@ from apps.invoice.schemas.invoices import (
     BySourceOut,
     DocumentIn,
     DocumentOut,
+    InvoiceFiltersIn,
     InvoiceGetIn,
     InvoiceListIn,
     InvoiceOut,
@@ -23,7 +24,8 @@ from apps.invoice.schemas.invoices import (
     LineDefaultsOut,
 )
 from apps.sale.queries.sales import visible_sale
-from apps.tax.queries import business_tax_kind, resolve_tax
+from apps.tax.queries.jurisdiction import business_tax_kind
+from apps.tax.queries.resolution import resolve_tax
 
 #: A sort column → its ordering; every one ends with the newest first, then the id.
 _SORTS = {
@@ -51,6 +53,34 @@ def _ordering(sort: str, direction: str) -> list:
     return [*columns, *tie]
 
 
+def filter_invoices(ctx: OperationContext, params: InvoiceFiltersIn):
+    """The invoices the caller sees that match the list's search and filters."""
+    invoices = INVOICES.visible(ctx)
+    if params.search:
+        text = params.search.strip()
+        invoices = invoices.filter(
+            Q(number__icontains=text)
+            | Q(customer_name__icontains=text)
+            | Q(customer_tax_id__icontains=text)
+        )
+    exact = {
+        "status": params.status,
+        "invoice_type": params.invoice_type,
+        "series_code": params.series_code.strip().upper()
+        if params.series_code
+        else None,
+        "source_type": params.source_type,
+        "customer_id": params.customer_id,
+        "issue_date__gte": params.issue_date_from,
+        "issue_date__lte": params.issue_date_to,
+        "total_amount__gte": params.total_amount_from,
+        "total_amount__lte": params.total_amount_to,
+    }
+    return invoices.filter(
+        **{lookup: value for lookup, value in exact.items() if value is not None}
+    )
+
+
 @operation(
     "invoice.invoice.list",
     kind="query",
@@ -75,30 +105,7 @@ def _ordering(sort: str, direction: str) -> list:
     },
 )
 def list_invoices(ctx: OperationContext, params: InvoiceListIn) -> dict:
-    invoices = INVOICES.visible(ctx)
-    if params.search:
-        text = params.search.strip()
-        invoices = invoices.filter(
-            Q(number__icontains=text)
-            | Q(customer_name__icontains=text)
-            | Q(customer_tax_id__icontains=text)
-        )
-    exact = {
-        "status": params.status,
-        "invoice_type": params.invoice_type,
-        "series_code": params.series_code.strip().upper()
-        if params.series_code
-        else None,
-        "source_type": params.source_type,
-        "customer_id": params.customer_id,
-        "issue_date__gte": params.issue_date_from,
-        "issue_date__lte": params.issue_date_to,
-        "total_amount__gte": params.total_amount_from,
-        "total_amount__lte": params.total_amount_to,
-    }
-    invoices = invoices.filter(
-        **{lookup: value for lookup, value in exact.items() if value is not None}
-    )
+    invoices = filter_invoices(ctx, params)
     invoices = with_links(invoices).order_by(*_ordering(params.sort, params.dir))
     return _page(invoices, params, invoice_row)
 

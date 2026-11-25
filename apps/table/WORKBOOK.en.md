@@ -316,7 +316,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | TABLE-F34 | See which tables have asked for the bill | done |
 
 ### TABLE-F01 Create and order the zones of the room
-<!-- from WORKBOOK.md sha256:d8bca1dff5ed -->
+<!-- from WORKBOOK.md sha256:36821e62de43 -->
 Status: done
 Actor: manager, administrator, assistant
 Screen: Zones; assistant
@@ -328,7 +328,7 @@ Steps:
    also created from the "+" of the plan in "Edit plan" (Zone field and "Add zone"): it goes last and
    stays chosen.
 5. With the assistant: "I want another zone, Bar, for people eating at the counter, and it should come
-   first". The card carries only what was asked for, the name and the order ("Create in Tables: Bar · 0"):
+   first". The card carries only what was asked for, the name and the order ("Create in Tables: Bar · Order: 0"):
    what the zone is for is not kept as its description. The description goes in only if it is asked for
    ("with the description…").
 In: the name, the description, the colour and the order.

@@ -3,6 +3,8 @@
 that ran it leaves Django's language cookie, the one ``LocaleMiddleware`` reads; nothing else does.
 """
 
+import json
+
 import pytest
 from django.conf import settings
 from live.context import OperationContext
@@ -28,7 +30,8 @@ ASKED = {
 
 
 def preferences(language: str) -> str:
-    return f'{{"language": "{language}", "theme_mode": "", "palette": "", "ui_scale": 100}}'
+    """What the assistant sends when only the language is asked of it."""
+    return json.dumps({"language": language})
 
 
 def asked_for(language: str, *, said: str = "") -> dict:
@@ -140,3 +143,13 @@ def test_preferences_the_screen_could_not_save_leave_no_language(client, ana):
     assert response.status_code == 422
     assert COOKIE not in response.cookies
     assert session_language(client) == "es"
+
+
+@pytest.mark.parametrize("spoken", ["es", "en"])
+def test_the_appearance_alone_leaves_the_language_the_person_speaks_here(client, ana, spoken):
+    """Who enters with their account speaks its language, which may not be the business's (BASE-F51)."""
+    client.cookies[COOKIE] = spoken
+    response = post(client, "/me/preferences", {"theme_mode": "dark"})
+    assert response.status_code == 200, response.content
+    assert COOKIE not in response.cookies
+    assert session_language(client) == spoken

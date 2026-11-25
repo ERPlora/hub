@@ -422,7 +422,6 @@ class TestFollowedLive:
         )
         assert on["base.person.list"] == people_events
         assert on["base.person.detail"] == people_events
-        assert on["base.role.list"] == [events.HUB_STATE_APPLIED]
         # An app turned on or off changes the apps a key may be given.
         assert on["base.api_key.list"] == sorted({events.HUB_STATE_APPLIED, *events.API_KEY_EVENTS, *events.APP_EVENTS})
 
@@ -438,6 +437,10 @@ PEOPLE_ROUTES = {
     ("POST", "/people/badge/remove", "base.person.badge_remove"),
     ("GET", "/roles", "base.role.list"),
     ("GET", "/roles/detail", "base.role.detail"),
+    ("POST", "/roles", "base.role.create"),
+    ("POST", "/roles/update", "base.role.update"),
+    ("POST", "/roles/delete", "base.role.delete"),
+    ("POST", "/roles/assign", "base.role.assign"),
     ("GET", "/access/grantors", "base.access.grantors"),
 }
 

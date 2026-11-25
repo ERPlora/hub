@@ -1,8 +1,8 @@
 """The Hub's context builder (``settings.LIVE["context_builder"]``).
 
 Scope = the one label of the Host in front of ``settings.HUB_BASE_DOMAIN`` (``a.localhost`` → ``a``,
-``acme.erplora.com`` → ``acme``) when it is a hub's slug (``live.slugs``); any other host (a reserved
-name such as ``hub`` or ``www``, an invalid label, the bare host, an IP, a host of another domain such
+``acme.erplora.com`` → ``acme``) when a hub is served under it (``base.platform_hub``: a business's slug, or the
+name of ERPlora's own hub); any other host (another reserved name such as ``hub`` or ``www``, an invalid label, the bare host, an IP, a host of another domain such
 as pre's ``acme.pre.erplora.com`` on prod's Hub) is no hub and raises ``Http404``: the SPA, the API,
 ``/api/live`` and ``/auth/callback`` answer 404. prod and pre share one ALB, whose wildcard
 ``*.erplora.com`` also matches ``*.pre.erplora.com``: the base domain keeps each Hub on its own hosts.
@@ -34,10 +34,8 @@ from live.context import OperationContext, Scope, system_context
 from live.errors import AppInactive, InvalidPayload, NotFound, OperationError, Unauthorized
 from live.operations import UnknownOperation
 from live.operations import get as get_operation
-from live.slugs import validate_hub_slug
 
-from base import meter
-from base import registry
+from base import meter, platform_hub, registry
 from base.access import CREDENTIAL_SESSION_KEY
 from base.api_keys import KeyCaller
 from base.approvals import Approved, consequence_context
@@ -60,7 +58,7 @@ class HostScopeResolver:
             raise Http404(f"{host!r} is not a host on {settings.HUB_BASE_DOMAIN!r}.")
         try:
             # A demo's slug (``demo-…``) is a hub's host too; whether it answers is the registry's (base.middleware).
-            validate_hub_slug(slug, allow_demo=True)
+            platform_hub.validate_served_slug(slug, allow_demo=True)
         except ValueError as exc:
             raise Http404(f"{slug!r} is no hub's slug ({exc}).") from None
         return Scope("host", slug)
@@ -89,9 +87,9 @@ def is_demo_hub(scope: Scope) -> bool:
 
 
 def is_platform_hub(scope: Scope) -> bool:
-    """Whether ``scope``'s hub is ERPlora's own, the one that issues ERPlora's invoices: the hub of the reserved slug
-    ``PLATFORM_HUB_SLUG``."""
-    return scope.key == settings.PLATFORM_HUB_SLUG
+    """Whether ``scope``'s hub is ERPlora's own, the one that issues ERPlora's invoices, under either of its names
+    (``base.platform_hub``)."""
+    return platform_hub.is_platform_slug(scope.key)
 
 
 #: The operation that answers a hub's business (``business_currency``).

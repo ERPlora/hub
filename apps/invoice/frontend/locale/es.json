@@ -86,7 +86,12 @@
         "markPaid": "Marcar pagada",
         "rectify": "Rectificar"
       },
-      "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros."
+      "noResultsMessage": "Nada coincide con tu búsqueda o tus filtros.",
+      "export": {
+        "button": "Descargar en Excel",
+        "pending": "Preparando…",
+        "failed": "No se han podido descargar las facturas: {reason}"
+      }
     },
     "filters": {
       "series": "Serie",

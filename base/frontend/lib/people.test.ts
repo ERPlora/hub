@@ -8,6 +8,7 @@ import {
   employeesTabOf,
   employeesTabsFor,
   roleKey,
+  roleName,
 } from './people';
 
 describe('Employees tabs', () => {
@@ -55,6 +56,12 @@ describe('How a person gets in', () => {
     expect(roleKey('hub_owner')).toBe('base.people.roles.hub_owner');
     expect(roleKey('hub_employee')).toBe('base.people.roles.hub_employee');
     expect(roleKey('hub_accountant')).toBe('base.people.roles.hub_accountant');
+  });
+
+  it('names a role: one of erplora.com’s by its key, the business’s own by the name it gave it', () => {
+    const t = (key: string) => `«${key}»`;
+    expect(roleName({ key: 'hub_manager', label: 'Manager', origin: 'basic' }, t)).toBe('«base.people.roles.hub_manager»');
+    expect(roleName({ key: '0199aaaa-0000-7000-8000-000000000001', label: 'Cajero', origin: 'own' }, t)).toBe('Cajero');
   });
 });
 

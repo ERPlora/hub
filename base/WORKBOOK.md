@@ -16,6 +16,11 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 
 ## Para qué sirve y para quién
 
+Es lo que el Hub trae siempre, sin activar ninguna app: el **Inicio**, las **personas** del negocio, sus **archivos**,
+sus **apps**, el **sistema** y los **ajustes**. Desde aquí se abre cada app y se prepara el negocio para trabajar.
+
+### De un vistazo
+
 El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vistazo:
 
 - **Sus apps**, para abrir la que necesite sin buscarla en ningún menú.
@@ -68,34 +73,39 @@ llenarse.
 ## Pantallas
 
 ### Inicio · Resumen
-Arriba, el nombre del negocio y «Hoy» con la fecha larga; mientras el negocio no tiene nombre, un saludo
-según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo, en este orden:
+Arriba, el nombre del negocio y «Hoy» con la fecha larga. Debajo, en este orden:
 
 - **Cómo está funcionando el negocio**, solo para quien lo administra: una etiqueta de color por cada app encendida que
   dice cómo está (la impresora de tiques, el número de WhatsApp), con lo que lo arregla, y «Ver sistema».
 - **«Empieza con un negocio como el tuyo»**, solo para quien administra el negocio y mientras el negocio no
-  tiene nada de lo que trae una plantilla: hasta cuatro plantillas con «Usar esta», «Ver todas las
-  plantillas» y «Ahora no».
+  tiene nada de lo que trae una plantilla.
 - **«Mis apps»**: una baldosa por app que la persona puede abrir, con su icono y su nombre; las que más se abren
-  en este navegador, primero. En el móvil, con seis apps o más, las cuatro primeras y «Ver todas las apps».
-- **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan,
-  cada uno con su icono, su explicación, una etiqueta («Necesario para facturar», «Importante»,
-  «Recomendado», «Hecho» o «Todavía no disponible») y «Configurar». Plegada: cinco pasos (dos en el
+  en este navegador, primero.
+- **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan, cada uno con
+  «Configurar».
+- **El tablero de paneles**, con «Personalizar panel» (⋮) arriba a la derecha.
+
+#### Lo que trae cada parte
+- **El nombre del negocio**: mientras no lo tiene, un saludo según la hora («Buenos días», «Buenas tardes», «Buenas
+  noches»).
+- **Las plantillas**: hasta cuatro, con «Usar esta», «Ver todas las plantillas» y «Ahora no».
+- **«Mis apps»**: en el móvil, con seis apps o más, las cuatro primeras y «Ver todas las apps».
+- **Cada paso por configurar**: su icono, su explicación, una etiqueta («Necesario para facturar», «Importante»,
+  «Recomendado», «Hecho» o «Todavía no disponible») y «Configurar». La lista, plegada: cinco pasos (dos en el
   móvil), primero los que impiden facturar, con «Ver todo» y «Ver menos». Cuando no falta nada: «Tu negocio
   está listo».
-- **El tablero de paneles**, con «Personalizar panel» (⋮) arriba a la derecha.
 
 ### Inicio · Actividad
 La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método», «Importe» y «Estado», con
 «Buscar actividad…», el embudo de filtros (método y estado), el orden, la vista de tarjetas y «Columnas».
-Se abre también con el enlace del Inicio terminado en `#actividad`.
+Se abre también con el enlace del Inicio terminado en #actividad.
 
 ### La campana
 Arriba a la derecha, la última de la barra, después de «Mis apps», de los destellos del asistente y, en la aplicación
 instalada, de «Cambiar de negocio» (HUB_APP-F04 de ERPlora/app), también en el móvil. Reúne lo que pide una acción
 y sigue siendo verdad hasta que se resuelve: «Todavía no puedes facturar», una factura del plan sin pagar, los
-eventos caídos, los límites del plan, las citas por confirmar, los clientes de WhatsApp esperando respuesta, una
-impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
+eventos caídos, los límites del plan, los roles por revisar, las citas por confirmar, los clientes de WhatsApp
+esperando respuesta, una impresora que no imprime… Ningún aviso se descarta: se va solo cuando se resuelve.
 
 - **La campana.** Sin nada pendiente, solo la campana. Con algo, pasa a una píldora con la campana y el número, en el
   color y con el icono del aviso más grave (urgente, atención o información). Si un aviso tiene plazo, como la hora de
@@ -151,14 +161,16 @@ tiene que configurar un administrador.». Se va solo en cuanto el paso queda hec
 ### Apps
 Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
 «Añadir apps» (todas las apps de ERPlora) y «De pago» (las que se contratan aparte). Arriba, cuántas apps tiene
-activadas el negocio (las de «Mis apps», también las que nacen activadas, como Impuestos, y las que llegaron con otra)
-y cuántas de las que deja su plan ha elegido: «27 apps activadas · 17 de 20 de tu plan» o, sin límite, «27 apps
-activadas · Sin límite». Un negocio recién dado de alta: «1 app activada · 0 de 20 de tu plan» (hub#1286).
+activadas el negocio y cuántas de las que deja su plan ha elegido: «27 apps activadas · 17 de 20 de tu plan».
 Cada pestaña, una tabla (o tarjetas) con su buscador, el embudo de filtros, el orden y «Columnas»: «App» (icono y
 nombre), «Categoría» y «Estado»; en «Añadir apps» y «De pago», además «Descripción», «Precio» y «Viene con».
 «Abrir» en la fila de una app que la persona puede abrir y, para quien administra, «Activar» o «Desactivar».
-Encima de la tabla, cuando toca, el aviso del límite del plan o el de por qué no se ha cambiado una app.
 «De pago» y «Precio» solo salen si alguna app se contrata aparte; hoy ninguna: todas van en todos los planes.
+
+#### La cuenta de apps y los avisos
+Cuentan las de «Mis apps», también las que nacen activadas, como Impuestos, y las que llegaron con otra. Sin límite:
+«27 apps activadas · Sin límite». Un negocio recién dado de alta: «1 app activada · 0 de 20 de tu plan» (hub#1286).
+Encima de la tabla, cuando toca, el aviso del límite del plan o el de por qué no se ha cambiado una app.
 
 ### La pantalla de una app que no se abre
 En la misma dirección de la pantalla de la app, el motivo: «Suscripción necesaria» o «Esta app no está
@@ -232,7 +244,7 @@ foto), «Preferencias» (idioma y apariencia: paleta, tema y tamaño de interfaz
 ### Ajustes · General
 Lo que se abre con «Ajustes» en el menú lateral: la primera pestaña de abajo, «General», con «Este dispositivo»
 (en la app de ERPlora de un ordenador, también «Arrancar al iniciar sesión»), «Pinpad», para quien administra
-«Dispositivos» y, al final, «Documentación de la API».
+«Dispositivos» y, al final, la tarjeta de la documentación de la API.
 
 ### Estamos preparando tu negocio
 La página que sale en la dirección de un negocio que erplora.com aún está preparando; se actualiza sola.
@@ -241,13 +253,16 @@ La página que sale en la dirección de un negocio que erplora.com aún está pr
 Desde «Archivos» en el menú lateral; la ve todo el equipo. A la izquierda, «Carpetas»: el árbol de carpetas del
 negocio, que empieza en «Archivos» (lo de arriba del todo), con la carpeta abierta resaltada; en una pantalla
 estrecha, el árbol se pliega en el selector «Carpetas». A la derecha, «Buscar archivos…», «Lista» y «Cuadrícula» y,
-para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, la ruta de la carpeta abierta, con ⋮ al
-lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y el límite del plan («{used} de {limit}»)
-o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las carpetas y luego los archivos, cada uno con su
-icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮: «Abrir», «Descargar», «Renombrar», «Mover a…»
-y «Eliminar». En la lista, cada nombre ocupa una línea: lo que no cabe se corta con «…» y la extensión se ve
-siempre entera; en el móvil, el tamaño y la fecha van debajo del nombre, en gris. Pulsar un archivo lo abre en el visor, con su nombre, «Descargar» y «Cerrar» («Ampliar» y «Reducir» en
-imágenes y PDF).
+para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, lo que hay en la carpeta abierta: pulsar
+un archivo lo abre.
+
+#### La carpeta abierta
+Arriba, la ruta de la carpeta, con ⋮ al lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y
+el límite del plan («{used} de {limit}») o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las
+carpetas y luego los archivos, cada uno con su icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮:
+«Abrir», «Descargar», «Renombrar», «Mover a…» y «Eliminar». En la lista, cada nombre ocupa una línea: lo que no cabe se
+corta con «…» y la extensión se ve siempre entera; en el móvil, el tamaño y la fecha van debajo del nombre, en gris.
+Pulsar un archivo lo abre en el visor, con su nombre, «Descargar» y «Cerrar» («Ampliar» y «Reducir» en imágenes y PDF).
 
 ### Empleados · Personal
 Lo que se abre con «Empleados» en el menú lateral: la primera pestaña de abajo, «Personal», con las plazas del plan,
@@ -257,16 +272,16 @@ pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobacione
 «Atrás» sale de Empleados.
 
 ### Empleados · Roles
-Los cinco roles de erplora.com, con de dónde vienen, cuántas personas tienen y cuántos permisos dan. Tocar uno abre
-«Qué permite».
+Los cinco roles de erplora.com y, debajo, los propios del negocio, con de dónde vienen, cuántas personas tienen y
+cuántos permisos dan. Tocar uno abre «Qué permite».
 
 ### Empleados · Roles · Qué permite
-Un rol básico, de solo lectura: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
+Un rol, de solo lectura: cuántas personas lo tienen y, en un panel por app encendida, cada permiso con su frase
 y si lo da («Permitido»), lo deja hacer con la aprobación de un responsable («Con aprobación») o no («No»).
 
 ### Empleados · API keys
-Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie,
-«Documentación de la API».
+Las llaves con las que otro sistema llama a la API del negocio: «Nueva API key», la tabla de llaves y, al pie, el
+enlace a la documentación de la API.
 
 ### Empleados · Aprobaciones
 El registro de lo que se aprobó con el PIN de un responsable, solo de lectura.
@@ -465,6 +480,11 @@ En la pantalla Archivos:
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 | BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
 | BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | parcial |
+| BASE-F127 | Crear un rol propio a partir de otro | parcial |
+| BASE-F128 | Ajustar lo que permite un rol propio | parcial |
+| BASE-F129 | Borrar un rol propio | parcial |
+| BASE-F130 | Dar un rol propio a una persona | parcial |
+| BASE-F131 | Ver en la campana los roles por revisar | parcial |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -774,7 +794,7 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: cualquier pantalla del hub
 Pasos:
   1. En erplora.com, quien gestiona el negocio le cambia el rol a una persona, la quita del negocio o le
-     traspasa la propiedad.
+     traspasa la propiedad; o en el Hub le da un rol propio o cambia lo que permite el suyo (BASE-F130, BASE-F128).
   2. Si le ha cambiado el rol, su sesión sigue abierta y lo que tiene abierto, en todos sus dispositivos,
      pasa en ese momento a lo que permite el rol nuevo, sin recargar ni volver a entrar: el menú, «Mis apps»
      y las pestañas enseñan solo lo que puede abrir; la pantalla que tiene delante pasa a «Sin acceso» si el
@@ -792,7 +812,7 @@ Sale: su rol en el negocio, al día, y lo que tiene abierto con lo que ese rol p
 ya no está en el negocio, cerradas.
 Si falla: si el hub no responde en ese momento, erplora.com se lo vuelve a pasar al poco y el cambio llega
 entonces. Un dispositivo sin conexión lo recibe al reconectar.
-Implicados: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118
+Implicados: HUBS-F26, HUBS-F27, HUBS-F28, BASE-F118, BASE-F128, BASE-F130
 
 ### BASE-F14 Ver las apps del negocio
 Estado: hecho
@@ -1012,12 +1032,12 @@ Pasos:
      cualquier idioma del Hub, sin mirar mayúsculas ni acentos, o, si ninguna se llama así, por la única con una
      palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
      aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y antes del
-     sí nombra las que necesita y están desactivadas, como el aviso del paso 2: «Activar en Apps: Reservas · Reservas
-     necesita Horarios y Mesas: se activan con ella.». Si ya estaba activada el asistente lo dice («Clientes ya estaba
-     activada») en vez de «activada».
+     sí nombra las que necesita y están desactivadas, como el aviso del paso 2: «Activar en Apps: Reservas · Otras
+     apps: Reservas necesita Horarios y Mesas: se activan con ella.». Si ya estaba activada el asistente lo dice
+     («Clientes ya estaba activada») en vez de «activada».
   5. Si el país del negocio la exige (VeriFactu en España), la tarjeta dice además, antes del sí, que ya no se podrá
-     desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · VeriFactu es obligatoria para los negocios de
-     España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
+     desactivar, con el motivo de Apps: «Activar en Apps: VeriFactu · Una vez activada: VeriFactu es obligatoria para
+     los negocios de España: no se puede desactivar.» (BASE-F25). El asistente lo sabe también al preguntarle por ella.
   6. Si al asistente se le pide algo de una app desactivada diciendo su nombre, aunque no se diga «app» («quiero
      gestionar reservas», «apunta una cita»), o si lo nombra lo que el asistente busca para hacerlo, dice qué app lo
      hace, para qué sirve como lo dice Apps y que está desactivada, en vez de decir que no puede o de intentarlo con otra
@@ -1262,14 +1282,18 @@ Pasos:
      también los clientes) o «Plantilla para compartir» (nunca lleva clientes).
   4. Elige las apps y sus datos (BASE-F36) y pulsa «Exportar» («Exportando…»).
   5. El archivo baja con el navegador y sale «{file} descargado.».
+  6. Pedido al asistente («Voy a abrir otro bar y quiero llevarme la carta y los clientes»), dice que se hace aquí,
+     en Ajustes › Datos y copias › Exportar, con «Plantilla para compartir» o «Copia de seguridad de este negocio», y
+     qué lleva: los productos y los servicios van con sus fotos propias dentro. El archivo no lo saca él.
 Entra: el nombre, el idioma, para qué es y lo marcado.
-Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas; nunca personas, PIN
-ni datos fiscales. En el negocio no se guarda nada.
+Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas, con las fotos propias de los
+productos y los servicios dentro (INVENTORY-F33); nunca las ventas, las personas, los PIN ni los datos fiscales. En el
+negocio no se guarda nada.
 Si falla: «La exportación falló: {reason}»; sin nombre, «Escribe un nombre para el archivo.» y no se puede
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
 exporta igual que el propietario: lo que es solo del propietario son las copias completas que ERPlora guarda antes de
 restablecer (BASE-F37).
-Implicados: BASE-F112 (dentro de la app), BASE-F37
+Implicados: BASE-F112 (dentro de la app), BASE-F37, INVENTORY-F33
 
 ### BASE-F36 Elegir qué apps, datos y tablas viajan en la exportación
 Estado: hecho
@@ -1898,9 +1922,10 @@ Pasos:
      negocio» deshace lo propio y devuelve el tamaño a 100%. El idioma pasa a toda la aplicación abierta, también a
      los textos que manda el servidor (el menú lateral, «Mis apps», el checklist, los paneles de Inicio y la campana),
      sin recargar ni volver a Inicio.
-  5. Si se lo pide al asistente («ponme el idioma en inglés») y confirma la tarjeta, el idioma nuevo se aplica igual
-     que desde el selector: la aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla
-     en este dispositivo.
+  5. Si se lo pide al asistente («ponme el idioma en inglés»), la tarjeta dice solo lo que ha pedido («English»; lo que
+     vuelve a ser del negocio, por su nombre: «El idioma del negocio»). Al confirmarla cambia solo eso, y el tema, la
+     paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
+     aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
@@ -2282,7 +2307,8 @@ Pasos:
   2. Una fila por rol: «Propietario», «Administrador», «Encargado», «Empleado» y «Gestoría», con «Básico»,
      «Siempre disponible», cuántas personas lo tienen y cuántos permisos da. Son los roles básicos de erplora.com:
      cada app aporta lo que da a cada rol básico en ella, y una app puede traer un rol básico propio cuando su
-     funcionalidad lo pida.
+     funcionalidad lo pida. Debajo, por su nombre, los roles propios del negocio (BASE-F127), con «Propio»: quien
+     tiene uno cuenta en él y no en el de su invitación, salvo el propietario, que siempre es el propietario.
   3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
      totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
      registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
@@ -2292,13 +2318,16 @@ Pasos:
      «El negocio» primero, después cada app encendida por su nombre y «Datos sensibles» al final. En cada panel, la
      frase de cada permiso y su estado: «Permitido», «Con aprobación» (lo hace si un responsable lo aprueba con su PIN en ese
      momento, BASE-F84) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con
-     aprobación». Una app apagada no sale. Es solo lectura: aquí no se cambia nada.
+     aprobación». Una app apagada no sale. Es solo lectura: aquí no se cambia nada. En un rol propio pone «Lo que
+     este rol deja hacer en este negocio, app por app.» y sale lo que el negocio guardó; lo que no se puede dar en un
+     rol propio, ser el propietario del negocio, no sale.
   5. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles, las personas del negocio, las apps encendidas y lo que cada app da a cada rol.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar»; en «Qué permite», «No se pudo cargar lo que
-permite este rol.» con «Reintentar», y un rol que no es de los cinco, «Este rol no existe en este negocio.».
-Implicados: BASE-F83, BASE-F84
+permite este rol.» con «Reintentar», y un rol que no es de los cinco ni de los propios, «Este rol no existe en este
+negocio.».
+Implicados: BASE-F83, BASE-F84, BASE-F127, BASE-F128, BASE-F130, BASE-F131
 
 ### BASE-F83 Asignar un rol a una persona
 Estado: hecho
@@ -2315,6 +2344,105 @@ Entra: el rol que se elige en erplora.com.
 Sale: la persona con su rol nuevo, como lo manda erplora.com, y su sesión abierta.
 Si falla: lo que diga erplora.com.
 Implicados: BASE-F82, BASE-F13
+
+### BASE-F127 Crear un rol propio a partir de otro
+Estado: parcial — se crea pidiéndoselo al asistente o por la API del Hub; falta su pantalla
+Actor: propietario, administrador
+Pantalla: Asistente
+Pasos:
+  1. Pide al asistente un rol a partir de otro, con su nombre: «crea el rol Cajero a partir de Empleado». Puede partir
+     de uno básico o de uno propio, y llevar una descripción.
+  2. La tarjeta dice «A partir de: Empleado» y «Nombre: Cajero» (BASE-F97). Al aceptarla, el rol queda creado con lo
+     mismo que permite el otro, app por app, menos ser el propietario del negocio, que ningún rol propio da.
+  3. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él. Lo que permite se ve al tocarlo (BASE-F82) y
+     se cambia con BASE-F128; se da a una persona con BASE-F130. Desde entonces no cambia con el rol del que salió.
+Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la descripción.
+Sale: el rol propio del negocio. Evento `base.role.created`. No sale del negocio: erplora.com no lo conoce.
+Si falla: sin nombre, «Ponle nombre al rol.»; con el nombre de otro rol propio, sin contar mayúsculas, «Ya hay un rol
+con ese nombre. Elige otro.»; un rol que no está, «Este rol no existe en este negocio.». Nadie da lo que no tiene: si
+el rol del que parte permite algo que quien lo crea no puede hacer, «Un rol no puede permitir más de lo que puedes
+hacer tú.» y no se crea. A quien no gestiona roles el asistente no se lo ofrece, y la API contesta 403.
+Implicados: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
+
+### BASE-F128 Ajustar lo que permite un rol propio
+Estado: parcial — se ajusta pidiéndoselo al asistente o por la API del Hub; falta su pantalla
+Actor: propietario, administrador
+Pantalla: Asistente
+Pasos:
+  1. Pide el cambio al asistente: «que el rol Cajero no pueda anular ventas», «llama Caja de tarde al rol Cajero».
+  2. La tarjeta dice el rol, cada permiso con la misma frase de «Qué permite» y lo que pasará a hacer («Permitido»,
+     «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR
+     (BASE-F98).
+  3. Al aceptarla solo cambia lo que se pidió. Si alguien tiene el rol, lo que ve y lo que puede hacer cambian
+     al momento en sus dispositivos, sin cerrar su sesión (BASE-F13).
+  4. Una app que se enciende después de guardar el rol da lo que da al rol básico del que salió; un permiso que una app
+     añade después entra en «No». En los dos casos el rol queda por revisar hasta que se guarda con ellos, y la campana
+     lo dice (BASE-F131).
+Entra: el rol y lo que cambia: el nombre, la descripción o el estado de cada permiso.
+Sale: el rol cambiado. Evento `base.role.updated`.
+Si falla: un rol básico no se cambia: «Este rol es de erplora.com. Duplícalo y cambia la copia.». Nadie da lo que no
+tiene: «Un rol no puede permitir más de lo que puedes hacer tú.»; y ser el propietario no se da a nadie: «Eso es solo
+del propietario del negocio: ningún rol lo da.». Un permiso que no es de una app encendida, «Ese permiso no es de
+ninguna app encendida de este negocio.»; «Con aprobación» en algo que un responsable no puede aprobar con su PIN, «Eso
+no se puede aprobar con un PIN: elige permitido o no.». El nombre, como al crearlo.
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
+
+### BASE-F129 Borrar un rol propio
+Estado: parcial — se borra pidiéndoselo al asistente o por la API del Hub; falta su pantalla
+Actor: propietario, administrador
+Pantalla: Asistente
+Pasos:
+  1. Pide al asistente «borra el rol Cajero».
+  2. La tarjeta dice el rol y, bajo «Lo que va a pasar», cuántas personas lo tienen, y pide escribir CONFIRMAR
+     (BASE-F98). Al aceptarla, el rol desaparece de **Empleados › Roles**.
+  3. Quien salió del negocio con ese rol, si vuelve, entra con el de su invitación.
+Entra: el rol.
+Sale: el rol borrado. Evento `base.role.deleted`.
+Si falla: si alguien del negocio lo tiene, no se borra: «2 personas tienen este rol. Dales otro antes de borrarlo.». Un
+rol básico no se borra: «Este rol es de erplora.com. Duplícalo y cambia la copia.».
+Implicados: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
+
+### BASE-F130 Dar un rol propio a una persona
+Estado: parcial — se da pidiéndoselo al asistente o por la API del Hub; falta su sitio en la ficha de la persona
+Actor: propietario, administrador
+Pantalla: Asistente
+Pasos:
+  1. Pide al asistente «dale a Luis el rol Cajero» o «quítale a Luis el rol Cajero».
+  2. La tarjeta dice la persona y el rol por sus nombres y, bajo «Lo que va a pasar», cuántas personas tienen ese rol.
+     Pide escribir CONFIRMAR (BASE-F98).
+  3. Al aceptarla, la persona queda con ese rol, que manda sobre el de su invitación: lo que ve y lo que puede hacer
+     cambian al momento en sus dispositivos, sin cerrar su sesión (BASE-F13), y quien ahora puede hacer algo con ese rol
+     lo aprueba también con su PIN (BASE-F84). Cada persona tiene un solo rol.
+  4. Para devolverla al de su invitación se le pide ese rol («Empleado»): es el que tiene desde entonces.
+  5. El asistente de esa persona sabe con qué rol habla: el propio, por el nombre que le puso el negocio (BASE-F100).
+Entra: la persona y el rol, uno propio del negocio o el de su invitación.
+Sale: la persona con ese rol. Evento `base.role.assigned`. erplora.com no lo sabe: allí sigue con el de su invitación.
+Si falla: al propietario nadie le da otro rol, «El propietario siempre es el propietario: nadie le da otro rol.»; nadie
+se lo cambia a sí mismo, «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.»; ni a quien no está por
+debajo en su invitación, «Solo puedes dar un rol a quien está por debajo de ti en el negocio.». Nadie da un rol que
+permite más de lo que puede hacer él, tampoco el de la invitación al devolverla ni lo que daría una app apagada: «Un rol
+no puede permitir más de lo que puedes hacer tú.». Otro rol básico, «Ese rol se da en erplora.com. Aquí se da uno propio
+del negocio.»; un rol que no está, «Este rol no existe en este negocio.»; una persona que no es del negocio, «Esa
+persona no está en este negocio.». Si alguien borra el rol a la vez, o se borra o se da, nunca las dos cosas: se oye el
+«Este rol no existe en este negocio.» o el «2 personas tienen este rol. Dales otro antes de borrarlo.».
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
+
+### BASE-F131 Ver en la campana los roles por revisar
+Estado: parcial — la campana los cuenta y lleva a los roles; falta la pantalla donde se revisan
+Actor: propietario, administrador
+Pantalla: La campana
+Pasos:
+  1. Se enciende una app, o una app gana un permiso, después de guardar un rol propio: ese rol queda por revisar
+     (BASE-F128).
+  2. La campana de quien gestiona los roles sube sin recargar con el aviso «2 roles por revisar» y su frase: «Hay una
+     app encendida o un permiso nuevo que aún no llevan: mira lo que permite cada rol.».
+  3. «Revisar los roles» abre **Empleados › Roles**.
+  4. Al guardar un rol con lo que le faltaba (BASE-F128), deja de contar; sin ninguno, el aviso desaparece.
+Entra: los roles propios del negocio y las apps encendidas.
+Sale: nada guardado.
+Si falla: quien no gestiona los roles no ve el aviso. Si no se pueden leer los avisos, la campana se queda con lo último
+que supo, como en BASE-F10.
+Implicados: BASE-F10, BASE-F82, BASE-F128
 
 ### BASE-F84 Aprobar con el PIN de un responsable
 Estado: hecho
@@ -2648,7 +2776,13 @@ Pasos:
      en una sola pregunta corta y nunca se lo inventa («¿Con qué impuesto lo vendes?»), y si la petición vale para
      varios registros, le pregunta cuál. Nunca pregunta en su texto si sigue adelante: eso lo pregunta la tarjeta.
   2. Antes de hacerlo sale, encima de todo, «¿Ejecutar esta acción?» con la acción, la app y sus primeros datos en una
-     línea, por ejemplo «Crear en Servicios: Corte · 15,00 € · 30». Un importe, todo dato que su app declara como
+     línea, por ejemplo «Crear en Servicios: Corte · Precio: 15,00 € · Duración (minutos): 30». El primero, lo que la
+     acción toca (su registro o su nombre), sale solo por su valor cuando se entiende solo (un nombre, un registro, una
+     fecha o unos registros por su nombre); cada dato detrás, y una cifra, un importe o un sí o un no en primer lugar,
+     lleva delante el nombre de su dato, el mismo que en su pantalla, porque suelto no dice qué es: «Cambiar en
+     Servicios: Mechas · Precio mínimo: 65,00 €», nunca «Mechas · 65,00 €», que se lee igual que su precio; «Crear en
+     Ventas / TPV: Varios · Categoría fiscal: Producto — general · Posición: 0»; «Abrir en Mesas: Mesa: 4 · Comensales:
+     3». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
      asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
      acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
@@ -2812,7 +2946,8 @@ Pasos:
      botones, en las apps encendidas del negocio, y nada más. Una acción para la que no tiene permiso no se le ofrece
      al asistente, que así se lo dice; la que su app deja aprobar a un responsable sí, igual que su botón en la
      pantalla. El asistente sabe con qué rol habla (propietario, administrador, encargado o empleado, dicho en el
-     idioma de la conversación) y que sus herramientas son las de ese rol: si le piden algo que ninguna hace, no busca
+     idioma de la conversación, o el propio que el negocio le dio, por su nombre, BASE-F130) y que sus herramientas son
+     las de ese rol: si le piden algo que ninguna hace, no busca
      otro camino ni cuenta el estado de otra cosa, sino que dice en una frase que no lo tiene disponible aquí, porque
      su rol no puede o porque esa app no está encendida, y quién puede (al empleado, un encargado o el propietario; al
      encargado, el propietario o un administrador) o en qué pantalla se hace.
@@ -2830,7 +2965,7 @@ vez y durante dos minutos, y se gasta junto con la acción (BASE-F84).
 Si falla: si el permiso se pierde entre ofrecer la acción y hacerla, su app la rechaza y el recibo lo dice. Una
 aprobación ya usada o caducada no deja pasar la acción: el recibo dice «No se hizo, falló: …» y el asistente lo
 cuenta.
-Implicados: BASE-F13, BASE-F84, BASE-F97
+Implicados: BASE-F13, BASE-F84, BASE-F97, BASE-F130
 
 ### BASE-F101 Pedirle varias cosas seguidas
 Estado: hecho
@@ -3957,7 +4092,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   `HubContextBuilder.refresh` ve la sesión borrada (`SessionEnded`, 401) y acaba con `bye`; `/ws/print`
   relee la sesión en cada mensaje. Un rol nuevo cambia la `Membership` y no cierra nada: tras el COMMIT también se
   despierta el host, cada stream re-ejecuta con los permisos del rol nuevo (`refresh` los relee) y
-  `base.session.access` (una huella de los permisos, con `base.view_home`, que tienen todos los roles) cambia.
+  `base.session.access` (una huella de los permisos, del nombre del rol y de lo aprobable, con `base.view_home`, que
+  tienen todos los roles) cambia.
   `AccessFollower` (en `BackgroundChrome`, junto a `AppsFollower`) llama entonces a `sessionChanged()` y, si la
   sesión releída abre o cierra la pantalla de delante, la vuelve a pasar por la guarda (`gateAgain`,
   `lib/app-gate.ts`). Tests: `base/tests/test_session_revoke.py`, `test_hub_state_members.py`,
@@ -3975,7 +4111,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   `base.blueprint.list` (con `empty`, viva), `base.blueprint.export` (GET, el fichero en base64),
   `base.import.list` (con `unfinished`, viva) y `base.dataset.list`; órdenes `base.blueprint.inspect` (no escribe;
   orden porque su entrada es un fichero), `base.blueprint.import` (plantilla, fichero o `retry_of`),
-  `base.import.undo` y `base.hub.reset` (`dry_run` = el plan). Eventos `base.blueprint.imported`,
+  `base.import.undo` y `base.hub.reset` (`dry_run` = el plan; en el negocio propio de ERPlora, 409
+  `base.platform_hub_kept`: no se vacía nunca). Eventos `base.blueprint.imported`,
   `base.import.undone` y `base.hub.data_reset`, tras los que se re-ejecutan las consultas vivas del Inicio.
 - `base.ImportBatch` (modelo de hub, migración `0009`) guarda cada importación: informe, filas creadas por parte
   (lo que deshace), origen y versión de la plantilla (lo que reintenta).
@@ -4058,9 +4195,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   ERPlora (`Hub.is_platform`) no tiene plan ni foto, y no la tendrá porque el SaaS no lo conoce: es su fila la que le da
   `limits.PLATFORM`, 6 a la vez dentro de ese tope y `statement_timeout` de 30 s, con la misma función en el semáforo y
   en esta pantalla (`limits.hub_limits`), y nunca se le ofrece ampliar (`limits.bigger_plan_gives_hub_more`). `known` sigue
-  en falso porque no hay plan que leer. Esta pantalla no se abre en ese hub: su slug es reservado y su host da 404 antes de
-  mirar el registro (`test_nobody_can_open_a_screen_of_the_platform_hub_though_its_row_is_ready`), y si algún día se
-  abriera, el aviso de plan desconocido le prometería uno que nunca llega. Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
+  en falso porque no hay plan que leer. Ese hub se abre en su dirección (`base/platform_hub.py`), donde nadie tiene acceso
+  todavía: queda por decidir qué enseña aquí, porque el aviso de plan desconocido le prometería uno que nunca llega.
+  Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
   `test_plan_usage_figures.py`.
 - Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
   `SET LOCAL idle_in_transaction_session_timeout` en el alias activo (`base.tenancy.connections.allow_idle_wait`), solo
@@ -4186,8 +4323,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   propio de ERPlora (`PLATFORM_HUB_SLUG`; una fila del registro con BD propia, de `create_platform_hub`)
   contesta el negocio de ERPlora, su emisor:
   `PLATFORM_ISSUER_LEGAL_NAME` y `PLATFORM_ISSUER_COUNTRY` con la moneda de ese país, la zona y el idioma del despliegue,
-  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com), con fila o sin ella; su host no sirve
-  pantallas (`erplora` es un slug reservado: 404). La moneda que cobra cada app es
+  `demo` falso y `settings_url` vacío (nada suyo se cambia en erplora.com), con fila o sin ella; su host es el de
+  `PLATFORM_HUB_SLUG` (`erp`), el único nombre reservado que se sirve (`base/tests/test_platform_hub_host.py`). La moneda
+  que cobra cada app es
   `base.operations.business_currency(scope)`: la de `base.business.get` leída como la plataforma (`system_context`;
   una API key solo tiene los permisos de lo que cobra) y, en un ámbito que no es de ningún hub, su `NotFound`, nunca un
   `EUR` por defecto (`base/tests/test_business_currency.py`). Un importe con su moneda lo escribe el servidor solo con
@@ -4247,8 +4385,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   `queries.people.face_name`, gh:hub#2536), `base.access.faces` (viva, `base.view_home`), `base.pin.set` (freno
   `PIN_CHANGE_LIMIT`, 30 en 1 h; 409 `base.pin_taken`, 403 `base.pin_current_wrong`), `base.device.current` y
   `base.device.mode_set`, `base.device.list|rename|remove|prune` y `base.access.settings|settings_update`
-  (`base.administer_hub`), y `base.profile.get|update|preferences_set|avatar_set|avatar_remove` (la foto, en
-  `avatars/` del almacén del hub, servida solo a una sesión: `AVATARS_FOLDER` de `base/media.py`). Eventos
+  (`base.administer_hub`), y `base.profile.get|update|preferences_set|avatar_set|avatar_remove` (`preferences_set` cambia solo lo
+  que se le manda, y sin el idioma no deja su cookie; la foto, en `avatars/` del almacén del hub, servida solo a una
+  sesión: `AVATARS_FOLDER` de `base/media.py`). Eventos
   `base.pin.set`, `base.device.mode_changed|renamed|removed|pruned`, `base.access.settings_changed` y
   `base.profile.updated`; `base/live.py` sigue con ellos las caras, los dispositivos, el dial y el perfil.
 - El pase a erplora.com (BASE-F11; ACCOUNTS-F29 del SaaS): `base.saas_pass.create` (`base/services/`, `ai=INTERNAL`:
@@ -4563,7 +4702,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   `base/queries/app_help.py`; su ruta, `GET /api/help`, en `base/api_help.py`, que monta `config/api.py`) lee la parte
   del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Un módulo tiene la ayuda
   lista cuando declara `help = Help(…)` (`live.meta.Help`, con un vídeo de YouTube opcional por idioma, que valida
-  `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esos módulos en `help_apps`. Con ellos, `HelpEntry.vue`
+  `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esas apps en `help_apps`. Con ellas, `HelpEntry.vue`
   pinta el «?» en la barra de la página visible y abre `HelpWindow.vue` (con `HelpContent.vue` y `HelpFlowList.vue`, en
   `base/frontend/components/`); `base/frontend/lib/help.ts` guarda lo leído por módulo e idioma hasta que se recarga la
   página, y `tests/e2e/base-help.spec.ts` la recorre en tres tamaños (`tests/e2e/base-help-video.spec.ts`, con el
@@ -4598,6 +4737,17 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   código, sin referencias a issues, sin tamaños en px, sin ids de flujo ni nombres de operación o de evento; cada flujo
   publicado, con sus pasos; ningún flujo que se lea como hecho en una pestaña, fuera; y cada traducción, con las mismas
   pestañas y flujos que el original.
+- **La ayuda de las pantallas propias del Hub** (BASE-F115): `base.help.get` con `app=base` la sirve igual que la de un
+  módulo, por la misma ruta y con el mismo permiso. `base` declara `help = Help()`, y `base/platform_screens.py` dice
+  cada pantalla (una por pestaña, si la página las tiene) con la etiqueta de su `###` en los dos idiomas (msgids
+  `pgettext("workbook", …)`), su ruta en el router de la SPA (sin leer sus parámetros y con el `#` de su pestaña) y el
+  permiso que pide su página. Quien no tiene ese permiso no recibe su ayuda: el filtro se aplica en cada llamada, fuera
+  de lo guardado en `_READ`. Un `###` que no es una de esas pantallas (la campana, el menú lateral, el asistente) se
+  queda en el fichero, y de los flujos de `base` todavía no se publica ninguno: sus pasos llevan ids, referencias y
+  marcadores para quien los mantiene. Ninguna pantalla la enseña todavía: las rutas de `base` no llevan `meta.app`, así
+  que el «?» sigue saliendo solo en los módulos. `tests/test_help_workbooks.py` exige de cada pantalla su `###`, una
+  sola vez, y las mismas reglas de texto que a un módulo; `base/tests/test_platform_screens.py`, que cada dirección
+  exista en la SPA y que su permiso sea el de la operación que lee.
 - **La documentación de ERPlora** (saas ASSISTANT-F28): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
   único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del
@@ -4656,8 +4806,24 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 - Personas y permisos: las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
   el hub enlaza a «Miembros» (`members_url` de `hub-home`). Reglas puras en `base/people.py`; operaciones
-  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.{list,detail}` (rutas `/api/people…`,
-  `/api/roles`, `/api/roles/detail`). El PIN y la placa son los de Acceso (`Credential`): mismo hash, mismos frenos.
+  `base.person.{list,detail,pin_remove,badge_set,badge_remove}` y `base.role.{list,detail,create,update,delete,assign}`
+  (rutas `/api/people…`, `/api/roles`, `/api/roles/{detail,update,delete,assign}`). El PIN y la placa son los de Acceso
+  (`Credential`): mismo hash, mismos frenos.
+- Roles propios (`base.models.roles.BusinessRole`, en la BD del negocio): `base/roles.py` dice sin ORM lo que permite
+  uno hoy y lo que queda por revisar; `base.permissions.permissions_of_business_role` es el único cálculo, el mismo de
+  quien lo tiene (`access_for`), y con él `base/services/roles.py` mide la escalada: solo lo que pasa a «Permitido» y
+  antes no lo estaba, en todas las apps de este despliegue, también las apagadas (una app que se encienda da lo de su
+  rol de origen). Guardar `states` escribe lo que llega; si llega algo de una app que el rol no había guardado, se
+  escribe la app entera con lo que ya daba, para que nombrar un permiso no apague los demás. `base.role.update`
+  despierta todas las consultas vivas del negocio tras el COMMIT (`_wake_open_apps`). El nombre es único sin contar
+  mayúsculas (`base_businessrole_name_unique`), como en Shopify POS, Lightspeed, Odoo, NetSuite, Business Central y
+  WordPress; y solo quien está en el negocio impide borrarlo, como en Square y Lightspeed. `base.role.assign` escribe
+  `HubUser.business_role` (nulo es el rol de la invitación) con la regla de rangos de `base.people.role_refusal`, mide
+  lo que el rol da con la misma vara y bloquea la fila del rol hasta el COMMIT, para que borrarlo a la vez espere
+  (`base/tests/test_role_assign_race.py`). `base.permissions.role_held` dice el rol de la invitación y el propio que
+  manda: lo leen `access_for`, `base.session.me` (el nombre del rol y los permisos que un responsable puede aprobar),
+  la huella de `base.session.access` y el asistente. Los «Roles por revisar» los cuenta
+  `base.queries.roles.roles_to_review` en `base.bell.counters`.
 - Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su
   principio); `base/api_keys.py` pone la puerta de la llave (`KeyDoor`) delante de la sesión en toda ruta de una
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
@@ -4979,8 +5145,12 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.person.detail` | F78, F79 |
 | `base.person.pin_remove` | F78 |
 | `base.person.badge_set`, `base.person.badge_remove` | F79 |
-| `base.role.list` | F82, F83 |
-| `base.role.detail` | F82 |
+| `base.role.list` | F82, F83, F127, F129, F130 |
+| `base.role.detail` | F82, F97, F128, F129, F130 |
+| `base.role.create` | F127 |
+| `base.role.update` | F128 |
+| `base.role.delete` | F129 |
+| `base.role.assign` | F130 |
 | `base.approval.approvers`, `base.approval.approve`, `base.approval.spend` | F84 |
 | `base.approval.list`, `base.approval.export` | F85 |
 | `base.api_key.create` | F86 |
@@ -5013,6 +5183,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.location.list` | ninguno: solo el asistente y la API |
 | `base.hub.cut_finish` | ninguno: `manage.py cut_shared_hubs` y el migrador, al dar a un negocio su propia base de datos |
 | `base.hub.by_slugs`, `base.hub.seed_local` | ninguno: `manage.py seed_local_hubs`, solo en desarrollo |
+| `base.hub.platform_rename` | ninguno: `manage.py create_platform_hub --rename`, el nombre del negocio propio de ERPlora |
 
 ## Lo que queda fuera
 
@@ -5049,9 +5220,9 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
   programas ni archivos de más de 25 MB.
 - No invita, no cambia el rol ni quita a nadie: es de erplora.com, que lleva las plazas del plan; el hub lo enseña y
   enlaza a «Miembros».
-- No deja que el negocio cree, ajuste ni encienda o apague roles: tiene los roles básicos de erplora.com, que se dan
-  al invitar; cada app aporta lo que da a cada rol básico en ella y puede traer un rol básico propio cuando su
-  funcionalidad lo pida, y «Qué permite» lo enseña sin dejar cambiarlo (BASE-F82).
+- No cambia, borra ni apaga un rol básico: son los de erplora.com, que se dan al invitar; cada app aporta lo que da a
+  cada uno en ella y puede traer uno propio cuando su funcionalidad lo pida. Lo que un negocio quiere distinto lo hace
+  en un rol propio, a partir de otro (BASE-F127); ninguno da ser el propietario.
 - No enseña nunca el token entero de una llave después de crearla o rotarla, ni guarda el PIN de quien aprueba.
 - El asistente no guarda la conversación en el servidor: vive en la pestaña de quien pregunta y se olvida al cerrar
   sesión o cambiar de usuario.

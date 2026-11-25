@@ -21,7 +21,10 @@ from apps.invoice.services.recipient import _chosen_card, _recipient
 from apps.invoice.services.writes import _detail, _today
 from apps.sale.queries.business import TICKET_LIMIT, business_country, money_text
 from apps.sale.queries.checkout import tax_category_name
-from apps.tax.queries import business_tax_kind, resolve_category_text, resolve_tax, round_half_up
+from apps.tax.queries.calculation import round_half_up
+from apps.tax.queries.jurisdiction import business_tax_kind
+from apps.tax.queries.naming import resolve_category_text
+from apps.tax.queries.resolution import resolve_tax
 from base import operations as base_operations
 
 SERIES_INACTIVE = _("This series is not active: activate it or choose another one.")

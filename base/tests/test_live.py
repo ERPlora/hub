@@ -21,6 +21,7 @@ from base.events import (
     HUB_STATE_APPLIED,
     HUB_USAGE_MEASURED,
     IMPORT_UNDONE,
+    ROLE_EVENTS,
     SUPPORT_ACCESS_CHANGED,
     SUPPORT_ACCESS_ENTERED,
 )
@@ -53,8 +54,10 @@ def test_the_three_queries_and_their_events():
         # An app turned on or off by the business brings its hooks to the Home or takes them away.
         "base.setup.status": sorted({*declared("setup"), HUB_STATE_APPLIED, *DATA, *APP_EVENTS}),
         "base.widget.list": sorted({*declared("widgets"), HUB_STATE_APPLIED, *DATA, *APP_EVENTS}),
-        # The failed events the relay gives up on, resent or discarded change the bell's row.
-        "base.bell.counters": sorted({*declared("bell"), HUB_STATE_APPLIED, *DATA, *FAILED_EVENTS, *APP_EVENTS}),
+        # The failed events the relay gives up on, resent or discarded change the bell's row; so do the roles to review.
+        "base.bell.counters": sorted(
+            {*declared("bell"), HUB_STATE_APPLIED, *DATA, *FAILED_EVENTS, *APP_EVENTS, *ROLE_EVENTS}
+        ),
         "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED, *APP_EVENTS}),
         # Apps: the photo gives or takes the right to a paid module; the business turns them on and off.
         "base.app.list": sorted({HUB_STATE_APPLIED, *APP_EVENTS}),

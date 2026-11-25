@@ -36,8 +36,18 @@ BADGE_CHANGE_LIMIT = AttemptLimit("badge-change", attempts=30, window=3600)
 OWNER_ONLY = "base.person_owner_only"
 OWN_BADGE = "base.badge_own"
 
+#: Why a person cannot be given a role by who asks.
+ROLE_OF_OWNER = "base.role_of_owner"
+ROLE_OWN = "base.role_own"
+ROLE_ABOVE = "base.role_above"
+
 OWNER_ONLY_MESSAGE = _("Only the owner changes the owner's way in.")
 OWN_BADGE_MESSAGE = _("Nobody registers their own badge: ask another administrator.")
+ROLE_REFUSALS = {
+    ROLE_OF_OWNER: _("The owner is always the owner: nobody gives them another role."),
+    ROLE_OWN: _("Nobody changes their own role: ask somebody above you."),
+    ROLE_ABOVE: _("You may only give a role to people below you in the business."),
+}
 
 
 def role_rank(role: str) -> int:
@@ -58,6 +68,16 @@ def refusal(*, actor: str, actor_role: str, target: str, target_role: str, badge
     if badge and actor == target and not is_owner:
         return OWN_BADGE
     return None
+
+
+def role_refusal(*, actor: str, actor_role: str, target: str, target_role: str) -> str | None:
+    """Why ``actor`` (a username, with the role of its invitation) may not change the role of ``target`` in the business;
+    ``None`` when it may: only of somebody below, by their invitations."""
+    if target_role == Membership.Role.OWNER:
+        return ROLE_OF_OWNER
+    if actor == target:
+        return ROLE_OWN
+    return ROLE_ABOVE if role_rank(target_role) <= role_rank(actor_role) else None
 
 
 def ways(*, pin: bool, badge: bool) -> dict[str, bool]:
