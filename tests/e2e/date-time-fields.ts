@@ -27,10 +27,11 @@ async function confirm(picker: Locator): Promise<void> {
   await expect(picker).toBeHidden();
 }
 
-/** `day` (`YYYY-MM-DD`) as a DateField shows it to the specs' owner, who reads the Hub in American English. */
-export function dayAsShown(day: string): string {
+/** `day` (`YYYY-MM-DD`) as a DateField shows it in `locale`: by default to the specs' owner, who reads the Hub in
+ *  American English. */
+export function dayAsShown(day: string, locale = 'en-US'): string {
   const options = { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' } as const;
-  return new Intl.DateTimeFormat('en-US', options).format(Date.parse(`${day}T00:00:00Z`));
+  return new Intl.DateTimeFormat(locale, options).format(Date.parse(`${day}T00:00:00Z`));
 }
 
 /** `time` (`HH:MM`, 24 hours) as a TimeField shows it to the specs' owner, in American English («09:30 AM»). */

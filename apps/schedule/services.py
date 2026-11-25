@@ -1,7 +1,7 @@
 """Write operations of the schedule app: one operation = one transaction, with its events in the outbox.
 
 A refused command leaves no trace (the transaction rolls back: no row, no event). The rules of the
-intervals are ``schemas.check_intervals`` (engine.py underneath), applied again here to what a
+intervals are ``schemas.intervals.check_intervals`` (engine.py underneath), applied again here to what a
 correction leaves. Writes on the temporary changes lock the settings row first, so two that would
 cover the same day never slip past each other's check; a special day's date is unique in the database.
 """
@@ -35,27 +35,19 @@ from apps.schedule.queries import (
     special_day_out,
     week_out,
 )
-from apps.schedule.schemas import (
-    RANGE_BACKWARDS,
+from apps.schedule.schemas.fields import RANGE_BACKWARDS, DeletedOut, NoParamsIn
+from apps.schedule.schemas.intervals import IntervalIn, check_intervals
+from apps.schedule.schemas.overrides import OverrideIn, OverrideOut, OverridePatchIn, OverrideRefIn
+from apps.schedule.schemas.settings import SettingsIn, SettingsOut
+from apps.schedule.schemas.special_days import (
     BulkCreatedOut,
     BulkSpecialDayIn,
-    DeletedOut,
-    IntervalIn,
-    NoParamsIn,
-    OverrideIn,
-    OverrideOut,
-    OverridePatchIn,
-    OverrideRefIn,
-    SetDayIn,
-    SettingsIn,
-    SettingsOut,
     SpecialDayIn,
     SpecialDayOut,
     SpecialDayPatchIn,
     SpecialDayRefIn,
-    WeekOut,
-    check_intervals,
 )
+from apps.schedule.schemas.week import SetDayIn, WeekOut
 
 SPECIAL_DAY_EXISTS = _("There is already a special day on that date.")
 OVERRIDE_OVERLAPS = _(

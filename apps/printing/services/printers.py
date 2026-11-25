@@ -19,7 +19,7 @@ from apps.printing.queries.job_printer import job_printer
 from apps.printing.queries.jobs import actor
 from apps.printing.queries.printers import find_printer, printer_row
 from apps.printing.queries.settings import DEFAULT_FIELDS, current_settings
-from apps.printing.schemas import PrinterIn, PrinterOut, PrinterUpdateIn
+from apps.printing.schemas.printers import PrinterIn, PrinterOut, PrinterUpdateIn
 from apps.printing.services.writes import _queued
 
 DEFAULT_PORT = 9100

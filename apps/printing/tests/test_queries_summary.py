@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.printing.models import PrintJob
 from apps.printing.queries.summary import job_summary
-from apps.printing.schemas import EmptyIn
+from apps.printing.schemas.fields import EmptyIn
 from apps.printing.tests.conftest import HUB_DB, age, ctx_for, enqueue, printer, queued_ago, reaches, run
 
 pytestmark = HUB_DB

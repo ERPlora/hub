@@ -361,6 +361,7 @@ TASK_VIDEOS = [
     (("INVOICE-F05",), "KtnQOADy0w4", "5wsz2czzqbs"),
     (("INVOICE-F17", "INVOICE-F18"), "Yc8UiKuP1s8", "73SPPT0_dSY"),
     (("INVOICE-F08",), "bUVP4k5SZs8", "b8EAicT5vjo"),
+    (("INVOICE-F21",), "3jb2tjLO8w8", "ASShGRv53hc"),
 ]
 
 

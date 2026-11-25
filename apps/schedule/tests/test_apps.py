@@ -1,16 +1,18 @@
 """The schedule app declares its module metadata, its menu entries, its permissions, what each role gets,
 the assistant's contract of every operation (``ai`` and described input fields) and its hook of the Home."""
 
-
+import pytest
 from django.apps import apps
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, Help, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.schedule import events
 from apps.schedule import queries, services  # noqa: F401  (importing them registers the operations)
 from base import home
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.shell_icons import shell_icon_registry
 
 PERMISSIONS = [
@@ -264,5 +266,19 @@ def test_schedules_brings_no_panels_and_no_bell_rows_to_the_home():
     assert (schedule().widgets, schedule().bell) == ([], [])
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert schedule().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert schedule().help.videos == {"es": "50id_wAk79k", "en": "JXIPtMHdgpk"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("SCHEDULE-F02",), "v58AKat9mNQ", "U78Ugos-G1A"),
+    (("SCHEDULE-F04", "SCHEDULE-F06", "SCHEDULE-F13"), "CPWUbFbBxA8", "Orajt5aK6rU"),
+    (("SCHEDULE-F05",), "-ULk0OHUpfk", "RxKp9XMuNQM"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("schedule", language) == help_videos.by_task(TASK_VIDEOS, language)

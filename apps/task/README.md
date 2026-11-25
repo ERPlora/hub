@@ -33,7 +33,7 @@ cambia las suyas (asignadas o creadas por él); el responsable, todas.
 | Usa de otras apps | Personal: `Member` por clave ajena (`assigned_to`, `owner`), `resolve_member` (con bloqueo de la ficha), `actor_user_id` y `own_member`; las pantallas llaman a `staff.member.list` y `staff.member.mine` |
 | La usan | Automatizaciones llama por nombre a `task.task.create` (recetas de Citas y Reservas online, FLOW-F33); Tareas no sabe de ellas |
 | Pantallas | `/task/tasks` (Todas / Mis tareas) y `/task/projects`; la hoja de la tarea y la del proyecto, en un `ion-modal` sin URL propia |
-| Operaciones | 7 consultas (`queries.py`) y 11 acciones (`services.py`), todas con `ai=`; 17 rutas en `/api/task/…` (`task.task.release_member`, solo de la plataforma, no tiene ruta) |
+| Operaciones | 7 consultas (`queries.py`) y 11 acciones (`services/`), todas con `ai=`; 17 rutas en `/api/task/…` (`task.task.release_member`, solo de la plataforma, no tiene ruta) |
 | Eventos | 10, `task.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `staff.member.terminated` (`task.task.release_member`), por el relay del outbox |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial` y `0002_hub_users` |

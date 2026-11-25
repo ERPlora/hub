@@ -8,7 +8,7 @@ from live.errors import NotFound, PermissionDenied
 
 from apps.printing.models import PrintJob
 from apps.printing.queries.jobs import get_job
-from apps.printing.schemas import JobRefIn
+from apps.printing.schemas.jobs import JobRefIn
 from apps.printing.tests.conftest import HUB_DB, age, ctx_for, enqueue, printer, run
 
 pytestmark = HUB_DB

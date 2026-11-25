@@ -5,7 +5,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.printing.models import PrintJob
-from apps.printing.schemas import EmptyIn, JobSummaryOut
+from apps.printing.schemas.fields import EmptyIn
+from apps.printing.schemas.jobs import JobSummaryOut
 
 from .device_reads import this_device_key
 from .job_printer import active_printers, prints_on

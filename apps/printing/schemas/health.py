@@ -4,7 +4,7 @@ from typing import Literal
 
 from ninja import Field, Schema
 
-from apps.printing.schemas import Usage
+from apps.printing.schemas.fields import Usage
 
 StationState = Literal["ok", "no_signal", "not_configured"]
 

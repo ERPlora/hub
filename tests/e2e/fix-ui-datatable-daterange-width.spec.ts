@@ -1,28 +1,27 @@
-// flow: UI DataTable date filter — in Payments › Payments the Date column filters by a range, two native date fields
-// with the browser's calendar icon (hub#182). As in the market (Shopify, Odoo, Square) the date field fits whole: each
-// end of the Date range shows its whole date with the icon apart from it, never «dd/mm/yyy▢» with the icon over its
-// last character as in a box as narrow as a numeric «From/To» (5.5–7rem), in the panel behind the funnel (1440, 834),
-// in the 360px panel of the cards at 1440 and in the sheet at 390, with the browser in Spanish and in English, and
+// flow: UI DataTable date filter — in Payments › Payments the Date column filters by a range of two DateFields of
+// @erplora/ui, each with its calendar icon apart from the date (PAYMENT-F06). As in the market (Shopify, Odoo, Square)
+// each end shows its whole picked date, never cut by its box nor under its icon, in the panel behind the funnel (1440,
+// 834), in the 360px panel of the cards at 1440 and in the sheet at 390, with the Hub in Spanish and in English, and
 // nothing runs past the panel or the sheet. The Amount range keeps its short boxes.
 //
-// How it is measured (Chromium): the native field's `scrollWidth` never exceeds its `clientWidth`, clipped or not,
-// so the evidence is its pixels: the blank columns between the date's last ink and the icon's. 3px is the icon's
-// own padding, all a clipped or touching date leaves; a whole date keeps 8px or more (box 112px: 3, cut; 117px: 3,
-// touching; 122px: 8 — measured on this field). In the row each end also gets the width a free date field of its
-// font asks for (116px at 13px), what the browser gives a date field by default.
-// Payments keeps its column filters behind the funnel: at 1440 and 834 the ends are measured in its panel (no hub
-// list paints a date range in the open row; the row's 8.75rem is guarded by ui's DataTable.visual.test.ts).
+// How it is measured: a DateField is a read-only text field, so a date cut by its box makes the field's `scrollWidth`
+// pass its `clientWidth`; and the date, drawn in the field's font, ends at least MIN_GAP px before the icon starts.
+// Payments keeps its column filters behind the funnel: every size measures the ends in its panel (no hub list paints a
+// date range in the open row; the row's 8.75rem is guarded by ui's DataTable.visual.test.ts).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, login, record, shot, shown, untilStill } from './helpers';
+import { dayAsShown, pickDay } from './date-time-fields';
+import { A, login, record, shot, shown, signedInSpanish, untilStill } from './helpers';
 
 const KEY = 'FIX-UI-DATATABLE-DATERANGE-ICON-CLIPS-PLACEHOLDER';
 const TABLE = 'payment-payments';
 const DATE_ENDS = ['payment_date_from', 'payment_date_to'];
 const AMOUNT_ENDS = ['amount_from', 'amount_to'];
-// The browser's locale gives the native field its format: «dd/mm/yyyy» or «mm/dd/yyyy».
-const LOCALES = ['es-ES', 'en-US'] as const;
-/** Fewer blank px between the date and its icon: the date is cut or the icon touches it. */
+const LIST = '/payment/payments';
+/** The Hub's language gives a DateField its format: «28/11/2026» or «11/28/2026». */
+const LANGUAGES = ['es', 'en'] as const;
+type Language = (typeof LANGUAGES)[number];
+/** Fewer blank px between the date and its icon: the icon touches the date. */
 const MIN_GAP = 6;
 
 interface Case {
@@ -44,24 +43,33 @@ const CASES: Case[] = [
   { label: '390', width: 390, height: 844, where: 'panel' },
 ];
 
-/** What a date end has and needs, in px. */
+/** What a date end shows and how it fits, in px. */
 interface Fit {
+  value: string;
   /** Its box: left edge and width. */
   x: number;
   box: number;
-  /** Room the native field gives its date and its icon (inside its padding). */
-  room: number;
-  /** Width a free date field of the same font takes: its whole date and its calendar icon. */
-  needed: number;
-  /** Blank columns between the date's last ink and the icon's, in a screenshot of the native field. */
+  /** The field's content and its own width: a wider content is a cut date. */
+  scrollWidth: number;
+  clientWidth: number;
+  /** Blank px between the end of the date, drawn in the field's font, and the start of its icon. */
   gap: number;
 }
 
-async function signedIn(browser: Browser, locale: string, size: Case): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL: A, viewport: { width: size.width, height: size.height }, locale });
+/** The owner on the list of payments, with the Hub in `language`. */
+async function signedIn(browser: Browser, language: Language, size: { width: number; height: number }): Promise<{ context: BrowserContext; page: Page }> {
+  const viewport = { width: size.width, height: size.height };
+  if (language === 'es') return signedInSpanish(browser, viewport, LIST);
+  const context = await browser.newContext({ baseURL: A, viewport, locale: 'en-US' });
   const page = await context.newPage();
-  await login(page, A, '/payment/payments');
+  await login(page, A, LIST);
   return { context, page };
+}
+
+/** The 28th, which every month has, of the month the calendar opens on: picking it moves no month. */
+function dayOfThisMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-28`;
 }
 
 /** The column filters: the open filter row, or the panel behind the funnel (opened here). */
@@ -77,98 +85,62 @@ async function filters(page: Page): Promise<{ where: 'row' | 'panel'; scope: Loc
   return { where: 'panel', scope: panel };
 }
 
-/** The blank columns before the last run of ink (the calendar icon) in a PNG of the native field. */
-async function iconGap(page: Page, png: Buffer): Promise<number> {
-  return page.evaluate(async (base64) => {
-    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    const context = canvas.getContext('2d')!;
-    context.drawImage(bitmap, 0, 0);
-    const { data, width, height } = context.getImageData(0, 0, bitmap.width, bitmap.height);
-    const at = (x: number, y: number) => [0, 1, 2].map((c) => data[(y * width + x) * 4 + c]);
-    // The field's background: the most common colour of its top line.
-    const counts = new Map<string, number>();
-    for (let x = 0; x < width; x++) counts.set(at(x, 0).join(), (counts.get(at(x, 0).join()) ?? 0) + 1);
-    const background = [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0].split(',').map(Number);
-    // Its middle band, where the date and the icon are: an outlined field (`fill="outline"`) also crosses its
-    // border lines at the top and the bottom of the native field.
-    const ink = (x: number) => {
-      for (let y = Math.round(height * 0.25); y < Math.round(height * 0.75); y++) {
-        if (Math.max(...at(x, y).map((v, c) => Math.abs(v - background[c]))) > 48) return true;
-      }
-      return false;
-    };
-    const runs: Array<[number, number]> = [];
-    for (let x = 0; x < width; x++) {
-      if (!ink(x)) continue;
-      const last = runs.at(-1);
-      if (last && last[1] === x - 1) last[1] = x;
-      else runs.push([x, x]);
-    }
-    return runs.length < 2 ? 0 : runs.at(-1)![0] - runs.at(-2)![1] - 1;
-  }, png.toString('base64'));
-}
-
-/** Measures a date end: its box, the room of its native field, what a free date field of its font needs and the gap. */
-async function fit(page: Page, end: Locator): Promise<Fit> {
-  const input = end.locator('input');
-  const own = await input.evaluate((field: HTMLInputElement) => {
+/** Measures a date end: what it shows, its box, its content against its width and the room between its date and icon. */
+async function fit(end: Locator): Promise<Fit> {
+  return end.evaluate((host) => {
+    const field = host.querySelector('input')!;
     const style = getComputedStyle(field);
-    const twin = document.createElement('input');
-    twin.type = 'date';
-    twin.style.cssText = `position: absolute; visibility: hidden; width: auto; padding: 0; border: 0; font: ${style.font}; letter-spacing: ${style.letterSpacing}`;
-    document.body.append(twin);
-    const needed = twin.getBoundingClientRect().width;
-    twin.remove();
-    const box = (field.closest<HTMLElement>('ion-input') as HTMLElement).getBoundingClientRect();
-    return { x: box.x, box: box.width, room: field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight), needed };
+    const pen = document.createElement('canvas').getContext('2d')!;
+    pen.font = style.font;
+    const dateEnd = field.getBoundingClientRect().left + parseFloat(style.paddingLeft) + pen.measureText(field.value).width;
+    const icon = host.querySelector('[slot="end"]')!.getBoundingClientRect();
+    const box = host.getBoundingClientRect();
+    return { value: field.value, x: box.x, box: box.width, scrollWidth: field.scrollWidth, clientWidth: field.clientWidth, gap: icon.left - dateEnd };
   });
-  return { ...own, gap: await iconGap(page, await input.screenshot()) };
 }
 
 for (const size of CASES) {
   test(`UI DataTable filtro de fechas at ${size.label}: each end of the Date range shows its whole date, the calendar icon apart; Amount keeps its short boxes`, async ({
     browser,
   }) => {
-    for (const locale of LOCALES) {
-      const { context, page } = await signedIn(browser, locale, size);
+    const day = dayOfThisMonth();
+    for (const language of LANGUAGES) {
+      const { context, page } = await signedIn(browser, language, size);
       try {
         await shown(page).locator(`[data-testid=${TABLE}-empty], [data-testid=${TABLE}-row]`).first().waitFor({ state: 'visible' });
         if (size.view === 'cards') await shown(page).locator(`[data-testid=${TABLE}-view-cards]`).click();
         const { where, scope } = await filters(page);
-        const area = (await scope.boundingBox())!;
+        const end = (name: string) => scope.locator(`[data-testid=${TABLE}-filter-${name}]`);
+        for (const name of DATE_ENDS) await pickDay(page, end(name), day);
+        // Measured once both are picked: a tap scrolls its end into view, and measured one by one each end could
+        // look inside the panel while the other is out of it.
         const dates: Record<string, Fit> = {};
-        for (const name of DATE_ENDS) {
-          const end = scope.locator(`[data-testid=${TABLE}-filter-${name}]`);
-          await expect(end.locator('input'), `${locale}: ${name} is a date field`).toHaveAttribute('type', 'date');
-          dates[name] = await fit(page, end);
-        }
+        for (const name of DATE_ENDS) dates[name] = await fit(end(name));
+        const area = (await scope.boundingBox())!;
         const amounts: Record<string, { x: number; box: number }> = {};
         for (const name of AMOUNT_ENDS) {
           const box = (await scope.locator(`[data-testid=${TABLE}-filter-${name}]`).boundingBox())!;
           amounts[name] = { x: box.x, box: box.width };
         }
-        record(`${KEY}-${size.label}-${locale}`, { where, area: { x: area.x, width: area.width }, dates, amounts });
-        await page.screenshot({ path: shot(`${KEY}-${size.label}${locale === 'es-ES' ? '' : '-en'}`) });
+        record(`${KEY}-${size.label}-${language}`, { where, area: { x: area.x, width: area.width }, dates, amounts });
+        await page.screenshot({ path: shot(`${KEY}-${size.label}${language === 'es' ? '' : '-en'}`) });
 
-        expect(where, `${locale}: where the filters are`).toBe(size.where);
+        expect(where, `${language}: where the filters are`).toBe(size.where);
         for (const [name, own] of Object.entries(dates)) {
-          expect(own.gap, `${locale} ${name}: the calendar icon stands apart from the whole date (blank px)`).toBeGreaterThanOrEqual(MIN_GAP);
-          if (where === 'row') {
-            expect(own.room, `${locale} ${name}: the width of a date field (${own.needed.toFixed(1)} px)`).toBeGreaterThanOrEqual(own.needed - 0.5);
-          }
+          expect(own.value, `${language} ${name}: the picked day`).toBe(dayAsShown(day, language));
+          expect(own.scrollWidth, `${language} ${name}: «${own.value}» whole in its box (px)`).toBeLessThanOrEqual(own.clientWidth);
+          expect(own.gap, `${language} ${name}: the calendar icon stands apart from the whole date (blank px)`).toBeGreaterThanOrEqual(MIN_GAP);
         }
         for (const [name, own] of Object.entries({ ...dates, ...amounts })) {
           // Nothing runs past the row, the panel or the sheet.
-          expect(own.x, `${locale} ${name} starts inside the ${where}`).toBeGreaterThanOrEqual(area.x - 0.5);
-          expect(own.x + own.box, `${locale} ${name} ends inside the ${where}`).toBeLessThanOrEqual(area.x + area.width + 0.5);
+          expect(own.x, `${language} ${name} starts inside the ${where}`).toBeGreaterThanOrEqual(area.x - 0.5);
+          expect(own.x + own.box, `${language} ${name} ends inside the ${where}`).toBeLessThanOrEqual(area.x + area.width + 0.5);
         }
         // The numeric range is as before: in the row, its short boxes of 5.5–7rem.
         if (where === 'row') {
           for (const [name, own] of Object.entries(amounts)) {
-            expect(own.box, `${locale} ${name}: the short number box of the row`).toBeGreaterThanOrEqual(88 - 0.5);
-            expect(own.box, `${locale} ${name}: the short number box of the row`).toBeLessThanOrEqual(112 + 0.5);
+            expect(own.box, `${language} ${name}: the short number box of the row`).toBeGreaterThanOrEqual(88 - 0.5);
+            expect(own.box, `${language} ${name}: the short number box of the row`).toBeLessThanOrEqual(112 + 0.5);
           }
         }
       } finally {
@@ -178,11 +150,11 @@ for (const size of CASES) {
   });
 }
 
-// The reviewer's FIX of this component (rv-ui-29): between 641 and 1024 px the search box shrinks to leave room for
-// the toolbar (12–22rem) and its example text was cut short with no sign, «Search reference or benefic» at 820 and
-// «…beneficia» at 834. As in the market (Shopify, Square, Gmail) the example text fits whole where it has room and
-// ends in «…» where it has none; the box keeps its widths. Measured with the page in English and in Spanish
-// («Buscar referencia o beneficiario…», the `django_language` the account would pick).
+// Between 641 and 1024 px the search box shrinks to leave room for the toolbar (12–22rem), and its example text was cut
+// short with no sign: «Search reference or benefic» at 820 and «…beneficia» at 834. As in the market (Shopify, Square,
+// Gmail) the example text fits whole where it has room and ends in «…» where it has none; the box keeps its widths.
+// Measured with the page in English and in Spanish («Buscar referencia o beneficiario…», the `django_language` the
+// account would pick).
 const SEARCH_SIZES = [
   { label: '820', width: 820, height: 1180 },
   { label: '834', width: 834, height: 1112 },
@@ -206,19 +178,8 @@ for (const size of SEARCH_SIZES) {
   }) => {
     const measured: Partial<Record<'en' | 'es', SearchFit>> = {};
     for (const language of ['en', 'es'] as const) {
-      const context = await browser.newContext({
-        baseURL: A,
-        viewport: { width: size.width, height: size.height },
-        locale: language === 'es' ? 'es-ES' : 'en-US',
-      });
+      const { context, page } = await signedIn(browser, language, size);
       try {
-        const page = await context.newPage();
-        await login(page, A, '/payment/payments');
-        if (language === 'es') {
-          await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-          await page.goto(`${A}/payment/payments`);
-          await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-        }
         await shown(page).locator(`[data-testid=${TABLE}-empty], [data-testid=${TABLE}-row]`).first().waitFor({ state: 'visible' });
         const input = shown(page).locator(`[data-testid=${TABLE}-search] input`);
         await expect(input).toHaveAttribute('placeholder', language === 'es' ? 'Buscar referencia o beneficiario…' : 'Search reference or beneficiary…');
