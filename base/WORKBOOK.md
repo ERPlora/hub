@@ -3768,20 +3768,24 @@ dice el sistema. Una app anterior a esta orden no lo enseña.
 Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Encender o apagar el acceso de soporte de ERPlora
-Estado: parcial — se cambia y se consulta por la API y con el asistente, y el negocio ya deja entrar o rechaza a
-soporte según esté; falta su tarjeta en Ajustes › General y que erplora.com dé al personal de soporte su código para
-entrar
+Estado: parcial — se cambia y se consulta en Ajustes › General, por la API y con el asistente, y el negocio ya deja
+entrar o rechaza a soporte según esté; falta que erplora.com dé al personal de soporte su código para entrar
 Actor: propietario, administrador, personal de soporte de ERPlora
 Pantalla: Ajustes · General, la página «Este negocio no deja entrar a soporte»
 Pasos:
   1. Cuando el negocio quiere que el personal de soporte de ERPlora entre para ayudarle a configurarlo (cargar los
-     productos, ajustar sus apps), el propietario o un administrador enciende el acceso de soporte. Viene apagado.
-     Hoy se enciende y se apaga por la API o pidiéndoselo al asistente, que lo confirma antes de cambiarlo (BASE-F97).
-  2. El cambio se guarda al instante, con quién lo hizo y cuándo. No caduca: sigue encendido hasta que alguien del
-     negocio lo apaga, porque una puesta en marcha puede durar varios días.
-  3. Cualquiera del negocio puede consultar si está encendido, quién lo cambió por última vez y cuándo, si él mismo
-     puede cambiarlo y las 10 últimas entradas de soporte (quién y cuándo), la más reciente primero. Mientras nadie de
-     soporte haya entrado, la lista está vacía.
+     productos, ajustar sus apps), el propietario o un administrador enciende «Dejar entrar al soporte de ERPlora» en
+     la tarjeta «Acceso de soporte», la última de Ajustes › General. Viene apagado. También se enciende y se apaga por
+     la API o pidiéndoselo al asistente, que lo confirma antes de cambiarlo (BASE-F97).
+  2. El cambio se guarda al instante, con quién lo hizo y cuándo, y lo confirma un aviso: «Acceso de soporte
+     encendido: el soporte de ERPlora puede entrar.» o «Acceso de soporte apagado: el soporte de ERPlora ya no puede
+     entrar.». No caduca: sigue encendido hasta que alguien del negocio lo apaga, porque una puesta en marcha puede
+     durar varios días.
+  3. Cualquiera del negocio ve en la tarjeta si está encendido, quién lo cambió por última vez y cuándo («Último
+     cambio: Ana, 24/11/2026, 10:30.») y, en «Últimas entradas de soporte», las 10 últimas entradas de soporte (quién y
+     cuándo), la más reciente primero; lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
+     soporte de ERPlora ha entrado todavía.». A quien no administra el negocio el interruptor le sale desactivado, con
+     «Solo quien administra el negocio puede cambiarlo.».
   4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio desde erplora.com con su propia
      cuenta y llega como un administrador: puede hacer todo menos lo que solo hace el propietario (comprar para el
      negocio, reiniciarlo, sus copias). No sale en Empleados ni entre quienes pueden dar acceso, no entra en las cajas
@@ -3797,8 +3801,10 @@ Entra: encendido o apagado; la cuenta de soporte que comprueba erplora.com.
 Sale: el ajuste del negocio, con quién lo cambió y cuándo. Evento `base.support_access.changed`. Cada entrada de
 soporte, con quién y cuándo. Evento `base.support_access.entered`.
 Si falla: a quien no administra el negocio se le rechaza el cambio (403 `permission_denied`) y el ajuste se queda como
-estaba; al consultarlo, le sale que no puede cambiarlo. Con el acceso apagado, soporte no abre sesión ni deja entrada
-(la página del paso 5).
+estaba; al consultarlo, le sale que no puede cambiarlo. Si el cambio no se puede guardar, debajo sale «No se pudo
+guardar el cambio.» y el interruptor vuelve a lo guardado; si la tarjeta no puede leer el ajuste, «No se pudo cargar
+el acceso de soporte.» con «Reintentar». Con el acceso apagado, soporte no abre sesión ni deja entrada (la página del
+paso 5).
 Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
 
 ## Para quien lo mantiene
@@ -4894,7 +4900,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
   forma de entrar `support`, y la operación interna `base.support_access.enter` anota la visita
   (`base.support_access.entered`) o, apagado, la rechaza con `base/templates/base/support_access_off.html`. El equipo del
   negocio es `Membership.objects.team(host)`, que deja fuera a soporte: quien liste personas lo usa. Al apagar, el mismo
-  `base.support_access.update` cierra sus sesiones.
+  `base.support_access.update` cierra sus sesiones. La tarjeta es `base/frontend/components/SupportAccessCard.vue` (e2e
+  en `tests/e2e/base-support-access.spec.ts`); su interruptor, como el de `ApiDocsCard`, se guarda al moverlo con
+  `useSavedSwitch` (`base/frontend/lib/saved-switch.ts`), que lo vuelve a pintar en lo guardado si falla.
 - Menú lateral: `SIDEBAR` de `base/frontend/lib/sidebar.ts`; cada entrada declara `permission`, el de la operación de
   su pantalla, y `shellSidebar` lo convierte en el `visible` del shell (`ShellSidebarItem`, `packages/ui`); «API» lleva
   además `shownWhile` (la documentación mostrada). Un empleado no ve «Sistema» (`base.administer_hub`), y su dirección

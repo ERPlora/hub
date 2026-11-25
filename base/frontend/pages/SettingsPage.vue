@@ -10,6 +10,7 @@ import ApiDocsCard from '../components/ApiDocsCard.vue';
 import DeviceModeCard from '../components/DeviceModeCard.vue';
 import DevicesCard from '../components/DevicesCard.vue';
 import PinPolicyCard from '../components/PinPolicyCard.vue';
+import SupportAccessCard from '../components/SupportAccessCard.vue';
 import BusinessPanel from '../components/settings/BusinessPanel.vue';
 import TicketsPanel from '../components/settings/TicketsPanel.vue';
 import DataPanel from '../components/data/DataPanel.vue';
@@ -56,6 +57,7 @@ const tab = computed<SettingsTab | undefined>({
         </p>
       </section>
       <ApiDocsCard />
+      <SupportAccessCard />
     </template>
     <BusinessPanel v-else-if="tab === 'business'" />
     <TicketsPanel v-else-if="tab === 'tickets'" />
