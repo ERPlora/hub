@@ -39,8 +39,12 @@ def group(answer: dict, key: str) -> dict:
     return next(app for app in answer["apps"] if app["app"] == key)
 
 
+def lines(answer: dict) -> dict[str, dict]:
+    return {line["permission"]: line for app in answer["apps"] for line in app["permissions"]}
+
+
 def states(answer: dict) -> dict[str, str]:
-    return {line["permission"]: line["state"] for app in answer["apps"] for line in app["permissions"]}
+    return {permission: line["state"] for permission, line in lines(answer).items()}
 
 
 @pytest.fixture
@@ -77,6 +81,18 @@ class TestWhatABasicRoleAllows:
         assert employee["sale.view_all_sales"] == "off"
         assert employee["base.view_customer_contact"] == "on"
         assert employee["base.view_costs"] == "off"
+
+    def test_it_says_what_a_manager_can_approve_whatever_the_role_does_with_it(self):
+        employee, owner = lines(read("hub_employee")), lines(read("hub_owner"))
+
+        approvable = {permission for permission, line in employee.items() if line["approvable"]}
+        assert "sale.void_sale" in approvable
+        assert approvable == {permission for permission, line in owner.items() if line["approvable"]}
+        # What nobody approves is done or it is not.
+        assert not approvable & {"sale.take_payment", "base.view_costs", "base.manage_roles"}
+
+    def test_a_basic_role_has_nothing_to_review(self):
+        assert not any(line["to_review"] for line in lines(read("hub_employee")).values())
 
     def test_the_states_follow_what_each_role_is_given(self):
         for role in Membership.Role.values:
@@ -236,7 +252,28 @@ class TestTheRolesOfTheBusiness:
 
         own, basic = detail(client, str(role.pk)).json(), detail(client, "hub_employee").json()
 
-        assert group(own, "sale") == group(basic, "sale")
+        allows = [(line["permission"], line["state"]) for line in group(own, "sale")["permissions"]]
+        assert allows == [(line["permission"], line["state"]) for line in group(basic, "sale")["permissions"]]
+
+    def test_each_permission_it_was_not_saved_with_is_marked_to_review(self, client, eva):
+        role = a_role(sale__view_sale=ON, sale__void_sale=OFF)
+        client.force_login(eva)
+
+        answer = detail(client, str(role.pk)).json()
+
+        seen = {line["permission"] for line in group(answer, "sale")["permissions"] if not line["to_review"]}
+        assert seen == {"sale.view_sale", "sale.void_sale"}
+        assert all(line["to_review"] for line in group(answer, "inventory")["permissions"])
+
+    def test_saved_with_all_it_shows_it_has_nothing_left_to_review(self, client, eva):
+        saved = {permission: ON for permission in permissions_of_role(Membership.Role.ADMIN)}
+        role = BusinessRole.objects.create(name="Cashier", origin=Membership.Role.EMPLOYEE, states=saved)
+        client.force_login(eva)
+
+        answer = detail(client, str(role.pk)).json()
+
+        assert answer["to_review"] is False
+        assert not any(line["to_review"] for line in lines(answer).values())
 
     def test_owning_the_business_is_not_among_what_it_may_allow(self, client, eva):
         role = a_role(origin=Membership.Role.ADMIN)
