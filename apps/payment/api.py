@@ -37,27 +37,27 @@ async def payment_get(request, params: Query[PaymentRefIn]):
 
 @bind(router, "payment.payment.create", "/payment/payments", status=201)
 async def payment_create(request, data: PaymentIn):
-    return await run_operation(request, services.create_payment, data)
+    return await run_operation(request, services.payments.create_payment, data)
 
 
 @bind(router, "payment.payment.approve", "/payment/payments/approve")
 async def payment_approve(request, data: PaymentRefIn):
-    return await run_operation(request, services.approve_payment, data)
+    return await run_operation(request, services.payments.approve_payment, data)
 
 
 @bind(router, "payment.payment.mark_sent", "/payment/payments/mark_sent")
 async def payment_mark_sent(request, data: PaymentRefIn):
-    return await run_operation(request, services.mark_sent, data)
+    return await run_operation(request, services.payments.mark_sent, data)
 
 
 @bind(router, "payment.payment.mark_completed", "/payment/payments/mark_completed")
 async def payment_mark_completed(request, data: PaymentRefIn):
-    return await run_operation(request, services.mark_completed, data)
+    return await run_operation(request, services.payments.mark_completed, data)
 
 
 @bind(router, "payment.payment.cancel", "/payment/payments/cancel")
 async def payment_cancel(request, data: CancelIn):
-    return await run_operation(request, services.cancel_payment, data)
+    return await run_operation(request, services.payments.cancel_payment, data)
 
 
 # Methods
@@ -75,19 +75,19 @@ async def method_get(request, params: Query[MethodRefIn]):
 
 @bind(router, "payment.method.create", "/payment/methods", status=201)
 async def method_create(request, data: MethodIn):
-    return await run_operation(request, services.create_method, data)
+    return await run_operation(request, services.methods.create_method, data)
 
 
 @bind(router, "payment.method.update", "/payment/methods/update")
 async def method_update(request, data: MethodPatchIn):
-    return await run_operation(request, services.update_method, data)
+    return await run_operation(request, services.methods.update_method, data)
 
 
 @bind(router, "payment.method.deactivate", "/payment/methods/deactivate")
 async def method_deactivate(request, data: MethodRefIn):
-    return await run_operation(request, services.deactivate_method, data)
+    return await run_operation(request, services.methods.deactivate_method, data)
 
 
 @bind(router, "payment.method.activate", "/payment/methods/activate")
 async def method_activate(request, data: MethodRefIn):
-    return await run_operation(request, services.activate_method, data)
+    return await run_operation(request, services.methods.activate_method, data)

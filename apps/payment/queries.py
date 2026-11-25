@@ -3,7 +3,7 @@
 Every list pages (``limit`` ≤ 100) with ``id`` as the last tie-break, so pages never overlap. The
 ``find_*`` helpers resolve how a person names a record (assistant, voice): a method by its id, else
 its exact name, else the only name that contains it (several → 409 ``payment.method_ambiguous`` naming
-them); a payment by its id or its reference. services.py uses them too, inside its own transaction.
+them); a payment by its id or its reference. services/ uses them too, inside its own transaction.
 """
 
 from uuid import UUID
@@ -58,7 +58,7 @@ METHOD_ORDER = {
 }
 
 
-# --- Shared with services.py, inside the command's own transaction --------------------------------
+# --- Shared with services/, inside the command's own transaction ----------------------------------
 
 
 def find_method(
