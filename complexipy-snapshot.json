@@ -522,8 +522,8 @@
     ]
   },
   {
-    "path": "base/tenancy/move.py",
-    "file_name": "move.py",
+    "path": "base/tenancy/move/bucket.py",
+    "file_name": "bucket.py",
     "functions": [
       {
         "name": "_run",

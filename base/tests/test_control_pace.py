@@ -417,8 +417,8 @@ def asked_after_the_second_tick(queue: list[str], *asked: str):
 
 
 def test_the_second_of_two_moves_asked_is_taken_at_the_tick_after_the_first_ended(at_rest, monkeypatch):
-    """``move.run_due`` moves one hub a pass (a copy takes a while): the one asked after it starts at the next tick,
-    as it did when the moves' pass started on every tick, not at the moves' look ten minutes later."""
+    """``move.worker_pass.run_due`` moves one hub a pass (a copy takes a while): the one asked after it starts at the
+    next tick, as it did when the moves' pass started on every tick, not at the moves' look ten minutes later."""
     queue, moved = [], []
     monkeypatch.setattr(worker_data.move, "run_due", lambda now, cancelled=None: 1 if queue and not moved.append((queue.pop(0), now)) else 0)
 

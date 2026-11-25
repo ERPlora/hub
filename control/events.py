@@ -15,7 +15,7 @@ CLUSTER_DELETED = "control.cluster.deleted"
 HUB_MOVE_REQUESTED = "control.hub.move_requested"
 
 #: A hub was asked to move in its next night (``id``, ``slug``, ``from``, ``to``, ``at``: when it starts); open until
-#: the worker starts it (``base.tenancy.move.launch_due``).
+#: the worker starts it (``base.tenancy.move.worker_pass.launch_due``).
 HUB_MOVE_SCHEDULED = "control.hub.move_scheduled"
 
 #: A move was asked to be undone (``id``, ``slug``); the worker puts the hub back on its origin.

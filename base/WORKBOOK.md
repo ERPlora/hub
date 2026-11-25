@@ -5051,8 +5051,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   sigue abierto: la lista de Hubs lo dice en la columna del clúster, con la hora en su reloj. La franja acota el
   arranque, no el final, como la ventana de AWS; sale del mercado (Square actualiza a las 03:00 de la hora del
   negocio; Business Central y Azure SQL ponen su ventana en la hora local del entorno; RDS, «Apply immediately» o
-  «next maintenance window»). La arranca el worker al principio de `base.tenancy.move.run_due` (`launch_due`), con el
-  arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
+  «next maintenance window»). La arranca el worker al principio de `base.tenancy.move.worker_pass.run_due`
+  (`launch_due`), con el arriendo del hub (`claim_hub`, el de `HubDue`) y en una transacción sobre su fila bloqueada
   (`control.services.start_scheduled_move`): si en su reloj ya no es de madrugada (el worker estuvo parado, la zona
   cambió) la deja para la siguiente; si una comprobación de `control.hub.move` la rechaza en ese momento (clúster
   cerrado o lleno, base que no está en su servidor, en restauración…), la quita y lo dice en `Hub.last_error`
@@ -5091,10 +5091,10 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   reales, `base/tenancy/tests/test_restore.py::TestAskedInTheHubAdmin`.
 - **Cuánto puede estar cerrado el negocio** (hub#1527): las páginas de «Mover a otro clúster…» y «Restaurar desde una
   copia…» dicen debajo de cada hub el tamaño de su base (el que mide la lista, `control.cluster.sizes`, una vez por
-  petición) y hasta cuánto puede estar cerrado (`base.tenancy.move.longest_closure`: las dos mitades de la copia a
-  `COPY_SLOWEST_BYTES_PER_SECOND`, 10 MB/s, cada una con su `COPY_TIMEOUT_SECONDS`, en minutos enteros; un tamaño que
-  no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: cada uno se cierra
-  al pedirlo y espera cerrado su turno (hub#1532). La copia aparte no cierra nada y no lo dice. Tests:
+  petición) y hasta cuánto puede estar cerrado (`base.tenancy.move.bucket.longest_closure`: las dos mitades de la
+  copia a `COPY_SLOWEST_BYTES_PER_SECOND`, 10 MB/s, cada una con su `COPY_TIMEOUT_SECONDS`, en minutos enteros; un
+  tamaño que no se lee cuenta como el plazo entero), y el aviso suma los elegidos, que se copian uno tras otro: cada
+  uno se cierra al pedirlo y espera cerrado su turno (hub#1532). La copia aparte no cierra nada y no lo dice. Tests:
   `base/tenancy/tests/test_move_closure.py` y `control/tests/test_admin_closure.py`.
 - **Un negocio de cualquier tamaño se restaura o se copia aparte** (hub#1524): la copia del clúster temporal pasa por el
   bucket de volcados como la de un traslado, nunca por el disco del worker: `pg_dump` la sube según la hace

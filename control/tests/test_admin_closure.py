@@ -101,7 +101,7 @@ class TestItsPage:
         assert html.count("Connection refused") == 1
 
     def test_follows_the_copys_time_limit(self, client, root, sizes, target, monkeypatch):
-        monkeypatch.setattr(move, "COPY_TIMEOUT_SECONDS", 30 * 60)
+        monkeypatch.setattr(move.bucket, "COPY_TIMEOUT_SECONDS", 30 * 60)
 
         html = choose(client, a_hub(sizes, "acme", 500 * 1000 * MB))
 
