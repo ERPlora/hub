@@ -528,6 +528,7 @@ def test_what_the_automatic_issue_writes_does_not_depend_on_what_was_tried_by_ha
     second = Invoice.objects.get(number="ERP-2026-00124")
     erp = series("ERP")
     assert (second.sequence, second.series_id, second.invoice_type) == (124, erp.id, "F1")
+    assert (erp.invoice_type, series("ERPR").invoice_type) == ("F1", "R1")
     assert (erp.name, erp.prefix, erp.format, erp.current_number, erp.is_active, erp.is_default) == (
         "ERPlora",
         "ERP",
