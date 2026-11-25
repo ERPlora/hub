@@ -237,7 +237,7 @@ def _read_stock(row: ProductImportRowIn, fields: dict, file: _ProductFile) -> di
     unit = row.unit.strip().lower() or Unit.UNIT
     if unit not in Unit.values:
         return str(ROW_UNIT_UNKNOWN) % {"text": row.unit.strip()}
-    stock = parse_quantity(row.stock) if row.stock.strip() else Decimal("0")
+    stock = _parse_stock(row.stock) if row.stock.strip() else Decimal("0")
     threshold = (
         parse_quantity(row.low_stock_threshold)
         if row.low_stock_threshold.strip()
@@ -301,7 +301,7 @@ def _quantity_refusal(unit: str, *quantities: Decimal | None) -> str:
     """Why ``quantities``, as read, are not all quantities of ``unit``; empty if they are."""
     if None in quantities:
         return str(ROW_QUANTITY_NOT_NUMERIC)
-    if max(quantities) >= MAX_QUANTITY:
+    if max(abs(quantity) for quantity in quantities) >= MAX_QUANTITY:
         return str(ROW_QUANTITY_TOO_LARGE)
     return "" if all(fits_unit(quantity, unit) for quantity in quantities) else str(ROW_OFF_GRID)
 
@@ -359,6 +359,15 @@ def parse_quantity(text: str) -> Decimal | None:
     if normalized is None or not _QUANTITY_RE.match(normalized):
         return None
     return Decimal(normalized)
+
+
+def _parse_stock(text: str) -> Decimal | None:
+    """A stock as written: a quantity, or one below zero (-3) of a business that sells without stock."""
+    text = text.strip()
+    if not text.startswith("-"):
+        return parse_quantity(text)
+    quantity = parse_quantity(text[1:])
+    return None if quantity is None else -quantity
 
 
 def _decimal_point(raw: str) -> str | None:

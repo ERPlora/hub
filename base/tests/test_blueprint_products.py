@@ -188,6 +188,17 @@ def test_a_service_that_comes_back_still_keeps_no_stock(ctx):
     assert (made.product_type, made.tracks_stock) == ("service", False)
 
 
+def test_a_product_sold_below_zero_comes_back_with_its_stock(ctx):
+    call(ctx, "inventory.config.update", allow_sell_without_stock=True)
+    burger = call(ctx, "inventory.product.create", **BURGER, initial_stock=2)
+    call(ctx, "inventory.stock.write_off", product_id=burger.id, qty=5, reason="Se quemaron en la plancha")
+
+    report = deleted_and_loaded(ctx)
+
+    assert (report["status"], report["created"], report["failed"], report["problems"]) == ("applied", 1, 0, [])
+    assert Product.objects.get(sku="HAM-01", is_deleted=False).stock == Decimal("-3")
+
+
 def test_a_file_that_does_not_say_them_loads_physical_products_priced_by_one_of_their_unit(ctx):
     rows = [{**OLD_ROW, "unit": "g"}, {**OLD_ROW, "name": "Agua", "sku": "BEB-01", "unit": ""}]
     rows += [{**OLD_ROW, "sku": "ENT-02", "product_type": None, "price_quantity": "", "pricing_unit": None}]
