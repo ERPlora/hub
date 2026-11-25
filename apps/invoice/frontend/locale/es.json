@@ -47,7 +47,8 @@
       "substitution": "Sustituye a una factura simplificada",
       "rectification": "Rectificación",
       "refund": "Devolución de la venta",
-      "void": "Anulación de la venta"
+      "void": "Anulación de la venta",
+      "platform": "erplora.com"
     },
     "taxes": {
       "vat": "IVA",

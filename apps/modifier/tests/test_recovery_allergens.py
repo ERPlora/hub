@@ -40,8 +40,8 @@ def as_before_allergens() -> None:
 def test_the_copy_gives_each_option_with_its_allergens():
     cheese = cheese_in_extras()
 
-    [read] = queries.options_in_copy(direct())
-    [group] = queries.groups_in_copy(direct())
+    [read] = queries.recovery.options_in_copy(direct())
+    [group] = queries.recovery.groups_in_copy(direct())
 
     assert (read["id"], read["allergens"]) == (cheese.id, ["gluten", "milk"])
     assert [option["allergens"] for option in group["options"]] == [["gluten", "milk"]]
@@ -52,8 +52,8 @@ def test_a_copy_from_before_options_had_allergens_gives_its_options_without_them
     cheese = cheese_in_extras()
     as_before_allergens()
 
-    [read] = queries.options_in_copy(direct())
-    [group] = queries.groups_in_copy(direct())
+    [read] = queries.recovery.options_in_copy(direct())
+    [group] = queries.recovery.groups_in_copy(direct())
 
     assert (read["id"], read["name"]) == (cheese.id, "Cheese")
     assert "allergens" not in read
@@ -68,8 +68,8 @@ def test_what_is_lacking_takes_the_allergens_the_copy_gave_to_its_create():
     option = lost.of_the_copy(sauces.id, "Mustard sauce", allergens=["mustard"])
     group = whole.a_group_of_the_copy("Sizes", options=[whole.an_option_of_the_copy("Large", allergens=["milk"])])
 
-    [option_back] = queries.options_not_in_business([option])
-    [group_back] = queries.groups_not_in_business([group])
+    [option_back] = queries.recovery.options_not_in_business([option])
+    [group_back] = queries.recovery.groups_not_in_business([group])
 
     assert option_back == lost.as_recovered(option, sauces.id, allergens=["mustard"])
     assert [one["allergens"] for one in group_back["options"]] == [["milk"]]
@@ -78,7 +78,7 @@ def test_what_is_lacking_takes_the_allergens_the_copy_gave_to_its_create():
 @HUB_DB
 def test_an_option_comes_back_by_its_create_with_its_allergens():
     sauces = whole.a_group("Sauces")
-    [record] = queries.options_not_in_business([lost.of_the_copy(sauces.id, "Mustard sauce", allergens=["mustard"])])
+    [record] = queries.recovery.options_not_in_business([lost.of_the_copy(sauces.id, "Mustard sauce", allergens=["mustard"])])
 
     made = lost.recovered(record)
 

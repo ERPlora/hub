@@ -810,7 +810,7 @@ and an invoice never prints without its QR.".
 Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Mark an invoice as paid
-<!-- from WORKBOOK.md sha256:d3f2db5041b0 -->
+<!-- from WORKBOOK.md sha256:3bb70b44599f -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's), assistant
 Screen: Invoices, Invoice detail
@@ -830,7 +830,7 @@ If it fails: if meanwhile someone paid it or rectified it, "This invoice cannot 
 issued invoice that is not paid yet can be. Nothing was changed.". Someone else's, for an employee, "Invoice not
 found.", without changing anything. The invoices born from a sale are
 already born paid and a rectifying invoice is not paid: they do not offer the action.
-Involved: none
+Involved: INVOICE-F23
 
 ### INVOICE-F20 Give other apps the invoice of a sale
 <!-- from WORKBOOK.md sha256:b0a7e73cec22 -->
@@ -881,7 +881,7 @@ next try is refused too; a refusal that names no field shows above the form and 
 Involved: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
-<!-- from WORKBOOK.md sha256:1c10fa35b8a2 -->
+<!-- from WORKBOOK.md sha256:e0e635e87417 -->
 Status: done
 Actor: system (the ERPlora account)
 Screen: none (the account issues it; it shows in Invoices)
@@ -907,6 +907,13 @@ Steps:
    own series ("TICKET", "FACT", "RECT" or the ones it creates), in the same VeriFactu chain. An invoice of the account
    is corrected in the account, with its credit note: "Rectify" (INVOICE-F08) and "Full invoice" (INVOICE-F05) are not
    offered here.
+7. In **Invoices** and on its page (INVOICE-F16, INVOICE-F17) an invoice of the account shows as what it is: "Source"
+   "erplora.com" and "Paid", because the account only sends it once the customer has paid; credited in full,
+   "Cancelled". Its credit note also says "erplora.com" and, like every rectifying invoice, "Issued". None of them offers
+   "Mark as paid" (INVOICE-F19). The list filters and sorts by that same status, and the "Source" filter does not take
+   them for handmade ones: they are found by their series.
+8. Who enters that business and how is HUBS-F39 (erplora.com); that it has no plan and buys nothing, BASE-F11 and
+   BASE-F40.
 In: the account's invoice: its number, its date, its amounts, how it is taxed, the payer, its lines
 (each with its discount) and, in a credit note, the invoice it corrects.
 Out: the invoice, with the account's reference (announces `invoice.invoice.issued`; a credit note, also
@@ -919,9 +926,10 @@ VeriFactu refusal undoes the whole invoice; in production with real filing with 
 does not charge. Through the window, the API, the assistant or an automation, choosing, creating or changing one of
 those two series, or giving another one a prefix or a format that would print its numbers (`ERP-2026-00123`),
 "erplora.com numbers the ERP and ERPR series: use another series."; rectifying or replacing an invoice of the account,
-"erplora.com issued this invoice and corrects it, in its ERPR series: it cannot be corrected by hand here.". Nothing is
-written and no number is used.
-Involved: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14
+"erplora.com issued this invoice and corrects it, in its ERPR series: it cannot be corrected by hand here."; marking an
+invoice of the account or its credit note as paid, the refusal of INVOICE-F19. Nothing is written and no number is used.
+Involved: VERIFACTU-F13, INVOICE-F03, INVOICE-F05, INVOICE-F08, INVOICE-F12, INVOICE-F13, INVOICE-F14, INVOICE-F16,
+INVOICE-F17, INVOICE-F19, HUBS-F39 (erplora.com), BASE-F11, BASE-F40
 
 ### INVOICE-F24 Download the issued invoices in Excel
 <!-- from WORKBOOK.md sha256:09578b93d648 -->

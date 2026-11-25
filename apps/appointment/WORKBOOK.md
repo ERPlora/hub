@@ -923,7 +923,7 @@ agenda tuya que enseñar.».
   series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
   negocio y su copia) y `base/tenancy/tests/test_recovery_appointments.py`.
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
-  `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries/`
+  `schemas/` (un módulo por tema), `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries/`
   (un módulo por tema), `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`
   (con las apps reales, sin dobles) y `test_concurrency.py` (hilos).
@@ -980,14 +980,14 @@ agenda tuya que enseñar.».
   `appointment.appointment.get` y su `label` (clienta, día, hora y profesional, sin los que falten), y el título
   «Cita»; quien no puede leerla no ve el dato. Vale para la tarjeta del chat y para «Esperan tu respuesta».
 - **Cómo se nombra cada dato en una tarjeta** (hub#637): un dato que ningún modelo de Citas nombra lleva su `title`
-  en `schemas.py`, con su `es` en `locale/`: «Reservar aunque se solape» (`confirm_overlap`), «Fechas y horas»
+  en `schemas/`, con su `es` en `locale/`: «Reservar aunque se solape» (`confirm_overlap`), «Fechas y horas»
   (`starts`), «Lo pide la clienta» (`on_behalf_of_customer`), «Se aplica desde» (`from_date` al editar una serie),
   «Reservar desde» y «Reservar hasta» (al reservar sus citas) y «Ficha duplicada» (`absorbed_id`), nunca el título que
   pydantic inventa («Confirm Overlap»). `tests/test_integration_assistant.py` barre todas las escrituras, también las
   reacciones, y `tests/test_i18n.py` comprueba que la tarjeta dice estos nombres, cada uno con español propio de Citas
   y no el de otra app.
 - **Cómo se nombra el resto en una tarjeta** (BASE-F97, hub#635): cada id de una escritura de Citas lleva su marca
-  `refers` de `schemas.py`, leída como quien pregunta y con su permiso; el trinquete de
+  `refers` de `schemas/fields.py`, leída como quien pregunta y con su permiso; el trinquete de
   `base/tests/test_assistant_card_values_references.py` deja Citas a 0. El profesional (`staff_id` de reservar varias, editar,
   bloquear y crear o editar una serie; `A_MEMBER`) por su nombre con `staff.member.detail` (`staff.view`); cada cita
   de `bulk_delete` (`ids`, título «Citas») con `AN_APPOINTMENT`, y la tarjeta dice cuántas aunque no pueda nombrar

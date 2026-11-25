@@ -5,7 +5,6 @@
 # fits its cap, and no path or higher number is ever added.
 462 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
 531 apps/appointment/models.py ERPlora/erplora-next#74
-1122 apps/appointment/schemas/__init__.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
 688 apps/attendance/services.py ERPlora/erplora-next#74
 560 apps/cart_checkout/queries.py ERPlora/erplora-next#74
@@ -17,7 +16,6 @@
 301 apps/combo/frontend/operations.d.ts ERPlora/erplora-next#74
 542 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
-2641 apps/customer/tests/test_services.py ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
 468 apps/inventory/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -27,7 +25,6 @@
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
 766 apps/kitchen/schemas.py ERPlora/erplora-next#74
-815 apps/modifier/queries/__init__.py ERPlora/erplora-next#74
 678 apps/modifier/services/__init__.py ERPlora/erplora-next#74
 726 apps/online_booking/queries.py ERPlora/erplora-next#74
 515 apps/online_booking/schemas.py ERPlora/erplora-next#74

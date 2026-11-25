@@ -14,12 +14,8 @@ from apps.appointment.queries.access import ADD_OWN
 from apps.appointment.queries.agenda import load_agenda
 from apps.appointment.queries.business import current_settings, read_moment
 from apps.appointment.queries.reads import CUSTOMER_SOURCES, load_detail
-from apps.appointment.schemas import (
-    AppointmentCreateIn,
-    AppointmentOut,
-    AppointmentsOut,
-    BulkCreateIn,
-)
+from apps.appointment.schemas.appointments import AppointmentOut, AppointmentsOut
+from apps.appointment.schemas.booking import AppointmentCreateIn, BulkCreateIn
 from apps.appointment.services.writes import _booking_basis, _create, _judge, _short
 from base.business import business_zone
 
