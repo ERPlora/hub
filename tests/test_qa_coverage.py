@@ -1,4 +1,5 @@
-"""The QA journeys walk every flow that is done on a screen, cite only flows that are done, and keep their format.
+"""The QA journeys walk every flow that is done on a screen, cite only flows that are done, and keep their format; and the
+WORKBOOKs say what the assistant does in each of those flows.
 
 A journey (``qa/journeys/<slug>.md``, its contract in ``qa/README.md``) refers to the WORKBOOKs' flows only by id, so a
 change to a WORKBOOK that adds, drops or finishes a flow without updating the journeys fails here. The made-up
@@ -12,8 +13,9 @@ from pathlib import Path
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from live.operations import registry
 
-from base import qa_coverage
+from base import qa_assistant, qa_coverage
 from base.catalog import known_verticals
 from base.qa_coverage import Walk
 
@@ -163,6 +165,11 @@ def repo_journeys():
     return qa_coverage.read_journeys(REPO, known_verticals())
 
 
+@pytest.fixture(scope="module")
+def repo_answers(repo_flows):
+    return qa_assistant.report(REPO, repo_flows, registry)
+
+
 class TestTheRepository:
     def test_every_journey_keeps_the_format(self, repo_journeys):
         assert repo_journeys, "qa/journeys holds no journey"
@@ -174,6 +181,20 @@ class TestTheRepository:
     def test_every_flow_done_on_a_screen_is_in_some_journey(self, repo_flows, repo_journeys):
         report = qa_coverage.coverage(repo_flows, repo_journeys)
         assert {app: apps.not_walked for app, apps in report.items() if apps.not_walked} == {}
+
+
+class TestWhatTheRepositorySaysOfTheAssistant:
+    def test_every_flow_done_on_a_screen_has_a_group(self, repo_answers):
+        assert [one.flow.id for one in repo_answers.flows if one.group is None] == []
+
+    def test_no_flow_contradicts_itself(self, repo_answers):
+        assert [one.flow.id for one in repo_answers.flows if one.contradicts] == []
+
+    def test_every_flow_and_operation_the_manuals_cite_exists(self, repo_answers):
+        assert repo_answers.broken_citations == ()
+
+    def test_every_tool_of_the_assistant_is_cited_by_some_flow(self, repo_answers):
+        assert repo_answers.uncited_tools == ()
 
 
 class TestTheWorkbooks:

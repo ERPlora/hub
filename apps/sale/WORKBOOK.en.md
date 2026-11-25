@@ -1645,7 +1645,7 @@ and refunding) only reaches the sales the person sees: without "See all sales", 
 the ones attributed to them. One they do not see does not exist for them (404 `sale.sale_not_found`).
 
 ### What it offers: queries (they read and change nothing)
-<!-- from WORKBOOK.md sha256:a52fac486ff1 -->
+<!-- from WORKBOOK.md sha256:a82dbcf5d08c -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -1660,7 +1660,7 @@ the ones attributed to them. One they do not see does not exist for them (404 `s
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
 | The steps the apps turned on add to the charge, those whoever charges sees and in their order: which app each one is of and which part of it paints it; with none, the charge takes nothing added | charge | F39 | `sale.checkout.steps` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
-| A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
+| A check with its uncharged lines | see sales | F17, F19, F40 | `sale.order.get` |
 | The active payment methods, with the ones the business allows today | see payment methods | F02, F03 | `sale.payment_method.list` |
 | The POS settings (to edit them) | settings | F34 | `sale.settings.get` |
 | The settings the POS needs to sell | see sales | F01–F05 | `sale.pos_settings.get` |
@@ -1677,7 +1677,7 @@ The sales, the figures, the checks, the charge preview, the payment methods, the
 the quick notes and what is refundable can be followed live.
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:ff9716022a8c -->
+<!-- from WORKBOOK.md sha256:521328cbfe57 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -1688,9 +1688,9 @@ the quick notes and what is refundable can be followed live.
 | Prints a sale's ticket or invoice again, marked "DUPLICATE", on the receipt printer; if none takes it (or its fiscal document is pending, or its QR cannot be read), it fails and says why, and the screen prints it on the device | see sales | F29 | `sale.sale.print` |
 | Refunds money from a sale per payment, and the lines that go back (the ones paid with a voucher give back their session); with its corrective invoice in the same refund | refund | F31, F32 | `sale.sale.refund` |
 | Opens a check, with or without lines (articles, services —at their booked price or at the professional's— or open price); that of an appointment that already has an open one returns that one (`already`) | build the check | F01, F17, F26, F38 | `sale.order.open` |
-| Adds a catalog article to a check | build the check | F01, F10 | `sale.order.add_line` |
+| Adds a catalog article to a check | build the check | F01, F10, F11, F40 | `sale.order.add_line` |
 | Adds a service from Services to a check | build the check | F38 | `sale.order.add_service_line` |
-| Adds a menu from Menus and combos to a check, with what was picked in each course; Menus checks the choice and sets the price | build the check | F12 | `sale.order.add_combo_line` |
+| Adds a menu from Menus and combos to a check, with what was picked in each course; Menus checks the choice and sets the price | build the check | F12, F40, F42 | `sale.order.add_combo_line` |
 | Pays a service line with one of the client's vouchers (holds the session) | build the check and spend sessions | F27 | `sale.order.apply_voucher` |
 | Undoes a line's voucher (releases the session) | build the check and spend sessions | F27 | `sale.order.remove_voucher` |
 | Adds an open-price line | open price | F09 | `sale.order.add_open_line` |
@@ -1700,12 +1700,12 @@ the quick notes and what is refundable can be followed live.
 | Marks or takes off the customer's allergy on a line not sent yet | build the check | F41 | `sale.order.set_line_allergy` |
 | Splits a line of N units into N lines | build the check | F27 | `sale.order.split_line` |
 | Removes an unsent line | build the check | F01 | `sale.order.remove_line` |
-| Voids a line already sent to the kitchen, with a reason | void | F20 | `sale.order.void_line` |
+| Voids a line already sent to the kitchen, with a reason | void | F20, KITCHEN-F29 | `sale.order.void_line` |
 | Sends the pending lines to the kitchen | build the check | F20 | `sale.order.fire` |
 | Splits a check | build the check | F23 | `sale.order.split` |
 | Merges two checks | build the check | F24 | `sale.order.merge` |
-| Voids an open check (an empty one, with no live lines or payments, with just building the check) | void; empty: build the check | F18 | `sale.order.void` |
-| The same void of a check with something ordered or charged, the one a manager approves with their PIN | void | F18 | `sale.order.void_ordered` |
+| Voids an open check (an empty one, with no live lines or payments, with just building the check) | void; empty: build the check | F18, TABLE-F20 | `sale.order.void` |
+| The same void of a check with something ordered or charged, the one a manager approves with their PIN | void | F18, TABLE-F20 | `sale.order.void_ordered` |
 | Sets the check's discount (and its version above the maximum) | build the check / uncapped discount | F14 | `sale.order.set_discount`, `sale.order.set_discount_over_limit` |
 | Sets a line's discount (and its version above the maximum) | build the check / uncapped discount | F14 | `sale.order.set_line_discount`, `sale.order.set_line_discount_over_limit` |
 | Sets a check's title (parking) | build the check | F17 | `sale.order.set_label` |
@@ -1750,7 +1750,7 @@ the quick notes and what is refundable can be followed live.
 | Document issued (`invoice.invoice.issued`) | Invoicing | Links by its source (`source = {type, sale_id, refund_id, void}`) a document that was left pending: a refund's corrective invoice goes back to that refund, a void's to the sale, the charge's ticket or invoice to the sale; the rest (manual invoice, F3 that replaces, corrective invoice of an invoice) belongs to Invoicing (F29) | `sale.sale.record_invoice` |
 
 ### What it needs from other apps
-<!-- from WORKBOOK.md sha256:629c4df7f2c2 -->
+<!-- from WORKBOOK.md sha256:272d015e0c61 -->
 
 - **Taxes** (required): the rule and the VAT calculation of each line when charging.
 - **Customers** (required): the sale's customer record and its search by name or, for whoever sees the
@@ -1782,6 +1782,14 @@ the quick notes and what is refundable can be followed live.
   without Tables, or without the right to see its checks, by its title.
 - **Appointments** (optional): a check's appointment and what it booked, to charge its booked price
   (`appointment.appointment.get`).
+
+| From | What for | Flows | Service |
+|---|---|---|---|
+| Inventory | The articles that are tapped or searched for, with what is sold out, those with no VAT and their allergens | F07, F40 | `inventory.product.list` |
+| Inventory | The allergens of a menu's dishes | F40 | `inventory.product.get` |
+| Modifiers | The groups and options of an article, or of a dish in a menu | F11, F42 | `modifier.group.for_target` |
+| Menus and combos | The menus that can be sold, with their courses and choices | F12, F42 | `combo.combo.for_sale` |
+| VeriFactu | Whether tickets and invoices can be issued now, and if not, why | F07 | `verifactu.config.get` |
 
 ### Who uses it
 <!-- from WORKBOOK.md sha256:4722b9a4a381 -->

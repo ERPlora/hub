@@ -1602,6 +1602,7 @@ Implicados: ninguno
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · General, Ajustes · Negocio, Ajustes · Impresión, Ajustes · Datos y copias
+Operaciones: ninguna
 Pasos:
   1. Pulsa «Ajustes» en el menú lateral, o llega desde un enlace de otra pantalla.
   2. Abajo, las pestañas «General», «Negocio», «Impresión» y «Datos y copias», cada una solo para quien puede usar lo
@@ -1702,6 +1703,7 @@ Implicados: BASE-F13
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Acceso
+Operaciones: ninguna
 Pasos:
   1. En erplora.com, con la sesión abierta, pulsa entrar en su negocio.
   2. El negocio se abre con la persona ya dentro, en **Inicio**, sin pasar por ninguna pantalla de entrada.
@@ -1853,6 +1855,7 @@ Implicados: BASE-F55, BASE-F56
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: El menú de usuario
+Operaciones: ninguna
 Pasos:
   1. Abre la tarjeta de usuario arriba del menú lateral (en el móvil, primero el menú con el botón de la barra).
   2. Pulsa «Cerrar sesión».
@@ -1889,6 +1892,7 @@ Implicados: BASE-F55
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Estamos preparando tu negocio
+Operaciones: ninguna
 Pasos:
   1. Abre la dirección de un negocio que erplora.com aún está preparando (recién creado).
   2. Sale «Estamos preparando tu negocio» — «Tarda unos segundos. Esta página se actualiza sola.».
@@ -3124,6 +3128,7 @@ Implicados: BASE-F93, BASE-F102, BASE-F104
 Estado: hecho
 Actor: el equipo de QA de ERPlora
 Pantalla: todas las de la plataforma del hub
+Operaciones: ninguna
 Pasos:
   1. El equipo crea en erplora.com, con una cuenta nueva, un negocio de su tipo (un restaurante): el hub lo recibe
      con su sector y en «Datos y copias» le ofrece primero la plantilla de ese sector, que deja el negocio con su
@@ -3215,6 +3220,7 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
 Estado: hecho (la dirección y lo que sirve; conectar el dominio es HUBS-F17 de erplora.com, que lo enseña en el panel)
 Actor: cualquiera, sin cuenta
 Pantalla: La página pública del negocio (WEBSITE-F10), en su dominio
+Operaciones: ninguna
 Pasos:
   1. Alguien abre el dominio del negocio (por ejemplo, www.minegocio.es) en un móvil, una tableta o un ordenador.
   2. Se ve la página publicada del negocio, con sus fotos, en el idioma del navegador.
@@ -3233,6 +3239,7 @@ Implicados: HUBS-F17, WEBSITE-F10
 Estado: hecho
 Actor: cualquier persona del negocio en el Hub, en la web o en la app, y cualquier programa conectado por la API
 Pantalla: cualquiera del Hub, Página «Volvemos enseguida»
+Operaciones: ninguna
 Pasos:
   1. La persona abre una pantalla o guarda algo mientras la base de datos se corta unos segundos: un reinicio, un
      mantenimiento de AWS o el cambio de versión.
@@ -3771,6 +3778,7 @@ Implicados: BASE-F86, BASE-F88, BASE-F89, BASE-F119, HUBS-F26 (erplora.com)
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · General
+Operaciones: ninguna
 Pasos:
   1. En la app de ERPlora de un ordenador, **Ajustes › General** lleva en «Este dispositivo» el interruptor
      «Arrancar al iniciar sesión» («Abre ERPlora al iniciar sesión en este ordenador, para que los tiques siempre
@@ -5141,34 +5149,38 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
 
 ### Operaciones y sus flujos
 
-Cada operación de la plataforma con los flujos que la usan; las que no usa ningún flujo del Hub dicen quién las llama.
+Cada operación de la plataforma, y la de otra app que pide un flujo de la plataforma, con los flujos que la usan; las que no
+usa ningún flujo del Hub dicen quién las llama.
 
 | Servicios | Flujos |
 |---|---|
 | `base.setup.status` | F01, F03, F04, F12, F103 |
 | `base.health.list` | F02 |
 | `base.widget.list` | F06, F07, F08 |
-| `base.bell.counters` | F10, F40, F117 |
-| `base.notice.list` | F113, KITCHEN-F16, APPOINTMENT-F28, WHATSAPP_INBOX-F09 |
-| `base.session.me` | F05, F13 |
+| `base.bell.counters` | F10, F117 |
+| `base.notice.list` | F113, KITCHEN-F16 |
+| `base.session.me` | F05, F13, F118 |
+| `base.session.access` | F13 |
+| `base.access.grantors` | F118 |
 | `base.saas_pass.create` | F11 |
-| `base.hub.state_apply` | F13, F20, F40, F117 |
-| `base.session.revoke` | F13 |
-| `base.app.list` | F14–F17, F22, F26, F27 |
+| `base.hub.state_apply` | ninguno: erplora.com, cada vez que cambia algo del negocio |
+| `base.session.revoke` | ninguno: erplora.com, al cerrar las sesiones de una persona |
+| `base.app.list` | F14–F17, F19, F20, F22, F26, F27 |
 | `base.app.get` | F18, F21, F23, F24, F97 |
-| `base.app.enable` | F18, F24, F31 |
+| `base.app.enable` | F18, F19, F24, F31, VERIFACTU-F01 |
 | `base.app.retry` | F21 |
-| `base.app.activation_settle` | F22 |
-| `base.app.disable` | F23, F25 |
-| `base.blueprint.list` | F29, F38 |
-| `base.blueprint.inspect` | F30, F31 |
-| `base.blueprint.import` | F31, F33, F38, F94 |
+| `base.app.activation_settle` | ninguno: el worker, al terminar de preparar los datos de una app |
+| `base.app.disable` | F23, F25, VERIFACTU-F32 |
+| `base.blueprint.list` | F29, F38, INVENTORY-F12, INVENTORY-F33 |
+| `base.blueprint.inspect` | F30, F31, INVENTORY-F12, INVENTORY-F33 |
+| `base.blueprint.import` | F31, F33, F38, F94, INVENTORY-F12, INVENTORY-F33 |
 | `base.import.list` | F32, F33, F34, F38 |
 | `base.import.detail` | F33, F34, F97 |
 | `base.import.undo` | F34 |
-| `base.blueprint.export` | F35, F36 |
+| `base.blueprint.export` | F35, F36, INVENTORY-F33 |
 | `base.dataset.list` | F36 |
-| `base.hub.reset`, `base.hub.reset_apply`, `base.hub.dumps`, `base.hub.dump_link` | F37 |
+| `base.hub.reset`, `base.hub.dumps`, `base.hub.dump_link` | F37 |
+| `base.hub.reset_apply` | ninguno: el worker, al vaciar lo que pidió un restablecimiento |
 | `base.system.cards` | F39 |
 | `base.plan.usage` | F40, F77 |
 | `base.assistant.usage` | F40, F104 |
@@ -5180,12 +5192,12 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.failed_event.discard` | F46 |
 | `base.failed_event.detail` | F44, F46, F97 |
 | `base.business.get` | F49, F50, F51 |
-| `base.access.door` | F52, F55, F56 |
-| `base.hub_user.sync` | F13, F52 |
+| `base.access.door` | F52, F55, F56, F57, F58, F59 |
+| `base.hub_user.sync` | ninguno: erplora.com, al mandar las personas del negocio |
 | `base.pin.set` | F54, F65 |
 | `base.access.faces` | F60 |
 | `base.device.current`, `base.device.mode_set` | F62 |
-| `base.hub.register` | F63 |
+| `base.hub.register` | ninguno: erplora.com, al crear el negocio |
 | `base.profile.get` | F54, F64, F65 |
 | `base.profile.update`, `base.profile.preferences_set`, `base.profile.avatar_set`, `base.profile.avatar_remove` | F64 |
 | `base.access.settings`, `base.access.settings_update` | F66, F67 |
@@ -5199,7 +5211,7 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.file.read` | F74 |
 | `base.file.move`, `base.file.rename` | F75 |
 | `base.file.delete` | F76 |
-| `base.person.list` | F77, F80, F81 |
+| `base.person.list` | F77, F80, F81, F119 |
 | `base.person.detail` | F78, F79 |
 | `base.person.pin_remove` | F78 |
 | `base.person.badge_set`, `base.person.badge_remove` | F79 |
@@ -5225,20 +5237,25 @@ Cada operación de la plataforma con los flujos que la usan; las que no usa ning
 | `base.assistant.transcribe` | F94 |
 | `base.assistant.report` | F105 |
 | `base.support.report` | F108 |
-| `base.hub.cancel` | F109, HUBS-F18, HUBS-F20 |
+| `base.hub.cancel` | ninguno: erplora.com, al eliminar un negocio o darlo de baja por impago |
 | `base.hub.purge` | F109 |
 | `base.help.get` | F115 |
 | `base.release_note.list` | F116 |
-| `base.hub.restore` | HUBS-F19 |
-| `base.hub.dump_list` | HUBS-F18 |
-| `base.hub.get` | HUBS-F21 |
-| `base.usage.list` | HUBS-F22 |
-| `base.demo.create`, `base.demo.code_create` | PUBLIC-F28 |
-| `base.demo.expire` | PUBLIC-F33 |
-| `base.demo.get`, `base.demo.purge` | PUBLIC-F34 |
+| `base.hub.restore` | ninguno: erplora.com, al recuperar un negocio eliminado |
+| `base.hub.dump_list` | ninguno: erplora.com, al enseñar las copias de un negocio |
+| `base.hub.get` | ninguno: erplora.com, al esperar a que el negocio esté listo y al enseñar su estado |
+| `base.usage.list` | ninguno: erplora.com, cada noche |
+| `base.demo.create`, `base.demo.code_create` | ninguno: erplora.com, al crear una demo y entrar en ella |
+| `base.demo.expire` | ninguno: el admin de Hubs y `manage.py demo_expire` |
+| `base.demo.get` | ninguno: `manage.py demo_expire` |
+| `base.demo.purge` | ninguno: el worker, al retirar una demo vencida |
 | `base.catalog_image.search`, `base.catalog_image.get` | INVENTORY-F30, SERVICE-F34, COMBO-F14 |
+| `control.hub.restore`, `control.hub.restore_aside`, `control.copy.recover` | F114 |
+| `sale.sale.list` | F09 |
+| `sale.sale.stats` | F119 |
+| `inventory.product.export`, `inventory.category.export`, `customer.customer.export`, `invoice.invoice.export` | F112 |
 | `base.hub_user.get` | F97, en las tarjetas de Personal y de la Bandeja de WhatsApp |
-| `base.location.list` | ninguno: solo el asistente y la API |
+| `base.location.list` | F93 |
 | `base.hub.cut_finish` | ninguno: `manage.py cut_shared_hubs` y el migrador, al dar a un negocio su propia base de datos |
 | `base.hub.by_slugs`, `base.hub.seed_local` | ninguno: `manage.py seed_local_hubs`, solo en desarrollo |
 | `base.hub.platform_rename` | ninguno: `manage.py create_platform_hub --rename`, el nombre del negocio propio de ERPlora |
