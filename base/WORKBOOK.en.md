@@ -392,7 +392,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:a8ada64d0106 -->
+<!-- from WORKBOOK.md sha256:3ed52f8f4208 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -509,13 +509,13 @@ On the Employees screens and the API documentation:
 | BASE-F112 | Save a downloaded file inside the app | done |
 | BASE-F113 | Keep warning with the screen off (Android app) | done |
 | BASE-F114 | Put a business back as it was at a past moment from the Hub admin | done |
-| BASE-F115 | See the help of a module's screen | done |
+| BASE-F115 | See the help of the screen in view | done |
 | BASE-F116 | Read what is new in ERPlora | done |
 | BASE-F117 | See in the bell that the plan has an unpaid invoice | done |
 | BASE-F118 | Open a screen without permission: "No access" and whom to ask | done |
 | BASE-F119 | What each person sees by their data permissions | done |
 | BASE-F120 | Start ERPlora on signing in to the computer | done |
-| BASE-F126 | Turn ERPlora's support access on or off | partial |
+| BASE-F126 | Turn ERPlora's support access on or off | done |
 | BASE-F127 | Make a role of your own from another | partial |
 | BASE-F128 | Adjust what a role of your own allows | partial |
 | BASE-F129 | Delete a role of your own | partial |
@@ -2753,15 +2753,15 @@ it.".
 Involved: BASE-F90
 
 ### BASE-F92 Open and close the assistant's panel
-<!-- from WORKBOOK.md sha256:7a761cb0f856 -->
+<!-- from WORKBOOK.md sha256:0063a7a68d0c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
   1. With the session open, they tap the "Assistant" sparkles in the top bar, next to the bell. Tapping them again
-     closes it. On a phone, the sparkles and "My apps" go in "⋮" ("More actions"), so the title stays centred, and
-     the bell stays in sight: there, "Assistant" opens the panel as soon as the menu has finished closing, so what
-     they type straight away goes to the chat's box and Enter sends it.
+     closes it. On a phone, the sparkles and "My apps" go in "⋮" ("More actions"), so the title reads whole, and the
+     bell and the help's "?" stay in sight: there, "Assistant" opens the panel as soon as the menu has finished
+     closing, so what they type straight away goes to the chat's box and Enter sends it.
   2. The panel comes in from the right. On a tablet or a computer it takes a column beside the screen and pushes it:
      they can keep working with the panel open. On a phone it covers the screen, over a dark veil.
   3. It closes with the "Close" ×, with the Esc key (wherever the cursor is, except in a window open over the
@@ -3756,42 +3756,46 @@ hub#1285, hub#1306, hub#1307, hub#1319, hub#1320, hub#1321, hub#1322, hub#1323, 
 hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, hub#1438, hub#1442, hub#1456, hub#1457,
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
-### BASE-F115 See the help of a module's screen
-<!-- from WORKBOOK.md sha256:cd0e69a5291e -->
+### BASE-F115 See the help of the screen in view
+<!-- from WORKBOOK.md sha256:e6318599c755 -->
 Status: done
 Actor: owner, administrator, manager, employee
-Screen: the top bar of a module whose help is ready ("?" button, "Help") and the help window
+Screen: the top bar of a module whose help is ready or of a screen of the Hub ("?" button, "Help") and the help window
 Steps:
-  1. In a module whose help is ready, at the top right, next to the assistant, is the "?" button ("Help"). A module
-     whose help is not ready yet does not show it.
-  2. Tapping it opens the "Help · <module>" window, with the module's icon, centred on a tablet or a computer and from
-     the bottom on a phone. It never opens by itself, and it closes when the person moves to another module.
+  1. In a module whose help is ready and on the Hub's own screens (Home, Employees, a person's page, what a role allows,
+     Files, Apps, System, Settings and My profile), at the top right, next to the assistant, is the "?" button ("Help"),
+     going back too. It is not in a module whose help is not ready yet, on a screen without help (the API's
+     documentation), on the "No access" one, nor for whoever cannot see the Home.
+  2. Tapping it opens the "Help · <module>" window, with the module's icon ("Help · ERPlora" on a screen of the Hub),
+     centred on a tablet or a computer and from the bottom on a phone. It never opens by itself, and it closes when the
+     person moves to another module.
   3. At the top, the module's video, if it has one, in the person's language or, if there is none, in Spanish. Nothing
      is asked of YouTube until it is tapped, and it plays inside the window, across its whole width, in YouTube's full
      player: fullscreen, captions on in the help's language and its logo, which opens the video on YouTube in another
      tab.
-  4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module, and "On this
-     screen · <tab>", marked "You are here", with the summary of what the tab the person is on shows: short and whole,
-     with no "See more".
+  4. Below, "What it is for", with a short text, two or three sentences, of what is done in the module (on a screen of
+     the Hub, of what the Hub always brings), and "On this screen · <tab>", marked "You are here", with the summary of
+     what the tab the person is on shows: short and whole, with no "See more".
   5. "How to" brings each finished task of the module, grouped by tab, those of the tab the person is on first. Each
      task is a folded row that opens with its steps and its "If something goes wrong", one at a time. A task with a
      short video shows it when it opens, before its steps, in the same player as the module's and in the person's
      language or, if there is none, in Spanish; with several, one below the other. Opening the help or a task asks
      nothing of YouTube until the video is tapped. With more than eight tasks, "Search tasks…" appears on top, filtering by the title and the steps regardless of accents and
-     capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again.
-  6. "Other screens of this module" brings the other tabs, folded, each with its short summary. A link of the help to a
-     screen of the Hub goes there and closes the help.
+     capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again. The
+     help of a screen of the Hub brings no tasks.
+  6. "Other screens" brings the other tabs of the module, or the other screens of the Hub the person can see, folded,
+     each with its short summary. A link of the help to a screen of the Hub goes there and closes the help.
   7. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: "How
      do I do this: <task>?" about the last task opened or, if none was opened, "How do I use <module> on <screen>?";
      if something was already written, the question goes below it. "Close" closes the help.
-In: the module and the tab the person is on.
-Out: nothing: the help is only read. It is the part of the module's user manual the customer reads, in the person's
-language.
+In: the module, or the screen of the Hub, and the tab the person is on.
+Out: nothing: the help is only read. It is the part of the user manual of the module, or of the Hub's own screens, the
+customer reads, in the person's language.
 If it fails: while it is read, the window shows its skeleton; if it cannot be read, it says "Could not load the help."
 and "Retry" asks for it again. The help already read stays stored until the page is reloaded: offline it opens again,
-also from another tab of the module, and each video says "Offline: the video is not available", with the text in
-view. If the manual is not translated into the person's language, or its translation fell behind, the help comes in
-Spanish.
+also from another tab of the module or another screen of the Hub, and each video says "Offline: the video is not
+available", with the text in view. If the manual is not translated into the person's language, or its translation fell
+behind, the help comes in Spanish.
 Involved: BASE-F92, BASE-F93
 
 ### BASE-F116 Read what is new in ERPlora
@@ -3947,10 +3951,8 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:a939d641b5a9 -->
-Status: partial — it is changed and read in Settings › General, through the API and with the assistant, and the
-business already lets support in or refuses it as it says; erplora.com giving the support staff their code to come in
-is still missing
+<!-- from WORKBOOK.md sha256:8c48efdd08cf -->
+Status: done
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
 Steps:
@@ -3966,13 +3968,13 @@ Steps:
      most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
      support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
      business can change it.".
-  4. With the access on, a person of ERPlora's support comes into the business from erplora.com with their own account
-     and arrives as an administrator: they may do everything but what only the owner does (buying for the business,
-     resetting it, its copies). They are not in Employees nor among who can give access, do not enter the tills with
-     a PIN or a badge, take no place and do not count in the plan's use, and their browser does not stay as a device
-     of the business: it neither ends another device's session nor has its own ended by another one's entry
-     (BASE-F57). Each entry joins the list of the latest entries at once, and what they do stays in the records under
-     their name.
+  4. With the access on, a person of ERPlora's support comes into the business with "Enter as support", in erplora.com's
+     admin, with their own account (HUBS-F38 of erplora.com), and arrives as an administrator: they may do everything
+     but what only the owner does (buying for the business, resetting it, its copies). They are not in Employees nor
+     among who can give access, do not enter the tills with a PIN or a badge, take no place and do not count in the
+     plan's use, and their browser does not stay as a device of the business: it neither ends another device's session
+     nor has its own ended by another one's entry (BASE-F57). Each entry joins the list of the latest entries at once,
+     and what they do stays in the records under their name.
   5. With the access off they do not come in: they see "This business does not let support in" — "The owner or an
      administrator of this business has to turn on ERPlora's support access before you can come in. Ask them to, then
      try again." with "Try again".
@@ -3986,4 +3988,4 @@ as it was; reading it, they see they cannot change it. If the change cannot be s
 shows below it and the switch goes back to what was saved; if the card cannot read the setting, "Could not load the
 support access." with "Retry". With the access off, support opens no session and leaves no entry (the page of step
 5).
-Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100
+Involved: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)

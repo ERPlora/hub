@@ -31,6 +31,6 @@ Para qué: lo que mira el dueño de vez en cuando: el uso del plan, la versión 
 16. BASE-F75 — un archivo, renombrado y movido.
 17. BASE-F76 — una carpeta, borrada.
 18. BASE-F117 — en la campana, la factura del plan sin pagar.
-19. BASE-F115 — la ayuda de la pantalla de un módulo.
+19. BASE-F115 — la ayuda de la pantalla de un módulo, y la de Ajustes › Datos y copias al volver atrás desde Empleados.
 20. BASE-F108 — un problema, reportado a soporte.
 21. BASE-F111 — durante una actualización, la base de datos se corta un momento.
