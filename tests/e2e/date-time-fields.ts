@@ -56,31 +56,33 @@ export async function pickDay(page: Page, field: Locator, day: string): Promise<
   await confirm(picker);
 }
 
-/** Taps the option of the wheel `column` that reads `text` until the wheel holds it. A quarter of a second after a
- *  wheel last scrolls it takes the option then in its middle, undoing a tap made meanwhile: AM or PM redraws the hours
- *  and scrolls their wheel, so the hour tapped right after it is lost, and is tapped again as a person would. */
+/** Taps the option of the wheel `column` that reads `text` until the wheel holds it: in its middle (`option-active`) and
+ *  taken as its value (the `active` part). The first alone is not enough: an option let go keeps it a moment longer.
+ *  A quarter of a second after a wheel last scrolls it takes the option then in its middle, undoing a tap made
+ *  meanwhile: AM or PM redraws the hours and scrolls their wheel, so the hour tapped right after it is lost, and is
+ *  tapped again as a person would. */
 async function spin(picker: Locator, column: string, text: string): Promise<void> {
   const wheel = picker.locator(`ion-picker-column[aria-label="${column}"]`);
   const option = wheel.locator('ion-picker-column-option').filter({ hasText: new RegExp(`^${text}$`) });
+  const held = wheel.locator('ion-picker-column-option.option-active[part~="active"]');
   await expect(async () => {
     await option.click();
-    await expect(option).toHaveClass(/option-active/, { timeout: 2_000 });
+    await expect(held).toHaveText(text, { timeout: 2_000 });
   }).toPass();
 }
 
-/** Picks `time` (`HH:MM`, 24 hours) in the TimeField `field`: on a wheel with AM and PM (a page in English) or on the
- *  24-hour wheel of a language that reads the clock that way, whose hours have two digits. */
+/** Picks `time` (`HH:MM`, 24 hours) in the TimeField `field`, and fails if the field is left at another: on a wheel with
+ *  AM and PM (a page in English) or on the 24-hour wheel of a language that reads the clock that way, whose hours have
+ *  two digits. */
 export async function pickTime(page: Page, field: Locator, time: string): Promise<void> {
   const picker = await openPicker(page, field, 'time');
   const [hours, minutes] = time.split(':').map(Number);
-  if (await picker.locator('ion-picker-column[aria-label="Select a day period"]').count()) {
-    await spin(picker, 'Select a day period', hours < 12 ? 'AM' : 'PM');
-    await spin(picker, 'Select an hour', String(hours % 12 || 12));
-  } else {
-    await spin(picker, 'Select an hour', String(hours).padStart(2, '0'));
-  }
+  const halves = (await picker.locator('ion-picker-column[aria-label="Select a day period"]').count()) > 0;
+  if (halves) await spin(picker, 'Select a day period', hours < 12 ? 'AM' : 'PM');
+  await spin(picker, 'Select an hour', halves ? String(hours % 12 || 12) : String(hours).padStart(2, '0'));
   await spin(picker, 'Select a minute', String(minutes).padStart(2, '0'));
   await confirm(picker);
+  await expect(field.locator('input')).toHaveValue(halves ? timeAsShown(time) : time);
 }
 
 /** Empties the DateField or TimeField `field` (one that is not required) with its picker's Clear. */
