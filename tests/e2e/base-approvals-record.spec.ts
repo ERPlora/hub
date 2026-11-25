@@ -3,7 +3,8 @@
 // Shopify list every void with who did it, and who approved it only when somebody had to). The owner adds a line to an
 // item of Demo and voids a sale, which a manager would have to approve for a cashier: each one is a row with their name,
 // «Their role» and nobody who approved it, with its figures when its app says them. It is searched, filtered by «With»
-// and exported, and the record already on screen gets the void without a reload. In Spanish, in the three sizes.
+// and exported, and the record already on screen gets the void without a reload. In Spanish, in the three sizes; on a
+// tablet held upright, the price of an open price and the names are read whole and nothing scrolls sideways.
 // Everything this file creates goes with it (`afterAll`).
 import { readFileSync } from 'node:fs';
 
@@ -15,11 +16,13 @@ import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
 import { clearFilters, filterBy } from './service-helpers';
+import { steady } from './table-columns';
 
 const KEY = 'base-approvals-record';
 const SKU = `E2E-REC-${stamp()}`;
 const LINE_TEXT = `Café solo ${stamp()}`;
 const SAID = `Añadir una línea: 2,5 × ${LINE_TEXT}`;
+const OPEN_PRICE = 'Vender a precio libre por 4,20 €';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -56,6 +59,10 @@ test.beforeAll(async ({ browser }) => {
   itemId = (await createItem(context, A, `E2E approvals record ${stamp()}`)).id;
   const added = await api(context, A, 'POST', '/demo/items/add_line', { id: itemId, text: LINE_TEXT, qty: '2.5' });
   expect(added.status, JSON.stringify(added.data)).toBe(200);
+  const order = await api<{ id: string }>(context, A, 'POST', '/sale/orders', { lines: [{ product: SKU }] });
+  const open = { order_id: order.data.id, unit_price: 420, tax_category_key: 'product.generic' };
+  const sold = await api(context, A, 'POST', '/sale/orders/add_open_line', open);
+  expect(sold.status, JSON.stringify(sold.data)).toBe(200);
 });
 
 test.afterAll(async () => {
@@ -77,15 +84,25 @@ test('BASE-F85: what the owner did by their role is a row with their name, its f
     await searchFor(LINE_TEXT);
     await expect(rows()).toHaveCount(1);
     await expect(rows()).toContainText(SAID);
-    await expect(rows().getByTestId('approvals-way')).toHaveText('Su rol');
+    await expect(rows()).toContainText('Su rol');
     await expect(rows().getByTestId('approvals-used')).toHaveText('Hecha');
-    // Its last column is whole in sight, on a tablet held upright too.
-    await expect(rows().getByTestId('approvals-used')).toBeInViewport({ ratio: 1 });
     await capture(page, `${KEY}-row-${size.label}`);
     await searchFor('');
     await expect(rows().first()).toBeVisible();
     await capture(page, `${KEY}-all-${size.label}`);
   }
+});
+
+test('BASE-F85: on a tablet held upright an action is read whole with its amount, and so are the names and the state', async () => {
+  await page.setViewportSize({ width: 820, height: 1180 });
+  await open();
+  await searchFor('precio libre');
+  await expect(rows().first()).toContainText(OPEN_PRICE);
+  const { overflow, columns } = await steady(shown(page).locator('.data-table').first());
+  expect(overflow, 'nothing scrolls sideways').toBeLessThanOrEqual(0);
+  for (const column of columns) expect(column.cut, `«${column.label}» cuts nothing: ${JSON.stringify(columns)}`).toEqual([]);
+  await expect(rows().first().getByTestId('approvals-used')).toBeInViewport({ ratio: 1 });
+  await capture(page, `${KEY}-upright`);
 });
 
 test('BASE-F85: it is filtered by «With» and exported as it is seen', async () => {
@@ -118,5 +135,5 @@ test('BASE-F85: a void the owner does elsewhere comes to the record on screen wi
 
   await expect(rows()).toHaveCount(before + 1);
   await expect(rows().first()).toContainText('Anular una venta');
-  await expect(rows().first().getByTestId('approvals-way')).toHaveText('Su rol');
+  await expect(rows().first()).toContainText('Su rol');
 });

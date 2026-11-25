@@ -45,25 +45,27 @@ const uses = computed<DataTableFilterOption[]>(() => [
   { value: 'false', label: t('base.approvals.unused') },
 ]);
 
-// Their widths add up to what a tablet held upright has, so the last column is never past its edge.
 const columns = computed<DataTableColumn<ApprovalRow>[]>(() => [
   {
     key: 'at',
     label: t('base.approvals.columns.at'),
     format: (value: unknown) => formatDateTime(value as string, locale.value),
-    width: '9.5rem',
     filter: { type: 'daterange' },
   },
   {
     key: 'action',
     label: t('base.approvals.columns.action'),
-    width: 'minmax(9.5rem,2fr)',
     filter: { type: 'select', key: 'operation', options: actions.value },
   },
-  { key: 'approved_by', label: t('base.approvals.columns.approvedBy'), width: 'minmax(8rem,1fr)' },
-  { key: 'requested_by', label: t('base.approvals.columns.requestedBy'), width: 'minmax(6rem,1fr)' },
-  { key: 'way', label: t('base.approvals.columns.way'), cell: 'way', width: '5.5rem', filter: { type: 'select', options: ways.value } },
-  { key: 'used', label: t('base.approvals.columns.used'), cell: 'used', width: '6.25rem', filter: { type: 'select', options: uses.value } },
+  { key: 'approved_by', label: t('base.approvals.columns.approvedBy') },
+  { key: 'requested_by', label: t('base.approvals.columns.requestedBy') },
+  {
+    key: 'way',
+    label: t('base.approvals.columns.way'),
+    format: (value: unknown) => t(`base.approvals.way.${value as ApprovalWay}`),
+    filter: { type: 'select', options: ways.value },
+  },
+  { key: 'used', label: t('base.approvals.columns.used'), cell: 'used', filter: { type: 'select', options: uses.value } },
 ]);
 </script>
 
@@ -93,9 +95,6 @@ const columns = computed<DataTableColumn<ApprovalRow>[]>(() => [
     >
       <template #toolbar>
         <ApprovalsExportButton :query="exportQuery" />
-      </template>
-      <template #way="{ row }">
-        <span data-testid="approvals-way">{{ t(`base.approvals.way.${(row as ApprovalRow).way}`) }}</span>
       </template>
       <template #used="{ row }">
         <StatusPill

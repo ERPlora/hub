@@ -52,8 +52,8 @@ describe('ApprovalsList', () => {
     expect(rows[0].text()).not.toContain('sale.sale.void');
     expect(rows[0].text()).toContain('Adam');
     expect(rows[0].text()).toContain('Eva');
-    expect(rows[0].find('[data-testid="approvals-way"]').text()).toBe('PIN');
-    expect(rows[1].find('[data-testid="approvals-way"]').text()).toBe('Placa');
+    expect(rows[0].text()).toContain('PIN');
+    expect(rows[1].text()).toContain('Placa');
     expect(rows[0].find('[data-testid="approvals-used"]').text()).toBe('Hecha');
     expect(rows[1].find('[data-testid="approvals-used"]').text()).toBe('Sin hacer');
   });
@@ -69,7 +69,7 @@ describe('ApprovalsList', () => {
     const row = m.wrapper.get('[data-testid="approvals-row"]');
     expect(row.text()).toContain('Mario');
     expect(row.text()).not.toContain('Adam');
-    expect(row.get('[data-testid="approvals-way"]').text()).toBe(way);
+    expect(row.text()).toContain(way);
     expect(row.get('[data-testid="approvals-used"]').text()).toBe(state);
   });
 
@@ -86,6 +86,14 @@ describe('ApprovalsList', () => {
       'Con',
       'Estado',
     ]);
+  });
+
+  it('leaves its widths to the table, which gives each column what its text takes', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.approval.list', { approvals: [approval()] });
+    // DataTable is generic: its props are read as a plain record.
+    const props = m.wrapper.getComponent(DataTable).props() as Record<string, unknown>;
+    expect((props.columns as { key: string; width?: string }[]).filter((column) => column.width).map((column) => column.key)).toEqual([]);
   });
 
   it('shows each row with its figure and offers each action once, without figures, behind the funnel', async () => {
