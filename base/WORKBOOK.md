@@ -479,7 +479,7 @@ En la pantalla Archivos:
 | BASE-F118 | Abrir una pantalla sin permiso: «Sin acceso» y a quién pedirlo | hecho |
 | BASE-F119 | Lo que se ve según los permisos de dato | hecho |
 | BASE-F120 | Arrancar ERPlora al iniciar sesión en el ordenador | hecho |
-| BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | parcial |
+| BASE-F126 | Encender o apagar el acceso de soporte de ERPlora | hecho |
 | BASE-F127 | Crear un rol propio a partir de otro | parcial |
 | BASE-F128 | Ajustar lo que permite un rol propio | parcial |
 | BASE-F129 | Borrar un rol propio | parcial |
@@ -3784,8 +3784,7 @@ dice el sistema. Una app anterior a esta orden no lo enseña.
 Implicados: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Encender o apagar el acceso de soporte de ERPlora
-Estado: parcial — se cambia y se consulta en Ajustes › General, por la API y con el asistente, y el negocio ya deja
-entrar o rechaza a soporte según esté; falta que erplora.com dé al personal de soporte su código para entrar
+Estado: hecho
 Actor: propietario, administrador, personal de soporte de ERPlora
 Pantalla: Ajustes · General, la página «Este negocio no deja entrar a soporte»
 Pasos:
@@ -3802,12 +3801,13 @@ Pasos:
      cuándo), la más reciente primero; lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
      soporte de ERPlora ha entrado todavía.». A quien no administra el negocio el interruptor le sale desactivado, con
      «Solo quien administra el negocio puede cambiarlo.».
-  4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio desde erplora.com con su propia
-     cuenta y llega como un administrador: puede hacer todo menos lo que solo hace el propietario (comprar para el
-     negocio, reiniciarlo, sus copias). No sale en Empleados ni entre quienes pueden dar acceso, no entra en las cajas
-     con PIN ni con tarjeta, no ocupa plaza ni cuenta en el uso del plan y su navegador no se queda como dispositivo
-     del negocio: ni cierra la sesión de otro dispositivo ni se la cierra la entrada de otro (BASE-F57). Cada entrada
-     se suma al momento a la lista de las últimas entradas, y lo que hace queda a su nombre en los registros.
+  4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio con «Entrar como soporte», en el
+     admin de erplora.com, con su propia cuenta (HUBS-F38 de erplora.com), y llega como un administrador: puede hacer
+     todo menos lo que solo hace el propietario (comprar para el negocio, reiniciarlo, sus copias). No sale en Empleados
+     ni entre quienes pueden dar acceso, no entra en las cajas con PIN ni con tarjeta, no ocupa plaza ni cuenta en el
+     uso del plan y su navegador no se queda como dispositivo del negocio: ni cierra la sesión de otro dispositivo ni se
+     la cierra la entrada de otro (BASE-F57). Cada entrada se suma al momento a la lista de las últimas entradas, y lo
+     que hace queda a su nombre en los registros.
   5. Con el acceso apagado no entra: ve «Este negocio no deja entrar a soporte» — «El propietario o un administrador
      de este negocio tiene que encender el acceso de soporte de ERPlora para que puedas entrar. Pídeselo y vuelve a
      intentarlo.» con «Volver a intentarlo».
@@ -3821,7 +3821,7 @@ estaba; al consultarlo, le sale que no puede cambiarlo. Si el cambio no se puede
 guardar el cambio.» y el interruptor vuelve a lo guardado; si la tarjeta no puede leer el ajuste, «No se pudo cargar
 el acceso de soporte.» con «Reintentar». Con el acceso apagado, soporte no abre sesión ni deja entrada (la página del
 paso 5).
-Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100
+Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
 
 ## Para quien lo mantiene
 
