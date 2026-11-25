@@ -3,7 +3,7 @@
 import pydantic
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.ninja import FIELD_MESSAGES
+from live.ninja import field_message
 from live.operations import operation
 from live.outbox import record_event
 
@@ -26,20 +26,6 @@ ALREADY_IMPORTED = _(
 )
 #: What the export put in front of a cell a spreadsheet would run (queries.FORMULA_STARTS).
 EXPORT_GUARD = ("'=", "'+", "'-", "'@")
-
-
-def _field_message(error: dict) -> str:
-    """One pydantic error of a row as the 422 of the API words it (``live.ninja.FIELD_MESSAGES``)."""
-    context = error.get("ctx") or {}
-    if error.get("type") in ("value_error", "assertion_error"):
-        return str(context.get("error") or error.get("msg"))
-    template = FIELD_MESSAGES.get(error.get("type"))
-    try:
-        return (
-            str(template % context) if template is not None else str(error.get("msg"))
-        )
-    except KeyError, TypeError, ValueError:
-        return str(error.get("msg"))
 
 
 def _import_row(
@@ -74,7 +60,7 @@ def _import_row(
         errors: dict[str, str] = {}
         for error in exc.errors():
             errors.setdefault(
-                str(error["loc"][0]) if error["loc"] else "name", _field_message(error)
+                str(error["loc"][0]) if error["loc"] else "name", field_message(error)
             )
         return {}, errors, warnings
     try:
