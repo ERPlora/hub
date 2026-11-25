@@ -15,7 +15,6 @@ from live.context import OperationContext
 from live.errors import OperationError, Unauthorized
 from live.operations import get as get_operation
 from live.operations import operation
-from pydantic import ValidationError
 
 from base import approvals as approval_rules
 from base import activation, assistant, queries
@@ -116,19 +115,6 @@ def _functions(message: dict) -> list[dict]:
     calls = message.get("tool_calls") if message.get("role") == "assistant" else None
     asked = (call.get("function") for call in calls if isinstance(call, dict)) if isinstance(calls, list) else ()
     return [function for function in asked if isinstance(function, dict)]
-
-
-def _assistant_searched(still_open: list[dict]) -> list[str]:
-    """The tasks the model searched the person's tools for (``base.assistant.find_tools``) in the request still open
-    (``_assistant_opened``), in order; a search its operation refuses searched nothing."""
-    search = get_operation(assistant.relevance.FIND_TOOLS)
-    queries = []
-    for function in (function for message in still_open for function in _functions(message)):
-        if function.get("name") != shared.tool_name(search.name):
-            continue
-        with contextlib.suppress(ValidationError):
-            queries.append(search.input.model_validate_json(str(function.get("arguments") or "{}")).query)
-    return queries
 
 
 def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.ToolOutcome") -> dict:
@@ -332,7 +318,9 @@ def _assistant_offer(ctx: OperationContext, tools: dict, still_open: list, *, la
     off (``switched``: what is on was just decided), and nothing on the last round."""
     if last:
         return [], []
-    words, searched = _assistant_asked(still_open), _assistant_searched(still_open)
+    words = _assistant_asked(still_open)
+    # The tasks the model searched the person's tools for in the request still open (``base.assistant.find_tools``).
+    searched = shared.searched(still_open, get_operation(assistant.relevance.FIND_TOOLS))
     off = [] if switched else assistant.apps_not_on.named(ctx, words, searched)
     offered = assistant.relevance.relevant(tools, words, ctx.language, searched=searched)
     return assistant.apps_not_on.with_switch(offered, tools, off), off
