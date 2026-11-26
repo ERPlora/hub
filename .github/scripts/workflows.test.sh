@@ -278,6 +278,7 @@ SMOKE_GROUPS = {
     "appointments, services and vouchers": ("appointment-agenda", "appointment-charge", "service-catalog",
                                             "service-vouchers", "sale-voucher"),
     "sign-up, apps, the demo and live updates": ("base-sign-up-taxes-on", "base-app-activation", "demo", "two-tabs-live"),
+    "texts read whole on the screens of the journeys": ("screens-text-fits",),
 }
 grouped = []
 for group, names in SMOKE_GROUPS.items():
