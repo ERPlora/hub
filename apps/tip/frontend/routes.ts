@@ -10,8 +10,18 @@ const routes: RouteRecordRaw[] = [
     meta: { auth: true },
   },
   {
+    path: '/tip/report',
+    component: () => import('./pages/ReportPage.vue'),
+    meta: { auth: true },
+  },
+  {
     path: '/tip/settings',
     component: () => import('./pages/SettingsPage.vue'),
+    meta: { auth: true },
+  },
+  {
+    path: '/tip/mine',
+    component: () => import('./pages/MyTipsPage.vue'),
     meta: { auth: true },
   },
 ];

@@ -5,18 +5,14 @@
 // file makes is deleted after it, and the settings, the drawer and the apps it changed go back as they were.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, login, psql, shown, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { A, api, capture, login, psql, shown, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { capturedAtEachSize } from './screen';
 import { ownerPage, rowAction } from './service-helpers';
 import { pickSelect } from './tax-helpers';
 
 const RUN = stamp();
-const SIZES = [
-  { width: 375, height: 667 },
-  { width: 820, height: 1180 },
-  { width: 1440, height: 900 },
-];
 
 interface Suggestion {
   percent?: number | null;
@@ -80,16 +76,6 @@ async function tipsOf(page: Page): Promise<Tip[]> {
   return (await api<{ rows: Tip[] }>(page.context(), A, 'GET', '/tip/tips?limit=20')).data.rows;
 }
 
-async function lookAtEachSize(page: Page, name: string, what: string): Promise<void> {
-  for (const size of SIZES) {
-    await page.setViewportSize(size);
-    await expect(shown(page).locator(`[data-testid=${what}]`).first()).toBeVisible();
-    expect(await horizontalOverflow(page), `${name} ${size.width}x${size.height}`).toBe(0);
-    await capture(page, `${name}-${size.width}x${size.height}`);
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
-}
-
 test('TIP-F03, TIP-F05, TIP-F06: the manager records a card tip and the pool, adjusts one and voids the other', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/tip/tips');
@@ -121,7 +107,7 @@ test('TIP-F03, TIP-F05, TIP-F06: the manager records a card tip and the pool, ad
   expect([card.amount, card.status]).toEqual([300, 'active']);
   expect([pool.member_id, pool.status]).toEqual([null, 'active']);
   await expect(list.locator(`[data-testid=tip-list-row][data-id="${card.id}"]`).first()).toBeVisible();
-  await lookAtEachSize(page, 'tip-screens-list', 'tip-list-row');
+  await capturedAtEachSize(page, 'tip-screens-list', 'tip-list-row');
 
   // The card tip, adjusted with its reason.
   await rowAction(page, 'tip-list', card.id, 'adjust');
@@ -153,7 +139,7 @@ test('TIP-F01: the owner asks for a tip at the charge and gives the card an amou
   const card = before.methods.find((method) => method.method_type === 'card')!;
   const settings = shown(page);
   await expect(settings.locator('[data-testid=tip-settings-heading]')).toBeVisible();
-  await lookAtEachSize(page, 'tip-screens-settings', 'tip-settings-heading');
+  await capturedAtEachSize(page, 'tip-screens-settings', 'tip-settings-heading');
 
   const enabled = settings.locator('[data-testid=tip-settings-enabled]');
   if (!before.enabled) await enabled.click();

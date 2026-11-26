@@ -1,6 +1,7 @@
 // Test helper of the tips app's components: `mountInShell` with its catalogues over base's and Sales' (whose list
 // notices and period its screens reuse) and the hub's business.
 import type { SessionMe } from '@erplora/ui/shell';
+import { afterEach, beforeEach, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
@@ -34,4 +35,13 @@ export async function mountTip(component: Component, options: BusinessMountOptio
     business: business(),
     inDocFrom: 'component',
   });
+}
+
+/** The tests around it run at 9:00 on 25 November 2026 on the device's clock: the day their periods count from. */
+export function onTheTwentyFifth(): void {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 25, 9, 0));
+  });
+  afterEach(() => vi.useRealTimers());
 }

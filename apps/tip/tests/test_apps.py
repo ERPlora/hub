@@ -42,13 +42,15 @@ def test_it_is_in_the_store_and_in_the_restaurant_and_hair_salon_templates():
     assert sorted(config().verticals) == ["hair_salon", "restaurant"]
 
 
-def test_its_menu_opens_the_tips_and_the_settings_to_whoever_manages_them():
-    # Whoever only records tips sees neither: their own tips come with «My tips».
+def test_its_menu_opens_the_tips_the_report_and_the_settings_to_whoever_manages_them_and_my_tips_to_everyone():
+    # Whoever only records tips sees «My tips» alone, so Tips opens straight on their own.
     assert [(nav.id, nav.path, nav.permission) for nav in config().navigation] == [
         ("tips", "/tip/tips", "tip.manage"),
+        ("report", "/tip/report", "tip.manage"),
         ("settings", "/tip/settings", "tip.manage"),
+        ("mine", "/tip/mine", "tip.view_tip"),
     ]
-    assert [str(nav.label) for nav in config().navigation] == ["Tips", "Settings"]
+    assert [str(nav.label) for nav in config().navigation] == ["Tips", "Report", "Settings", "My tips"]
     for nav in config().navigation:
         assert f"'{nav.icon.removeprefix('ion:')}'" in shell_icon_registry(), nav.id
 
@@ -66,6 +68,8 @@ def test_what_each_role_may_do():
 
 def test_its_operations_are_the_ones_of_this_layer():
     assert sorted(name for name in registry if name.startswith("tip.")) == [
+        "tip.report.get",
+        "tip.report.mine",
         "tip.sale.refund",
         "tip.sale.void",
         "tip.settings.get",

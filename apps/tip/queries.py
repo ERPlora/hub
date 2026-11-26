@@ -1,10 +1,12 @@
-"""Read operations of the tips app (``READ ONLY``): its settings and the tips, which can be followed live (live.py); and
-the finders services/ reuses: the settings row, a tip by its id or its sale's number, and a tip as a row."""
+"""Read operations of the tips app (``READ ONLY``): its settings, the tips, the team's report and one's own tips, which can
+be followed live (live.py); and the finders services/ reuses: the settings row, a tip by its id or its sale's number, and
+a tip as a row."""
 
 import datetime as dt
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import Count, Q, QuerySet, Sum
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
@@ -12,19 +14,36 @@ from live.operations import operation
 
 from apps.sale.models import PaymentMethod
 from apps.sale.schemas.fields import EmptyIn
+from apps.staff.models import Member
 from apps.tip.models import Settings, Tip
-from apps.tip.schemas import SettingsOut, SuggestionIn, SuggestionOut, TipListIn, TipOut, TipPage, TipRefIn
+from apps.tip.schemas import (
+    MineOut,
+    ReportIn,
+    ReportOut,
+    SettingsOut,
+    SuggestionIn,
+    SuggestionOut,
+    TipListIn,
+    TipOut,
+    TipPage,
+    TipRefIn,
+)
 from base.business import business_zone
-from base.operations import call
+from base.operations import answer_if_on, call
 
 
 TIP_NOT_FOUND = _("That tip no longer exists.")
 SEVERAL_TIPS = _("The sale %(number)s has several tips: say which one by its id.")
+MEMBER_NOT_LINKED = _("Your user is not linked to any staff record: ask a manager to link it in Staff.")
 
 #: A payment method's suggestions from the factory: 3 %, 5 % and 10 % (what is usual in Spain, the WORKBOOK says).
 FACTORY_SUGGESTIONS = [{"percent": value, "amount": None} for value in (3, 5, 10)]
 #: Staff's answer to «whose record is the caller's?»: what an employee's own tips are.
 CURRENT_MEMBER = "staff.member.current"
+#: Time clock's working days, asked by name: Time clock is no requirement of Tips.
+SHIFTS = "attendance.record.list"
+#: How many working days each read of Time clock brings (its page's top).
+SHIFTS_PAGE = 100
 
 
 def current_settings() -> Settings:
@@ -231,4 +250,156 @@ def list_tips(ctx: OperationContext, params: TipListIn) -> dict:
         "total": rows.count(),
         "limit": params.limit,
         "offset": params.offset,
+    }
+
+
+def _figures() -> dict:
+    """What the report says of some tips: by card, in cash and any other way, in all and how many."""
+    other = ~Q(method_type__in=(PaymentMethod.Type.CARD, PaymentMethod.Type.CASH))
+    return {
+        "card": Sum("amount", filter=Q(method_type=PaymentMethod.Type.CARD), default=0),
+        "cash": Sum("amount", filter=Q(method_type=PaymentMethod.Type.CASH), default=0),
+        "other": Sum("amount", filter=other, default=0),
+        "total": Sum("amount", default=0),
+        "count": Count("id"),
+    }
+
+
+def _active(first: dt.date, last: dt.date) -> QuerySet[Tip]:
+    """The active tips recorded from the business day ``first`` to ``last``, both included."""
+    return Tip.objects.filter(
+        status=Tip.Status.ACTIVE,
+        created_at__gte=_day_start(first),
+        created_at__lt=_day_start(last + dt.timedelta(days=1)),
+    )
+
+
+def _business_today() -> dt.date:
+    return timezone.localdate(timezone=business_zone())
+
+
+def _no_one(**more) -> dict:
+    return {"member_id": None, "member_name": "", "shift_id": None, "clock_in_at": None, "clock_out_at": None, **more}
+
+
+def _by_person(rows: QuerySet[Tip]) -> list[dict]:
+    lines = list(rows.order_by().values("member_id").annotate(**_figures()))
+    members = Member.objects.in_bulk([line["member_id"] for line in lines if line["member_id"]])
+    named = [
+        _no_one(**line, member_name=members[line["member_id"]].full_name) for line in lines if line["member_id"]
+    ]
+    unassigned = [_no_one(**line) for line in lines if not line["member_id"]]
+    return sorted(named, key=lambda line: (line["member_name"].casefold(), str(line["member_id"]))) + unassigned
+
+
+def _shifts(ctx: OperationContext, first: dt.date, last: dt.date) -> list | None:
+    """Time clock's working days of the period, as the caller may read them; ``None`` with Time clock absent, off or not
+    theirs to read."""
+    found: list = []
+    while True:
+        asked = {"date_from": first, "date_to": last, "sort": "clock_in_at", "limit": SHIFTS_PAGE, "offset": len(found)}
+        page = answer_if_on(ctx, SHIFTS, asked)
+        if page is None:
+            return None
+        found += page.rows
+        if not page.rows or len(found) >= page.total:
+            return found
+
+
+def _count(line: dict, tip: Tip) -> None:
+    kind = tip.method_type if tip.method_type in (PaymentMethod.Type.CARD, PaymentMethod.Type.CASH) else "other"
+    line[kind] += tip.amount
+    line["total"] += tip.amount
+    line["count"] += 1
+
+
+def _by_shift(shifts: list, rows: QuerySet[Tip]) -> list[dict]:
+    """A line per working day with the tips of its person recorded while it ran (an open one, up to now), and one line
+    with the tips recorded outside every working day, when there are any."""
+    now = timezone.now()
+    zero = {"card": 0, "cash": 0, "other": 0, "total": 0, "count": 0}
+    lines = [
+        _no_one(**zero, member_id=shift.member_id, member_name=shift.member_name, shift_id=shift.id,
+                clock_in_at=shift.clock_in_at, clock_out_at=shift.clock_out_at)
+        for shift in shifts
+    ]
+    outside = _no_one(**zero)
+    for tip in rows.order_by("created_at", "id").only("member_id", "created_at", "method_type", "amount"):
+        ran = (
+            line for line in lines
+            if line["member_id"] == tip.member_id and line["clock_in_at"] <= tip.created_at < (line["clock_out_at"] or now)
+        )
+        _count(next(ran, outside), tip)
+    return lines + ([outside] if outside["count"] else [])
+
+
+@operation(
+    "tip.report.get",
+    kind="query",
+    permission="tip.manage",
+    input=ReportIn,
+    output=ReportOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": ("how much did each waiter get in tips this week?", "show me today's tips by shift"),
+            "es": ("¿cuánto ha sacado de propinas cada camarero esta semana?", "enséñame las propinas de hoy por turno"),
+        },
+        "description": "The team's active tips of a period of business days (today when none is said), by card, in "
+        "cash and any other way, in cents, with how many: a line per person (the unassigned and the pool's last) or, by "
+        "shift, a line per working day clocked in Time clock with the tips of its person recorded while it ran and one "
+        "line with those recorded outside every working day; and the period's totals. Without Time clock on, by shift "
+        "gives no lines and shifts_available is false.",
+    },
+)
+def get_report(ctx: OperationContext, params: ReportIn) -> dict:
+    last = params.date_to or _business_today()
+    first = params.date_from or last
+    rows = _active(first, last)
+    lines = _by_person(rows) if params.by == "person" else _shift_lines(ctx, first, last, rows)
+    return {
+        "by": params.by,
+        "date_from": first,
+        "date_to": last,
+        "shifts_available": lines is not None,
+        "rows": lines or [],
+        "totals": rows.aggregate(**_figures()),
+    }
+
+
+def _shift_lines(ctx: OperationContext, first: dt.date, last: dt.date, rows: QuerySet[Tip]) -> list[dict] | None:
+    shifts = _shifts(ctx, first, last)
+    return None if shifts is None else _by_shift(shifts, rows)
+
+
+@operation(
+    "tip.report.mine",
+    kind="query",
+    permission="tip.view_tip",
+    input=EmptyIn,
+    output=MineOut,
+    expose_api=True,
+    ai={
+        "asks": {
+            "en": ("how much have I made in tips today?", "show me my tips of this week"),
+            "es": ("¿cuánto llevo hoy de propinas?", "enséñame mis propinas de esta semana"),
+        },
+        "description": "The caller's own active tips, those of their record of the team: today's and this week's (from "
+        "Monday), by card, in cash and any other way, in cents, with how many. Refused when the caller's user has no "
+        "record of the team.",
+    },
+)
+def my_tips(ctx: OperationContext, params: EmptyIn) -> dict:
+    current = call(ctx, CURRENT_MEMBER, {}).member
+    if current is None:
+        raise Conflict(str(MEMBER_NOT_LINKED), code="tip.member_not_linked")
+    today = _business_today()
+    week_from = today - dt.timedelta(days=today.weekday())
+    own = _active(week_from, today).filter(member_id=current.id)
+    return {
+        "member_name": current.full_name,
+        "today": today,
+        "week_from": week_from,
+        "day": own.filter(created_at__gte=_day_start(today)).aggregate(**_figures()),
+        "week": own.aggregate(**_figures()),
     }

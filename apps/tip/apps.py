@@ -46,8 +46,10 @@ class TipConfig(LiveAppConfig):
         "hub_employee": ["tip.view_tip", "tip.add_tip"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =` as the
-    # module's own icon. Whoever only records tips opens neither entry; a manager reads the settings blocked.
+    # module's own icon. Whoever only records tips opens «My tips» alone; a manager reads the settings blocked.
     navigation = [
         Nav("tips", _("Tips"), "ion:wallet-outline", "/tip/tips", permission="tip.manage"),
+        Nav("report", _("Report"), "ion:list-outline", "/tip/report", permission="tip.manage"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/tip/settings", permission="tip.manage"),
+        Nav("mine", _("My tips"), "ion:person-outline", "/tip/mine", permission="tip.view_tip"),
     ]
