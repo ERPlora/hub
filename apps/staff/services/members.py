@@ -235,7 +235,7 @@ def update_member(ctx: OperationContext, data: MemberPatchIn) -> Member | None:
             ),
         },
         "description": "Deactivates a staff member (named by id or by name) without deleting anything: "
-        "they stop being bookable.",
+        "they stop being bookable. For a stretch away from the business, never a break within their working day.",
         "risk": "high",
     },
 )

@@ -200,7 +200,7 @@ or chosen has not been saved: "Keep editing" keeps it and "Discard changes" clos
 With the window as it opened, Back closes it without asking (BASE-F05); the currency proposed by itself and an amount rewritten in the business's are no change.
 
 ## Flows
-<!-- from WORKBOOK.md sha256:a14eff0e9166 -->
+<!-- from WORKBOOK.md sha256:a190d06a541d -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -219,6 +219,8 @@ With the window as it opened, Back closes it without asking (BASE-F05); the curr
 | PRICING-F13 | Look up the price of a line | done |
 | PRICING-F14 | When a product is deleted or comes back, a category or a group is deleted, or a service changes | done |
 | PRICING-F15 | Recover the price list prices from a separate copy | done |
+| PRICING-F16 | Delete a price list | not done |
+| PRICING-F17 | Delete a discount rule | not done |
 
 ### PRICING-F01 See the price lists
 <!-- from WORKBOOK.md sha256:f015a50d781f -->
@@ -538,6 +540,40 @@ because Services keeps which one of the copy it made it for; one the business ma
 Price Lists is asked without Services, or before it, and the service has not come back yet: asking again puts it. A
 service an earlier recovery brought back before this rule does not keep it, and its prices do not come back either.
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14, SERVICE-F01
+
+### PRICING-F16 Delete a price list
+<!-- from WORKBOOK.md sha256:b4c6da0a98ed -->
+Status: not done — the delete action, its route, its assistant phrase and **Delete** on the screen are missing
+Actor: owner, administrator, manager, assistant
+Screen: Price Lists, Price list (detail)
+Steps:
+1. **Delete** in the "⋮" menu of the price list's row or in the bar of its detail, on an active or a deactivated one.
+   It is not offered on the general price list.
+2. Confirm "VIP members disappears with all its prices. Sales already made do not change.".
+3. From the detail, deleting it goes back to **Price Lists**.
+In: the price list, by its id, its code or its name.
+Out: the price list deleted with all its prices, in a single operation, and `pricing.price_list.deleted` (with `id` and
+`code`). Its code is free for a new price list. Sales already made do not change: Sales keeps the price on its line
+and no other app points at a price list. To stop applying it and keep it, deactivate it (PRICING-F05).
+If it fails: "This is the general price list: make another one general or take its mark off before deleting it." (also
+through the assistant and the API); one that is no longer there, because someone else deleted it first, "This price
+list does not exist.". The refusal shows inside the confirmation.
+Involved: none
+
+### PRICING-F17 Delete a discount rule
+<!-- from WORKBOOK.md sha256:7678687e399f -->
+Status: not done — the delete action, its route, its assistant phrase and **Delete** on the screen are missing
+Actor: owner, administrator, manager, assistant
+Screen: Price Lists
+Steps:
+1. **Delete** in the rule's row, active or deactivated.
+2. Confirm "Happy hour disappears and stops applying to new sales. Sales already made do not change.".
+In: the rule, by its id, its code or its name.
+Out: the rule deleted and `pricing.rule.deleted` (with `id` and `code`). Its code is free for a new rule. Sales already
+made do not change: the discount is kept on its line. To stop it for a while, deactivate it (PRICING-F12).
+If it fails: one that is no longer there, because someone else deleted it first, "This discount rule does not
+exist.". The refusal shows inside the confirmation.
+Involved: none
 
 ## Services: what goes in and what comes out
 <!-- from WORKBOOK.md sha256:4917ebf7a5bc -->

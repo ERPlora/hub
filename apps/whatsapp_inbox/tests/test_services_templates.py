@@ -21,7 +21,7 @@ from django.utils import translation
 from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.whatsapp_inbox.models import Template
+from apps.whatsapp_inbox.models.templates import Template
 from apps.whatsapp_inbox.tests.conftest import A, HUB_DB, NOW, connect, ctx_for, run, system, template
 from base.tenancy.context import current_alias
 

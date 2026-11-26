@@ -769,7 +769,7 @@ already sales on screen, they stay under the notice.
 Involved: SALE-F28
 
 ### BASE-F10 See in the bell the notices between apps that were not delivered
-<!-- from WORKBOOK.md sha256:9dc8306fec6e -->
+<!-- from WORKBOOK.md sha256:fca556381650 -->
 Status: done
 Actor: owner, administrator
 Screen: The bell
@@ -779,7 +779,7 @@ Steps:
      with "An app did not receive what another one sent it: what it had to do stays undone until you send it again.",
      comes in as a card and settles in it.
   3. "Review the events" opens "System" on "Failed events", where they are resent or discarded (BASE-F43).
-  4. When none is left, the notice disappears.
+  4. When none is left (resent, discarded or already done another way), the notice disappears.
 In: how many notices of this business were left undelivered, only for whoever runs the business.
 Out: nothing.
 If it fails: an employee or a manager does not see the notice. If it cannot ask, the bell keeps what it
@@ -1583,7 +1583,7 @@ If it fails: "The log could not be loaded. Check the connection and try again." 
 Involved: none
 
 ### BASE-F43 See the failed events
-<!-- from WORKBOOK.md sha256:7b01ec3e1db1 -->
+<!-- from WORKBOOK.md sha256:75c3f078c4a3 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1597,7 +1597,9 @@ Steps:
      "Discard". On top, "Resend all". If the app it was for is no longer on, the card says it cannot be resent
      until it is turned on, with no "Resend".
   4. The 100 most recent show; with more, the screen says how many show out of how many.
-  5. The list and the bell get up to date by themselves when a notice fails, is resent or is discarded.
+  5. The list and the bell get up to date by themselves when a notice fails, is resent or is discarded, and also when
+     the app it was for does what it asked another way: if Invoicing issues a sale's document with "Issue now",
+     that sale's notice goes by itself.
   6. With none: "All in order" — "No failed events. The queue of events lives in the database: a restart never
      loses it.".
 In: the notices between apps of this business that ran out of retries, never another's.
@@ -1827,14 +1829,16 @@ entering: the first one is chosen in **My profile**.
 Involved: BASE-F52, BASE-F65
 
 ### BASE-F55 Enter with a PIN
-<!-- from WORKBOOK.md sha256:7c8ec3f06d4d -->
+<!-- from WORKBOOK.md sha256:c0bec9cbce51 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
 Steps:
   1. On a shared device of a business that asks for a PIN, **Access** opens on the "PIN" tab: "Enter your PIN",
      "…or pass your badge: no need to choose your name first." and "Choose your user" with a face per person
-     (initials and name; never their email). With a single person, they are already chosen.
+     (initials and name; never their email). The name is the one of their profile in this business; without it,
+     the one of their linked Staff record (STAFF-F03), and if they have none either, their account's. With a single
+     person, they are already chosen.
   2. They tap their name: "PIN of {name}" and the keypad show, with as many circles as the business's PIN has
      digits. The arrow ("Change user") goes back to the faces. The keypad shows whole, down to the 0 and the erase
      key, without scrolling the screen: on a tablet in landscape (in its browser too), a laptop or a low phone, the
@@ -1852,7 +1856,7 @@ which nobody ever entered with an account, or that an administrator removed: "Th
 PIN yet. Sign in once here with your account and from then on it will.". Without a connection, "Could not enter.
 Check the connection and try again."; if who works here cannot be read, "Could not load the PIN pad. You can
 still enter with your account.".
-Involved: BASE-F54, BASE-F67
+Involved: BASE-F54, BASE-F67, STAFF-F03
 
 ### BASE-F56 Enter by passing the badge
 <!-- from WORKBOOK.md sha256:02f7b0bae2a8 -->
@@ -2007,7 +2011,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:d3f6f60ee728 -->
+<!-- from WORKBOOK.md sha256:5fca4faf21e2 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2031,7 +2035,8 @@ Steps:
      selector: the open application switches to it without reloading, and stays in it on reloading or opening it again
      on this device.
 In: the profile of whoever has the session.
-Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
+Out: their name in this business (the one in the side menu, on the faces and in "Devices"; without it, the side menu and the
+faces say the one of their linked Staff record, STAFF-F03), their photo, their language and their
 appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
 business’s language", they enter with a PIN in the business's and with their account in their erplora.com
 account's (BASE-F51). The email is only for contact: it does not change the erplora.com account.
