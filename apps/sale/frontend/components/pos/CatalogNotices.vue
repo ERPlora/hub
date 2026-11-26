@@ -24,11 +24,7 @@ const canFix = computed(() => session.can('inventory.change_product'));
 const { data, error } = useLive('inventory.product.list', { needs_tax_setup: true, is_active: true, limit: 1, offset: 0 });
 
 const blocked = computed(() => (error.value ? 0 : (data.value?.total ?? 0)));
-const sentence = computed(() =>
-  blocked.value === 1
-    ? t('sale.pos.catalogBlockedOne', { tax: taxName.value })
-    : t('sale.pos.catalogBlocked', { count: blocked.value, tax: taxName.value }),
-);
+const sentence = computed(() => t('sale.pos.catalogBlocked', { count: blocked.value, tax: taxName.value }));
 
 function review(): void {
   void router.push({ path: '/inventory/products', query: { status: 'unconfigured' } });
