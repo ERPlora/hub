@@ -937,7 +937,7 @@ Through the assistant: its confirmation card says the check (a table's, by its t
 Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
-<!-- from WORKBOOK.md sha256:c1de49a32c77 -->
+<!-- from WORKBOOK.md sha256:81e5316a2d06 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -961,7 +961,9 @@ leaves the check marked as requested, whether it comes out on the receipt printe
 until it is charged in full or deleted; printing it again, adding lines or charging part of it does not remove it.
 Asked of the assistant ("print the bill for table 4"), it only comes out on the receipt printer: if none takes it,
 it is neither printed nor marked, and its receipt says it was not done, with the reason: "No receipt printer takes
-this bill: open it in Sales to print it on this device.".
+this bill: open it in Sales to print it on this device.". If it takes it but no device that is on prints its queue,
+the assistant says it waits in that printer's queue and will come out when a device set up to print it does, never
+that it has printed it.
 If it fails: while the business has not yet said its currency, "Bill" keeps loading and the printer stays grey:
 the paper never goes out with a supposed figure; if the currency cannot be read, it says so with "Retry", as
 when the bill cannot be worked out. If it does not print, "Bill could not be printed"; if the installed app does
@@ -1177,7 +1179,7 @@ be read, "Unavailable".
 Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, BASE-F119, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
-<!-- from WORKBOOK.md sha256:a66effd35f44 -->
+<!-- from WORKBOOK.md sha256:b299e5b0a8e5 -->
 Status: done
 Vertical: common
 Actor: employee (of their sales), manager (of all of them)
@@ -1232,7 +1234,10 @@ the assistant, "That sale does not exist.". If the assistant is asked ("reprint 
 if a receipt printer takes the paper; if not, nothing is printed and its receipt says it was not done, with the
 reason: "No receipt printer takes this sale's paper: open the sale to print it on this device."; with its fiscal
 document pending, "Its fiscal document is still pending: open the sale to issue it.", and if its VeriFactu record
-cannot be read, "Its VeriFactu record could not be read, and its paper never prints without its QR.".
+cannot be read, "Its VeriFactu record could not be read, and its paper never prints without its QR.". If the printer
+takes it but no device that is on prints its queue (none set up with it, or the one that has it, off), the ticket
+waits in that queue: the assistant says it waits in that printer's queue and will come out when a device set up to
+print it does, never that it has reprinted it.
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
