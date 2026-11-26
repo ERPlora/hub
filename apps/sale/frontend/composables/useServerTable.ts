@@ -20,8 +20,8 @@ export const MAX_LIMIT = MAX_WINDOW;
 export type { ListWindow };
 
 export interface ServerTableOptions {
-  /** Column the server sorts by at first. */
-  sort: string;
+  /** Column the server sorts by at first; none for a list that keeps its own order. */
+  sort?: string;
   dir?: SortDir;
   pageSize?: number;
   /** The longest search the list takes (`max_length` of its schema's `search`). */
@@ -47,7 +47,7 @@ export function useServerTable<Op extends OpName>(op: Op, options: ServerTableOp
   const pageSize = ref(options.pageSize ?? 50);
   /** Pages shown from `page` on: 1 on a desk; each «Load more» on a phone adds one. */
   const windowPages = ref(1);
-  const sort = ref(options.sort);
+  const sort = ref(options.sort ?? '');
   const dir = ref<SortDir>(options.dir ?? 'asc');
 
   /** Shows page `n` alone (the desk pager, a new search, a crossed breakpoint). */
@@ -90,8 +90,7 @@ export function useServerTable<Op extends OpName>(op: Op, options: ServerTableOp
   const query = computed(() => ({
     ...(JSON.parse(pageFilters.value) as object),
     ...(text.value.trim() ? { search: text.value.trim().slice(0, options.maxSearch) } : {}),
-    sort: sort.value,
-    dir: dir.value,
+    ...(sort.value ? { sort: sort.value, dir: dir.value } : {}),
   }));
 
   /** The rows on screen, from the page's first row, as windows of at most `MAX_LIMIT` (the engine's). */

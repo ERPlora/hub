@@ -121,7 +121,7 @@ def test_spanish_texts_are_the_old_modules():
             == "Ya existe un día especial en esa fecha."
         )
         assert (
-            str(queries.SPECIAL_DAY_NOT_FOUND)
+            str(queries.references.SPECIAL_DAY_NOT_FOUND)
             == "Ese día especial no existe en este negocio."
         )
 

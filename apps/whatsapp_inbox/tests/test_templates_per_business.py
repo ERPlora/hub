@@ -10,7 +10,7 @@ import respx
 from live.context import Scope
 from live.errors import NotFound
 
-from apps.whatsapp_inbox.models import Template
+from apps.whatsapp_inbox.models.templates import Template
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, ctx_for, receive, resume_each, run, system, template
 from base.tenancy.context import use_hub
 
