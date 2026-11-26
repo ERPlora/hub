@@ -2734,7 +2734,9 @@ Pasos:
      cobra, cómo se abre y se cierra la caja, si cada reserva pide teléfono); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
      pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18. Todo
      importe que dice va en la moneda y con los decimales que enseñan las pantallas: lo que la ficha de un cliente dice
-     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €.
+     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €. Una opción de una lista cerrada la dice con el nombre
+     que le dan las pantallas en su idioma, nunca con su código: de una clienta recién dada de alta dice que ha quedado en
+     la etapa «Contacto» y con origen «En el local», no «lead» ni «walk_in».
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -4782,7 +4784,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   como dinero va como lo escriben las pantallas («3.60 EUR»), en la moneda del objeto que la nombra (`currency`, con
   sus `currency_decimals` si los da) o en la del negocio, nunca en la unidad menor: lo comprueban
   `base/tests/test_business_facts.py`, también con dos negocios en zonas distintas, y
-  `base/tests/test_assistant_result_amounts.py`; el paso del asistente de Automatizaciones lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
+  `base/tests/test_assistant_result_amounts.py`; cada valor de una lista cerrada que nombran las pantallas lleva
+  además ese nombre en el idioma de la persona, una vez por dato y valor, bajo `screen_names` (`live.assistant`, con
+  la etiqueta de las opciones del modelo que usa la tarjeta, `choice_label`): lo comprueban
+  `base/tests/test_assistant_screen_names.py`, que guarda por app las listas cerradas que ninguna app nombra todavía
+  (solo encoge), y `apps/customer/tests/test_assistant_screen_names.py`; el paso del asistente de Automatizaciones
+  lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,
