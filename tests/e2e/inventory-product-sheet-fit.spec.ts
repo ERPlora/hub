@@ -16,7 +16,7 @@ import {
   searchProducts,
   stamp,
 } from './inventory-helpers';
-import { CHROME_LANDSCAPE, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
+import { CHROME_LANDSCAPE, expectWindowFitsAt, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
 import { rowAction } from './service-helpers';
 
 const RUN = stamp();
@@ -78,14 +78,7 @@ test('INVENTORY-F25: on a tablet in landscape the product sheet shows all its ac
   expectBarcodeReached(await scrolledToBarcode(sheet));
   await capture(page, 'FIX-INVENTORY-SHEET-FIT-1280x761-barcode');
 
-  for (const size of SIZES) {
-    const label = `${size.width}x${size.height}`;
-    await page.setViewportSize(size);
-    await capture(page, `FIX-INVENTORY-SHEET-FIT-${label}`);
-    const at = await fitOf(sheet);
-    expect(at.screen, `the page fills the window at ${label}`).toBe(size.height);
-    expectWindowOnScreen(at, ON_VIEW, `at ${label}`);
-  }
+  await expectWindowFitsAt(page, { sizes: SIZES, measure: () => fitOf(sheet), onView: ON_VIEW, name: 'FIX-INVENTORY-SHEET-FIT' });
   await context.close();
 });
 
@@ -107,10 +100,7 @@ test('INVENTORY-F29: in Chrome on a tablet in landscape, under the address bar, 
   expectWindowOnScreen(scrolled, ON_VIEW, 'with the barcode scrolled into view under the address bar');
 
   await bar.evaluate((style) => (style as Element).remove());
-  await page.setViewportSize({ width: CHROME_LANDSCAPE.width, height: CHROME_LANDSCAPE.page });
-  const low = await fitOf(sheet);
-  expect(low.screen, 'the page fills a 1280x665 window').toBe(CHROME_LANDSCAPE.page);
-  expectWindowOnScreen(low, ON_VIEW, 'at 1280x665');
-  await capture(page, 'FIX-INVENTORY-SHEET-FIT-1280x665');
+  const low = [{ width: CHROME_LANDSCAPE.width, height: CHROME_LANDSCAPE.page }];
+  await expectWindowFitsAt(page, { sizes: low, measure: () => fitOf(sheet), onView: ON_VIEW, name: 'FIX-INVENTORY-SHEET-FIT' });
   await context.close();
 });

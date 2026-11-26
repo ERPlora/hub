@@ -65,6 +65,27 @@ export function expectWindowOnScreen(fit: WindowFit, onView: readonly string[], 
   }
 }
 
+/** At each of `sizes`, the open window (`measure`) fits the page with each part of `onView` inside it, captured as
+ *  `<name>-<width>x<height>`. */
+export async function expectWindowFitsAt(
+  page: Page,
+  check: {
+    sizes: readonly { width: number; height: number }[];
+    measure: () => Promise<WindowFit>;
+    onView: readonly string[];
+    name: string;
+  },
+): Promise<void> {
+  for (const size of check.sizes) {
+    const label = `${size.width}x${size.height}`;
+    await page.setViewportSize(size);
+    const at = await check.measure();
+    expect(at.screen, `the page fills the window at ${label}`).toBe(size.height);
+    expectWindowOnScreen(at, check.onView, `at ${label}`);
+    await capture(page, `${check.name}-${label}`);
+  }
+}
+
 /** Every `ion-icon` on screen: its name and whether its shadow root painted an `<svg>`. */
 export async function iconStates(page: Page): Promise<{ name: string; painted: boolean }[]> {
   return page.evaluate(() =>

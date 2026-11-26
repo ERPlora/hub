@@ -8,7 +8,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { A, capture, shown } from './helpers';
 import { cleanTill, dishForTheTill, stamp, tillIn, TILL_LANGUAGES } from './sale-helpers';
 import type { Product } from './inventory-helpers';
-import { CHROME_LANDSCAPE, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
+import { CHROME_LANDSCAPE, expectWindowFitsAt, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
 
 const RUN = stamp();
 const SIZES = [
@@ -81,14 +81,7 @@ for (const till of TILL_LANGUAGES) {
     expectWindowOnScreen(end, ON_VIEW, 'with the ticket scrolled to its end');
 
     await bar.evaluate((style) => (style as Element).remove());
-    for (const size of SIZES) {
-      const label = `${size.width}x${size.height}`;
-      await page.setViewportSize(size);
-      const at = await fitOf(modal);
-      expect(at.screen, `the page fills the window at ${label}`).toBe(size.height);
-      expectWindowOnScreen(at, ON_VIEW, `at ${label}`);
-      await capture(page, `SALE-DOCUMENT-FIT-${till.lang}-${label}`);
-    }
+    await expectWindowFitsAt(page, { sizes: SIZES, measure: () => fitOf(modal), onView: ON_VIEW, name: `SALE-DOCUMENT-FIT-${till.lang}` });
     await context.close();
   });
 }

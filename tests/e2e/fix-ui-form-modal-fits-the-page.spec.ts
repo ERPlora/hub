@@ -7,7 +7,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { capture, shown, signedInSpanish } from './helpers';
 import { presentedDialog } from './inventory-helpers';
-import { CHROME_LANDSCAPE, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
+import { CHROME_LANDSCAPE, expectWindowFitsAt, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
 
 const FORM = 'staff-member-form';
 const SIZES = [
@@ -52,14 +52,7 @@ test('STAFF-F01: in Chrome on a tablet in landscape, under the address bar, «Ne
   await capture(page, 'FIX-UI-FORM-MODAL-FITS-THE-PAGE-staff-1280x665-chrome');
 
   await bar.evaluate((style) => (style as Element).remove());
-  for (const size of SIZES) {
-    const label = `${size.width}x${size.height}`;
-    await page.setViewportSize(size);
-    const at = await fitOf(form);
-    expect(at.screen, `the page fills the window at ${label}`).toBe(size.height);
-    expectWindowOnScreen(at, ON_VIEW, `at ${label}`);
-    await capture(page, `FIX-UI-FORM-MODAL-FITS-THE-PAGE-staff-${label}`);
-  }
+  await expectWindowFitsAt(page, { sizes: SIZES, measure: () => fitOf(form), onView: ON_VIEW, name: 'FIX-UI-FORM-MODAL-FITS-THE-PAGE-staff' });
   await context.close();
 });
 
