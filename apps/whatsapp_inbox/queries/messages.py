@@ -8,7 +8,7 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import operation
 
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models.conversations import Message
 from apps.whatsapp_inbox.queries.channel import channel, send_blocked
 from apps.whatsapp_inbox.queries.conversations import display_name, find_conversation
 from apps.whatsapp_inbox.queries.reads import page, person_name
