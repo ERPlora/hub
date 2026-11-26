@@ -100,7 +100,17 @@ class FlowConfig(LiveAppConfig):
     navigation = [
         Nav("automations", _("Automations"), "ion:sync-outline", "/flow/automations", permission="flow.answer")
     ]
-    help = Help()
+    help = Help(
+        flow_videos={
+            "FLOW-F11": {"es": ["nsf883pzXH8"], "en": ["69FcCkAcanY"]},
+            "FLOW-F12": {"es": ["sadTUoif9WM"], "en": ["bnK30N45oRM"]},
+            "FLOW-F13": {"es": ["k-whftpZ9jo"], "en": ["PeHMnFjK6xM"]},
+            "FLOW-F15": {"es": ["01L8dfo7kt8"], "en": ["Hvd4w9HTfEs"]},
+            "FLOW-F16": {"es": ["01L8dfo7kt8"], "en": ["Hvd4w9HTfEs"]},
+            "FLOW-F25": {"es": ["nsf883pzXH8"], "en": ["69FcCkAcanY"]},
+            "FLOW-F35": {"es": ["DGub4fEPBzE"], "en": ["XOpfDSEqGQg"]},
+        },
+    )
     # FLOW-F22 and FLOW-F23: the worker runs them every minute as the system (cron in UTC), in each business it
     # serves, in its database and on its scope (base.hub_visits).
     scheduled_tasks = [

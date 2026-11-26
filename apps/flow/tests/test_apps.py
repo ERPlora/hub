@@ -5,11 +5,13 @@ scheduled tasks, the assistant's contract of every operation (``ai`` and describ
 import pytest
 from django.apps import apps
 from django.utils import translation
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from base import assistant
 from base.queries import app_help
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
 QUERIES = {
@@ -283,8 +285,20 @@ def test_the_store_card_says_what_it_does_today():
         assert assistant in description, description
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert flow_app().help == Help()
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("FLOW-F11", "FLOW-F25"), "nsf883pzXH8", "69FcCkAcanY"),
+    (("FLOW-F13",), "k-whftpZ9jo", "PeHMnFjK6xM"),
+    (("FLOW-F15", "FLOW-F16"), "01L8dfo7kt8", "Hvd4w9HTfEs"),
+    (("FLOW-F12",), "sadTUoif9WM", "bnK30N45oRM"),
+    (("FLOW-F35",), "DGub4fEPBzE", "XOpfDSEqGQg"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("flow", language) == help_videos.by_task(TASK_VIDEOS, language)
 
 
 @pytest.mark.parametrize("language", ["es", "en"])

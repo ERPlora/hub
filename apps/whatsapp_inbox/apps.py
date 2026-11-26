@@ -145,4 +145,8 @@ class WhatsappInboxConfig(LiveAppConfig):
             refresh_on=NOTICE_EVENTS,
         )
     ]
-    help = Help()
+    help = Help(
+        flow_videos={
+            "WHATSAPP_INBOX-F16": {"es": ["bdZh9fc-kM8"], "en": ["mEqjI-FsgX8"]},
+        },
+    )

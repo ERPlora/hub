@@ -106,4 +106,13 @@ class AttendanceConfig(LiveAppConfig):
             "catch_up": "collapse",
         }
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "uOXeTh1ZSSE", "en": "bJRtG4HzBgM"},
+        flow_videos={
+            "ATTENDANCE-F01": {"es": ["d0mJ-eWWSs4"], "en": ["r7rMT_CeHdI"]},
+            "ATTENDANCE-F02": {"es": ["-r7iRA_l84E"], "en": ["NqHXQAtrRXs"]},
+            "ATTENDANCE-F06": {"es": ["7Iw3EckX5sk"], "en": ["vO7WaXRXYLI"]},
+            "ATTENDANCE-F07": {"es": ["2AIG_S251qE"], "en": ["ISb1OnHEnUA"]},
+            "ATTENDANCE-F10": {"es": ["2AIG_S251qE"], "en": ["ISb1OnHEnUA"]},
+        },
+    )
