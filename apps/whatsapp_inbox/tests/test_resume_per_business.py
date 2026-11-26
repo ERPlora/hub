@@ -8,7 +8,7 @@ import httpx
 import respx
 from live.context import Scope
 
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, ctx_for, receive, resume_each, run, system
 from base.tenancy.context import use_hub
 
