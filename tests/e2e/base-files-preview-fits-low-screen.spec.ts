@@ -10,17 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, settled, shown, testid } from './helpers';
+import { atEachFitSize, CHROME_LANDSCAPE, underAddressBar } from './screen';
 import { dismissToasts } from './toast-helpers';
 
-/** The tablet's screen with Chrome's address bar shown: what the page has, and what `100vh` counts. */
-const CHROME_LANDSCAPE = { width: 1280, page: 665, withoutBar: 761 };
-const SIZES = [
-  { width: 1280, height: 665 },
-  { width: 1280, height: 720 },
-  { width: 1440, height: 900 },
-  { width: 820, height: 1180 },
-  { width: 375, height: 667 },
-] as const;
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES' },
@@ -131,8 +123,7 @@ for (const language of LANGUAGES) {
       await upload(page, note, 'text/plain', Buffer.from(NOTE));
       await upload(page, video, 'video/webm', VIDEO);
       await dismissToasts(page);
-      // Chrome's address bar, as on the tablet: the page is 96 px shorter than what `100vh` counts.
-      const bar = await page.addStyleTag({ content: `body { height: ${CHROME_LANDSCAPE.page}px !important; max-height: ${CHROME_LANDSCAPE.page}px !important; }` });
+      const liftBar = await underAddressBar(page);
 
       let preview = await open(page, note);
       const fit = await fitOf(preview);
@@ -147,16 +138,13 @@ for (const language of LANGUAGES) {
       expectInside(await fitOf(preview), 'showing a video under the address bar');
       await capture(page, `BASE-FILE-PREVIEW-FIT-${language.lang}-1280x665-chrome-video`);
 
-      await bar.evaluate((style) => (style as Element).remove());
-      for (const size of SIZES) {
-        const label = `${size.width}x${size.height}`;
-        await page.setViewportSize(size);
-        await settled(page);
+      await liftBar();
+      await atEachFitSize(page, async (label, height) => {
         const at = await fitOf(preview);
-        expect(at.screen, `the page fills the window at ${label}`).toBe(size.height);
+        expect(at.screen, `the page fills the window at ${label}`).toBe(height);
         expectInside(at, `at ${label}`);
         await capture(page, `BASE-FILE-PREVIEW-FIT-${language.lang}-${label}`);
-      }
+      });
     } finally {
       for (const path of [note, video]) await api(context, A, 'POST', '/files/delete', { path });
       await context.close();

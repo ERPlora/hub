@@ -1,24 +1,16 @@
 // flow: SALE-F01, SALE-F29 — the ticket that opens right after charging, on a low screen. In Chrome on an Android
-// tablet in landscape the address bar takes part of the screen: the page has 665 px of height while `100vh` still
-// counts the 721 px it would have without the bar (hub#2543). The window fits the space the page really has, the
+// tablet in landscape the address bar takes part of the screen: the page has less height than `100vh` counts
+// (hub#2543). The window fits the space the page really has, the
 // ticket scrolls inside it, and its ✕ and its print button stay on view; the same at the fleet's sizes, in English
 // and in Spanish, with a screenshot at each.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, shown } from './helpers';
+import { atEachFitSize, CHROME_LANDSCAPE, underAddressBar } from './screen';
 import { cleanTill, dishForTheTill, stamp, tillIn, TILL_LANGUAGES } from './sale-helpers';
 import type { Product } from './inventory-helpers';
 
 const RUN = stamp();
-/** The tablet's screen with Chrome's address bar shown: what the page has, and what `100vh` counts. */
-const CHROME_LANDSCAPE = { width: 1280, page: 665, withoutBar: 721 };
-const SIZES = [
-  { width: 1280, height: 665 },
-  { width: 1280, height: 720 },
-  { width: 1440, height: 900 },
-  { width: 820, height: 1180 },
-  { width: 375, height: 667 },
-] as const;
 
 interface Box {
   top: number;
@@ -104,8 +96,7 @@ for (const till of TILL_LANGUAGES) {
     const context = await browser.newContext({ baseURL: A, locale: till.locale, viewport: { width: CHROME_LANDSCAPE.width, height: CHROME_LANDSCAPE.withoutBar } });
     const page = await context.newPage();
     await tillIn(page, context, till.lang);
-    // Chrome's address bar, as on the tablet: the page is 56 px shorter than what `100vh` counts.
-    const bar = await page.addStyleTag({ content: `body { height: ${CHROME_LANDSCAPE.page}px !important; max-height: ${CHROME_LANDSCAPE.page}px !important; }` });
+    const liftBar = await underAddressBar(page);
     const modal = await chargeDish(page);
 
     const fit = await fitOf(modal);
@@ -116,15 +107,13 @@ for (const till of TILL_LANGUAGES) {
     expect(end.paper.bottom, 'the end of the ticket is reached above the footer').toBeLessThanOrEqual(end.footer.top + 0.5);
     expectInside(end, 'with the ticket scrolled to its end');
 
-    await bar.evaluate((style) => (style as Element).remove());
-    for (const size of SIZES) {
-      const label = `${size.width}x${size.height}`;
-      await page.setViewportSize(size);
+    await liftBar();
+    await atEachFitSize(page, async (label, height) => {
       const at = await fitOf(modal);
-      expect(at.screen, `the page fills the window at ${label}`).toBe(size.height);
+      expect(at.screen, `the page fills the window at ${label}`).toBe(height);
       expectInside(at, `at ${label}`);
       await capture(page, `SALE-DOCUMENT-FIT-${till.lang}-${label}`);
-    }
+    });
     await context.close();
   });
 }
