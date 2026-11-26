@@ -167,5 +167,7 @@ describe('OverridesList', () => {
     ]);
     await s.filter({ reason: 'sum' });
     expect(name('filters-toggle')).toBe('Filtros de cambios temporales (1 activo)');
+    await s.filter({ reason: 'sum', is_closed: 'false' });
+    expect(name('filters-toggle')).toBe('Filtros de cambios temporales (2 activos)');
   });
 });

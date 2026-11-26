@@ -16,7 +16,7 @@ from base.permissions import ADMINISTER_HUB, VIEW_HOME, access_for
 from base.schemas.approvals import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut
 
 from .access import access_settings, pin_people
-from .people import face_name
+from .people import faces_of
 
 
 # ── People and permissions: a manager's approval ───────────────────────────────────────────────────────────────────
@@ -201,9 +201,5 @@ def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
     if found is None:
         return {"people": [], "pin_length": pin_length}
     op = found[0]
-    people = [
-        {"id": str(credential.pk), "name": face_name(user), "initials": access.initials(face_name(user))}
-        for credential, user in pin_people(ctx.scope.key)
-        if holds(user, ctx.scope, op.permission)
-    ]
-    return {"people": sorted(people, key=lambda person: person["name"].casefold()), "pin_length": pin_length}
+    approvers = [(credential, user) for credential, user in pin_people(ctx.scope.key) if holds(user, ctx.scope, op.permission)]
+    return {"people": faces_of(ctx.scope, approvers), "pin_length": pin_length}

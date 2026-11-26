@@ -475,7 +475,7 @@ or the customer themselves with the code of their ticket.
 Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
-<!-- from WORKBOOK.md sha256:6954ac8ae03c -->
+<!-- from WORKBOOK.md sha256:22172139dd57 -->
 Status: done
 Actor: system, employee, manager, administrator, assistant
 Screen: none
@@ -492,7 +492,11 @@ Steps:
    that sale: its document comes out and the sale is no longer pending. Through the API or the assistant
    it is asked the same way, by the sale's number, of Sales or of Invoicing: in both cases the sale carries
    its document as soon as it is issued.
-4. If it still cannot be done, "Issue now" says why and changes nothing.
+4. If that sale's notice to Invoicing was already in System › Failed events, it leaves it and the bell as
+   soon as its document comes out, without resending or discarding it by hand: the hub takes it as
+   delivered and issues no other document. The same with its void's or each refund's once its rectifying
+   invoice comes out.
+5. If it still cannot be done, "Issue now" says why and changes nothing.
 In: the sale waiting for its document.
 Out: that of INVOICE-F01 or INVOICE-F02, dated the day it is finally issued (the operation date is still
 that of the charge); the sale carries its number from that very moment (announces
@@ -502,7 +506,7 @@ operation; if it still cannot, the void or the refund goes ahead and both docume
 hub retries them and "Issue now" issues them in order (INVOICE-F07, INVOICE-F09). Asking Invoicing for
 the rectifying invoice of that void or that refund also leaves it in Sales at once. Asking again for a
 document that already came out issues no other and uses no number.
-Involved: SALE-F01, SALE-F29
+Involved: SALE-F01, SALE-F29, BASE-F43
 
 ### INVOICE-F07 Void a charged sale that already has its ticket
 <!-- from WORKBOOK.md sha256:f006da9259db -->
@@ -789,7 +793,7 @@ or replaces one of theirs is theirs, so its links open.
 Involved: INVOICE-F03, VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
-<!-- from WORKBOOK.md sha256:9b7526e4de98 -->
+<!-- from WORKBOOK.md sha256:38a88c89f151 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
@@ -816,7 +820,9 @@ service did not open"…). Someone else's, for an employee, is neither printed n
 assistant say "Invoice not found.". Asked of the assistant, it is only done if a system printer takes it; if not,
 its receipt says "Not done, it failed: Print in Invoicing." with the reason, "No system printer takes this invoice:
 open it to print it or save it as PDF." or, if its record cannot be read, "Its VeriFactu record could not be read,
-and an invoice never prints without its QR.".
+and an invoice never prints without its QR.". If the printer takes it but no device that is on prints its queue, the
+assistant says it waits in that printer's queue and will come out when a device set up to print it does, never that it
+has printed it.
 Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Mark an invoice as paid
