@@ -2,6 +2,9 @@
 erased and a professional who leaves.
 """
 
+from dataclasses import replace
+
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from live.context import OperationContext
 from live.errors import Conflict
@@ -36,6 +39,16 @@ from apps.appointment.services.writes import (
 from apps.customer.services.writes import lock_customers
 
 
+def _done_by(ctx: OperationContext, actor: str) -> OperationContext:
+    """The reaction's context, naming in the history whoever did at the till what it answers as every other line names
+    them: a person by their account; anyone else (an API key, the platform) as the outbox keeps them."""
+    if not actor:
+        return ctx
+    users = get_user_model()
+    person = users.objects.filter(**{users.USERNAME_FIELD: actor}).first()
+    return replace(ctx, actor=person or actor)
+
+
 @operation(
     "appointment.appointment.mark_charged",
     kind="command",
@@ -68,10 +81,11 @@ def mark_charged(ctx: OperationContext, data: SaleFromAppointmentIn) -> dict:
     if completes:
         appointment.status = S.COMPLETED
     appointment.save()
-    _history(ctx, appointment, A.CHARGED, new={"sale_id": str(data.sale_id)})
+    by = _done_by(ctx, data.actor)
+    _history(by, appointment, A.CHARGED, new={"sale_id": str(data.sale_id)})
     _event(ctx, events.APPOINTMENT_CHARGED, appointment, sale_id=str(data.sale_id))
     if completes:
-        _history(ctx, appointment, A.COMPLETED)
+        _history(by, appointment, A.COMPLETED)
         _event(ctx, events.APPOINTMENT_COMPLETED, appointment)
     return {"changed": 1}
 
@@ -88,6 +102,7 @@ def mark_charged(ctx: OperationContext, data: SaleFromAppointmentIn) -> dict:
     },
 )
 def unmark_charged(ctx: OperationContext, data: SaleVoidedIn) -> dict:
+    by = _done_by(ctx, data.actor)
     changed = 0
     for appointment in (
         Appointment.objects.select_for_update()
@@ -100,7 +115,7 @@ def unmark_charged(ctx: OperationContext, data: SaleVoidedIn) -> dict:
         appointment.save(
             update_fields=["sale_id", "charged_at", "order_id", "updated_at"]
         )
-        _history(ctx, appointment, A.UNCHARGED, old={"sale_id": str(data.sale_id)})
+        _history(by, appointment, A.UNCHARGED, old={"sale_id": str(data.sale_id)})
         _event(
             ctx, events.APPOINTMENT_UNCHARGED, appointment, sale_id=str(data.sale_id)
         )
