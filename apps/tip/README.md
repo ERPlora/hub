@@ -4,14 +4,19 @@ La propina que el cliente deja al pagar, con tarjeta o en efectivo, guardada apa
 La propina no es una venta: no lleva IVA, no cambia el tique y no llega a la AEAT. La de efectivo entra en el cajón y
 la caja la enseña en su propia línea.
 
-- **Estado**: parcial, fuera de la tienda y de las plantillas hasta que tenga sus pantallas. Hoy una propina se anota, se ajusta y se anula por la API y el asistente, y sale aparte en la
-  caja (TIP-F01, F03 a F06 en `parcial`); faltan las pantallas, el paso del cobro, el informe, «Mis propinas» y el
-  reparto.
+- **Estado**: parcial, en la tienda y en las plantillas de restaurante y peluquería. La hoja Cobro propone la propina y
+  la anota con su venta en un cobro de una sola forma de pago; la pantalla **Propinas** anota, ajusta, anula y echa al
+  bote, y **Ajustes** guarda las sugerencias (TIP-F01, F03, F05 y F06 hechos); faltan la propina de cada cobro al
+  repartir, «Quédese el cambio», el informe, «Mis propinas» y el reparto.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta «Para quien
   lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 
 ## Qué hace hoy
 
+- **El paso del cobro** (F02): la fila «Propina» de la hoja Cobro de Ventas (`frontend/components/TipStep.vue`, que
+  Ventas monta por su nombre porque `apps.py` lo declara en `checkout`): «Sin propina», las tres sugerencias de la forma
+  de pago con su importe (`tip.suggestion.get`, sobre el total antes de descuentos) y «Otra cantidad». Cobrada la
+  venta, la anota con ella (`tip.tip.add`) con la clave del intento del cobro y la posición de su cobro.
 - **Ajustes** (F01): pedir propina al cobrar (apagado de fábrica), la sugerencia marcada, «Otra cantidad» y tres
   sugerencias por forma de pago de Ventas, en porcentaje o en importe (3 %, 5 % y 10 % de fábrica).
 - **Anotar** (F03 a F05): una propina sobre su venta, por su id o su número, con su forma de pago, para quien atendió
@@ -23,15 +28,19 @@ la caja la enseña en su propia línea.
   Anular una venta o devolverla entera anula su propina sola.
 - **La lista y una propina**: las más nuevas primero, con búsqueda por venta o persona y filtros; una propina se lee
   por su id o por el número de su venta (la activa). Un empleado ve solo las suyas.
+- **Las pantallas** (`frontend/`): **Propinas** (`pages/TipsPage.vue`: el periodo, la tabla o las tarjetas, «Anotar
+  propina», «Ajustar» y «Anular») y **Ajustes** (`pages/SettingsPage.vue`), las dos en el menú de quien gestiona
+  (`tip.manage`); los cambios de los ajustes, solo con `tip.manage_settings`.
 
 ## Ficha
 
 | Qué | Valor |
 |---|---|
 | `LiveAppConfig` | `kind = "app"`, icono `ion:wallet-outline`, categoría `people`, gratuita (`premium = False`) |
-| Verticales y tienda | ninguna vertical y fuera de la tienda (`listed = False`) hasta que tenga sus pantallas: entonces, `hair_salon` y `restaurant` |
+| Verticales y tienda | `hair_salon` y `restaurant`, en la tienda |
 | `requires` | `sale` (la venta y su forma de pago), `cash_register` (el cajón) y `staff` (de quién es) |
-| Operaciones | 3 consultas (`queries.py`) y 6 acciones (`services/`), todas con `ai=`; 7 rutas en `/api/tip/…` (sin ruta: `tip.sale.void` y `tip.sale.refund`, las reacciones a Ventas) |
+| Operaciones | 4 consultas (`queries.py`) y 6 acciones (`services/`), todas con `ai=`; 8 rutas en `/api/tip/…` (sin ruta: `tip.sale.void` y `tip.sale.refund`, las reacciones a Ventas) |
+| Paso del cobro | `checkout = [CheckoutStep(key="tip", component="TipStep", permission="tip.add_tip")]` |
 | Eventos | 4, `tip.settings.updated` y `tip.tip.{added,adjusted,voided}` (`events.py`); reacciona a `sale.sale.voided` y `sale.sale.refunded` |
 | Tarea programada | ninguna |
 | Migraciones | `0001_initial` |

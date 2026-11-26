@@ -29,6 +29,8 @@ def test_each_query_and_its_events():
         "tip.tip.get": TIPS,
         # Its payment methods are Sales': a new one or one switched off changes what can be set.
         "tip.settings.get": ["tip.settings.updated", "sale.payment_method.created", "sale.settings.updated"],
+        # What the charge proposes is the settings' suggestions of a payment method.
+        "tip.suggestion.get": ["tip.settings.updated", "sale.payment_method.created", "sale.settings.updated"],
     }
 
 

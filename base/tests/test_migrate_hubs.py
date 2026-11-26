@@ -40,7 +40,7 @@ from base.tenancy.tests.hubs import (  # noqa: F401 (fixtures)
     same_server_by_another_name,
     template_name,
 )
-from control.models import Hub
+from control.models.hubs import Hub
 
 PLATFORM = ("base", "live")
 #: The deployment's own templates, kept before the ``small`` fixture replaces them.
@@ -494,7 +494,7 @@ def switch(db):
     the test, the switch not frozen and the events it recorded gone, so no later test finds the platform frozen."""
     from types import SimpleNamespace
 
-    from control.models import Freeze
+    from control.models.freeze import Freeze
     from control.schemas import FreezeIn
     from control.services.freeze import freeze_set
     from live.context import system_context

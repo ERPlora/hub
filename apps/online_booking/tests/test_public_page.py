@@ -15,7 +15,7 @@ from apps.online_booking.schemas import PublicBookIn
 from base.tenancy.context import use_hub
 from base.tests.test_public_door import B_HOST, TOKEN, book_here, door
 from config.api import api
-from control.models import Hub
+from control.models.hubs import Hub
 
 from .conftest import HUB_DB, A, B, booking_data, make_page, no_rule_of_hours, open_salon, public
 

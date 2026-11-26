@@ -769,7 +769,7 @@ already sales on screen, they stay under the notice.
 Involved: SALE-F28
 
 ### BASE-F10 See in the bell the notices between apps that were not delivered
-<!-- from WORKBOOK.md sha256:9dc8306fec6e -->
+<!-- from WORKBOOK.md sha256:fca556381650 -->
 Status: done
 Actor: owner, administrator
 Screen: The bell
@@ -779,7 +779,7 @@ Steps:
      with "An app did not receive what another one sent it: what it had to do stays undone until you send it again.",
      comes in as a card and settles in it.
   3. "Review the events" opens "System" on "Failed events", where they are resent or discarded (BASE-F43).
-  4. When none is left, the notice disappears.
+  4. When none is left (resent, discarded or already done another way), the notice disappears.
 In: how many notices of this business were left undelivered, only for whoever runs the business.
 Out: nothing.
 If it fails: an employee or a manager does not see the notice. If it cannot ask, the bell keeps what it
@@ -1268,7 +1268,7 @@ this business. Upload the file again in a minute to bring its data.".
 Involved: BASE-F22, INVENTORY-F01, INVENTORY-F12, INVENTORY-F26, INVENTORY-F36, VERIFACTU-F01, BASE-F32
 
 ### BASE-F32 Read the import report
-<!-- from WORKBOOK.md sha256:65b9b3c18b17 -->
+<!-- from WORKBOOK.md sha256:d556b3ffc787 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Import)
@@ -1278,8 +1278,9 @@ Steps:
      comes in by itself as soon as its apps are ready. You can leave this screen.", with nothing to tap.
   2. One row per app with its label: "Applied", "You had it already", "Applied in part", "Failed", "Nothing
      to copy", "Left out", "App off", "Not in this business", "Not chosen", "Being set up" or "Could not be set up".
-     Below, for each part, "12 created · 3 already there · 2 failed" and, of what failed, its
-     name and the reason.
+     "You had it already" shows only when everything the app brings was already in the business; an app it brings
+     nothing of, like the ones the template only turns on, says "Nothing to copy". Below, for each part, "12 created
+     · 3 already there · 2 failed" and, of what failed, its name and the reason.
   3. What was left out on purpose shows in "Left out on purpose".
   4. "See the templates" goes back to the catalogue; "Go to Home" leads to the Home.
   5. When the app is ready, its part loads by itself and the report gets up to date without reloading, whether this
@@ -1582,7 +1583,7 @@ If it fails: "The log could not be loaded. Check the connection and try again." 
 Involved: none
 
 ### BASE-F43 See the failed events
-<!-- from WORKBOOK.md sha256:7b01ec3e1db1 -->
+<!-- from WORKBOOK.md sha256:75c3f078c4a3 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1596,7 +1597,9 @@ Steps:
      "Discard". On top, "Resend all". If the app it was for is no longer on, the card says it cannot be resent
      until it is turned on, with no "Resend".
   4. The 100 most recent show; with more, the screen says how many show out of how many.
-  5. The list and the bell get up to date by themselves when a notice fails, is resent or is discarded.
+  5. The list and the bell get up to date by themselves when a notice fails, is resent or is discarded, and also when
+     the app it was for does what it asked another way: if Invoicing issues a sale's document with "Issue now",
+     that sale's notice goes by itself.
   6. With none: "All in order" — "No failed events. The queue of events lives in the database: a restart never
      loses it.".
 In: the notices between apps of this business that ran out of retries, never another's.
@@ -1826,14 +1829,16 @@ entering: the first one is chosen in **My profile**.
 Involved: BASE-F52, BASE-F65
 
 ### BASE-F55 Enter with a PIN
-<!-- from WORKBOOK.md sha256:7c8ec3f06d4d -->
+<!-- from WORKBOOK.md sha256:c0bec9cbce51 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
 Steps:
   1. On a shared device of a business that asks for a PIN, **Access** opens on the "PIN" tab: "Enter your PIN",
      "…or pass your badge: no need to choose your name first." and "Choose your user" with a face per person
-     (initials and name; never their email). With a single person, they are already chosen.
+     (initials and name; never their email). The name is the one of their profile in this business; without it,
+     the one of their linked Staff record (STAFF-F03), and if they have none either, their account's. With a single
+     person, they are already chosen.
   2. They tap their name: "PIN of {name}" and the keypad show, with as many circles as the business's PIN has
      digits. The arrow ("Change user") goes back to the faces. The keypad shows whole, down to the 0 and the erase
      key, without scrolling the screen: on a tablet in landscape (in its browser too), a laptop or a low phone, the
@@ -1851,7 +1856,7 @@ which nobody ever entered with an account, or that an administrator removed: "Th
 PIN yet. Sign in once here with your account and from then on it will.". Without a connection, "Could not enter.
 Check the connection and try again."; if who works here cannot be read, "Could not load the PIN pad. You can
 still enter with your account.".
-Involved: BASE-F54, BASE-F67
+Involved: BASE-F54, BASE-F67, STAFF-F03
 
 ### BASE-F56 Enter by passing the badge
 <!-- from WORKBOOK.md sha256:02f7b0bae2a8 -->
@@ -2006,7 +2011,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:f5fff0f123b1 -->
+<!-- from WORKBOOK.md sha256:5fca4faf21e2 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2023,13 +2028,15 @@ Steps:
      and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
      (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
      Home.
-  5. If they ask the assistant for it ("switch me to English"), the card says only what they asked for ("English";
-     what goes back to the business's, by its name: "The business's language"). On confirming it only that changes, and
+  5. If they ask the assistant for it ("switch me to English"), the card says only what they asked for, with the name
+     of its datum ("Language: English", "Interface scale: 110%"; what goes back to the business's, by its name: "The
+     business's language"). On confirming it only that changes, and
      the theme, the palette and the size they did not name stay as they were. The new language applies just as from the
      selector: the open application switches to it without reloading, and stays in it on reloading or opening it again
      on this device.
 In: the profile of whoever has the session.
-Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
+Out: their name in this business (the one in the side menu, on the faces and in "Devices"; without it, the side menu and the
+faces say the one of their linked Staff record, STAFF-F03), their photo, their language and their
 appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
 business’s language", they enter with a PIN in the business's and with their account in their erplora.com
 account's (BASE-F51). The email is only for contact: it does not change the erplora.com account.
@@ -2941,7 +2948,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:2ac115069559 -->
+<!-- from WORKBOOK.md sha256:d2fdb23a0674 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2953,10 +2960,11 @@ Steps:
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
      for example "Create in Services: Haircut · Price: €15.00 · Duration (minutes): 30". The first, what the action
      touches (its record or its name), shows by its value alone when it reads on its own (a name, a record, a date or
-     records by their names); each datum after it, and a figure, an amount or a yes or a no in first place, carries the
-     name of its datum in front, the same as on its screen, because alone it does not say what it is: "Change in
-     Services: Highlights · Minimum price: €65.00", never "Highlights · €65.00", which reads the same as its price;
-     "Create in Sales & POS: Misc · Tax category: Product — generic · 21% · Position: 0"; "Open in Tables: Table: 4 ·
+     records by their names); each datum after it, and a figure, an amount, a yes or a no or a value of a closed list in
+     first place, carries the name of its datum in front, the same as on its screen, because alone it does not say what
+     it is: "Change in Services: Highlights · Minimum price: €65.00", never "Highlights · €65.00", which reads the same
+     as its price; "Change in My profile: Interface scale: 110%" and "Change in Time clock: Allowed radius (m): 50 m",
+     never a bare "110%" or "50 m", which do not say what changes; "Create in Sales & POS: Misc · Tax category: Product — generic · 21% · Position: 0"; "Open in Tables: Table: 4 ·
      Guests: 3". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
      understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
@@ -3898,7 +3906,7 @@ If the notices cannot be read, the bell keeps what it last knew, as in BASE-F10.
 Involved: BASE-F10, BASE-F11, BILLING-F16 (erplora.com), BILLING-F17 (erplora.com), HUBS-F31 (erplora.com)
 
 ### BASE-F118 Open a screen without permission: "No access" and whom to ask
-<!-- from WORKBOOK.md sha256:6aed37103d8d -->
+<!-- from WORKBOOK.md sha256:f2f551451108 -->
 Status: done
 Actor: manager, employee
 Screen: No access
@@ -3906,7 +3914,8 @@ Steps:
   1. They open by its address (a link, the history, a tab left open or typing it) a screen their role does not open:
      an entry of an app that does not show in their menu, such as Taxes' "Rules" for an employee, one of the platform
      that does not show in their side menu, such as "System" for whoever does not run the business, or any screen
-     that hangs from them.
+     that hangs from them. Also another person's page in **Employees** for whoever does not run the business, even
+     when they reach it because the till switched user with the page open (BASE-F60).
   2. Instead of the screen, in the same address, "No access" shows: "You do not have access to this screen" — "Your
      role in this business does not open it.". While it looks for whom to ask: "Looking for who can give you access…".
   3. Below, "Ask one of these people to give you access:" and the name of each one, with their avatar: whoever can

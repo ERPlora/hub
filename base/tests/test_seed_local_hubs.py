@@ -51,7 +51,7 @@ def test_refuses_while_some_app_cannot_live_in_a_hub_s_own_database():
 
 @pytest.mark.usefixtures("fresh")
 def test_the_operation_names_each_local_hub_s_own_database_and_leaves_it_due():
-    from control.models import HubDue
+    from control.models.hubs import HubDue
 
     from base.tenancy import connections as tenancy_connections
     from base.tenancy import names

@@ -13,7 +13,7 @@ from base.models.scheduler import TaskSchedule
 from base.queries import due_work
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import Cluster, Hub, HubDue
+from control.models.hubs import Cluster, Hub, HubDue
 
 pytestmark = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 

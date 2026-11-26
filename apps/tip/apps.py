@@ -2,7 +2,7 @@
 belongs to, and entered in the open drawer as its own line (WORKBOOK.md)."""
 
 from django.utils.translation import gettext_lazy as _
-from live.meta import Category, LiveAppConfig
+from live.meta import Category, CheckoutStep, LiveAppConfig, Nav
 
 
 class TipConfig(LiveAppConfig):
@@ -21,10 +21,7 @@ class TipConfig(LiveAppConfig):
         "ticket. A tip in cash enters the drawer and one by card shows apart in the cash register, a tip can be "
         "corrected or voided with its reason, and voiding or refunding a sale voids its tip by itself."
     )
-    # Out of the store and of the restaurant and hair salon templates until its screens exist: turned on, it would
-    # offer nothing but the API and the assistant.
-    verticals = []
-    listed = False
+    verticals = ["hair_salon", "restaurant"]
     # A tip goes with its sale and its payment method (Sales), enters the open drawer (Cash register) and belongs to a
     # member of the team (Staff).
     requires = ["sale", "cash_register", "staff"]
@@ -33,6 +30,8 @@ class TipConfig(LiveAppConfig):
     # «gratuity» is a tip (tip.tip).
     assistant_synonyms = (("propina", "propinas", "bote", "gratuity", "tip"),)
     assistant_settings = ("tip.settings.get",)
+    # The «Tip» row of the charge sheet, which Sales mounts without knowing Tips (frontend/components/TipStep.vue).
+    checkout = [CheckoutStep(key="tip", component="TipStep", permission="tip.add_tip")]
     permissions = {
         "tip.view_tip": _("View tips (an employee, their own)"),
         "tip.add_tip": _("Record tips"),
@@ -46,3 +45,9 @@ class TipConfig(LiveAppConfig):
         "hub_manager": ["tip.view_tip", "tip.add_tip", "tip.manage"],
         "hub_employee": ["tip.view_tip", "tip.add_tip"],
     }
+    # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =` as the
+    # module's own icon. Whoever only records tips opens neither entry; a manager reads the settings blocked.
+    navigation = [
+        Nav("tips", _("Tips"), "ion:wallet-outline", "/tip/tips", permission="tip.manage"),
+        Nav("settings", _("Settings"), "ion:settings-outline", "/tip/settings", permission="tip.manage"),
+    ]

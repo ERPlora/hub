@@ -21,7 +21,7 @@ from base.models import Membership
 from base.permissions import access_for
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from control.models import Hub
+from control.models.hubs import Hub
 
 pytestmark = [pytest.mark.django_db(databases=hubs.HUB_DATABASES)]
 

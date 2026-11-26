@@ -25,7 +25,7 @@ from base.registry import REGISTRY_SCOPE
 from base.tenancy import credentials
 from base.tenancy.connections import hub_alias
 from control import queries
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 from control.schemas import ClusterSizesIn
 
 pytestmark = pytest.mark.django_db

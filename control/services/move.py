@@ -13,7 +13,7 @@ from live.outbox import record_event
 
 from base.business import zone_of
 from control import events, queries
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 from control.schemas import MOVE_AT_NIGHT, HubIdIn, HubMoveIn, HubMoveOut
 from control.services.actor import platform_admin_only
 from control.services.clusters import _locked, living_hubs

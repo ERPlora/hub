@@ -237,8 +237,8 @@ describe('ReceiptPaper', () => {
         tendered_total: 1250,
         change_total: 0,
         payments: [
-          { id: 'p1', position: 1, method_id: 'm2', method_name: 'Tarjeta', method_type: 'card', amount: 1000, tendered: 1000, change: 0, reference: '' },
-          { id: 'p2', position: 2, method_id: 'm3', method_name: 'Bizum', method_type: 'other', amount: 250, tendered: 250, change: 0, reference: '' },
+          { id: 'p1', position: 1, method_id: 'm2', method_name: 'Tarjeta', method_type: 'card', amount: 1000, tendered: 1000, change: 0, reference: '', extra: 0, extra_label: '' },
+          { id: 'p2', position: 2, method_id: 'm3', method_name: 'Bizum', method_type: 'other', amount: 250, tendered: 250, change: 0, reference: '', extra: 0, extra_label: '' },
         ],
       }),
       settings: SETTINGS,

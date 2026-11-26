@@ -29,4 +29,5 @@ Para qué: dibujar la sala con sus zonas y mesas, repartir la carta por estacion
 14. CASH_REGISTER-F02 — el cajón de la barra.
 15. ONLINE_ORDER-F01 — con Pedidos online encendida, los QR que faltan de golpe y, después, el de la mesa 7 regenerado.
 16. ONLINE_ORDER-F02 — la hoja con el QR de cada mesa para recortar, y la de la mesa 7 sola.
-17. TABLE-F09 — la sala, lista para el servicio.
+17. ONLINE_ORDER-F03 — en un móvil sin sesión, el QR nuevo de la mesa 7 abre su carta y un plato; el viejo, ya no.
+18. TABLE-F09 — la sala, lista para el servicio.

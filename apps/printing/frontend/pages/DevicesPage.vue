@@ -1,14 +1,17 @@
 <script setup lang="ts">
 // Printing → Devices (PRINTING-F18; WORKBOOK «Pantallas · Dispositivos»; the old hub's print hosts):
 // only the devices set up here print the queue, with anybody's session. The list, live, by name — Name (this
-// device marked), Printers, Last seen and Set up by — and what the device the page runs on does. Whoever
-// sets up the printers sets this device up («Print from this device»), edits any device and retires one after
-// asking; everybody else reads. A device's own id is never shown: the server marks this one.
+// device marked), Printers, Last seen and Set up by — and what the device the page runs on does. Inside the ERPlora
+// app, whoever sets up the printers sets this device up («Print from this device»); a browser reaches no printer
+// (`PrintHost` drains nothing there), so it is never offered and the note says where to get the app. From either,
+// they edit any device and retire one after asking; everybody else reads. A device's own id is never shown: the
+// server marks this one.
 import { DataTable, type DataTableAction, type DataTableColumn, EmptyState, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
+import { AppPage, nativeBridge, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
 import { computed, shallowRef } from 'vue';
 
+import AppDownloadButtons from '../components/AppDownloadButtons.vue';
 import DeviceModal from '../components/DeviceModal.vue';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
@@ -16,11 +19,14 @@ import { waited } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { DeviceOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+import '../../../../base/frontend/settings.css';
 
 const tabs = useAppTabs('printing');
 
 const session = useSession();
 const canManage = computed(() => session.can('printing.manage_settings'));
+/** Only the ERPlora app's bridge reaches a printer: the same test `PrintHost` makes before it prints. */
+const printsHere = nativeBridge() !== null;
 const t = useT();
 const { confirm } = useConfirm();
 /** «3 min ago» turns by itself, without another result. */
@@ -146,7 +152,17 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
       />
       <template v-else>
         <InlineFeedback
-          v-if="list.status.value !== 'loading' && !tableError"
+          v-if="list.status.value !== 'loading' && !tableError && !printsHere"
+          tone="warning"
+          data-testid="printing-devices-this"
+        >
+          <div class="settings-card__field">
+            <span>{{ $t('printing.devices.browser') }}</span>
+            <AppDownloadButtons testid="printing-devices-download" />
+          </div>
+        </InlineFeedback>
+        <InlineFeedback
+          v-else-if="list.status.value !== 'loading' && !tableError"
           :tone="thisDevice ? 'success' : 'info'"
           :icon="thisDevice ? 'checkmark-circle-outline' : 'information-circle-outline'"
           data-testid="printing-devices-this"
@@ -166,7 +182,7 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
           :card-icon="() => 'lucide:smartphone'"
           :loading="list.status.value === 'loading'"
           :error="tableError"
-          :addable="canManage && !thisDevice"
+          :addable="canManage && printsHere && !thisDevice"
           :actions="actions"
           :max-inline-actions="2"
           :entity-label="{ one: $t('printing.devices.entity.one'), many: $t('printing.devices.entity.many') }"

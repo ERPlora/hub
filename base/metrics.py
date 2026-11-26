@@ -47,7 +47,7 @@ from base.services import provisioning
 from base.tenancy.connections import close_hub_aliases
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.limits import HubBusy
-from control.models import Hub
+from control.models.hubs import Hub
 from control.queries import registry_health
 
 logger = logging.getLogger(__name__)

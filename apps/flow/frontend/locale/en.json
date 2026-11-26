@@ -1103,6 +1103,8 @@
       "online_booking__settings__get": "Read the online booking settings",
       "online_booking__settings__update": "Change the online booking settings",
       "online_booking__settings__upload_logo": "Upload the booking page's logo",
+      "online_order__public__menu": "Read a table's menu",
+      "online_order__public__options": "Read the options of a dish of a table's menu",
       "online_order__qr_code__list": "Look for the tables' QR codes",
       "payment__method__activate": "Turn on a payment method",
       "payment__method__create": "Create a payment method",
@@ -1425,7 +1427,8 @@
       "tip__tip__add": "Record a tip",
       "tip__tip__update": "Adjust a tip",
       "tip__tip__void": "Void a tip",
-      "tip__tip__get": "Look at a tip"
+      "tip__tip__get": "Look at a tip",
+      "tip__suggestion__get": "Read the tips a charge suggests"
     },
     "facts": {
       "created": "created",
@@ -1463,6 +1466,7 @@
       "send": "Send"
     },
     "fields": {
+      "combos": "Menus",
       "dish_id": "Dish",
       "modifier_id": "Modifier",
       "quick_note_id": "Quick note",

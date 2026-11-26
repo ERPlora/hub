@@ -12,17 +12,10 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
-from apps.service.models import (
-    Category,
-    Assignment,
-    Grant,
-    GrantAdjustment,
-    Package,
-    PackageItem,
-    Redemption,
-    Service,
-    ServiceSettings,
-)
+from apps.service.models.catalog import Category, Assignment, Service
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
+from apps.service.models.packages import Package, PackageItem
+from apps.service.models.settings import ServiceSettings
 from apps.service.schemas.assignments import AssignmentPatchIn, MemberReleaseIn
 from apps.service.schemas.categories import CategoryPatchIn
 from apps.service.schemas.customer_reactions import ReassignIn

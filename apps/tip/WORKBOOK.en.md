@@ -90,12 +90,12 @@ Tips opens from the **Tips** menu and has four entries: **Tips**, **Distribution
 **Settings**. Whoever cannot manage sees only **My tips**.
 
 ### "Tip" step in the Charge
-<!-- from WORKBOOK.md sha256:dcaa00b16a69 -->
+<!-- from WORKBOOK.md sha256:582768602156 -->
 Inside the Sales **Charge** sheet (SALE-F39), only with tips turned on: the "Tip" row with
 the three suggestions of the chosen payment method ("3 %", "5 %", "10 %", each with its amount below),
 "Other amount" and "No tip"; the one marked by default is "No tip". Below, "For <name>" (whoever
 serves). In cash, when what is tendered exceeds the total, the "Keep the change" button. With a tip
-set, the big amount says "<total> + <tip> tip".
+set, "+ <tip> tip" shows below the big amount.
 
 ### Tips
 <!-- from WORKBOOK.md sha256:328f530e757a -->
@@ -138,16 +138,16 @@ an amount), which one comes marked, "Allow other amount" and "Save".
 | No permission | What they cannot do does not show; if they get there another way, "You do not have permission". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:6a1beadd61ad -->
+<!-- from WORKBOOK.md sha256:fe772bcb6b44 -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
-| TIP-F01 | Set up tips | common | partial — the Settings screen is missing |
-| TIP-F02 | Suggest the tip when charging | common | not done |
-| TIP-F03 | Record a card tip | common | partial — the Charge and the Tips screen are missing |
-| TIP-F04 | Record a cash tip | common | partial — the Charge and the Tips screen are missing |
-| TIP-F05 | Put a tip with no ticket into the pool | restaurant | partial — the Tips screen is missing |
-| TIP-F06 | Adjust or void a tip | common | partial — the Tips screen is missing |
+| TIP-F01 | Set up tips | common | done |
+| TIP-F02 | Suggest the tip when charging | common | partial — "For <name>" and the tip of each payment when splitting are missing |
+| TIP-F03 | Record a card tip | common | done |
+| TIP-F04 | Record a cash tip | common | partial — "Keep the change" at the Charge is missing |
+| TIP-F05 | Put a tip with no ticket into the pool | restaurant | done |
+| TIP-F06 | Adjust or void a tip | common | done |
 | TIP-F07 | Declare the cash tips when closing the shift | restaurant | not done |
 | TIP-F08 | Define the distribution | restaurant | not done |
 | TIP-F09 | Share with another role (tip-out) | restaurant | not done |
@@ -158,8 +158,8 @@ an amount), which one comes marked, "Allow other amount" and "Save".
 | TIP-F14 | See my tips | common | not done |
 
 ### TIP-F01 Set up tips
-<!-- from WORKBOOK.md sha256:92522ec6f4ea -->
-Status: partial — the settings are read and saved through the API and the assistant; the Settings screen is missing (hub#1498)
+<!-- from WORKBOOK.md sha256:4fe80a656a28 -->
+Status: done
 Vertical: common
 Actor: owner, administrator, assistant
 Screen: Settings
@@ -178,8 +178,10 @@ the screen shows locked with "You do not have permission to change these setting
 Involved: SALE-F37
 
 ### TIP-F02 Suggest the tip when charging
-<!-- from WORKBOOK.md sha256:b6ac4ccc4a7d -->
-Status: not done — Tips does not declare its step on the Charge sheet yet (hub#1498, hub#1500)
+<!-- from WORKBOOK.md sha256:8e1578e7d694 -->
+Status: partial — the Charge sheet shows the "Tip" row with the payment method's suggestions, charges the tip with the
+sale in a charge with a single payment method and records it with its sale, only once even if it is retried; "For <name>"
+and the tip of each payment when splitting the charge, which today is charged with no tip, are missing (hub#1500)
 Vertical: common
 Actor: employee, manager
 Screen: Charge
@@ -202,9 +204,8 @@ assigned when it is adjusted (TIP-F06).
 Involved: SALE-F39, SALE-F16, CASH_REGISTER-F18
 
 ### TIP-F03 Record a card tip
-<!-- from WORKBOOK.md sha256:d36d271cbbfc -->
-Status: partial — a card tip is recorded on its sale through the API and the assistant and shows apart in the cash
-register; recording it at the Charge and on the Tips screen is missing (hub#1498, hub#1500)
+<!-- from WORKBOOK.md sha256:3e6e36fe28d4 -->
+Status: done
 Vertical: common
 Actor: employee, manager, assistant
 Screen: Charge, Tips
@@ -217,14 +218,14 @@ Steps:
 In: the sale and what the card terminal charged on top (ERPlora does not talk to the card terminal).
 Out: the card tip. In the open cash session it shows as "Tips by card", without touching the expected cash
 (CASH_REGISTER-F18).
-If it fails: recording it on a voided or fully refunded sale, "That sale is voided: it does not accept a tip."; on
-a sale of a day already distributed, "That day is already distributed: reopen it to add tips." (TIP-F11).
+If it fails: recording it on a voided or fully refunded sale, "That sale is voided: it does not accept a tip.".
 Involved: CASH_REGISTER-F18
 
 ### TIP-F04 Record a cash tip
-<!-- from WORKBOOK.md sha256:9b9c6a93331b -->
-Status: partial — a cash tip is recorded on its sale through the API and the assistant and goes into the drawer;
-"Keep the change" at the Charge and the Tips screen are missing (hub#1498, hub#1500)
+<!-- from WORKBOOK.md sha256:48b211427721 -->
+Status: partial — a cash tip is recorded at the Charge (what is tendered covers the bill and the tip, and the change
+takes both off) and, on its sale, on the Tips screen, and goes into the drawer; at the Charge, "Keep the change" and its
+own notice when what is tendered does not cover the total and the tip are missing (hub#1500)
 Vertical: common
 Actor: employee, manager, assistant
 Screen: Charge, Tips
@@ -243,9 +244,8 @@ tendered does not cover the total and the tip".
 Involved: SALE-F01, CASH_REGISTER-F18
 
 ### TIP-F05 Put a tip with no ticket into the pool
-<!-- from WORKBOOK.md sha256:e918cceb2aac -->
-Status: partial — the pool is recorded through the API and the assistant and goes into the drawer; the Tips screen is
-missing (hub#1498)
+<!-- from WORKBOOK.md sha256:14213dd6183c -->
+Status: done
 Vertical: restaurant
 Actor: manager
 Screen: Tips
@@ -256,13 +256,13 @@ Steps:
 In: the amount in cash.
 Out: a tip with no sale and no person, of the open shift, which goes into the drawer (CASH_REGISTER-F18) and is
 shared out with the day's rules (TIP-F08); without rules, it stays "Unassigned" until it is assigned (TIP-F06).
-If it fails: with the cash register closed, the same notice as in TIP-F04.
+If it fails: with "Turn on the cash register" on and the cash register closed, "The cash register is closed: open a
+cash register session to record a tip in cash.".
 Involved: TIP-F08, CASH_REGISTER-F18
 
 ### TIP-F06 Adjust or void a tip
-<!-- from WORKBOOK.md sha256:be1e67ef0a75 -->
-Status: partial — adjusting and voiding go through the API and the assistant, and voiding or refunding the whole sale
-voids its tip by itself; the Tips screen is missing (hub#1498)
+<!-- from WORKBOOK.md sha256:21bfe796673b -->
+Status: done
 Vertical: common
 Actor: manager, assistant
 Screen: Tips
@@ -275,8 +275,8 @@ In: the tip, the new amount or person and the reason; the voids and refunds of S
 Out: the tip adjusted or voided, with who, when and why (announces: `tip.tip.adjusted`, `tip.tip.voided`).
 In the open cash session, the difference comes in or goes out in its payment method (CASH_REGISTER-F18): a session
 already closed is never touched.
-If it fails: with no reason, "Write the reason."; with the day already distributed, "That day is already
-distributed: reopen it to change its tips.".
+If it fails: with no reason, "Write the reason."; a tip already voided does not change: "That tip is voided: it no
+longer changes.".
 Involved: SALE-F30, SALE-F31, CASH_REGISTER-F18
 
 ### TIP-F07 Declare the cash tips when closing the shift
@@ -348,7 +348,7 @@ If it fails: a day with no tips, "That day has no tips.".
 Involved: TIP-F08
 
 ### TIP-F11 Approve the distribution of a day or service
-<!-- from WORKBOOK.md sha256:03c076fd3380 -->
+<!-- from WORKBOOK.md sha256:64ee343e4e83 -->
 Status: not done — it comes with the distribution (hub#1501)
 Vertical: restaurant
 Actor: manager, administrator, assistant
@@ -358,7 +358,9 @@ Steps:
 2. To correct something of an approved day, press "Reopen", correct it and approve it again.
 In: the day's tips, declarations, sales and clock-ins and the rules in force that day.
 Out: each person's share, fixed (announces: `tip.pool.settled`, `tip.pool.reopened`). Without rules, each tip
-already belongs to whoever served and there is nothing to approve.
+already belongs to whoever served and there is nothing to approve. While the day is approved, its tips are not
+recorded, adjusted or voided: "That day is already distributed: reopen it to add tips." and "That day is already
+distributed: reopen it to change its tips.".
 If it fails: with a clock-in of that day open or pending review, "Some working days of that day are not closed or
 are pending review: correct them in Time clock before approving." (ATTENDANCE-F05, ATTENDANCE-F08); a day with tips
 already paid out is not reopened: "That day already has tips paid out.".

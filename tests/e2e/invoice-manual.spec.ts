@@ -87,7 +87,16 @@ test('INVOICE-F21: without the issuer the action center says so once; its button
     await page.waitForURL(/\/invoice\/issuer$/);
     const form = shown(page);
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toBeVisible();
+    // Saved with the required fields empty, each says it is required, and the message goes as it is written (hub#2523).
+    const required = ['legal-name', 'tax-id', 'address'].map((hook) => form.locator(`[data-testid=invoice-issuer-${hook}]`));
+    for (const field of required) await field.locator('input').fill('');
+    await form.locator('[data-testid=invoice-issuer-save]').click();
+    for (const field of required) await expect(field.locator('.error-text')).toHaveText('This field is required.');
+    await flowShots(page, 'INVOICE-F21-required', async (p) => {
+      await expect(shown(p).locator('[data-testid=invoice-issuer-legal-name]')).toHaveClass(/ion-invalid/);
+    });
     for (const [hook, value] of Object.entries(ISSUER)) await form.locator(`[data-testid=invoice-issuer-${hook}] input`).fill(value);
+    for (const field of required) await expect(field).not.toHaveClass(/ion-invalid/);
     // A tax ID the server refuses is said under it, and goes as soon as it is corrected (hub#854).
     const taxId = form.locator('[data-testid=invoice-issuer-tax-id]');
     await taxId.locator('input').fill('B12345670');

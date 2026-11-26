@@ -44,7 +44,9 @@ from base.registry import PREPARING_STATUSES, internal_only
 from base.tenancy.connections import NON_LIBPQ_OPTIONS
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from base.tenancy.ops import MAINTENANCE_DATABASE
-from control.models import Cluster, CopyRecovery, Freeze, Hub, HubDue, RestoredCopy
+from control.models.copies import CopyRecovery, RestoredCopy
+from control.models.freeze import Freeze
+from control.models.hubs import Cluster, Hub, HubDue
 from control.schemas import ClusterSizesIn, ClusterSizesOut, FreezeGetIn, FreezeOut
 
 logger = logging.getLogger(__name__)

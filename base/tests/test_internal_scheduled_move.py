@@ -17,7 +17,7 @@ from base.tenancy.context import use_control
 from base.tenancy.tests.business import HUB_DB
 from base.tests.test_internal import HUB_ID, signed
 from control import services as control_services
-from control.models import Cluster
+from control.models.hubs import Cluster
 from control.schemas import HubIdIn, HubMoveIn
 
 #: The business the SaaS registered, ``hub_a``, on its own database as every business is.

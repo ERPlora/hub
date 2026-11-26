@@ -26,7 +26,7 @@ from live.operations import atomic
 
 from apps.attendance.models import Record
 from apps.inventory.models import Category
-from apps.service.models import Assignment, Service
+from apps.service.models.catalog import Assignment, Service
 from apps.staff.models import Member, TimeOff
 from apps.task.models import Project
 from apps.tax.models import TaxCategory
@@ -41,7 +41,7 @@ from base.tests.test_worker_activations import (  # noqa: F401 (fixtures)
     nothing_checked_yet,
     platform_template,
 )
-from control.models import Hub
+from control.models.hubs import Hub
 
 
 @pytest.fixture

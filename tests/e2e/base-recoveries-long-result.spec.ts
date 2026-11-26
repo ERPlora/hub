@@ -15,7 +15,8 @@ const RECOVERIES = `${PLATFORM}/admin/control/copyrecovery/`;
 const ROOT = 'e2e-recoveries-root';
 /** Drops the separate copy of `a` this spec made, its recovery with it. */
 const DROP = [
-  'from control.models import CopyRecovery, Hub, RestoredCopy',
+  'from control.models.copies import CopyRecovery, RestoredCopy',
+  'from control.models.hubs import Hub',
   'hub = Hub.objects.get(slug="a")',
   `RestoredCopy.objects.filter(hub=hub, asked_by="${ROOT}").delete()`,
 ];

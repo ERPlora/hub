@@ -36,7 +36,8 @@ from base.services.provisioning import (
 )
 from base.services.reset import _holds
 from base.services.sessions import _end_sessions
-from control.models import HubDue, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import HubDue
 
 #: How long a business that left keeps its database.
 OFFBOARDING_RETENTION = dt.timedelta(days=90)

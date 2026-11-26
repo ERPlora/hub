@@ -130,7 +130,7 @@ def test_a_hub_is_closed_while_its_database_is_copied_moved_or_restored():
 
 
 def test_the_rows_closed_for_a_copy_are_the_moving_and_the_restored_ones():
-    from control.models import Cluster
+    from control.models.hubs import Cluster
 
     cluster = Cluster.objects.create(name="restore", host="writer-restore.example", is_open=False)
     moving = Hub.objects.create(slug="moving", moving_to=cluster)

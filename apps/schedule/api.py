@@ -29,17 +29,17 @@ router = Router(tags=["schedule"])
 
 @bind(router, "schedule.week.get", "/schedule/week")
 async def week_get(request):
-    return await run_operation(request, queries.get_week)
+    return await run_operation(request, queries.week.get_week)
 
 
 @bind(router, "schedule.week.set_day", "/schedule/week/set_day")
 async def week_set_day(request, data: SetDayIn):
-    return await run_operation(request, services.set_day, data)
+    return await run_operation(request, services.week.set_day, data)
 
 
 @bind(router, "schedule.week.confirm", "/schedule/week/confirm")
 async def week_confirm(request):
-    return await run_operation(request, services.confirm_week)
+    return await run_operation(request, services.week.confirm_week)
 
 
 # Special days
@@ -47,12 +47,12 @@ async def week_confirm(request):
 
 @bind(router, "schedule.special_day.list", "/schedule/special_days")
 async def special_day_list(request, params: Query[SpecialDayListIn]):
-    return await run_operation(request, queries.list_special_days, params)
+    return await run_operation(request, queries.lists.list_special_days, params)
 
 
 @bind(router, "schedule.special_day.create", "/schedule/special_days", status=201)
 async def special_day_create(request, data: SpecialDayIn):
-    return await run_operation(request, services.create_special_day, data)
+    return await run_operation(request, services.special_days.create_special_day, data)
 
 
 @bind(
@@ -62,17 +62,17 @@ async def special_day_create(request, data: SpecialDayIn):
     status=201,
 )
 async def special_day_bulk_create(request, data: BulkSpecialDayIn):
-    return await run_operation(request, services.bulk_create_special_days, data)
+    return await run_operation(request, services.special_days.bulk_create_special_days, data)
 
 
 @bind(router, "schedule.special_day.update", "/schedule/special_days/update")
 async def special_day_update(request, data: SpecialDayPatchIn):
-    return await run_operation(request, services.update_special_day, data)
+    return await run_operation(request, services.special_days.update_special_day, data)
 
 
 @bind(router, "schedule.special_day.delete", "/schedule/special_days/delete")
 async def special_day_delete(request, data: SpecialDayRefIn):
-    return await run_operation(request, services.delete_special_day, data)
+    return await run_operation(request, services.special_days.delete_special_day, data)
 
 
 # Temporary changes
@@ -80,22 +80,22 @@ async def special_day_delete(request, data: SpecialDayRefIn):
 
 @bind(router, "schedule.override.list", "/schedule/overrides")
 async def override_list(request, params: Query[OverrideListIn]):
-    return await run_operation(request, queries.list_overrides, params)
+    return await run_operation(request, queries.lists.list_overrides, params)
 
 
 @bind(router, "schedule.override.create", "/schedule/overrides", status=201)
 async def override_create(request, data: OverrideIn):
-    return await run_operation(request, services.create_override, data)
+    return await run_operation(request, services.overrides.create_override, data)
 
 
 @bind(router, "schedule.override.update", "/schedule/overrides/update")
 async def override_update(request, data: OverridePatchIn):
-    return await run_operation(request, services.update_override, data)
+    return await run_operation(request, services.overrides.update_override, data)
 
 
 @bind(router, "schedule.override.delete", "/schedule/overrides/delete")
 async def override_delete(request, data: OverrideRefIn):
-    return await run_operation(request, services.delete_override, data)
+    return await run_operation(request, services.overrides.delete_override, data)
 
 
 # Settings
@@ -103,12 +103,12 @@ async def override_delete(request, data: OverrideRefIn):
 
 @bind(router, "schedule.settings.get", "/schedule/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "schedule.settings.update", "/schedule/settings")
 async def settings_update(request, data: SettingsIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
 
 
 # Is it open? The hours of a range (the appointment book's)
@@ -116,9 +116,9 @@ async def settings_update(request, data: SettingsIn):
 
 @bind(router, "schedule.business.is_open", "/schedule/is_open")
 async def business_is_open(request, params: Query[IsOpenIn]):
-    return await run_operation(request, queries.business_is_open, params)
+    return await run_operation(request, queries.is_open.business_is_open, params)
 
 
 @bind(router, "schedule.hours.for_range", "/schedule/hours")
 async def hours_for_range(request, params: Query[HoursRangeIn]):
-    return await run_operation(request, queries.hours_for_range, params)
+    return await run_operation(request, queries.hours.hours_for_range, params)

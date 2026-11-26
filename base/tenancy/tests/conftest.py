@@ -15,7 +15,7 @@ from base.tenancy.context import use_control
 from base.tenancy.tests import hubs
 from base.tenancy.tests.test_move import Moves
 from base.tenancy.tests.test_recovery import Recoveries
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 
 
 @pytest.fixture

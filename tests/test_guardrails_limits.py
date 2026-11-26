@@ -30,7 +30,7 @@ from base.models import Membership
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import context, identity, limits, names
 from base.tenancy.tests import hubs
-from control.models import Hub
+from control.models.hubs import Hub
 
 HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
 SHORT_WAIT = 0.3

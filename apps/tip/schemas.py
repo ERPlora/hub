@@ -9,7 +9,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
-from apps.sale.schemas.fields import A_METHOD, A_SALE, AttemptKey, Closed, MethodType, Page, PageIn, PositiveCents
+from apps.sale.schemas.fields import A_METHOD, A_SALE, AttemptKey, Cents, Closed, MethodType, Page, PageIn, PositiveCents
 from base.schemas.assistant import names
 
 #: How many suggestions each payment method offers at the charge.
@@ -98,6 +98,28 @@ class SettingsOut(Schema):
     allow_custom: bool = Field(description="Another amount is allowed besides the suggestions.")
     preselected: int = Field(description="Which suggestion comes chosen, 1 to 3; 0: «No tip».")
     methods: list[MethodSuggestionsOut] = Field(description="Every active payment method of Sales, with its suggestions.")
+
+
+# What the charge proposes
+
+
+class SuggestionIn(Closed):
+    method_id: UUID = Field(
+        title=gettext_noop("Payment method"), description="The payment method chosen.", json_schema_extra=A_METHOD
+    )
+    total: Cents = Field(description="The check's total before discounts, in cents: what a percentage is worked out on.")
+
+
+class SuggestedTipOut(Schema):
+    percent: int | None = Field(description="The percentage it is; empty when it is a fixed amount.")
+    amount: int = Field(description="The tip it comes to, in cents.", json_schema_extra={"money": True})
+
+
+class SuggestionOut(Schema):
+    enabled: bool = Field(description="A tip is asked for at the charge; off, there is nothing to propose.")
+    allow_custom: bool = Field(description="Another amount is allowed besides the suggestions.")
+    preselected: int = Field(description="Which suggestion comes chosen, 1 to 3; 0: «No tip».")
+    suggestions: list[SuggestedTipOut] = Field(description="The payment method's three, in their order; none when off.")
 
 
 # Tips

@@ -3,7 +3,7 @@ Prefijo: SALE
 Alcance MVP: núcleo
 Estado de la app: completa (2026-10-31)
 Lo que no entra todavía: ver «Lo que queda fuera». La propina (SALE-G06) es de la app Propinas (`tip`), que añade
-su paso al cobro (SALE-F39, no hecho).
+su paso al cobro (SALE-F39, parcial).
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -323,7 +323,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | SALE-F36 | Preparar las notas rápidas | común | hecho |
 | SALE-F37 | Añadir un medio de pago (Bizum, transferencia…) | común | hecho |
 | SALE-F38 | Vender un servicio de Servicios | peluquería | hecho |
-| SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | no hecho |
+| SALE-F39 | Cobrar con lo que añade otra app (la propina) | común | parcial — faltan lo añadido en cada cobro al repartir y en el Documento de venta |
 | SALE-F40 | Ver los alérgenos de un plato al pedirlo | común | hecho |
 | SALE-F41 | Marcar la alergia del cliente en una línea | restaurante | hecho |
 | SALE-F42 | Elegir los suplementos de un plato del menú | restaurante | hecho |
@@ -1417,9 +1417,10 @@ reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Ser
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
-Estado: no hecho — la venta sabe guardar aparte, en cada cobro, lo que añade otra app, y Ventas ya dice qué pasos
-añaden al cobro las apps encendidas y acepta lo añadido solo cuando quien cobra tiene alguno, pero la hoja Cobro todavía
-no los pinta y el Documento de venta no enseña lo añadido (hub#1500, hub#1502)
+Estado: parcial — la hoja Cobro pinta los pasos que declaran las apps encendidas (hoy, la propina de Propinas), cobra con la
+venta lo que añaden en un cobro de una sola forma de pago y, ya cobrada, deja que cada paso guarde lo suyo, con «Reintentar» si
+no puede; faltan lo añadido en cada cobro al repartir el cobro, que hoy se cobra sin los pasos (hub#1500), y la línea de lo
+añadido en el Documento de venta (hub#1502)
 Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro, Documento de venta
@@ -2050,7 +2051,8 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   móvil deja la barra y el pie a la vista también en un teléfono de 320×568, y el botón de cliente se queda en su
   icono en uno de 320 px (hub#630). La tecla «Hablar» confirma lo pedido como BASE-F94 y BASE-F97.
 - **Cobro**: la fila de «Entregado» tiene alto fijo y las teclas no se mueven bajo el dedo (hub#456). La fila que
-  otra app añade al cobro (la propina) aún no existe: es SALE-F39, `no hecho`.
+  otra app añade al cobro (la propina, SALE-F39) la monta `CheckoutSteps.vue` por el nombre de su componente, con el
+  contrato de `lib/checkout/steps.ts`; al repartir el cobro se quita.
 - **SALE-F01**: con el móvil tumbado o una ventana de hasta 500 px de alto, el catálogo se desplaza con la página,
   con el botón flotante a la vista, y la cuenta tapa la barra de pestañas (hub#800); en un móvil de
   320×568 el importe del cobro sube junto al título (hub#630). El cobro pide el tique a la cola de Impresión en su
@@ -2256,8 +2258,8 @@ título, sus pasos y «Si falla»: ahí no van nombres de código, incidencias, 
   con mesa (no está registrado en `packages/ui`: se pinta `grid-outline` en color).
 - **Cobrar con propina**: es la app Propinas (`tip`, su `WORKBOOK.md`), con el paso del cobro que pinta Ventas
   (SALE-F39, que lee los pasos de las apps encendidas con la consulta `sale.checkout.steps`), las
-  dos `no hecho`; el código va por las issues hijas de hub#562. Mientras, la propina en efectivo se
-  anota en Caja como «Entrada» (CASH_REGISTER-F05).
+  dos parciales: falta lo añadido en cada cobro al repartir, y lo que queda va por las issues hijas de
+  hub#562. Sin Propinas, la propina en efectivo se anota en Caja como «Entrada» (CASH_REGISTER-F05).
 - **Los alérgenos de un suplemento**: la línea y las hojas del TPV ya enseñan los alérgenos del plato y la alergia
   del cliente (F40 y F41 hechos), y la tarjeta de Cocina resalta la alergia (KITCHEN-F32). La línea ya suma los de sus
   suplementos («+Queso» lleva leche) y los congela al pedirla; MODIFIER-F12 pasa a hecho con la hoja de suplementos

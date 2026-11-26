@@ -319,7 +319,7 @@ class TestWhenItStopsServing:
         assert response.status_code == 503 and response["Retry-After"]
 
     def test_a_business_moving_to_another_cluster_says_come_back(self, client, acme):
-        from control.models import Cluster
+        from control.models.hubs import Cluster
 
         cluster = Cluster.objects.create(name="other", host="other.internal")
         Hub.objects.filter(pk=acme.pk).update(moving_to=cluster)

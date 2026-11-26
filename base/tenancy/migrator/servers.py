@@ -13,7 +13,7 @@ from django.db.models import Q
 
 from base.tenancy import names
 from base.tenancy import connections as tenancy_connections
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 
 
 class MigratorCredentialsMissing(RuntimeError):

@@ -5,7 +5,7 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.tip import queries
-from apps.tip.schemas import SettingsPatchIn, TipAddIn, TipListIn, TipPatchIn, TipRefIn, TipVoidIn
+from apps.tip.schemas import SettingsPatchIn, SuggestionIn, TipAddIn, TipListIn, TipPatchIn, TipRefIn, TipVoidIn
 from apps.tip.services import settings, tips
 
 router = Router(tags=["tip"])
@@ -19,6 +19,11 @@ async def settings_get(request):
 @bind(router, "tip.settings.update", "/tip/settings")
 async def settings_update(request, data: SettingsPatchIn):
     return await run_operation(request, settings.update_settings, data)
+
+
+@bind(router, "tip.suggestion.get", "/tip/suggestions")
+async def suggestion_get(request, params: Query[SuggestionIn]):
+    return await run_operation(request, queries.get_suggestions, params)
 
 
 @bind(router, "tip.tip.list", "/tip/tips")

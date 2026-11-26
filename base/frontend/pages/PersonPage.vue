@@ -3,7 +3,8 @@
 // there; here only their PIN and badge. A badge reader's burst fills the field wherever the focus is. What this
 // administrator may not change (the owner's way in, one's own badge) is said instead of offered. «Open on erplora.com»
 // leaves the Hub by `openExternalLink` (the installed app opens nothing on a `_blank` link) and is never offered in the
-// Google Play copy (`managementOffered`).
+// Google Play copy (`managementOffered`). Whoever the server refuses it gets «No access», as on any screen their role
+// does not open, never a failure to retry.
 import { ConfirmDialog, formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, openExternalLink, toastSuccess } from '@erplora/ui/shell';
@@ -17,6 +18,7 @@ import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { accessKeys, badgeProblem, roleKey } from '../lib/people';
 import '../settings.css';
+import NoAccessPage from './NoAccessPage.vue';
 
 const { t, locale } = useBaseI18n();
 const route = useRoute();
@@ -32,6 +34,7 @@ const removeBadge = useCommand('base.person.badge_remove');
 const person = computed(() => data.value);
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 const notFound = computed(() => failed.value && error.value?.code === 'base.person_not_found');
+const noAccess = computed(() => error.value?.code === 'permission_denied');
 const when = (value: string | null) => formatDateTime(value, locale.value);
 const access = computed(() => (person.value ? accessKeys(person.value.ways).map((key) => t(key)).join(' + ') : ''));
 
@@ -122,7 +125,9 @@ onBeforeUnmount(() => stopReader?.());
 </script>
 
 <template>
+  <NoAccessPage v-if="noAccess" />
   <AppPage
+    v-else
     :title="person?.name ?? t('base.person.title')"
     back-href="/employees"
     content-layout="detail"

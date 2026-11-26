@@ -13,7 +13,9 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
-from apps.service.models import Assignment, GrantAdjustment, ServiceSettings
+from apps.service.models.catalog import Assignment
+from apps.service.models.grants import Grant, GrantAdjustment
+from apps.service.models.settings import ServiceSettings
 from apps.service.schemas.assignments import (
     AssignmentDetailOut,
     AssignmentListIn,
@@ -198,8 +200,6 @@ def test_an_assignment_of_a_professional_who_left_is_not_there():
 
 
 def sold_on_the_third_of_october():
-    from apps.service.models import Grant
-
     package = make_package("Bono 5 cortes", services=[make_service("Corte")], sessions=5)
     grant = make_grant(package, make_customer("Lucía Pérez"))
     Grant.objects.filter(pk=grant.pk).update(granted_at=dt.datetime(2026, 10, 3, 12, tzinfo=dt.UTC))

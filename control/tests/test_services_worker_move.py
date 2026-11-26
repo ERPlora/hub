@@ -6,7 +6,8 @@ import datetime as dt
 import pytest
 from django.utils import timezone
 
-from control.models import HubDue, MovedCopy
+from control.models.copies import MovedCopy
+from control.models.hubs import HubDue
 from control.services import worker_move
 from control.tests.conftest import a_cluster, a_ready_hub
 

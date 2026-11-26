@@ -30,7 +30,7 @@ from base.tenancy.connections import control_name
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import HUB_DB, A
 from base.tests.conftest import SECRET
-from control.models import HubDue
+from control.models.hubs import HubDue
 from control.tests.conftest import events
 
 pytestmark = HUB_DB

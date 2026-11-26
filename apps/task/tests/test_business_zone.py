@@ -7,7 +7,7 @@ import pytest
 from django.utils import timezone
 from live.operations import get
 
-from apps.task.queries import business_today
+from apps.task.queries.reads import business_today
 
 from .conftest import HUB_DB, ctx_for, make_task
 

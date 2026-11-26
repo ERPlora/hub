@@ -27,7 +27,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.identity import HubIdentityMismatch
 from base.tenancy.tests.business import HUB_DB
 from base.tests.test_internal import code, signed
-from control.models import Hub
+from control.models.hubs import Hub
 from live.context import Scope, system_context
 
 #: The door opens the platform hub's database itself: each test enters it only to read it.

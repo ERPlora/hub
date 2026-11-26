@@ -21,7 +21,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from base.registry import REGISTRY_SCOPE
 from base.tenancy import credentials
 from control import services
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 from control.schemas import ClusterIdIn, ClusterIn, ClusterUpdateIn
 from control.tests.conftest import SERVICES_MARKS, a_cluster, as_actor, events, person
 
@@ -223,7 +223,7 @@ class TestUpdate:
         ],
     )
     def test_its_writer_never_changes_under_what_is_coming_or_kept_there(self, admin_ctx, held_by):
-        from control.models import LeftoverDatabase, MovedCopy, RestoredCopy
+        from control.models.copies import LeftoverDatabase, MovedCopy, RestoredCopy
 
         cluster = a_cluster()
         hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")

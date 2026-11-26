@@ -506,7 +506,7 @@ def not_cut(client):
     from django.contrib.auth import get_user_model
 
     from base.models import Membership
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     hub = Hub.objects.create(slug="not-cut", status=Hub.Status.READY)
     assert not hub.db_name

@@ -3,7 +3,7 @@
   never deleted, and its name is unique whatever the case (the assistant names it).
 - ``Payment`` is one outgoing payment, in the minor unit of its currency (> 0), with its reference
   ``PAY-YYYYMMDD-NNNN`` and its ladder: draft → approved → sent → completed, or cancelled.
-- ``PaymentCounter`` holds the last number given on a business day; services.py raises it with
+- ``PaymentCounter`` holds the last number given on a business day; services/ raises it with
   ``UPDATE … RETURNING`` in the transaction of the payment (never a sequence).
 """
 

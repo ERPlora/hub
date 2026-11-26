@@ -81,8 +81,8 @@ def test_spanish_texts_are_the_old_modules():
             "Cancelada",
         ]
         assert [str(label) for label in Task.Priority.labels] == ["Baja", "Media", "Alta", "Urgente"]
-        assert str(queries.TASK_NOT_FOUND) == "Esa tarea no existe en este negocio."
-        assert str(queries.PROJECT_NOT_FOUND) == "Ese proyecto no existe en este negocio."
+        assert str(queries.reads.TASK_NOT_FOUND) == "Esa tarea no existe en este negocio."
+        assert str(queries.reads.PROJECT_NOT_FOUND) == "Ese proyecto no existe en este negocio."
         assert str(services.tasks.TASK_ALREADY_CLOSED) == "Esa tarea ya está cerrada, así que se ha dejado como estaba."
 
 

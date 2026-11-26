@@ -523,7 +523,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 ## Para quien lo mantiene
 
 - Anatomía completa de una app: `apps.py`, `models.py`, `engine.py` (las reglas, sin base de datos),
-  `schemas/`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `schemas/`, `queries/`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero; las páginas en `frontend/`. `UI-REQUESTS.md` lista lo que se pide
   a `@erplora/ui`.
 - Modelos (UUIDv7, sin `hub_id`): `WeekDay` (un día de la semana, lunes = 0, cerrado o no; un día sin
@@ -534,7 +534,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 - **Borrado de verdad**, no lógico: un día especial borrado libera su fecha (la restricción única cuenta
   solo lo que existe).
 - Las reglas viven en `engine.py` (validar y ordenar tramos, precedencia, ¿abierto?, tramos de un día),
-  sin ORM: las usan `queries.py` y `services.py`, y Citas puede llamar a `schedule.hours.for_range`.
+  sin ORM: las usan `queries/` y `services/`, y Citas puede llamar a `schedule.hours.for_range`.
 - **Dos cambios temporales no se pisan**: las escrituras de cambios temporales bloquean antes la fila de
   ajustes (`select_for_update`), así que dos altas a la vez se esperan y la segunda ve la primera. Un día
   especial repetido lo para la restricción única, traducida al mismo 409.
@@ -553,8 +553,9 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   o de la víspera) con `span.start ≤ start` y `end ≤ span.end`. Citas lo cruza con
   `staff.availability.for_member` (Personal) y decide qué hace con `source = none`. El aviso de cualquier cambio de Horarios
   re-ejecuta la consulta en vivo.
-- **Quién llama a qué**: Citas y Reservas (las dos con `schedule` en sus `requires`) importan de
-  `queries.py` `hours_for_range` y `day_label`, y Reservas también `get_week` (solo obedece la semana
+- **Quién llama a qué**: Citas y Reservas (las dos con `schedule` en sus `requires`) importan
+  `hours_for_range` de `queries/hours.py` y `day_label` de `queries/outputs.py`, y Reservas también `get_week`, de
+  `queries/week.py` (solo obedece la semana
   confirmada); las dos prestan `schedule.view` a quien reserva (`reader`), así que reservar no exige permiso
   en Horarios, y sus consultas vivas se re-ejecutan con los siete avisos de la semana, los días especiales y
   los cambios temporales (`SCHEDULE_EVENTS` de cada una; el de los ajustes no cambia ninguna hora). La agenda de Citas sigue en vivo

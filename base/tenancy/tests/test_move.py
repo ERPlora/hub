@@ -36,7 +36,8 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
 from base.tenancy.tests import hubs
 from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3  # noqa: F401
-from control.models import Cluster, Hub, HubDue, MovedCopy
+from control.models.copies import MovedCopy
+from control.models.hubs import Cluster, Hub, HubDue
 
 AT = dt.datetime(2026, 10, 31, 12, 0, tzinfo=dt.UTC)
 MARKER = "kept across the move"

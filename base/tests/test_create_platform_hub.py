@@ -43,7 +43,7 @@ def environment(settings):
 @pytest.fixture
 def deployment(hub_b, settings):
     """ERPlora's own hub, ready on a database of its own (``hub_b``), and the deployment's settings."""
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     Hub.objects.filter(pk=hub_b.pk).update(is_platform=True)
     environment(settings)
@@ -53,7 +53,7 @@ def deployment(hub_b, settings):
 
 def in_the_platform_hub():
     """Inside the platform hub's own database, where the command writes."""
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     return use_hub(Hub.objects.get(slug=deployed.PLATFORM_HUB_SLUG))
 
@@ -206,7 +206,7 @@ def test_with_production_open_its_dry_run_pins_production(deployment):
 @pytest.fixture
 def former(hub_b, settings):
     """ERPlora's own hub as it was made, its row still under the name it had before (``hub_b``'s database)."""
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     environment(settings)
     Hub.objects.filter(pk=hub_b.pk).update(slug="erplora", is_platform=True)
@@ -215,14 +215,14 @@ def former(hub_b, settings):
 
 def rows() -> dict:
     """Every column of the registry's platform rows, by id, but for when they were last written."""
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     found = Hub.objects.filter(is_platform=True).values()
     return {row["id"]: {name: value for name, value in row.items() if name != "updated_at"} for row in found}
 
 
 def issuer_of(hub) -> str:
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     with use_hub(Hub.objects.get(pk=hub.pk)):
         return Issuer.objects.get().tax_id
@@ -288,7 +288,7 @@ def test_the_rename_is_undone_by_naming_it_as_before(former, settings):
 @HUB_DB
 def test_the_rename_takes_its_people_with_it_and_undoing_it_brings_them_back(former, hub_a, make_user, settings):
     from base.models import Membership
-    from control.models import HubVisit
+    from control.models.usage import HubVisit
 
     ana = make_user("ana", host="erplora", role="hub_owner")
     Membership.objects.create(user=ana, host=hub_a.slug, role="hub_employee")
@@ -308,7 +308,7 @@ def test_the_rename_takes_its_people_with_it_and_undoing_it_brings_them_back(for
 
 @HUB_DB
 def test_it_is_never_renamed_over_another_row_with_that_name(former, hub_a):
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     Hub.objects.filter(pk=hub_a.pk).update(slug="erp")
 
@@ -321,7 +321,7 @@ def test_it_is_never_renamed_over_another_row_with_that_name(former, hub_a):
 
 @HUB_DB
 def test_two_platform_rows_are_refused_and_neither_is_touched(former, hub_a):
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     Hub.objects.filter(pk=hub_a.pk).update(slug="erp", is_platform=True)
     before = rows()
@@ -337,7 +337,7 @@ def test_two_platform_rows_are_refused_and_neither_is_touched(former, hub_a):
 def test_a_row_under_its_former_name_that_never_finished_is_the_one_made(former, monkeypatch):
     """Its database was never made: the command makes that row's, never another row under the new name."""
     from base.tenancy import provision
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     Hub.objects.filter(pk=former.pk).update(status=Hub.Status.REQUESTED)
     made = []
@@ -364,7 +364,7 @@ def made_for_real(django_db_blocker, hub_databases, settings, monkeypatch):
     from base.tenancy import connections as tenancy_connections
     from base.tenancy import identity, names, provision
     from base.tenancy.tests import hubs
-    from control.models import Hub, HubDue
+    from control.models.hubs import Hub, HubDue
 
     monkeypatch.setattr(identity, "_verified", set())
     monkeypatch.setattr(provision, "template_for", lambda hub: hub_databases.template)
@@ -386,7 +386,7 @@ def test_the_module_sets_the_tests_databases_up():
 @pytest.mark.usefixtures("made_for_real")
 def test_execute_makes_the_platform_hub_its_own_database_and_sets_its_issuer_there():
     from base.tenancy.context import use_hub
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     out = command("--execute")
 
@@ -404,7 +404,7 @@ def test_execute_makes_the_platform_hub_its_own_database_and_sets_its_issuer_the
 def test_the_hub_it_makes_is_on_its_own_limits_with_no_photo_and_no_step_by_hand(monkeypatch):
     from base.tenancy import limits
     from base.tenancy.context import current_alias, use_hub
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     command("--execute")
     monkeypatch.setattr(limits, "_limiters", {})
@@ -419,7 +419,7 @@ def test_the_hub_it_makes_is_on_its_own_limits_with_no_photo_and_no_step_by_hand
 
 @pytest.mark.usefixtures("made_for_real")
 def test_without_execute_a_missing_platform_hub_is_only_said():
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     out = command()
 
@@ -433,7 +433,7 @@ def test_its_row_is_never_left_due_for_the_worker_to_take_meanwhile():
     never finds the row to take first (it would leave the command with «could not be made»)."""
     from base.services import provisioning
     from base.tenancy.context import use_control
-    from control.models import Hub, HubDue
+    from control.models.hubs import Hub, HubDue
 
     with use_control():
         hub = provisioning.platform_hub_register(PLATFORM.key)
@@ -447,7 +447,7 @@ def test_when_the_worker_holds_it_the_command_waits_for_it_to_be_ready(deploymen
     """A row left due by an older run may be the worker's when the command comes: it waits for it, never fails."""
     from base.management.commands import create_platform_hub
     from base.tenancy import provision
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     Hub.objects.filter(slug=deployment.PLATFORM_HUB_SLUG).update(status=Hub.Status.MIGRATING)
     polls = []

@@ -296,7 +296,7 @@ or chosen has not been saved: "Keep editing" keeps it and "Discard changes" clos
 With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
-<!-- from WORKBOOK.md sha256:9804405bb7c3 -->
+<!-- from WORKBOOK.md sha256:f68cc86f0cbe -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -338,7 +338,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F36 | Prepare the quick notes | common | done |
 | SALE-F37 | Add a payment method (Bizum, bank transfer…) | common | done |
 | SALE-F38 | Sell a service from Services | hair salon | done |
-| SALE-F39 | Charge with what another app adds (the tip) | common | not done |
+| SALE-F39 | Charge with what another app adds (the tip) | common | partial — what is added to each payment when splitting and on the Sale document are missing |
 | SALE-F40 | See a dish's allergens when ordering it | common | done |
 | SALE-F41 | Mark the customer's allergy on a line | restaurant | done |
 | SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | done |
@@ -1476,10 +1476,11 @@ Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
-<!-- from WORKBOOK.md sha256:9a6ccd9de0bb -->
-Status: not done — the sale knows how to keep apart, in each payment, what another app adds, and Sales already says
-which steps the apps turned on add to the charge and takes what is added only when whoever charges has one, but the
-Charge sheet does not paint them yet and the Sale document does not show what was added (hub#1500, hub#1502)
+<!-- from WORKBOOK.md sha256:9eb254e402d2 -->
+Status: partial — the Charge sheet paints the steps the apps turned on declare (today, the tip of Tips), charges what they
+add with the sale in a charge with a single payment method and, once charged, lets each step save its own part, with "Retry"
+when it cannot; what is added to each payment when splitting the charge, which today is charged without the steps
+(hub#1500), and the line of what was added on the Sale document (hub#1502) are missing
 Vertical: common
 Actor: employee, manager
 Screen: Charge, Sale document

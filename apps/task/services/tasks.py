@@ -14,7 +14,8 @@ from live.outbox import record_event
 
 from apps.task import events
 from apps.task.models import Project, Task, TaskCounter
-from apps.task.queries import TASK_NOT_FOUND, Caller, business_today, load_task, resolve_task
+from apps.task.queries.reads import TASK_NOT_FOUND, Caller, business_today, resolve_task
+from apps.task.queries.tasks import load_task
 from apps.task.schemas import AssignIn, DeletedOut, SetStatusIn, TaskIn, TaskOut, TaskPatchIn, TaskRefIn
 from apps.task.services.writes import _changeable, _field_refusal, _hold, _locked, _member, _project, lock_tasks
 from base.services.sessions import acting_hub_user

@@ -7,7 +7,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.service.queries.catalog import find_service, load_service
 from apps.service.schemas.catalog import ServiceOut
 from apps.service.schemas.service_images import ServiceImageIn, ServiceImageUploadIn

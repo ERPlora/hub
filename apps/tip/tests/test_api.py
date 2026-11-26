@@ -10,6 +10,7 @@ from live.ninja import ensure_api_parity
 from live.operations import registry
 
 from apps.flow.tests.test_api import get, post
+from apps.sale.models import PaymentMethod
 from apps.tip.api import router
 from base.tests.routes import bound_routes, spa_routes
 from config.api import api
@@ -19,6 +20,7 @@ from .conftest import CARD, HUB_DB, charge
 ROUTES = {
     ("GET", "/tip/settings", "tip.settings.get"),
     ("POST", "/tip/settings", "tip.settings.update"),
+    ("GET", "/tip/suggestions", "tip.suggestion.get"),
     ("GET", "/tip/tips", "tip.tip.list"),
     ("GET", "/tip/tips/detail", "tip.tip.get"),
     ("POST", "/tip/tips", "tip.tip.add"),
@@ -93,3 +95,11 @@ def test_a_refusal_is_the_error_envelope_and_a_bad_payload_a_422_by_field(coffee
 def test_the_employee_neither_adjusts_nor_changes_the_settings(employee_client):
     assert post(employee_client, "/tip/settings", {"enabled": True}).status_code == 403
     assert get(employee_client, "/tip/settings").json()["enabled"] is False
+
+
+@HUB_DB
+def test_the_suggestions_of_a_charge_are_read_over_http(employee_client):
+    card = PaymentMethod.objects.get(type="card", is_active=True)
+    read = get(employee_client, "/tip/suggestions", method_id=str(card.id), total=1000)
+    assert read.status_code == 200, read.content
+    assert (read.json()["enabled"], read.json()["suggestions"]) == (False, [])

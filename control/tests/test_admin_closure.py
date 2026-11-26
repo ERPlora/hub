@@ -15,7 +15,7 @@ from live.errors import OperationError
 
 from base.tenancy import move
 from control import queries
-from control.models import Hub
+from control.models.hubs import Hub
 from control.tests.test_admin import HUBS, PLATFORM, a_cluster, nothing_kept, root  # noqa: F401
 from control.tests.test_admin_restore import AT_MOMENT, MOMENT
 
