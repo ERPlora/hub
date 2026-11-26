@@ -17,6 +17,9 @@ msgstr ""
 msgid "Tips"
 msgstr "Propinas"
 
+msgid "Settings"
+msgstr "Ajustes"
+
 msgid "Record the tips left by card or in cash, who each one belongs to, and see them apart in the drawer."
 msgstr "Anota las propinas que dejan con tarjeta o en efectivo, de quién es cada una, y velas aparte en la caja."
 

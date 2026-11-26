@@ -10,6 +10,125 @@
       "retry": "Retry",
       "invalid": "Write the tip as an amount.",
       "notSaved": "The sale is charged, but the tip has not been saved."
+    },
+    "title": "Tips",
+    "tabs": {
+      "label": "Tips sections"
+    },
+    "list": {
+      "period": {
+        "label": "Period",
+        "today": "Today",
+        "week": "7 days",
+        "month": "30 days"
+      },
+      "search": "Search sale or person…",
+      "add": "Record tip",
+      "loading": "Loading tips…",
+      "loadError": "The tips could not be loaded.",
+      "empty": "There are no tips yet.",
+      "emptyMessage": "The tips charged at the till, and the ones recorded here, show up in this list.",
+      "noResults": "No tips match",
+      "noResultsMessage": "Try another search, another period or other filters.",
+      "entity": {
+        "one": "tip",
+        "many": "tips"
+      },
+      "columns": {
+        "date": "Date",
+        "sale": "Sale",
+        "for": "For",
+        "method": "Payment method",
+        "amount": "Amount",
+        "status": "Status"
+      },
+      "pool": "To the pool",
+      "unassigned": "Unassigned",
+      "status": {
+        "active": "Active",
+        "voided": "Voided"
+      },
+      "methodTypes": {
+        "cash": "Cash",
+        "card": "Card",
+        "transfer": "Transfer",
+        "other": "Other"
+      },
+      "actions": {
+        "adjust": "Adjust",
+        "void": "Void"
+      }
+    },
+    "form": {
+      "title": "Record tip",
+      "target": {
+        "label": "Where it comes from",
+        "sale": "Of a sale",
+        "pool": "To the pool, no ticket"
+      },
+      "sale": "Sale number",
+      "method": "Payment method",
+      "amount": "Amount",
+      "poolHint": "Cash counted from the jar: it enters the open drawer and is split with the day's rules.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "failed": "The tip could not be recorded.",
+      "done": "Tip recorded.",
+      "amountInvalid": "Write the tip as an amount above zero."
+    },
+    "adjust": {
+      "title": "Adjust the tip of {sale}",
+      "poolTitle": "Adjust a tip of the pool",
+      "amount": "Amount",
+      "for": "For",
+      "searchPerson": "Search a person…",
+      "noPerson": "Nobody on the team matches.",
+      "reason": "Reason",
+      "save": "Save",
+      "cancel": "Cancel",
+      "failed": "The tip could not be adjusted.",
+      "done": "Tip adjusted."
+    },
+    "void": {
+      "title": "Void the tip of {sale}",
+      "poolTitle": "Void a tip of the pool",
+      "explain": "The tip stays in the list as voided, with your reason. If it was in cash, it leaves the open drawer.",
+      "reason": "Reason",
+      "confirm": "Void",
+      "cancel": "Cancel",
+      "failed": "The tip could not be voided.",
+      "done": "Tip voided."
+    },
+    "settings": {
+      "heading": "Tips at the charge",
+      "intro": "What the charge sheet offers: three suggestions for each payment method, each a percentage of the check's total before discounts or an amount.",
+      "loading": "Loading the settings…",
+      "loadError": "The settings could not be loaded.",
+      "enabled": "Ask for a tip at the charge",
+      "allowCustom": "Allow another amount",
+      "preselected": {
+        "label": "Comes chosen",
+        "none": "No tip",
+        "option": "Suggestion {n}"
+      },
+      "methods": "Suggestions by payment method",
+      "suggestion": "Suggestion {n}",
+      "kind": {
+        "short": "Type",
+        "label": "Kind of suggestion {n}",
+        "percent": "%",
+        "amount": "Amount"
+      },
+      "noMethods": "Sales has no active payment method yet.",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "saveError": "The settings could not be saved.",
+      "noPermission": "You do not have permission to change these settings.",
+      "errors": {
+        "percent": "Write a percentage from 1 to 100.",
+        "amount": "Write an amount above zero.",
+        "same": "That suggestion is already there."
+      }
     }
   }
 }
