@@ -1268,7 +1268,7 @@ this business. Upload the file again in a minute to bring its data.".
 Involved: BASE-F22, INVENTORY-F01, INVENTORY-F12, INVENTORY-F26, INVENTORY-F36, VERIFACTU-F01, BASE-F32
 
 ### BASE-F32 Read the import report
-<!-- from WORKBOOK.md sha256:d556b3ffc787 -->
+<!-- from WORKBOOK.md sha256:4a07e015da34 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Import)
@@ -1279,8 +1279,9 @@ Steps:
   2. One row per app with its label: "Applied", "You had it already", "Applied in part", "Failed", "Nothing
      to copy", "Left out", "App off", "Not in this business", "Not chosen", "Being set up" or "Could not be set up".
      "You had it already" shows only when everything the app brings was already in the business; an app it brings
-     nothing of, like the ones the template only turns on, says "Nothing to copy". Below, for each part, "12 created
-     · 3 already there · 2 failed" and, of what failed, its name and the reason.
+     nothing of, like the ones the template only turns on, says "Nothing to copy". Below, for each part, "12 new rows
+     · 3 were already there · 2 failed" and, of what failed, its name and the reason; each figure goes in the singular
+     with a single row ("1 new row · 1 was already there · 1 failed").
   3. What was left out on purpose shows in "Left out on purpose".
   4. "See the templates" goes back to the catalogue; "Go to Home" leads to the Home.
   5. When the app is ready, its part loads by itself and the report gets up to date without reloading, whether this
@@ -2948,7 +2949,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:4edddeb0deb4 -->
+<!-- from WORKBOOK.md sha256:f6300b6a02de -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2991,7 +2992,10 @@ Steps:
      combos and 17 more"); the rows of a file being imported (products, categories or customers), by the name of each,
      as the import keeps it ("File rows: Spoons, Stews"; a row without a name counts among the "more", never by
      another of its cells) and, in Inventory, the tax categories they take, once each, by their name and today's rate ("Tax
-     category: Restaurant — food · 10%"); a list of lines that carry only their record, such as the services of an appointment, the same
+     category: Restaurant — food · 10%"); the rows of a batch the person dictates, the same way, by the name of each:
+     each person of Staff by their first name and last name ("Create in Staff: Carla Ruiz, Diego Martín, Elena Sanz"; one
+     without a first name or a last name counts among the "more") and each service by its name ("Services: Cut,
+     Colour"), with the categories and the tax categories they take apart, once each; a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of what the person wrote,
