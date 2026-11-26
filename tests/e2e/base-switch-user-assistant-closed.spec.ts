@@ -1,7 +1,7 @@
 // flow: BASE-F102 BASE-F60 BASE-F92
-// On a shared till, «Switch user» with the assistant's panel open and a conversation in it: whoever enters, with their
-// PIN or with their badge, finds the panel closed and empty, and opening it starts from nothing. Whoever does not switch
-// finds it as they left it, also after reloading. A business of its own, signed up on the SaaS's screens, with its
+// On a shared till, with the assistant's panel open and a conversation in it, whoever enters next finds the panel
+// closed and empty, and opening it starts from nothing: after «Switch user» (with a PIN or a badge), after signing out
+// and after the till locked by itself. Whoever does not switch finds it as they left it, also after reloading. A business of its own, signed up on the SaaS's screens, with its
 // owner and an employee: a PIN in the hubs `a` or `b` would change every other spec's way in. The stack's fake
 // provider answers the panel (README of this folder, «El asistente»).
 import { expect, type Page, test } from '@playwright/test';
@@ -128,4 +128,32 @@ test('BASE-F102: whoever takes over with their badge finds the panel closed and 
   await expect(till).toHaveURL(`${origin}/`);
   expect(await whoIsIn(till)).toMatch(/e2e-switch-panel-owner/);
   await closedAndEmpty(till, 'badge');
+});
+
+test('BASE-F102: after signing out of the till, whoever enters next with their PIN finds the panel closed and empty', async () => {
+  await conversationOpen(till);
+  await userMenu(till, 'logout');
+  await expect(till).toHaveURL(/\/login(\?|$)/);
+  await shown(till).getByTestId('pin-face').filter({ hasText: 'e2e-switch-panel-employee' }).click();
+  await pressPin(till, EMPLOYEE_PIN);
+  await expect(till).toHaveURL(`${origin}/`);
+  expect(await whoIsIn(till)).toMatch(/e2e-switch-panel-employee/);
+  await closedAndEmpty(till, 'sign-out');
+});
+
+test('BASE-F102: after the till locked by itself, whoever enters next with their PIN finds the panel closed and empty', async () => {
+  // A business that asks always, after a minute without use; the page loaded again reads it.
+  psql("UPDATE base_accesssettings SET pin_policy = 'always', pin_inactivity_minutes = 1", business.slug);
+  await till.goto(`${origin}/`);
+  await conversationOpen(till);
+  await till.clock.install();
+  await till.reload();
+  await expect(panel(till)).toHaveAttribute('data-open', 'true');
+  await till.clock.fastForward('01:05');
+  await expect(till).toHaveURL(/\/login(\?|$)/, { timeout: 60_000 });
+  await shown(till).getByTestId('pin-face').filter({ hasText: 'e2e-switch-panel-owner' }).click();
+  await pressPin(till, OWNER_PIN);
+  await expect(till).toHaveURL(`${origin}/`);
+  expect(await whoIsIn(till)).toMatch(/e2e-switch-panel-owner/);
+  await closedAndEmpty(till, 'idle');
 });
