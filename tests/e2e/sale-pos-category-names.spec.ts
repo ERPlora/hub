@@ -4,8 +4,8 @@
 // `HUB-2409-<language>-<width>`. The categories this file creates are deleted after it.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown, turnOn } from './helpers';
-import { drawerOff, restoreDrawer } from './sale-helpers';
+import { A, api, capture, psql, shown, turnOn } from './helpers';
+import { asOwnerAtTheTill, restoreDrawer, tillIn } from './sale-helpers';
 
 const SIZES = [
   { width: 375, height: 667 },
@@ -21,21 +21,17 @@ function forget(): void {
   psql(`delete from inventory_category where name in (${RETAIL.map((name) => `'${name}'`).join(', ')})`);
 }
 
-test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  // The till opens without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
-  await drawerOff(context);
-  await turnOn(context, A, 'service');
-  forget();
-  for (const name of RETAIL) {
-    const res = await api<{ id: string }>(context, A, 'POST', '/inventory/categories', { name, order: 1 });
-    expect(res.status, name).toBe(201);
-    made.push(res.data.id);
-  }
-  await context.close();
-});
+test.beforeAll(({ browser }) =>
+  asOwnerAtTheTill(browser, async (context) => {
+    await turnOn(context, A, 'service');
+    forget();
+    for (const name of RETAIL) {
+      const res = await api<{ id: string }>(context, A, 'POST', '/inventory/categories', { name, order: 1 });
+      expect(res.status, name).toBe(201);
+      made.push(res.data.id);
+    }
+  }),
+);
 
 test.afterAll(() => {
   forget();
@@ -46,9 +42,7 @@ test.afterAll(() => {
 async function tillAt(browser: Browser, language: string, size: { width: number; height: number }): Promise<Page> {
   const context = await browser.newContext({ baseURL: A, viewport: size, locale: language });
   const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  await context.addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
-  await page.reload();
+  await tillIn(page, context, language);
   await expect(page.locator('html')).toHaveAttribute('lang', new RegExp(`^${language}`));
   await expect(shown(page).locator('[data-testid=pos-category-services]')).toBeVisible();
   for (const id of made) await expect(shown(page).locator(`[data-testid=pos-category-${id}]`)).toBeVisible();
