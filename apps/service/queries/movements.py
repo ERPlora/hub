@@ -9,7 +9,7 @@ from django.utils import timezone
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.service.models import Grant, GrantAdjustment, Redemption
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
 from apps.service.queries.packages import find_package
 from apps.service.queries.reads import CUSTOMER_VIEW
 from apps.service.queries.sale_numbers import name_the_sales

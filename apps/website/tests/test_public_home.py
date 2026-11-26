@@ -153,7 +153,7 @@ def test_a_new_deploy_renders_the_page_again_for_its_bundle(client, settings):
 def test_the_page_prices_in_the_business_s_currency_and_follows_a_change_of_its_country(client):
     # flow: website-business-currency — the kept page is the currency's too: a business whose country (hence its
     # currency) changes on erplora.com is never shown the old one until the page expires.
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     Service.objects.create(name="Cut", price=1500, duration_minutes=30)
     Hub.objects.filter(slug=A.key).update(country="ES")
@@ -191,7 +191,7 @@ def test_a_visit_served_from_the_cache_opens_no_transaction_of_its_own(client):
     # flow: website-business-currency — the currency of the kept page is the registry row's the host already loaded
     # (`request.hub`'s country, what `base.business.get` answers), never an operation of its own per visitor: a hub's
     # transactions are counted per plan (hub-tenancy), and a page served from the cache must cost what it cost before.
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     Service.objects.create(name="Cut", price=1500, duration_minutes=30)
     Hub.objects.filter(slug=A.key).update(country="PL")
