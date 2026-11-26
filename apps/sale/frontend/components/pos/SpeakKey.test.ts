@@ -150,15 +150,19 @@ async function key(options: Options = {}) {
     await settle();
   };
   const transcriptions = () => m.sent().filter((call) => call.path === '/api/assistant/transcribe');
-  return { ...m, button, press, transcriptions };
+  /** The key is its icon alone: what it says is its accessible name. */
+  const accessibleName = () => button().attributes('aria-label');
+  return { ...m, button, press, transcriptions, accessibleName };
 }
 
 describe('SpeakKey: who sees it', () => {
-  it('shows «Hablar» with the microphone to whoever may use the assistant on a device that records', async () => {
+  it('shows the microphone alone, named «Hablar», to whoever may use the assistant on a device that records', async () => {
     const k = await key();
     expect(k.button().exists()).toBe(true);
     expect(k.button().element.tagName.toLowerCase()).toBe('ion-button');
-    expect(k.button().text()).toBe('Hablar');
+    expect(k.button().text()).toBe('');
+    expect(k.accessibleName()).toBe('Hablar');
+    expect(k.button().attributes('title')).toBe('Hablar');
     expect(k.button().attributes('aria-pressed')).toBe('false');
     // The assistant composer's own microphone.
     expect(iconOf(k.button().element)).toBe(ASSISTANT_ICONS.mic);
@@ -166,7 +170,7 @@ describe('SpeakKey: who sees it', () => {
 
   it('speaks English: «Speak»', async () => {
     const k = await key({ locale: 'en' });
-    expect(k.button().text()).toBe('Speak');
+    expect(k.accessibleName()).toBe('Speak');
   });
 
   it('is not there for a person who may not use the assistant', async () => {
@@ -187,7 +191,9 @@ describe('SpeakKey: dictating into the assistant', () => {
     assistant.state.draft = 'y luego';
     await k.press();
     expect(voice.getUserMedia).toHaveBeenCalledWith({ audio: true });
-    expect(k.button().text()).toBe('Parar');
+    expect(k.button().text()).toBe('');
+    expect(k.accessibleName()).toBe('Parar');
+    expect(k.button().attributes('title')).toBe('Parar');
     expect(k.button().attributes('aria-pressed')).toBe('true');
     expect(iconOf(k.button().element)).toBe(ASSISTANT_ICONS.stop);
     expect(k.find('pos-speak-status').text()).toBe('Escuchando…');
@@ -200,7 +206,7 @@ describe('SpeakKey: dictating into the assistant', () => {
     expect(assistant.state.open).toBe(true);
     expect(posted).toEqual([]);
     expect(assistant.state.thread.bubbles).toEqual([]);
-    expect(k.button().text()).toBe('Hablar');
+    expect(k.accessibleName()).toBe('Hablar');
     expect(k.find('pos-speak-status').exists()).toBe(false);
     expect(toast).not.toHaveBeenCalled();
     expect(toastWarning).not.toHaveBeenCalled();
@@ -238,7 +244,7 @@ describe('SpeakKey: dictating into the assistant', () => {
     await k.press();
     expect(toast).toHaveBeenCalledWith({ message: 'No se ha podido transcribir el audio. Inténtalo de nuevo.', tone: 'error' });
     expect(assistant.state.open).toBe(false);
-    expect(k.button().text()).toBe('Hablar');
+    expect(k.accessibleName()).toBe('Hablar');
   });
 
   it('a recording longer than erplora.com takes is not sent: a toast says to say something shorter', async () => {
@@ -255,7 +261,7 @@ describe('SpeakKey: dictating into the assistant', () => {
     const k = await key({ voice });
     await k.press();
     expect(toast).toHaveBeenCalledWith({ message: 'El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.', tone: 'warning' });
-    expect(k.button().text()).toBe('Hablar');
+    expect(k.accessibleName()).toBe('Hablar');
     expect(k.find('pos-speak-status').exists()).toBe(false);
   });
 
@@ -305,7 +311,7 @@ describe('SpeakKey: dictating into the assistant', () => {
     expect(voice.getUserMedia).toHaveBeenCalledTimes(1);
     grant({ getTracks: () => [{ stop: released }] } as unknown as MediaStream);
     await settle();
-    expect(k.button().text()).toBe('Parar');
+    expect(k.accessibleName()).toBe('Parar');
     await k.press();
     expect(released).toHaveBeenCalledTimes(1);
     expect(k.transcriptions()).toHaveLength(1);
@@ -383,7 +389,7 @@ describe('SpeakKey: without connection', () => {
     expect(voice.released).toHaveBeenCalled();
     expect(k.transcriptions()).toEqual([]);
     expect(toastWarning).toHaveBeenCalledWith('Sin conexión: para hablar con el asistente hace falta internet.');
-    expect(k.button().text()).toBe('Hablar');
+    expect(k.accessibleName()).toBe('Hablar');
     expect(k.button().attributes('aria-disabled')).toBe('true');
   });
 });

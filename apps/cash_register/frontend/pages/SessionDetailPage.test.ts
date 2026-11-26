@@ -15,6 +15,7 @@ import SessionSummary from '../components/SessionSummary.vue';
 import { PrintRefused } from '../../../../base/frontend/lib/print-paper';
 import * as print from '../lib/print';
 import SessionDetailPage from './SessionDetailPage.vue';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'cash_register.session.get';
 
@@ -170,6 +171,8 @@ describe('SessionDetailPage', () => {
     const m = await setup('es');
     await m.result(OP, SESSION);
     expect(m.find('cash-register-detail-title').text()).toBe('Detalle de la sesión · S-261014-0001');
-    expect(m.find('cash-register-detail-print').text()).toContain('Imprimir');
+    const printButton = m.find('cash-register-detail-print');
+    // The printer icon alone: «Imprimir» is its name and its tooltip.
+    expect([printButton.text(), accessibleName(printButton.element), printButton.attributes('title')]).toEqual(['', 'Imprimir', 'Imprimir']);
   });
 });
