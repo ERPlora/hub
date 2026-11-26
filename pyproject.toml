@@ -165,7 +165,7 @@ ancestors = [
     "base", "base.api", "base.blueprint", "base.catalog", "base.files", "base.home", "base.models", "base.tenancy",
     "base.tenancy.migrator", "base.tenancy.move", "base.services", "base.queries", "base.schemas", "base.ws_print",
     "control", "control.models", "control.services", "control.queries", "apps.*", "apps.*.services", "apps.*.queries",
-    "apps.*.schemas",
+    "apps.*.schemas", "apps.*.models",
 ]
 depth = 0
 ignore_imports = [
@@ -413,7 +413,7 @@ type = "forbidden"
 source_modules = ["apps.online_order"]
 forbidden_modules = [
     "apps.appointment", "apps.attendance", "apps.cart_checkout", "apps.cash_register", "apps.combo", "apps.customer",
-    "apps.demo", "apps.flow", "apps.inventory", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
+    "apps.demo", "apps.flow", "apps.invoice", "apps.kitchen", "apps.modifier", "apps.online_booking",
     "apps.payment", "apps.pricing", "apps.printing", "apps.reservation", "apps.sale", "apps.schedule", "apps.service",
     "apps.staff", "apps.task", "apps.tax", "apps.tip", "apps.verifactu", "apps.website", "apps.whatsapp_inbox",
     "config", "control", "shared",

@@ -8,7 +8,8 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import Package, PackageItem, Service
+from apps.service.models.catalog import Service
+from apps.service.models.packages import Package, PackageItem
 from apps.service.queries.catalog import find_service
 from apps.service.queries.packages import find_package, load_package
 from apps.service.queries.reads import held_rows

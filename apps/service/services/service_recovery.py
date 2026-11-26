@@ -6,7 +6,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.operations import INTERNAL, operation
 
-from apps.service.models import Assignment, Service
+from apps.service.models.catalog import Assignment, Service
 from apps.service.queries.catalog import find_service, load_service
 from apps.service.queries.reads import SYSTEM
 from apps.service.schemas.assignments import AssignIn, AssignmentPatchIn
