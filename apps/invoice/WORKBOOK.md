@@ -784,7 +784,9 @@ aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora n
 se descarga: la API y el asistente dicen «Factura no encontrada.». Pedida al asistente, solo se hace si una impresora
 del sistema la recibe; si no, su recibo dice «No se hizo, falló: Imprimir en Facturación.» con el motivo, «Ninguna
 impresora del sistema recibe esta factura: ábrela para imprimirla o guardarla en PDF.» o, si no se puede leer su
-registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.».
+registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.». Si la impresora la
+recibe pero ningún dispositivo encendido imprime su cola, el asistente dice que queda en la cola de esa impresora y que
+saldrá cuando un dispositivo dado de alta la imprima, nunca que la ha impreso.
 Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Marcar una factura como pagada
