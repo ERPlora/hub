@@ -14,6 +14,7 @@ import { useRouter } from 'vue-router';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
+import { answerCounts } from '../lib/format';
 import { statusTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 import type { QueueRowOut } from '../operations';
@@ -59,12 +60,7 @@ async function processQueue(): Promise<void> {
       ? { tone: 'warning', text: answer.message }
       : {
           tone: 'success',
-          text: t('verifactu.contingency.processed', {
-            sent: answer.sent,
-            accepted: answer.accepted + answer.accepted_with_errors,
-            rejected: answer.rejected,
-            waiting: answer.waiting,
-          }),
+          text: t('verifactu.contingency.processed', answerCounts(answer, t)),
         };
   } catch {
     outcome.value = { tone: 'danger', text: refusal(process.error.value, t('verifactu.contingency.processFailed'))?.message ?? t('verifactu.contingency.processFailed') };

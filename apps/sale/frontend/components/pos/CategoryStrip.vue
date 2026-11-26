@@ -28,8 +28,8 @@ const emit = defineEmits<{ loadMore: [] }>();
 const t = useT();
 const ALL = 'all';
 
-const count = (n: number) => (n === 1 ? t('sale.pos.itemCountOne') : t('sale.pos.itemCount', { count: n }));
-const serviceCount = (n: number) => (n === 1 ? t('sale.pos.serviceCountOne') : t('sale.pos.serviceCount', { count: n }));
+const count = (n: number) => t('sale.pos.itemCount', { count: n });
+const serviceCount = (n: number) => t('sale.pos.serviceCount', { count: n });
 
 function onChange(event: CustomEvent<{ value?: string | number }>): void {
   const value = String(event.detail.value ?? ALL);
