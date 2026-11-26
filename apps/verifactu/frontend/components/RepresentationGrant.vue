@@ -455,6 +455,7 @@ function historyLabel(step: RepresentationOut['history'][number]): string {
               size="small"
               color="medium"
               :aria-label="$t('verifactu.grant.remove', { name: files[name]?.name ?? '' })"
+              :title="$t('verifactu.grant.remove', { name: files[name]?.name ?? '' })"
               :data-testid="`verifactu-grant-remove-${name}`"
               @click="files[name] = null"
             >

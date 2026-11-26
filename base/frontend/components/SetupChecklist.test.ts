@@ -2,6 +2,7 @@ import { IonProgressBar } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { setupItem, setupStatus } from '../__tests__/home-fixtures';
+import { iconOnly, iconOnlyNamed } from '../__tests__/icon-only';
 import type { SetupItem, SetupStatus } from '../operations/home';
 import { errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import { createAssistant, installAssistant } from '@erplora/ui/components';
@@ -141,14 +142,14 @@ describe('SetupChecklist', () => {
     expect(error.find('[data-testid="setup-retry"]').exists()).toBe(true);
   });
 
-  it('«Ask the assistant» opens the assistant on the setup, while something is left', async () => {
+  it('«Ask the assistant» is its sparkles alone and opens the assistant on the setup, while something is left', async () => {
     const assistant = createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined });
     installAssistant(assistant);
     try {
       const s = await setup({ locale: 'es' });
       await s.show(status([item('base.business', { state: 'pending' }), item('base.team', { state: 'done' })]));
       const ask = s.wrapper.get('[data-testid="setup-review"]');
-      expect(ask.text()).toBe('Pedírselo al asistente');
+      expect(iconOnly(ask)).toEqual(iconOnlyNamed('Pedírselo al asistente'));
       await ask.trigger('click');
       expect([assistant.state.open, assistant.state.thread.setup]).toEqual([true, true]);
       await s.show(status([item('base.business', { state: 'done' })]), 2);

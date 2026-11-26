@@ -2,18 +2,18 @@
 // On a phone, in Spanish, the bar of «Automatizaciones» must not read «A» (375 px) or «A…» (390 px) because its one
 // action, «Nueva automatización» with its icon and its text, takes the whole width. The owner of hub `a` opens the list in Spanish at
 // 375, 390, 834 and 1440 px: the title is read whole (its `.toolbar-title` not cut with «…») and «Nueva automatización»
-// is still one tap away, by its name. On a phone it is only its «+» (Material's top app bar, iOS's navigation bars),
-// from a tablet on, its icon and its text. No sideways scroll. Each width leaves its capture. Nothing is created.
+// is still one tap away, by its name. At every size it is only its «+», named and titled «Nueva automatización». No
+// sideways scroll. Each width leaves its capture. Nothing is created.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE';
 const SIZES = [
-  { label: '375', width: 375, height: 667, phone: true },
-  { label: '390', width: 390, height: 844, phone: true },
-  { label: '834', width: 834, height: 1112, phone: false },
-  { label: '1440', width: 1440, height: 900, phone: false },
+  { label: '375', width: 375, height: 667 },
+  { label: '390', width: 390, height: 844 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1440', width: 1440, height: 900 },
 ];
 
 /** The owner on `a` in Spanish at `viewport`, on «Automatizaciones». */
@@ -48,9 +48,10 @@ for (const size of SIZES) {
       });
       expect(cut, `the title «Automatizaciones» at ${size.label} is read whole`).toBe(false);
 
-      // On a phone the action is its «+» alone; from a tablet on, its words are on screen too.
+      // The action is its «+» alone at every size, its name as its title.
       const words = await shown(page).locator('[data-testid=flow-new]').evaluate((el) => (el as HTMLElement).innerText.trim());
-      expect(words, `the words of the action at ${size.label}`).toBe(size.phone ? '' : 'Nueva automatización');
+      expect(words, `the words of the action at ${size.label}`).toBe('');
+      await expect(shown(page).locator('[data-testid=flow-new]')).toHaveAttribute('title', 'Nueva automatización');
 
       const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);

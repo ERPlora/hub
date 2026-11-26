@@ -100,11 +100,10 @@ gallery**, with ready-made automations to start from and the ones other apps bri
 and each row open the editor, and **How does this work?** opens the guide.
 
 #### What it shows, from top to bottom
-<!-- from WORKBOOK.md sha256:2a6d9b6c391c -->
+<!-- from WORKBOOK.md sha256:ffe93a8a999d -->
 Menu **Automations**, a single entry. From top to bottom:
 
-- The **New automation** button, top right; on a phone it is only its **+**, so that the title can be read
-  in full.
+- The **New automation** button, top right: only its **+**, with its name on hover.
 - **Waiting for your answer** — only if there is some question you can answer: each card, which automation
   it comes from, the question and its details (in a change by the assistant, also, right below the
   question, what it wants to do —"Cancel a reservation"— and each piece of data it would send, in words),

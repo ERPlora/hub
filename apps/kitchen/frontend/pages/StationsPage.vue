@@ -120,6 +120,9 @@ const routeColumns = computed<DataTableColumn<RouteOut>[]>(() => [
 const routeActions = computed<DataTableAction<RouteOut>[]>(() =>
   canManage.value ? [{ id: 'remove', label: t('kitchen.routing.remove'), icon: 'close-circle-outline', color: 'danger' }] : [],
 );
+const routePrimary = computed(() =>
+  canManage.value ? { label: t('kitchen.routing.route'), icon: 'swap-horizontal-outline', showLabel: true } : undefined,
+);
 const clear = useCommand('kitchen.routing.clear');
 const routeError = ref<ApiError | null>(null);
 
@@ -232,7 +235,7 @@ async function onRouteAction({ row }: { actionId: string; row: RouteOut }): Prom
         :loading="routingStatus === 'loading'"
         :error="routingStatus === 'error' ? $t('kitchen.routing.loadError') : undefined"
         :actions="routeActions"
-        :primary-action="canManage ? { label: $t('kitchen.routing.route'), icon: 'swap-horizontal-outline' } : undefined"
+        :primary-action="routePrimary"
         :search-placeholder="$t('kitchen.routing.search')"
         :labels="{ loadError: $t('kitchen.routing.loadError'), retry: $t('kitchen.live.retry') }"
         :columns="routeColumns"

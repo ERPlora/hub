@@ -105,8 +105,7 @@ y cada fila abren el editor, y **¿Cómo funciona esto?** abre la guía.
 #### Lo que enseña, de arriba abajo
 Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 
-- El botón **Nueva automatización**, arriba a la derecha; en el móvil es solo su **+**, para que el título
-  se lea entero.
+- El botón **Nueva automatización**, arriba a la derecha: solo su **+**, con su nombre al pasar el ratón.
 - **Esperan tu respuesta** — solo si hay alguna pregunta que puedas contestar: cada tarjeta, de qué
   automatización viene, la pregunta y sus detalles (en un cambio del asistente, además, justo debajo de la
   pregunta, lo que quiere hacer —«Anular una reserva»— y cada dato que mandaría, en palabras), a quién se le hizo, qué pasa si nadie contesta y qué hace un no, **Añadir una nota

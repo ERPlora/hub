@@ -222,6 +222,7 @@ async function save(): Promise<void> {
           size="small"
           :data-testid="`${prefix}-up`"
           :aria-label="t('combo.courses.moveUp')"
+          :title="t('combo.courses.moveUp')"
           :disabled="index === 0"
           @click="emit('move', -1)"
         >
@@ -235,6 +236,7 @@ async function save(): Promise<void> {
           size="small"
           :data-testid="`${prefix}-down`"
           :aria-label="t('combo.courses.moveDown')"
+          :title="t('combo.courses.moveDown')"
           :disabled="index === count - 1"
           @click="emit('move', 1)"
         >
@@ -316,6 +318,7 @@ async function save(): Promise<void> {
               size="small"
               :data-testid="`combo-choice-${choice.id}-up`"
               :aria-label="t('combo.courses.moveUp')"
+              :title="t('combo.courses.moveUp')"
               :disabled="i === 0"
               @click="step(choice, -1)"
             >
@@ -329,6 +332,7 @@ async function save(): Promise<void> {
               size="small"
               :data-testid="`combo-choice-${choice.id}-down`"
               :aria-label="t('combo.courses.moveDown')"
+              :title="t('combo.courses.moveDown')"
               :disabled="i === options.length - 1"
               @click="step(choice, 1)"
             >
@@ -350,6 +354,7 @@ async function save(): Promise<void> {
               size="small"
               :data-testid="`combo-choice-${choice.id}-edit`"
               :aria-label="t('combo.choices.edit')"
+              :title="t('combo.choices.edit')"
               @click="startEdit(choice)"
             >
               <HubIcon
@@ -363,6 +368,7 @@ async function save(): Promise<void> {
               color="danger"
               :data-testid="`combo-choice-${choice.id}-delete`"
               :aria-label="t('combo.choices.delete')"
+              :title="t('combo.choices.delete')"
               @click="askRemove(choice)"
             >
               <HubIcon
