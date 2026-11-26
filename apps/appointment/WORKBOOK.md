@@ -922,7 +922,7 @@ agenda tuya que enseñar.».
   migración que quite o renombre una de sus columnas cambia también `appointments_in_copy` y su `reads_since`. Las
   series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
   negocio y su copia) y `base/tenancy/tests/test_recovery_appointments.py`.
-- Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
+- Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models/`, `migrations/`,
   `schemas/` (un módulo por tema), `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries/`
   (un módulo por tema), `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`

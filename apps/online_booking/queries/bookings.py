@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
-from apps.appointment.models import Appointment, AppointmentService
+from apps.appointment.models.appointments import Appointment, AppointmentService
 from apps.appointment.queries.business import day_bounds, now
 from apps.appointment.queries.ownership import APPOINTMENTS
 from apps.customer.models import Customer

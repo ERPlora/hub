@@ -9,7 +9,8 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.appointment import events
-from apps.appointment.models import Appointment, History, Recurring
+from apps.appointment.models.appointments import Appointment, History
+from apps.appointment.models.series import Recurring
 from apps.appointment.queries.business import now
 from apps.appointment.queries.reads import BUSY, MOVABLE
 from apps.appointment.schemas.reactions import (

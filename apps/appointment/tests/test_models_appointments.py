@@ -1,4 +1,4 @@
-"""Models of the appointment app: what the database itself refuses, and what a row looks like.
+"""Models of the appointments, their services and their history: what the database itself refuses, and what a row looks like.
 
 The operations check before writing; these constraints are the last line when two writes race or a
 second write path (the admin) skips the rules.
@@ -7,38 +7,21 @@ second write path (the admin) skips the rules.
 import datetime as dt
 import uuid
 
-import pytest
-from django.db import IntegrityError
-from live.operations import atomic
-
-from apps.appointment.models import (
-    Appointment,
-    AppointmentService,
-    BlockedTime,
-    Counter,
-    History,
-    Recurring,
-    RecurringService,
-    Settings,
-)
+from apps.appointment.models.appointments import Appointment, AppointmentService, History
+from apps.appointment.models.series import Recurring
 
 from .conftest import (
     HUB_DB,
     MONDAY,
     at,
     make_appointment,
-    make_block,
     make_customer,
     make_member,
     make_service,
+    refused,
 )
 
 pytestmark = HUB_DB
-
-
-def refused(make):
-    with pytest.raises(IntegrityError), atomic():
-        make()
 
 
 def test_every_key_is_a_uuid7():
@@ -46,38 +29,6 @@ def test_every_key_is_a_uuid7():
     appointment = make_appointment(customer, ana, [cut], at(MONDAY, "10:00"))
     assert isinstance(appointment.id, uuid.UUID) and appointment.id.version == 7
     assert appointment.lines.get().id.version == 7
-
-
-def test_the_factory_settings_are_one_set():
-    settings = Settings()
-    assert (
-        settings.default_duration,
-        settings.min_booking_notice,
-        settings.max_advance_booking,
-        settings.allow_overlapping,
-        settings.allow_customer_cancellation,
-        settings.cancellation_notice_hours,
-        settings.calendar_start_hour,
-        settings.calendar_end_hour,
-        settings.slot_interval,
-        settings.auto_confirm_online,
-    ) == (60, 60, 90, True, True, 24, 8, 20, 15, True)
-
-
-def test_the_settings_are_a_single_row():
-    Settings.objects.create()
-    refused(lambda: Settings.objects.create())
-
-
-def test_the_calendar_window_never_ends_before_it_starts():
-    refused(
-        lambda: Settings.objects.create(calendar_start_hour=20, calendar_end_hour=8)
-    )
-
-
-def test_one_counter_per_day():
-    Counter.objects.create(day=MONDAY, last_number=3)
-    refused(lambda: Counter.objects.create(day=MONDAY))
 
 
 def test_an_appointment_ends_after_it_starts_and_its_number_is_unique():
@@ -150,43 +101,6 @@ def test_a_line_keeps_the_service_it_was_booked_with():
             position=0,
         )
     )
-
-
-def test_a_series_refuses_a_rule_that_cannot_repeat():
-    customer, ana = make_customer(), make_member()
-    base = {
-        "customer": customer,
-        "customer_name": customer.name,
-        "staff": ana,
-        "staff_name": ana.full_name,
-        "time": dt.time(10),
-        "duration_minutes": 30,
-        "start_date": MONDAY,
-    }
-    refused(lambda: Recurring.objects.create(frequency="yearly", **base))
-    refused(lambda: Recurring.objects.create(frequency="weekly", day_of_week=7, **base))
-    refused(
-        lambda: Recurring.objects.create(
-            frequency="weekly", end_date=MONDAY - dt.timedelta(days=1), **base
-        )
-    )
-    refused(
-        lambda: Recurring.objects.create(frequency="weekly", max_occurrences=0, **base)
-    )
-    series = Recurring.objects.create(frequency="weekly", **base)
-    RecurringService.objects.create(
-        recurring=series, service=make_service(), position=0
-    )
-    assert series.lines.count() == 1
-
-
-def test_a_block_ends_after_it_starts():
-    make_block(at(MONDAY, "10:00"), at(MONDAY, "11:00"))
-    refused(lambda: make_block(at(MONDAY, "11:00"), at(MONDAY, "11:00")))
-    refused(
-        lambda: make_block(at(MONDAY, "11:00"), at(MONDAY, "12:00"), block_type="party")
-    )
-    assert BlockedTime.objects.count() == 1
 
 
 def test_history_belongs_to_its_appointment():

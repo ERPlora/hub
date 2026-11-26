@@ -18,7 +18,7 @@ import json
 import pytest
 from django.utils import timezone
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.tests.conftest import (  # noqa: F401 - anytime is a fixture
     MONDAY,
     anytime,

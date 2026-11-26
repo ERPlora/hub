@@ -190,7 +190,7 @@ def make_customer(name: str = "Lucía Pérez", **fields):
 
 def make_rules(**fields):
     """The booking rules of Citas (its settings row)."""
-    from apps.appointment.models import Settings
+    from apps.appointment.models.settings import Settings
 
     Settings.objects.all().delete()
     return Settings.objects.create(**fields)
@@ -215,7 +215,7 @@ def make_appointment(
     **fields,
 ):
     """An appointment straight in the table (no rules applied), its service lines frozen from the catalog."""
-    from apps.appointment.models import Appointment, AppointmentService
+    from apps.appointment.models.appointments import Appointment, AppointmentService
 
     services = list(services)
     minutes = sum(service.duration_minutes for service in services)

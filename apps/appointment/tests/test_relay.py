@@ -10,7 +10,8 @@ what these tests write is committed.
 import pytest
 from live.models import OutboxEvent
 
-from apps.appointment.models import Appointment, Recurring
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring
 from apps.sale.models import Order
 from apps.tax.models import TaxCategory
 from base.models.relay import EventDelivery

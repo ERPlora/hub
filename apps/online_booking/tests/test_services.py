@@ -18,8 +18,8 @@ from live.errors import (
 from live.models import OutboxEvent
 from live.outbox import channel_for
 
-from apps.appointment.models import Appointment, History
-from apps.appointment.models import Settings as Rules
+from apps.appointment.models.appointments import Appointment, History
+from apps.appointment.models.settings import Settings as Rules
 from apps.customer.models import Customer
 from apps.online_booking import services
 from apps.online_booking.models import Booking, Settings
