@@ -13,7 +13,7 @@ from live.operations import get, registry
 
 from apps.sale.models import Sale, SaleLine, VoucherSession
 from apps.sale.tests.conftest import HUB_DB, by_staff, charge, charged_open, ctx_for, pay_with, professional, redeem, refund, run, spend_session, svc, voucher_of_100
-from apps.service.models import Grant, Redemption
+from apps.service.models.grants import Grant, Redemption
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 

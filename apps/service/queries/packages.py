@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.service.models import Package, PackageItem
+from apps.service.models.packages import Package, PackageItem
 from apps.service.queries.reads import _page, _resolve
 from apps.service.schemas.fields import PackageRefIn
 from apps.service.schemas.packages import PackageListIn, PackageOut, PackagePage

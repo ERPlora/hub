@@ -164,7 +164,7 @@ def make_day(weekday: int, *intervals: tuple[str, str], closed: bool = False):
 def make_service(
     name: str = "Haircut", *, price: int = 2000, duration: int = 30, **fields
 ):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     return Service.objects.create(
         name=name, price=price, duration_minutes=duration, **fields
@@ -178,7 +178,7 @@ def make_member(first_name: str = "Ana", last_name: str = "López", **fields):
 
 
 def assign(service, member, **fields):
-    from apps.service.models import Assignment
+    from apps.service.models.catalog import Assignment
 
     return Assignment.objects.create(service=service, member=member, **fields)
 

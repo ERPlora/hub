@@ -167,7 +167,7 @@ def test_a_service_without_a_fixed_price_is_charged_at_the_price_booked(db):
 
 
 def test_the_check_charges_what_was_booked_the_professionals_own_price_and_an_old_price_included(db):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     from .conftest import assign
 

@@ -3,7 +3,7 @@
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.service.models import ServiceSettings
+from apps.service.models.settings import ServiceSettings
 from apps.service.schemas.fields import NoIn
 from apps.service.schemas.settings import SettingsOut
 
