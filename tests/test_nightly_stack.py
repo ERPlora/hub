@@ -335,7 +335,7 @@ def test_the_proxy_settings_are_the_var_value_words_printed():
 def test_a_command_that_cannot_start_is_said_and_fails(capsys, tmp_path):
     assert nightly_stack.run(["no-such-command-anywhere"]).returncode == 127
     folder = str(tmp_path)
-    settings = nightly_stack.Settings(folder, folder, folder, folder, 9770, 1, 1, 1, "ERPlora/hub")
+    settings = nightly_stack.Settings(folder, folder, folder, folder, 9770, 1, 1, 1)
     night = nightly_stack.Night(settings, folder, [])
     assert night.start(["no-such-command-anywhere"], folder, {}) is None
     assert night.started == []

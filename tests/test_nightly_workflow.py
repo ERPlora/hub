@@ -130,8 +130,8 @@ def test_the_report_reads_every_shard_whatever_their_result_and_keeps_the_issue_
     assert download["continue-on-error"] is True
     step = step_using(job, "scripts/e2e_report.py")
     assert step["env"]["REPORTS"] == download["with"]["path"]
-    assert step["run"].split("\n")[-2:] == ['find "$REPORTS" -name results.json -exec cat {} + > "$REPORT"',
-                                            "python3 scripts/e2e_report.py"]
+    assert step["run"].splitlines()[-2:] == ['find "$REPORTS" -name results.json -exec cat {} + > "$REPORT"',
+                                             "python3 scripts/e2e_report.py"]
     assert step["env"]["RESULT"] == "${{ needs.e2e.result }}"
     assert step["env"]["SHA"] == "${{ github.sha }}"
     assert step["env"]["PUBLISH"] == "${{ github.ref == 'refs/heads/main' }}"
