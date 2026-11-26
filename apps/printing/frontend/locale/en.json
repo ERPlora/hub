@@ -115,6 +115,7 @@
       "thisPrints": "This device prints for: {printers}.",
       "thisNotSetUp": "This device does not print yet: «Print from this device» sets it up with the printers it reaches.",
       "thisAskSomeone": "This device does not print here: someone who manages the printers sets it up from it.",
+      "browser": "A browser cannot print: the paper comes out of the ERPlora app. Install it on the device next to the printers and set that device up from the app, in Printing → Devices.",
       "actions": {
         "edit": "Edit",
         "retire": "Retire"
