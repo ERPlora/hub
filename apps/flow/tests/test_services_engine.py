@@ -266,10 +266,7 @@ def test_a_step_it_was_not_allowed_stops_the_run_and_says_why():
     deliver()
     run_ = FlowRun.objects.get()
     assert (run_.status, run_.error_code) == (FlowRun.Status.FAILED, "flow.not_allowed")
-    assert run_.error_message == (
-        "It tried to do something you have not allowed it to do («task.task.create»), so it stopped. "
-        "Open Permissions and allow what it needs."
-    )
+    assert run_.error_message == "It tried to do something you have not allowed it to do («Create a task»), so it stopped."
     assert run_.log[0]["outcome"] == "failed"
     assert Task.objects.count() == 0
 
