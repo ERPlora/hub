@@ -39,12 +39,18 @@ describe('BasketSheet', () => {
 
   it('asks one more or one less of a line', async () => {
     const s = await setup([CROQUETTES]);
-    await click(s.inDoc('oo-order-more-1'));
-    await click(s.inDoc('oo-order-less-1'));
+    await click(s.inDoc('oo-order-qty-1-plus'));
+    await click(s.inDoc('oo-order-qty-1-minus'));
     expect(s.wrapper.emitted('quantity')).toEqual([
       [1, 3],
       [1, 1],
     ]);
+  });
+
+  it('takes no more than twenty of a line, as the order is taken', async () => {
+    const s = await setup([{ ...CROQUETTES, quantity: 20 }]);
+    expect((s.inDoc('oo-order-qty-1-plus') as HTMLButtonElement).disabled).toBe(true);
+    expect((s.inDoc('oo-order-qty-1-minus') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('says the order is empty and sends nothing', async () => {

@@ -2,8 +2,8 @@
 // The order a customer is about to send from their table: each line with what goes with it, its note, one less and one
 // more, and its amount; the total; «Send order». The amounts are the menu's as the page shows them: the server prices
 // the order again when it arrives. One less of a line of one takes it out.
-import { EmptyState, FormModal, type FormModalError, formatMoney, type Money } from '@erplora/ui/components';
-import { IonButton, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
+import { EmptyState, FormModal, type FormModalError, formatMoney, type Money, QuantityStepper } from '@erplora/ui/components';
+import { IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useBaseI18n } from '../../../../base/frontend/lib/i18n';
@@ -65,24 +65,13 @@ function picked(line: BasketLine): string {
           </p>
           <p>{{ money(unitPrice(line) * line.quantity) }}</p>
         </ion-label>
-        <ion-button
-          fill="clear"
-          :aria-label="line.quantity === 1 ? t('online_order.order.remove', { name: line.name }) : t('online_order.order.fewer')"
-          :data-testid="`oo-order-less-${line.key}`"
-          @click="$emit('quantity', line.key, line.quantity - 1)"
-        >
-          −
-        </ion-button>
-        <span :data-testid="`oo-order-quantity-${line.key}`">{{ line.quantity }}</span>
-        <ion-button
-          fill="clear"
-          :disabled="line.quantity >= MAX_QUANTITY"
-          :aria-label="t('online_order.order.another')"
-          :data-testid="`oo-order-more-${line.key}`"
-          @click="$emit('quantity', line.key, line.quantity + 1)"
-        >
-          +
-        </ion-button>
+        <QuantityStepper
+          :quantity="line.quantity"
+          :max="MAX_QUANTITY"
+          :decrease-label="line.quantity === 1 ? t('online_order.order.remove', { name: line.name }) : undefined"
+          :testid="`oo-order-qty-${line.key}`"
+          @change="$emit('quantity', line.key, Number($event))"
+        />
       </ion-item>
       <ion-item
         lines="none"

@@ -3,7 +3,7 @@
 // photo, what it is, its allergens and price, each group of what goes with it (a dish's options, a set menu's courses)
 // to pick from, how many and a note for the kitchen. «Add» waits until each group has what it asks; its price is the
 // menu's as the page shows it, and the server prices the order again.
-import { AllergenRow, FormModal, formatMoney, InlineFeedback, type Money } from '@erplora/ui/components';
+import { AllergenRow, FormModal, formatMoney, InlineFeedback, type Money, QuantityStepper } from '@erplora/ui/components';
 import { IonButton, IonImg, IonInput, IonItem, IonLabel, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
@@ -119,25 +119,14 @@ function add(): void {
       />
       <ion-item lines="none">
         <ion-label>{{ t('online_order.order.quantity') }}</ion-label>
-        <ion-button
-          fill="clear"
-          :disabled="quantity <= 1"
-          :aria-label="t('online_order.order.fewer')"
-          data-testid="oo-dish-fewer"
-          @click="quantity -= 1"
-        >
-          −
-        </ion-button>
-        <span data-testid="oo-dish-quantity">{{ quantity }}</span>
-        <ion-button
-          fill="clear"
-          :disabled="quantity >= MAX_QUANTITY"
-          :aria-label="t('online_order.order.another')"
-          data-testid="oo-dish-another"
-          @click="quantity += 1"
-        >
-          +
-        </ion-button>
+        <QuantityStepper
+          :quantity="quantity"
+          :min="1"
+          :max="MAX_QUANTITY"
+          :label="t('online_order.order.quantity')"
+          testid="oo-dish-qty"
+          @change="quantity = Number($event)"
+        />
       </ion-item>
       <ion-item lines="none">
         <ion-input

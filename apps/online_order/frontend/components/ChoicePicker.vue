@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // One group of what goes with a dish (a modifier group) or a set menu (a course), as a customer picks it on their
 // table's page: its name and how many to pick, and each choice with its allergens and what it adds. A choice that may
-// be repeated has one-less and one-more buttons with its count; the others are a checkbox, and once a group with a
+// be repeated has the quantity stepper with its count; the others are a checkbox, and once a group with a
 // ceiling above one is full its unchecked choices wait. The rules of a tap are the till's (`modifierChoice` of Sales).
-import { AllergenRow, formatMoney, type Money } from '@erplora/ui/components';
-import { IonButton, IonCheckbox, IonItem, IonLabel, IonList, IonListHeader, IonNote } from '@ionic/vue';
+import { AllergenRow, formatMoney, type Money, QuantityStepper } from '@erplora/ui/components';
+import { IonCheckbox, IonItem, IonLabel, IonList, IonListHeader, IonNote } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useBaseI18n } from '../../../../base/frontend/lib/i18n';
@@ -23,7 +23,7 @@ export interface PickGroup {
 }
 
 const props = defineProps<{ group: PickGroup; choice: Choice; money: Money | undefined }>();
-defineEmits<{ tap: [optionId: string]; less: [optionId: string] }>();
+const emit = defineEmits<{ tap: [optionId: string]; less: [optionId: string] }>();
 
 const { t, locale } = useBaseI18n();
 const rule = computed(() => {
@@ -33,6 +33,12 @@ const rule = computed(() => {
 const picked = computed(() => props.group.options.reduce((sum, option) => sum + countOf(props.choice, option.id), 0));
 /** A ceiling above one reached: a group of one swaps its choice instead. */
 const full = computed(() => props.group.max_choices > 1 && picked.value >= props.group.max_choices);
+
+/** One more of a choice that may repeat is a tap on it; one less takes it out once. */
+function step(optionId: string, next: number): void {
+  if (next > countOf(props.choice, optionId)) emit('tap', optionId);
+  else emit('less', optionId);
+}
 
 function delta(minor: number): string {
   if (minor === 0) return '';
@@ -74,25 +80,15 @@ function delta(minor: number): string {
           {{ option.name }}
           <AllergenRow :codes="option.allergens" />
         </ion-label>
-        <ion-button
-          fill="clear"
-          :disabled="countOf(choice, option.id) === 0"
-          :aria-label="t('online_order.order.less', { name: option.name })"
-          :data-testid="`oo-pick-less-${option.id}`"
-          @click="$emit('less', option.id)"
-        >
-          −
-        </ion-button>
-        <span :data-testid="`oo-pick-count-${option.id}`">{{ countOf(choice, option.id) }}</span>
-        <ion-button
-          fill="clear"
-          :disabled="full"
-          :aria-label="t('online_order.order.more', { name: option.name })"
-          :data-testid="`oo-pick-more-${option.id}`"
-          @click="$emit('tap', option.id)"
-        >
-          +
-        </ion-button>
+        <QuantityStepper
+          :quantity="countOf(choice, option.id)"
+          :max="full ? countOf(choice, option.id) : undefined"
+          :label="option.name"
+          :decrease-label="t('online_order.order.less', { name: option.name })"
+          :increase-label="t('online_order.order.more', { name: option.name })"
+          :testid="`oo-pick-qty-${option.id}`"
+          @change="(next) => step(option.id, Number(next))"
+        />
       </template>
       <ion-note
         v-if="option.price_delta"

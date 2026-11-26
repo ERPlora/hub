@@ -56,10 +56,17 @@ describe('ChoicePicker', () => {
 
   it('counts a choice that may repeat, with one less and one more', async () => {
     const s = await setup({ ...SAUCES, allow_repeat: true }, ['o1', 'o1']);
-    expect(s.wrapper.find('[data-testid="oo-pick-count-o1"]').text()).toBe('2');
-    expect(s.prop('oo-pick-less-o2', 'disabled')).toBe(true);
-    expect(s.prop('oo-pick-more-o3', 'disabled')).toBe(true);
-    await click(s.wrapper.find('[data-testid="oo-pick-less-o1"]').element);
+    expect((s.wrapper.find('[data-testid="oo-pick-qty-o1-field"]').element as HTMLInputElement).value).toBe('2');
+    expect(s.prop('oo-pick-qty-o2-minus', 'disabled')).toBe(true);
+    expect(s.prop('oo-pick-qty-o3-plus', 'disabled')).toBe(true);
+    await click(s.wrapper.find('[data-testid="oo-pick-qty-o1-minus"]').element);
     expect(s.wrapper.emitted('less')).toEqual([['o1']]);
+  });
+
+  it('asks one more of a choice that may repeat while its group has room', async () => {
+    const s = await setup({ ...SAUCES, allow_repeat: true }, ['o1']);
+    expect(s.prop('oo-pick-qty-o2-plus', 'disabled')).toBe(false);
+    await click(s.wrapper.find('[data-testid="oo-pick-qty-o2-plus"]').element);
+    expect(s.wrapper.emitted('tap')).toEqual([['o2']]);
   });
 });

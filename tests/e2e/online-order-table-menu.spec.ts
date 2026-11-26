@@ -134,7 +134,7 @@ test('ONLINE_ORDER-F04: the customer sends their order from the table; a QR rege
   await page.goto(`${A}/p/a/order/${code}`);
   const view = shown(page);
   await view.locator(`[data-testid=oo-menu-dish-${productId}]`).click();
-  await page.locator('[data-testid=oo-dish-another]').last().click();
+  await page.locator('[data-testid=oo-dish-qty-plus]').last().click();
   await page.locator('[data-testid=oo-menu-sheet-submit]').last().click();
   const bar = page.locator('[data-testid=oo-order-view]');
   await expect(bar).toHaveText('View order (2) · €15.00');

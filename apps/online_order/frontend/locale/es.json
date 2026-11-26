@@ -71,8 +71,6 @@
       "less": "Uno menos de {name}",
       "more": "Uno más de {name}",
       "quantity": "Cantidad",
-      "fewer": "Uno menos",
-      "another": "Uno más",
       "note": "Nota para cocina",
       "add": "Añadir · {price}",
       "view": "Ver pedido ({count}) · {total}",

@@ -269,7 +269,7 @@ async function addDish(s: Awaited<ReturnType<typeof setup>>, id: string, picks: 
   await click(s.inDoc(`oo-menu-dish-${id}`));
   await settle();
   for (const pick of picks) await ionValue(s.inDoc(`oo-pick-check-${pick}`), true);
-  for (let i = 0; i < more; i++) await click(s.inDoc('oo-dish-another'));
+  for (let i = 0; i < more; i++) await click(s.inDoc('oo-dish-qty-plus'));
   if (note) await ionValue(s.inDoc('oo-dish-note'), note, 'ionInput');
   await click(s.inDoc('oo-menu-sheet-submit'));
 }
@@ -301,6 +301,25 @@ describe('TableMenu: the order', () => {
     expect(disabled(s.inDoc('oo-menu-sheet-submit'))).toBe(true);
     await ionValue(s.inDoc('oo-pick-check-o2'), true);
     expect(disabled(s.inDoc('oo-menu-sheet-submit'))).toBe(false);
+  });
+
+  it('waits to add a dish whose options could not be read', async () => {
+    const s = await setup(MENU, new ApiError(500, 'server_error', 'boom'));
+    await click(s.inDoc('oo-menu-dish-p1'));
+    await settle();
+    expect(s.inDoc('oo-menu-options-error')).not.toBeNull();
+    expect(disabled(s.inDoc('oo-menu-sheet-submit'))).toBe(true);
+  });
+
+  it('takes up to twenty of a dish, as the order is taken', async () => {
+    const s = await setup();
+    await click(s.inDoc('oo-menu-dish-p2'));
+    const field = s.inDoc('oo-dish-qty-field') as HTMLInputElement;
+    field.value = '20';
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+    expect(disabled(s.inDoc('oo-dish-qty-plus'))).toBe(true);
+    expect(words(s.inDoc('oo-menu-sheet-submit')!)).toBe('Add · €24.00');
   });
 
   it('adds a set menu with a dish of each course', async () => {
@@ -353,7 +372,7 @@ describe('TableMenu: the order', () => {
     const s = await setup();
     await addDish(s, 'p2');
     await click(s.inDoc('oo-order-view'));
-    await click(s.inDoc('oo-order-less-1'));
+    await click(s.inDoc('oo-order-qty-1-minus'));
     expect(words(s.inDoc('oo-order-empty')!)).toContain('Your order is empty');
     expect(s.inDoc('oo-order-view')).toBeNull();
   });

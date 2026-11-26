@@ -1,11 +1,11 @@
 // Sell by weight (SALE-F10): a quantity typed on a line that does not fit the step of its unit is refused with the
 // server's reason, and the line and its field stay as they were.
+import { QuantityStepper } from '@erplora/ui/components';
 import { toastError } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { settle } from '../__tests__/mount-sale';
 import { posWithCheck } from '../__tests__/pos-with-check';
-import QtyStepper from '../components/pos/QtyStepper.vue';
 import { line, memoryStorage, order, refused } from '../components/pos/__tests__/fixtures';
 
 beforeEach(() => vi.stubGlobal('localStorage', memoryStorage()));
@@ -16,7 +16,7 @@ const OFF_GRID = 'La cantidad no encaja con el escalón del producto (0,001 kg).
 
 async function sellingPrawns() {
   const m = await posWithCheck(CHECK, { locale: 'es' });
-  const field = () => m.wrapper.findComponent(QtyStepper).find('input').element as HTMLInputElement;
+  const field = () => m.wrapper.findComponent(QuantityStepper).find('input').element as HTMLInputElement;
   const lineWrites = () =>
     m
       .sent()

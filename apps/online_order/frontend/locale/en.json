@@ -71,8 +71,6 @@
       "less": "One less {name}",
       "more": "One more {name}",
       "quantity": "Quantity",
-      "fewer": "One fewer",
-      "another": "One more",
       "note": "Note for the kitchen",
       "add": "Add · {price}",
       "view": "View order ({count}) · {total}",
