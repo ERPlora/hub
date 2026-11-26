@@ -64,11 +64,13 @@ async function expectBar(page: Page, size: Size): Promise<void> {
   const order = list.locator('[data-testid=flow-list-sort]');
   const funnel = list.locator('[data-testid=flow-list-filters-toggle]');
   const where = size.label;
-  const [searchBox, orderBox, funnelBox, bar] = await Promise.all([search, order, funnel, list.locator('.data-table__bar-main')].map(boxOf));
+  const [searchBox, orderBox, bar] = await Promise.all([search, order, list.locator('.data-table__bar-main')].map(boxOf));
 
   expect(orderBox.width, `${where}: «Order» as wide as what it shows`).toBeLessThanOrEqual(16 * 16 + 1);
   expect(await cutText(order), `${where}: «Order» cut`).toBe(false);
   expect(await searchTextOverflow(search), `${where}: the search box's text is cut`).toBeLessThanOrEqual(0);
+  await expect(funnel, `${where}: the filters button`).toBeVisible();
+  const funnelBox = await boxOf(funnel);
   if (size.width >= 1024) {
     for (const [name, box] of [['«Order»', orderBox], ['the filters button', funnelBox]] as const) {
       expect(Math.abs(box.top + box.bottom - searchBox.top - searchBox.bottom) / 2, `${where}: ${name} on the search's line`).toBeLessThanOrEqual(8);
