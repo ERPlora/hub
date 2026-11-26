@@ -27,6 +27,7 @@ from apps.service.schemas.catalog import (
 from apps.service.schemas.fields import ServiceRefIn
 from apps.service.services.writes import TAX_UNKNOWN, _actor, _apply, _changes, _refuse, _tax_category
 from apps.tax.queries.categories import held_categories
+from base.assistant import file_rows
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 
@@ -188,6 +189,7 @@ def create_service(ctx: OperationContext, data: ServiceIn) -> dict:
             ),
             "es": ("da de alta de golpe corte, tinte y peinado", "crea de una vez todos estos servicios de estética"),
         },
+        "summary": file_rows.rows_named_by("services", "name"),
     },
 )
 def bulk_create_services(ctx: OperationContext, data: ServiceBulkIn) -> dict:
