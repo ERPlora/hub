@@ -14,7 +14,7 @@ import AssistantSetupEmpty from './AssistantSetupEmpty.vue';
 import ChangeBusinessDialog from './ChangeBusinessDialog.vue';
 import DeviceNotices from './DeviceNotices.vue';
 import HelpEntry from './HelpEntry.vue';
-import LanguageFollower from './LanguageFollower.vue';
+import PreferencesFollower from './PreferencesFollower.vue';
 import ReportProblemDialog from './ReportProblemDialog.vue';
 import SystemBackButton from './SystemBackButton.vue';
 </script>
@@ -31,7 +31,7 @@ import SystemBackButton from './SystemBackButton.vue';
   </AssistantPanel>
   <AppsFollower />
   <AccessFollower />
-  <LanguageFollower />
+  <PreferencesFollower />
   <ReportProblemDialog />
   <ChangeBusinessDialog />
   <SystemBackButton />

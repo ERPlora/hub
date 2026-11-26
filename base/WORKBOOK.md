@@ -1932,7 +1932,9 @@ Pasos:
      su dato («Idioma: English», «Tamaño de la interfaz: 110%»; lo que vuelve a ser del negocio, por su nombre: «El
      idioma del negocio»). Al confirmarla cambia solo eso, y el tema, la
      paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
-     aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo.
+     aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo. Con la
+     apariencia («ponme el modo oscuro»), igual: la aplicación abierta pasa al tema, la paleta o el tamaño nuevos sin
+     recargar.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,

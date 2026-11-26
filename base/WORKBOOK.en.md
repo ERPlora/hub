@@ -2007,7 +2007,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:d3f6f60ee728 -->
+<!-- from WORKBOOK.md sha256:bb07e845a4d9 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2029,7 +2029,8 @@ Steps:
      business's language"). On confirming it only that changes, and
      the theme, the palette and the size they did not name stay as they were. The new language applies just as from the
      selector: the open application switches to it without reloading, and stays in it on reloading or opening it again
-     on this device.
+     on this device. The same with the appearance ("put the app in dark mode"): the open application switches to the
+     new theme, palette or size without reloading.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"), their photo, their language and their
 appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
