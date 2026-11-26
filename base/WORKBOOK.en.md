@@ -2008,7 +2008,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:f5fff0f123b1 -->
+<!-- from WORKBOOK.md sha256:d3f6f60ee728 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2025,8 +2025,9 @@ Steps:
      and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
      (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
      Home.
-  5. If they ask the assistant for it ("switch me to English"), the card says only what they asked for ("English";
-     what goes back to the business's, by its name: "The business's language"). On confirming it only that changes, and
+  5. If they ask the assistant for it ("switch me to English"), the card says only what they asked for, with the name
+     of its datum ("Language: English", "Interface scale: 110%"; what goes back to the business's, by its name: "The
+     business's language"). On confirming it only that changes, and
      the theme, the palette and the size they did not name stay as they were. The new language applies just as from the
      selector: the open application switches to it without reloading, and stays in it on reloading or opening it again
      on this device.
@@ -2943,7 +2944,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:2ac115069559 -->
+<!-- from WORKBOOK.md sha256:d2fdb23a0674 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2955,10 +2956,11 @@ Steps:
   2. Before doing it, "Run this action?" shows over everything, with the action, the app and its first data in one line,
      for example "Create in Services: Haircut · Price: €15.00 · Duration (minutes): 30". The first, what the action
      touches (its record or its name), shows by its value alone when it reads on its own (a name, a record, a date or
-     records by their names); each datum after it, and a figure, an amount or a yes or a no in first place, carries the
-     name of its datum in front, the same as on its screen, because alone it does not say what it is: "Change in
-     Services: Highlights · Minimum price: €65.00", never "Highlights · €65.00", which reads the same as its price;
-     "Create in Sales & POS: Misc · Tax category: Product — generic · 21% · Position: 0"; "Open in Tables: Table: 4 ·
+     records by their names); each datum after it, and a figure, an amount, a yes or a no or a value of a closed list in
+     first place, carries the name of its datum in front, the same as on its screen, because alone it does not say what
+     it is: "Change in Services: Highlights · Minimum price: €65.00", never "Highlights · €65.00", which reads the same
+     as its price; "Change in My profile: Interface scale: 110%" and "Change in Time clock: Allowed radius (m): 50 m",
+     never a bare "110%" or "50 m", which do not say what changes; "Create in Sales & POS: Misc · Tax category: Product — generic · 21% · Position: 0"; "Open in Tables: Table: 4 ·
      Guests: 3". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
      understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
