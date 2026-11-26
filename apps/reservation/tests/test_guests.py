@@ -98,3 +98,22 @@ def test_the_check_is_only_on_the_card_and_only_for_who_may_take_reservations():
     op = get(CHECK)
     with pytest.raises(PermissionDenied):
         op(reader, op.input.model_validate({**BY_PHONE, "date": "2026-10-15", "time": "14:00", "party_size": 4}))
+
+
+def test_among_several_cards_with_the_phone_the_name_said_picks_hers_whatever_its_case_and_accents():
+    open_week()
+    ana = make_customer("Ana García", phone="+34600111222")
+    lucia = make_customer("Lucía Gómez", phone="+34600111222")
+    assert book(ctx=employee(), **{**BY_PHONE, "guest_name": "lucia gomez"}).customer_id == lucia.id
+    # With the phone alone, the first by name: the card says her before the yes.
+    assert book(ctx=employee(), **{**BY_PHONE, "time": "13:00"}).customer_id == ana.id
+    assert Customer.objects.count() == 2
+
+
+def test_the_card_of_a_booking_names_nobody_by_her_phone_for_who_does_not_see_the_customers_contact():
+    make_customer("Lucía Gómez", phone="+34600111222")
+    said = {**BY_PHONE, "date": "2026-10-15", "time": "14:00", "party_size": 4}
+    summary = get("reservation.reservation.create").ai["summary"]
+    blind = ctx_for(permissions=employee().permissions - {VIEW_CUSTOMER_CONTACT})
+    assert [field["value"] for field in summary(employee(), said, [])] == ["Lucía Gómez"]
+    assert summary(blind, said, []) == []

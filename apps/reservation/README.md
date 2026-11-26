@@ -41,7 +41,7 @@ sentar abre su cuenta en Ventas. Las reservas que el cliente hace o cambia por W
 | Usa de otras apps | la retención y la sesión de mesa de Mesas, la ficha de Clientes (buscar o crear por teléfono), el horario de Horarios |
 | Quién la usa | la Bandeja de WhatsApp (receta `reservation_from_whatsapp`, «Reservar mesa», y `reservation_confirmed`), Automatizaciones, Mesas (lo que retiene y suelta), el asistente |
 | Pantallas | `/reservation/reservations`, `/reservation/waitlist`, `/reservation/availability` y `/reservation/settings` |
-| Operaciones | 11 consultas (`queries/`) y 20 acciones (`services/`), todas con `ai=`; 29 rutas en `/api/reservation/…` |
+| Operaciones | 12 consultas (`queries/`) y 20 acciones (`services/`), todas con `ai=`; 29 rutas en `/api/reservation/…` (sin ruta: `reservation.reservation.check`, que comprueba para quién es una reserva antes de la tarjeta del asistente) |
 | Eventos | 16 (`events.py`): `reservation.reservation.{created,updated,status_changed,deleted,unconfirmed_released}`, `reservation.waitlist.{created,updated,deleted,converted}`, `reservation.time_slot.{created,deleted}`, `reservation.blocked_date.{created,deleted}`, `reservation.settings.updated` y `reservation.customer.{reassigned,erased}`; reacciona a `customer.customer.merged` y `customer.customer.erased` |
 | Tarea programada | `release_unconfirmed_reservations` cada 15 minutos (`collapse`), en cada negocio y con su ámbito (`base.hub_visits`) |
 | Migraciones | `0001_initial` y `0002_guest_phone_e164` |
