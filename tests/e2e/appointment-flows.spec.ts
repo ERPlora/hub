@@ -187,8 +187,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       // APPOINTMENT-F02, F01: «Add appointment» with her card, the service, its professional and a free time.
       await view.locator('[data-testid=appointment-list-add]').click();
       const form = page.locator('ion-modal[data-testid=appointment-form]');
-      // Still empty, «Duration (min)» sits full size inside its box: it reads whole there too.
-      await expect(form.locator('[data-testid=appointment-form-minutes]')).toBeVisible();
+      // Still empty, every label of the panel reads whole.
+      await expect(form.locator('[data-testid=appointment-form-duration]')).toBeVisible();
       expect(await cutLabels(form), `labels cut in the empty appointment form at ${vp.label}`).toEqual([]);
       await chooseCustomer(page, 'appointment-form', who);
       await pick(page, 'appointment-form-service-add', word(who.service.name), who.service.name);
@@ -216,6 +216,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await rowAction(page, 'appointment-list', first.id, 'edit');
       await expect(form).toBeVisible();
       await expect(form.locator('ion-title')).toHaveText('Edit appointment');
+      await form.locator('[data-testid=appointment-form-notes-fold-toggle]').click();
       await form.locator('[data-testid=appointment-form-notes] textarea').fill('Bring the colour reference');
       await capture(page, 'APPOINTMENT-F22');
       await pickTime(page, form.locator('[data-testid=appointment-form-time]'), '11:00');

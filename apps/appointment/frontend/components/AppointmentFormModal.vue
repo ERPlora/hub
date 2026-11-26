@@ -543,33 +543,37 @@ function thisOnly(): void {
 </template>
 
 <style scoped>
-/* Phone: one column, the professional and the day side by side. The columns' boxes step aside (`contents`) so their
-   fields share the panel's grid, and `dense` brings the day up beside the professional. */
-.appointment-form {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-flow: row dense;
-  gap: 14px 10px;
-}
-.appointment-form__who,
-.appointment-form__when {
-  display: contents;
-}
-.appointment-form__who > *,
-.appointment-form__when > *,
-.appointment-form__more {
-  grid-column: 1 / -1;
-}
-.appointment-form__who > .appointment-form__staff {
-  grid-column: 1;
-}
-.appointment-form__when > .appointment-form__day {
-  grid-column: 2;
-}
+.appointment-form,
 .appointment-form__more,
 .appointment-form__slots {
   display: grid;
   gap: 10px;
+}
+.appointment-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 10px;
+}
+/* Phone: one column, the professional and the day side by side. The columns' boxes step aside (`contents`) so their
+   fields share the panel's grid, and `dense` brings the day up beside the professional. */
+@media (max-width: 639.98px) {
+  .appointment-form {
+    grid-auto-flow: row dense;
+  }
+  .appointment-form__who,
+  .appointment-form__when {
+    display: contents;
+  }
+  .appointment-form__who > *,
+  .appointment-form__when > *,
+  .appointment-form__more {
+    grid-column: 1 / -1;
+  }
+  .appointment-form__who > .appointment-form__staff {
+    grid-column: 1;
+  }
+  .appointment-form__when > .appointment-form__day {
+    grid-column: 2;
+  }
 }
 /* Tablet and desktop: who and what on the left, when on the right, the notes under the left column. */
 @media (min-width: 640px) {
@@ -582,10 +586,6 @@ function thisOnly(): void {
     display: grid;
     gap: 14px;
     align-content: start;
-  }
-  .appointment-form__who > *,
-  .appointment-form__when > * {
-    grid-column: auto;
   }
   .appointment-form__who,
   .appointment-form__more {

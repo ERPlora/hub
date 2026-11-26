@@ -78,18 +78,19 @@ const text = (value: unknown): string => (value === null || value === undefined 
       <span
         v-if="sum"
         class="duration-picker__sum"
-        data-testid="appointment-form-duration-sum"
-      >{{ $t('appointment.form.durationSum', { n: sum }) }}</span>
-      <button
-        v-if="touched && minutes !== sum && sum"
-        type="button"
-        class="duration-picker__use-sum"
-        data-testid="appointment-form-duration-use-sum"
-        :disabled="disabled"
-        @click="useSum"
       >
-        {{ $t('appointment.form.useSum') }}
-      </button>
+        <span data-testid="appointment-form-duration-sum">{{ $t('appointment.form.durationSum', { n: sum }) }}</span>
+        <button
+          v-if="touched && minutes !== sum"
+          type="button"
+          class="duration-picker__use-sum"
+          data-testid="appointment-form-duration-use-sum"
+          :disabled="disabled"
+          @click="useSum"
+        >
+          {{ $t('appointment.form.useSum') }}
+        </button>
+      </span>
     </div>
     <div
       class="duration-picker__choices"
@@ -142,12 +143,14 @@ const text = (value: unknown): string => (value === null || value === undefined 
 .duration-picker {
   display: grid;
   gap: 8px;
+  container-type: inline-size;
 }
 .duration-picker__head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 8px;
+  align-items: center;
+  gap: 0 8px;
+  min-height: 24px;
 }
 .duration-picker__label {
   flex: 1 1 auto;
@@ -156,12 +159,20 @@ const text = (value: unknown): string => (value === null || value === undefined 
   color: var(--ep-text-muted, #646b78);
 }
 .duration-picker__sum {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0 8px;
+  margin-inline-start: auto;
   font-size: 0.8rem;
   color: var(--ep-text-muted, #646b78);
   font-variant-numeric: tabular-nums;
 }
+/* A finger-sized target that does not push the buttons down. */
 .duration-picker__use-sum {
-  min-height: 32px;
+  min-height: 44px;
+  margin: -10px 0;
   padding: 0 4px;
   border: 0;
   background: transparent;
@@ -178,7 +189,13 @@ const text = (value: unknown): string => (value === null || value === undefined 
 }
 .duration-picker__choices {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
+}
+/* All seven in a row only where «Other» fits whole beside the numbers. */
+@container (min-width: 440px) {
+  .duration-picker__choices {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
 }
 </style>
