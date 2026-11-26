@@ -97,6 +97,11 @@ describe('HistoryPanel', () => {
     expect(ids).toEqual(['flow-run-r2', 'flow-run-r1']);
   });
 
+  it('says several stopped runs in the plural', async () => {
+    const m = await setup([run('r1'), FAILED], 2);
+    expect(m.find('flow-history-attention').text()).toContain('2 runs stopped by a problem');
+  });
+
   it('a run says how it ended, why it failed and what to do', async () => {
     const m = await setup([FAILED], 1);
     const failed = m.find('flow-run-r2');
