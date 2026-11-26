@@ -16,7 +16,7 @@ import { computed, shallowRef } from 'vue';
 import CancelRecordModal from '../components/CancelRecordModal.vue';
 import PageNotices from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
-import { formatDate, formatMoney } from '../lib/format';
+import { answerCounts, formatDate, formatMoney } from '../lib/format';
 import { environmentTone, statusTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 
@@ -105,9 +105,7 @@ async function sendNow(): Promise<void> {
     toastWarning(answer.message);
     return;
   }
-  toastSuccess(
-    t('verifactu.detail.transmitted', { accepted: answer.accepted + answer.accepted_with_errors, rejected: answer.rejected, waiting: answer.waiting }),
-  );
+  toastSuccess(t('verifactu.detail.transmitted', answerCounts(answer, t)));
 }
 
 async function askTheAeat(): Promise<void> {
