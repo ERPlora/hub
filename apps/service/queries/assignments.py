@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import operation
 
-from apps.service.models import Assignment
+from apps.service.models.catalog import Assignment
 from apps.service.queries.catalog import find_service
 from apps.service.queries.reads import _page
 from apps.service.schemas.assignments import (

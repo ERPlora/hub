@@ -205,7 +205,7 @@ def test_an_archived_or_unconfigured_service_is_not_sold(haircut):
         {"name": "Massage", "price": 3000, "tax_category_key": "service.generic"},
     )
     # Its tax category gone (deactivated in Taxes, or emptied by support in the admin).
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     Service.objects.filter(pk=untaxed.id).update(tax_category=None)
     with pytest.raises(Conflict) as refusal:

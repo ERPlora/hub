@@ -16,7 +16,7 @@ from live.errors import Conflict
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get, registry
 
-from apps.service.models import Redemption
+from apps.service.models.grants import Redemption
 
 from .conftest import HUB_DB, A, ctx_for
 
