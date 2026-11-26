@@ -6,15 +6,18 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.assistant import label
+from live.operations import get, operation
 from live.outbox import record_event
+from pydantic import ValidationError
 
 from apps.reservation import engine, events
 from apps.reservation.models import Reservation
+from apps.reservation.queries.guests import card_of_phone, phone_names
 from apps.reservation.queries.reservations import find_reservation, reservation_out
 from apps.reservation.schemas.reservations import ReservationIn, ReservationOut, ReservationPatchIn, ReservationRefIn
 from apps.reservation.services.gate import choose_table, judge, lock_book
-from apps.reservation.services.guests import CARD_SOURCES, _guest_contact, card_for_phone, typed_phone
+from apps.reservation.services.guests import _guest_contact, booking_card, typed_phone
 from apps.reservation.services.other_apps import drop_hold, status_changed, sync_hold
 from apps.reservation.services.writes import S, _stamp
 from base.assistant import card_order
@@ -34,6 +37,7 @@ STAFF_ONLY = _(
 STAFF_ONLY_FIELDS = ("table_id", "table", "zone", "no_table", "internal_notes", "overbook")
 #: The data that say for whom a booking is: the customer card, by its id or as said, else the guest's name.
 FOR_WHOM = ("customer_id", "customer", "guest_name")
+CREATE = "reservation.reservation.create"
 
 
 def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
@@ -48,8 +52,24 @@ def _booking_summary(ctx: OperationContext, arguments: dict, fields: list[dict])
     three data, so a guest's name said as well goes after them."""
     whom = next((field for field in fields if field["name"] in FOR_WHOM and field["kind"] == "text"), None)
     if whom is None:
-        return fields
+        whom = _whom_by_phone(ctx, arguments)
+        if whom is None:
+            return fields
+        fields = [whom, *fields]
     return card_order.put_first(fields, (whom["name"], "date", "time"))
+
+
+def _whom_by_phone(ctx: OperationContext, arguments: dict) -> dict | None:
+    """The customer a staff booking that gives only the guest's phone is for, by the name of the card that number is
+    on, as the card names a customer chosen; ``None`` when no card says it (the check refuses it before the card)."""
+    try:
+        data = ReservationIn.model_validate(arguments)
+    except ValidationError:
+        return None
+    card = card_of_phone(ctx, data.guest_phone) if phone_names(data) else None
+    if card is None:
+        return None
+    return {"name": "customer", "label": label(get(CREATE), "customer", None), "kind": "text", "value": card.name}
 
 
 @operation(
@@ -73,11 +93,12 @@ def _booking_summary(ctx: OperationContext, arguments: dict, fields: list[dict])
         },
         "description": "Takes a reservation («a table for 4 tomorrow at 21:00 for Ana, phone 600 111 222, table 5»): "
         "the guest's customer card (by id, name or phone; with only a name and phone, the card with that phone or a new "
-        "one), the day, time and guests, optionally the table, duration, source and notes. It must pass the book's gate "
+        "one; with only a phone, the card with it), the day, time and guests, optionally the table, duration, source and notes. It must pass the book's gate "
         "(guests, time, blocked days, opening hours, a slot with room, a free table); it is born pending, or confirmed "
         "when the book confirms by itself, which holds its table. Somebody already on the waitlist is booked with "
         "reservation.waitlist.convert, which marks their entry converted.",
         "risk": "normal",
+        "check": "reservation.reservation.check",
         "summary": _booking_summary,
     },
 )
@@ -90,10 +111,9 @@ def create_reservation(ctx: OperationContext, data: ReservationIn) -> dict:
     # The card before the gate: a phone Customers refuses is said first, never after «Book anyway?». A
     # refusal of the gate rolls the new card back with everything else.
     if card is None and phone:
-        card = card_for_phone(ctx, name or phone, phone, email, CARD_SOURCES[data.source])
+        card = booking_card(ctx, data, name, phone, email)
         phone = card.phone or phone
-        # A guest who books herself without a name (WhatsApp) is booked under her card's name: her phone, on a
-        # new card.
+        # Named by her phone alone: under her card's name (a guest who books herself: her phone, on a new card).
         name = name or card.name
     request = engine.Request(
         date=data.date,

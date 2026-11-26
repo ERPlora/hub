@@ -3,6 +3,7 @@
 import pytest
 from django.apps import apps
 from live.meta import Category, LiveAppConfig, Nav, module_configs
+from live.operations import INTERNAL
 
 from base import assistant
 from base.tenancy.tests.business import HUB_DB
@@ -71,7 +72,12 @@ OPERATIONS = {
     "reservation.settings.update",
     "reservation.customer.reassign",
     "reservation.customer.erase",
+    "reservation.reservation.check",
 }
+#: What only the assistant's card reads before it is shown: no tool, no route (``ai=INTERNAL``).
+INTERNAL_READS = {"reservation.reservation.check"}
+#: The writes the assistant's card checks first by a read of the app (``ai["check"]``).
+CHECKED = {"reservation.reservation.create": "reservation.reservation.check"}
 
 
 def reservation():
@@ -185,9 +191,17 @@ def test_every_operation_is_a_tool_of_the_assistant():
         op for name, op in registry.items() if name.startswith("reservation.")
     ]
     assert len(operations) == len(OPERATIONS)
+    internal = {op.name for op in operations if op.ai is INTERNAL}
+    assert internal == INTERNAL_READS
+    assert all(not registry[name].expose_api for name in internal)
     for op in operations:
+        if op.name in internal:
+            continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if op.name in CHECKED:
+            expected = expected | {"check"}
+            assert op.ai["check"] == CHECKED[op.name]
         if assistant.tools.is_tool(op):  # what a person types to ask for it (live.E020: reservation is listed)
             expected = expected | {"asks"}
         if op.name in IN_PERSON:

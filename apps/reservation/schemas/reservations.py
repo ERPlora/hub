@@ -18,7 +18,6 @@ from apps.reservation.schemas.fields import (
     A_TABLE,
     BOOK_ANYWAY,
     D_GUEST_NAME,
-    D_GUEST_PHONE,
     D_LABEL,
     GUEST,
     ON_BEHALF_OF,
@@ -41,6 +40,11 @@ from base.sensitive import CUSTOMER_CONTACT
 
 #: The sources where the guest books herself (engine.GUEST_SOURCES): without a name, her phone names her.
 GUEST_BOOKS = frozenset({"online", "whatsapp"})
+D_BOOKING_PHONE = (
+    "The guest's phone as typed; with no customer chosen, the live card with this number is used, or one is created "
+    "with the guest's name. Alone, it names the guest by that card; with none, ask the guest's name (a guest booking "
+    "herself online or by WhatsApp is booked under her phone)."
+)
 D_ON_BEHALF_OF = (
     "Only for a channel acting for the guest herself (WhatsApp): her customer card. The reservation must be hers; "
     "the table, the internal notes and booking anyway stay the restaurant's, and her own booking rules apply."
@@ -165,7 +169,7 @@ class ReservationIn(In):
         json_schema_extra=unless_given(A_CUSTOMER_SAID, "customer_id"),
     )
     guest_name: GuestName = Field("", description=D_GUEST_NAME)
-    guest_phone: Phone = Field("", description=D_GUEST_PHONE)
+    guest_phone: Phone = Field("", description=D_BOOKING_PHONE)
     guest_email: Email = Field("", description="The guest's email.")
     date: dt.date = Field(description="The day, YYYY-MM-DD on the business's calendar.")
     time: dt.time = Field(description="The time, HH:MM on the business's clock.")
@@ -193,9 +197,8 @@ class ReservationIn(In):
 
     @model_validator(mode="after")
     def _for_whom(self):
-        named = self.guest_name or self.customer_id is not None or self.customer
-        # A guest who books herself without a name (a WhatsApp message) is booked under her phone.
-        if not named and not (self.source in GUEST_BOOKS and self.guest_phone):
+        # A phone alone names the guest by the card it is on (a guest who books herself: by her phone, on a new card).
+        if not (self.guest_name or self.customer_id is not None or self.customer or self.guest_phone):
             raise ValueError(str(SAY_FOR_WHOM))
         return self
 
@@ -301,6 +304,10 @@ class ReservationDetailOut(ReservationOut):
 
 class ReservationPage(Page[ReservationOut]):
     pass
+
+
+class BookingGuestOut(Schema):
+    id: UUID | None = Field(description="The guest's customer card, when a card says whom the booking is for.")
 
 
 class ReleasedOut(Schema):
