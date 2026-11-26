@@ -621,15 +621,15 @@ If it fails: the display shows "The pass could not be printed. Check the printer
 Involved: KITCHEN-F11, KITCHEN-F26, PRINTING-F10
 
 ### KITCHEN-F18 Send the round from the till, normal or rush
-<!-- from WORKBOOK.md sha256:734b3309ebcd -->
+<!-- from WORKBOOK.md sha256:f6958f9a44b3 -->
 Status: done
 Actor: employee
 Screen: Sales: Sell
 Steps:
 1. In **Sales → Sell**, with the check open, open the "Current order" tab: what is left to send. On adding
    the first product, which opens the check, the till stays on that tab.
-2. If the round is in a hurry, tap the flame: the button becomes "Send RUSH (N)". Each tap arms it or
-   disarms it.
+2. If the round is in a hurry, tap the flame: the button turns red and is called "Send RUSH (N)". Each tap
+   arms it or disarms it.
 3. Press "Send order (N)" (or "Send RUSH (N)"): "Order N sent to the kitchen." shows and the flame is
    disarmed.
 4. Sales marks the pending lines with a new round (SALE-F20) and Kitchen opens the ticket (KITCHEN-F05),

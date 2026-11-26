@@ -9,7 +9,7 @@ from live.outbox import record_event
 
 from apps.customer.phones import InvalidPhone
 from apps.whatsapp_inbox import clock, events
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.queries.reads import e164, preview
 from apps.whatsapp_inbox.schemas.received import ReceiveIn, ReceiveOut, StatusIn, StatusOut
 

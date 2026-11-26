@@ -48,7 +48,7 @@ const splittable = (row: Row) => Number.isInteger(row.units) && row.units >= 2 &
 function held(line: PreviewLineOut): string {
   return line.voucher_remaining === null
     ? t('sale.voucher.heldUnlimited', { name: line.voucher_name })
-    : t('sale.voucher.held', { name: line.voucher_name, after: line.voucher_remaining });
+    : t('sale.voucher.held', { name: line.voucher_name, n: line.voucher_remaining });
 }
 
 async function attempt(row: Row, write: () => Promise<void>, fallbackKey: string): Promise<void> {

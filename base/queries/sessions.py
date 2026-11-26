@@ -13,7 +13,7 @@ from base.permissions import VIEW_HOME
 from base.schemas.sessions import SessionAccessIn, SessionAccessOut, SessionMeIn, SessionMeOut
 
 from .apps import _can_see, _may_use, open_entries
-from .people import hub_user_of, person_label
+from .people import hub_user_of, person_label, staff_names
 from .roles import approvable_of, role_label, signed_in_role_held
 
 
@@ -43,7 +43,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
         shown = home.shown_modules.shown_modules(demo_hub=demo is not None)
         usable = [config for config in shown if _may_use(ctx, config)]
         return {
-            "user": _user(ctx.actor, hub_user_of(ctx)),
+            "user": _user(ctx, hub_user_of(ctx)),
             "scope": {"kind": ctx.scope.kind, "key": ctx.scope.key},
             "permissions": sorted(ctx.permissions),
             "menu": [
@@ -123,12 +123,16 @@ def _demo_hub(ctx: OperationContext) -> Hub | None:
     return Hub.objects.filter(slug=ctx.scope.key, is_demo=True).first()
 
 
-def _user(actor: Any, person: HubUser | None = None) -> dict[str, str] | None:
+def _user(ctx: OperationContext, person: HubUser | None = None) -> dict[str, str] | None:
+    actor = ctx.actor
     if actor is None:
         return None
     if not hasattr(actor, "get_username"):  # the platform itself (live.context.system_context)
         return {"id": str(actor), "label": str(actor)}
     # The person of the business's database (base.HubUser), whose id every app's record names, so a screen tells
     # «mine» by it; without one there yet (the platform's host), the session's user. Named as in this hub: its «My
-    # profile» name, else its account's.
-    return {"id": str(actor.pk if person is None else person.pk), "label": person_label(actor)}
+    # profile» name, else its Staff record's, else its account's.
+    if person is None:
+        return {"id": str(actor.pk), "label": person_label(actor)}
+    staff_name = staff_names(ctx.scope, [person.username]).get(person.username, "")
+    return {"id": str(person.pk), "label": person_label(actor, staff_name)}

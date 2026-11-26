@@ -20,7 +20,8 @@ import respx
 from live.context import Scope
 from live.errors import InvalidPayload
 
-from apps.whatsapp_inbox.models import Message, Template, TemplateSample
+from apps.whatsapp_inbox.models.conversations import Message
+from apps.whatsapp_inbox.models.templates import Template, TemplateSample
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, SEND, connect, conv, ctx_for, receive, run, send, stored, system, template
 from apps.whatsapp_inbox.tests.test_template_header_file import JPEG, MP4, OTHER_JPEG, approved_with_photo, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture

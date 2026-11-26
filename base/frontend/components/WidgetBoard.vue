@@ -104,10 +104,9 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
         @click="picking = true"
       >
         <HubIcon
-          slot="start"
+          slot="icon-only"
           name="ion:ellipsis-vertical"
         />
-        <span class="widget-board-customize-label">{{ $t('base.widgets.customize') }}</span>
       </ion-button>
     </header>
 
@@ -290,20 +289,6 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
   --background: var(--ep-primary-tint);
   --border-radius: 10px;
   margin: 0;
-}
-
-.widget-board-customize-label {
-  font-size: 0.8125rem;
-  font-weight: 650;
-}
-
-@media (max-width: 575px) {
-  .widget-board-customize-label {
-    max-width: 9rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 }
 
 .widget-board-empty {
