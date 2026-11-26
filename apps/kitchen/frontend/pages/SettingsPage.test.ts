@@ -73,6 +73,17 @@ describe('SettingsPage', () => {
     expect(s.field('save-error')).toBeNull();
   });
 
+  it('a refusal that is of no field goes in the red notice, under its heading', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    const message = 'The kitchen screen is not available on this plan.';
+    s.answer(409, { error: { code: 'conflict', message } });
+    await ionValue(s.field('critical_minutes'), '40', 'ionInput');
+    await click(s.field('save'));
+    expect(s.field('save-error')?.textContent).toContain('Could not save the settings.');
+    expect(s.field('save-error')?.textContent).toContain(message);
+  });
+
   describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
     const AMBER_FIRST = 'The amber warning has to come before the red one.';
     const REFUSAL = { error: { code: 'invalid_field', message: AMBER_FIRST, fields: { warning_minutes: AMBER_FIRST, critical_minutes: AMBER_FIRST } } };

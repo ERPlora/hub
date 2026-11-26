@@ -89,6 +89,7 @@ describe('SettingsPage', () => {
     it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
       const s = await refused();
       expect(s.notice()).toBe(true);
+      expect(s.field('save-error')?.textContent).toContain('Could not save the settings');
       expect([s.says('timer_warning_minutes'), s.says('timer_critical_minutes')]).toEqual([
         'Ensure this value is less than or equal to 600.',
         'The red warning cannot come before the amber one.',

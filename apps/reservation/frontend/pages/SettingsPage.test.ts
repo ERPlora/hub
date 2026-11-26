@@ -67,6 +67,7 @@ describe('SettingsPage', () => {
     s.answer(422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields: refused } });
     await ionValue(s.field('max_advance_days'), '999', 'ionInput');
     await click(s.field('save'));
+    expect(s.field('save-error')?.textContent).toContain('Could not save the settings');
     await ionValue(s.field('min_party_size'), '2', 'ionInput');
     const says = (name: string) => [s.field(name).errorText ?? '', s.field(name).classList.contains('ion-invalid')];
     expect([says('min_party_size'), says('max_advance_days'), s.field('save-error') !== null]).toEqual([['', false], [refused.max_advance_days, true], false]);
