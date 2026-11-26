@@ -14,10 +14,7 @@ from apps.flow.schemas.catalog import OperationNameOut, OperationRefIn
 from .problems import HIGH_RISK, HIGH_RISK_CODE, UNKNOWN_ACTION
 from .reads import VIEW
 
-NOT_ALLOWED = _(
-    "It tried to do something you have not allowed it to do («%(name)s»), so it stopped. "
-    "Open Permissions and allow what it needs."
-)
+NOT_ALLOWED = _("It tried to do something you have not allowed it to do («%(name)s»), so it stopped.")
 UNAVAILABLE = _(
     "«%(name)s» is not available in this business any more (its app is off), so it stopped."
 )
@@ -77,8 +74,15 @@ ASSISTANT_GONE_UNNAMED = _("That action is no longer allowed or available, so th
 
 #: A change of the assistant no longer granted (code ``flow.not_allowed``), named for a person when it is read.
 ASSISTANT_GONE_KEY = "flow.assistant_gone"
-#: The reasons of a question nobody said yes to that, for the assistant's change, name its action (``say``).
-NAMED_BY_ITS_ACTION = frozenset({"flow.question_rejected", "flow.question_expired"})
+#: The reasons that name an action, by the value that keeps its operation and the value its words go in (``say``):
+#: the assistant's change nobody said yes to («Cancel a reservation», not the title kept in the automation's
+#: language) and what it was not allowed to do («Create a task», as Permissions and Try name it). An action that no
+#: longer exists, or the address of a call, is said as it was kept.
+NAMED_BY_ITS_ACTION = {
+    "flow.question_rejected": ("operation", "title"),
+    "flow.question_expired": ("operation", "title"),
+    "flow.not_allowed": ("name", "name"),
+}
 #: The engine's own reasons, by name (the code, but where one code says different things): a run and the entry of
 #: the step that failed keep the name and its values, and the reason is said when it is read, in the reader's
 #: language (FLOW-F16). A name never equals a code it does not say whole: a run kept with its words alone
@@ -141,20 +145,27 @@ def say(reason: dict, said: str = "") -> str:
     values = dict(reason.get("values") or {})
     if key == ASSISTANT_GONE_KEY:
         # The action it wanted, named as the History names it now; one that no longer exists, not at all.
-        op = registry.get(str(values.get("operation", "")))
-        if op is None:
+        label = _label(values.get("operation"))
+        if label is None:
             return str(ASSISTANT_GONE_UNNAMED)
-        values["name"] = action_label(op, (translation.get_language() or "en").split("-")[0])
-    elif key in NAMED_BY_ITS_ACTION and values.get("operation"):
-        # The assistant's change nobody said yes to, by its action as the History names it now («Cancel a
-        # reservation»), not by the title kept in the automation's language; one that no longer exists, by that title.
-        op = registry.get(str(values["operation"]))
-        if op is not None:
-            values["title"] = action_label(op, (translation.get_language() or "en").split("-")[0])
+        values["name"] = label
+    elif key in NAMED_BY_ITS_ACTION:
+        source, target = NAMED_BY_ITS_ACTION[key]
+        label = _label(values.get(source))
+        if label is not None:
+            values[target] = label
     try:
         return str(words) % values
     except (KeyError, TypeError, ValueError):
         return said
+
+
+def _label(name: object) -> str | None:
+    """The action ``name`` as the History names it now, in the active language; ``None`` if no such action exists."""
+    op = registry.get(str(name or ""))
+    if op is None:
+        return None
+    return action_label(op, (translation.get_language() or "en").split("-")[0])
 
 
 def _said_entry(entry: dict) -> dict:

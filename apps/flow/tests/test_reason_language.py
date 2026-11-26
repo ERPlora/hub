@@ -20,11 +20,10 @@ from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, make_run, run
 
 pytestmark = HUB_DB
 
+# The action by the words Permissions and Try give it; what to do about it is the History's advice, said once.
 NOT_ALLOWED = {
-    "en": "It tried to do something you have not allowed it to do («task.task.create»), so it stopped. "
-    "Open Permissions and allow what it needs.",
-    "es": "Ha intentado hacer algo que no le has permitido («task.task.create»), así que ha parado. "
-    "Abre Permisos y concédele lo que necesita.",
+    "en": "It tried to do something you have not allowed it to do («Create a task»), so it stopped.",
+    "es": "Ha intentado hacer algo que no le has permitido («Crear una tarea»), así que ha parado.",
 }
 DELETED = {"en": "Cancelled: the automation was deleted.", "es": "Cancelada: la automatización se borró."}
 OTHER = {"en": "es", "es": "en"}
@@ -148,6 +147,20 @@ def test_a_run_kept_before_its_reason_had_a_name_still_says_something():
     # Its values (which action) were not kept: it is said as it was.
     assert rows["flow.not_allowed"].error_message == NOT_ALLOWED["es"]
     assert rows["flow.not_allowed"].log[0]["error"] == failed
+
+
+@pytest.mark.parametrize(
+    ("name", "shown"),
+    [
+        ("task.task.create", "«Crear una tarea»"),
+        ("api.example.com", "«api.example.com»"),  # a call not allowed names its address
+        ("gone.thing.make", "«gone.thing.make»"),  # an action that no longer exists, as it was kept
+    ],
+)
+def test_what_it_was_not_allowed_is_named_as_the_permissions_name_it(name, shown):
+    with translation.override("es"):
+        said = queries.reasons.say({"key": "flow.not_allowed", "values": {"name": name}})
+    assert said == f"Ha intentado hacer algo que no le has permitido ({shown}), así que ha parado."
 
 
 def test_every_reason_of_the_engine_is_said_in_english_and_in_spanish():
