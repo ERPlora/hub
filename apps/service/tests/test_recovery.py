@@ -27,7 +27,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.service import queries
-from apps.service.models import Assignment, Category, Service
+from apps.service.models.catalog import Assignment, Category, Service
 from apps.service.schemas.recovery import ServiceRecoverIn
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias, use_hub

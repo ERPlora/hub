@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict, NotFound
 
 from apps.appointment.schemas.references import ServiceRefIn
-from apps.service.models import Assignment, Service
+from apps.service.models.catalog import Assignment, Service
 from apps.service.queries import catalog
 from apps.staff.models import Member
 

@@ -21,17 +21,10 @@ from apps.service.admin import (
     ServiceAdmin,
     ServiceSettingsAdmin,
 )
-from apps.service.models import (
-    Assignment,
-    Category,
-    Grant,
-    GrantAdjustment,
-    Package,
-    PackageItem,
-    Redemption,
-    Service,
-    ServiceSettings,
-)
+from apps.service.models.catalog import Assignment, Category, Service
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
+from apps.service.models.packages import Package, PackageItem
+from apps.service.models.settings import ServiceSettings
 
 from .conftest import (
     HUB_DB, make_customer, make_grant, make_member, make_package, make_redemption, make_service, make_tax,
