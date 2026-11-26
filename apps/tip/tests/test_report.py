@@ -8,6 +8,7 @@ import pytest
 from django.utils import timezone
 from live.errors import Conflict, PermissionDenied
 
+from apps.attendance.models import Record
 from apps.tip.models import Tip
 from base import activation
 from base.business import business_zone
@@ -107,6 +108,22 @@ def test_by_shift_a_working_day_still_open_runs_until_now_and_one_without_tips_i
     assert [(row.member_name, row.clock_out_at, figures(row)) for row in rows[:2]] == [
         ("Ana Ruiz", None, (0, 40, 0, 40, 1)),
         ("Bea Ruiz", None, (0, 0, 0, 0, 0)),
+    ]
+
+
+def test_by_shift_a_working_day_clocked_in_the_evening_before_keeps_its_tips_after_midnight(team, today):
+    """A bar that closes past midnight: tonight's tips are of the working day clocked in yesterday evening, and one
+    that ended before today began is not listed."""
+    midnight = dt.datetime.combine(today, dt.time.min, tzinfo=business_zone())
+    over, still = (run("attendance.record.clock_in", {"member_id": str(team[name].id)}) for name in ("ana", "bea"))
+    yesterday = {"work_date": today - dt.timedelta(days=1), "clock_in_at": midnight - dt.timedelta(hours=4)}
+    Record.objects.filter(pk=over.id).update(
+        **yesterday, clock_out_at=midnight - dt.timedelta(hours=1), status=Record.Status.CLOSED
+    )
+    Record.objects.filter(pk=still.id).update(**yesterday)
+    rows = report(by="shift").rows
+    assert [(row.member_name, row.shift_id, figures(row)) for row in rows[:-1]] == [
+        ("Bea Ruiz", still.id, (100, 200, 0, 300, 2))
     ]
 
 

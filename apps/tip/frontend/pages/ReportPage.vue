@@ -144,14 +144,15 @@ async function exportCsv(): Promise<void> {
             size="small"
             fill="outline"
             data-testid="tip-report-export"
+            :aria-label="$t('tip.report.export')"
+            :title="$t('tip.report.export')"
             :disabled="!canExport"
             @click="exportCsv"
           >
             <HubIcon
-              slot="start"
+              slot="icon-only"
               name="ion:download-outline"
             />
-            {{ $t('tip.report.export') }}
           </ion-button>
         </template>
         <template #empty>

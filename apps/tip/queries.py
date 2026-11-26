@@ -293,17 +293,18 @@ def _by_person(rows: QuerySet[Tip]) -> list[dict]:
 
 
 def _shifts(ctx: OperationContext, first: dt.date, last: dt.date) -> list | None:
-    """Time clock's working days of the period, as the caller may read them; ``None`` with Time clock absent, off or not
-    theirs to read."""
-    found: list = []
+    """Time clock's working days that ran in the period, as the caller may read them; ``None`` with Time clock absent,
+    off or not theirs to read. A working day belongs to the day it was clocked in on, so those of the evening before
+    are asked for too: one still running after midnight keeps its tips."""
+    since, found = _day_start(first), []
     while True:
-        asked = {"date_from": first, "date_to": last, "sort": "clock_in_at", "limit": SHIFTS_PAGE, "offset": len(found)}
-        page = answer_if_on(ctx, SHIFTS, asked)
+        asked = {"date_from": first - dt.timedelta(days=1), "date_to": last, "sort": "clock_in_at"}
+        page = answer_if_on(ctx, SHIFTS, {**asked, "limit": SHIFTS_PAGE, "offset": len(found)})
         if page is None:
             return None
         found += page.rows
         if not page.rows or len(found) >= page.total:
-            return found
+            return [shift for shift in found if shift.clock_out_at is None or shift.clock_out_at > since]
 
 
 def _count(line: dict, tip: Tip) -> None:

@@ -192,6 +192,8 @@ describe('ReportPage: in Spanish', () => {
     await s.show(BY_PERSON);
     expect(s.prop<Array<{ label: string }>>('columns').map((column) => column.label)).toEqual(['Persona', 'Propinas', 'Con tarjeta', 'En efectivo', 'Otras formas', 'Total']);
     expect(s.cells(1)[0]).toBe('Sin asignar');
-    expect(s.find('tip-report-export').text()).toBe('Exportar');
+    const exportButton = s.find('tip-report-export');
+    expect(exportButton.text()).toBe('');
+    expect([exportButton.attributes('aria-label'), exportButton.attributes('title')]).toEqual(['Exportar', 'Exportar']);
   });
 });
