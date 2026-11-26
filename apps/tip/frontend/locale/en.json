@@ -114,6 +114,7 @@
       "methods": "Suggestions by payment method",
       "suggestion": "Suggestion {n}",
       "kind": {
+        "short": "Type",
         "label": "Kind of suggestion {n}",
         "percent": "%",
         "amount": "Amount"

@@ -32,6 +32,7 @@ describe('MethodSuggestions', () => {
     const s = await setup();
     expect(s.find('tip-settings-method-m-card').text()).toContain('Card');
     expect(s.field('tip-settings-m-card-0-kind').value).toBe('percent');
+    expect([s.field('tip-settings-m-card-0-kind').label, s.field('tip-settings-m-card-0-kind').getAttribute('aria-label')]).toEqual(['Type', 'Kind of suggestion 1']);
     expect(s.field('tip-settings-m-card-0-value').value).toBe('3');
     expect([s.field('tip-settings-m-card-0-value').label, s.field('tip-settings-m-card-0-value').fill]).toEqual(['Suggestion 1', 'outline']);
     expect(s.field('tip-settings-m-card-0-value').getAttribute('mode')).toBe('md');

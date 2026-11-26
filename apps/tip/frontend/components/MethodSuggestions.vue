@@ -41,11 +41,16 @@ const testid = (index: number, part: string): string => `tip-settings-${props.me
       <ion-row
         v-for="(field, index) in method.suggestions"
         :key="index"
-        class="ion-align-items-start"
+        class="ion-align-items-start ion-margin-bottom"
       >
-        <ion-col size="4">
+        <ion-col
+          size="4"
+          class="ion-padding-end"
+        >
           <ion-select
             :data-testid="testid(index, 'kind')"
+            :label="$t('tip.settings.kind.short')"
+            label-placement="stacked"
             :aria-label="$t('tip.settings.kind.label', { n: index + 1 })"
             fill="outline"
             mode="md"

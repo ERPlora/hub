@@ -114,6 +114,7 @@
       "methods": "Sugerencias por forma de pago",
       "suggestion": "Sugerencia {n}",
       "kind": {
+        "short": "Tipo",
         "label": "Tipo de la sugerencia {n}",
         "percent": "%",
         "amount": "Importe"
