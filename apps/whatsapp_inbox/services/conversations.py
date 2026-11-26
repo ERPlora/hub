@@ -11,7 +11,7 @@ from live.outbox import record_event
 from apps.customer.models import Customer
 from apps.customer.queries.reads import find_customer
 from apps.whatsapp_inbox import events
-from apps.whatsapp_inbox.models import Conversation
+from apps.whatsapp_inbox.models.conversations import Conversation
 from apps.whatsapp_inbox.queries.agents import team
 from apps.whatsapp_inbox.queries.conversations import conversation_out, find_conversation, profile_name
 from apps.whatsapp_inbox.queries.reads import actor_id, person_name

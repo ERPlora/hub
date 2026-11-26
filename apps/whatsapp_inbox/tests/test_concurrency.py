@@ -16,7 +16,7 @@ from live.errors import Conflict, OperationError
 
 from apps.customer.models import Customer
 from apps.customer.tests.conftest import reads
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, card, connect, ctx_for, receive, run, system, template
 from base.tenancy.context import current_alias
 from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, in_a_thread, meanwhile

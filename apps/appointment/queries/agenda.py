@@ -9,7 +9,7 @@ from live.context import OperationContext
 
 from apps.appointment import engine
 from apps.appointment.models import Appointment, BlockedTime, Settings
-from apps.schedule.queries import hours_for_range
+from apps.schedule.queries.hours import hours_for_range
 from apps.schedule.schemas.hours import HoursRangeIn
 from apps.staff.models import Member
 from apps.staff.queries.availability import member_availability
