@@ -629,7 +629,7 @@ Pasos:
 Entra: los ajustes actuales de Citas.
 Sale: `appointment.settings.updated`.
 Si falla: cada motivo bajo su campo, una sola vez, sin perder lo escrito: el aviso «No se pudieron
-guardar los ajustes.» de arriba no lo repite; un calendario que termina antes de empezar, «El calendario
+guardar los ajustes.» de encima de «Guardar» no lo repite; un calendario que termina antes de empezar, «El calendario
 tiene que terminar después de empezar.». Como en
 las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
 corrige ese campo; los dos vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda

@@ -661,7 +661,7 @@ taken (`appointment.slot_taken`); the automation offers another time.
 Involved: CUSTOMER-F26, ONLINE_BOOKING-F01
 
 ### APPOINTMENT-F19 Adjust the booking rules
-<!-- from WORKBOOK.md sha256:68dde92bbf85 -->
+<!-- from WORKBOOK.md sha256:48525661663a -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Settings
@@ -672,7 +672,7 @@ Steps:
 In: the current Appointments settings.
 Out: `appointment.settings.updated`.
 If it fails: each reason under its field, once, without losing what was written: the notice "The
-settings could not be saved." above does not repeat it; a calendar that ends before it starts, "The
+settings could not be saved." above "Save" does not repeat it; a calendar that ends before it starts, "The
 calendar has to end after it starts.". As in the form
 windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
 corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
