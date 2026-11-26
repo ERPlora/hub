@@ -484,6 +484,24 @@ def test_a_template_turns_on_its_apps_and_then_loads_them(born, load):
     assert all(app.reason == "" for app in loaded.report.apps)
 
 
+def test_an_app_the_template_only_turns_on_has_nothing_to_copy_and_none_was_already_there(born, load):
+    """Of the apps the restaurant template turns on, only Inventory and Tables bring rows: every other one has nothing
+    to copy (hub#2522). «You had it already» is for what was in the business before, as loading it again shows."""
+    with_rows = {key.split(".", 1)[0] for key in blueprint.seeds.template("restaurant.es").bundle.data}
+
+    first = load(born, template="restaurant.es")
+    again = load(born, template="restaurant.es")
+
+    assert with_rows == {"inventory", "table"}
+    first_statuses = {app.id: app.status for app in first.report.apps}
+    assert {app: status for app, status in first_statuses.items() if app in with_rows} == dict.fromkeys(with_rows, "applied")
+    assert {status for app, status in first_statuses.items() if app not in with_rows} == {"empty"}
+    assert {app.id: app.status for app in again.report.apps} == {
+        app: "already" if app in with_rows else "empty" for app in first_statuses
+    }
+    assert (first.status, again.status) == ("complete", "complete")
+
+
 def test_only_the_apps_chosen_are_turned_on(born, load):
     loaded = load(born, template="restaurant.es", apps=["table"])
 
