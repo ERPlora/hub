@@ -66,6 +66,25 @@
         "between": "Elige de {min} a {max}",
         "atLeast": "Elige al menos {min}"
       }
+    },
+    "order": {
+      "less": "Uno menos de {name}",
+      "more": "Uno más de {name}",
+      "quantity": "Cantidad",
+      "fewer": "Uno menos",
+      "another": "Uno más",
+      "note": "Nota para cocina",
+      "add": "Añadir · {price}",
+      "view": "Ver pedido ({count}) · {total}",
+      "title": "Tu pedido",
+      "send": "Enviar pedido",
+      "total": "Total",
+      "remove": "Quitar {name}",
+      "empty": "Tu pedido está vacío",
+      "emptyMessage": "Añade platos de la carta.",
+      "sent": "Pedido enviado: el local lo confirmará enseguida.",
+      "offline": "Sin conexión. Compruébala y vuelve a enviar el pedido.",
+      "failed": "No se ha podido enviar el pedido."
     }
   }
 }

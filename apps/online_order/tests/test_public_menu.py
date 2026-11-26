@@ -84,12 +84,15 @@ def test_without_dishes_on_the_menu_the_page_has_no_groups(table_code):
 
 def test_a_set_menu_comes_with_its_courses_and_each_dish_s_allergens(table_code):
     combo = make_combo("Menu of the day", price=1350, kitchen_name="MENU")
-    starters, mains = make_group(combo, "Starters"), make_group(combo, "Mains")
+    starters, mains = make_group(combo, "Starters"), make_group(combo, "Mains", allow_repeat=True, max_choices=2)
     # A dish the menu offers but the business does not show on its own: its allergens still come with it.
-    make_option(starters, make_product("Lentils", price=700, sku="LEN", show_on_website=False, allergens=["celery"]))
+    lentils = make_option(
+        starters, make_product("Lentils", price=700, sku="LEN", show_on_website=False, allergens=["celery"])
+    )
     make_option(starters, make_product("Soup", price=600, sku="SOU", is_sold_out=True))
-    make_option(mains, make_product("Hake", price=1400, sku="HAK", allergens=["fish"]), price_delta=200)
+    hake = make_option(mains, make_product("Hake", price=1400, sku="HAK", allergens=["fish"]), price_delta=200)
     [read] = menu(table_code).combos
+    # Each course and each dish by its id: the order names what was picked by them.
     assert read.model_dump() == {
         "id": combo.id,
         "name": "Menu of the day",
@@ -97,16 +100,20 @@ def test_a_set_menu_comes_with_its_courses_and_each_dish_s_allergens(table_code)
         "image_url": "",
         "courses": [
             {
+                "id": starters.id,
                 "name": "Starters",
                 "min_choices": 1,
                 "max_choices": 1,
-                "choices": [{"name": "Lentils", "price_delta": 0, "allergens": ["celery"]}],
+                "allow_repeat": False,
+                "choices": [{"id": lentils.id, "name": "Lentils", "price_delta": 0, "allergens": ["celery"]}],
             },
             {
+                "id": mains.id,
                 "name": "Mains",
                 "min_choices": 1,
-                "max_choices": 1,
-                "choices": [{"name": "Hake", "price_delta": 200, "allergens": ["fish"]}],
+                "max_choices": 2,
+                "allow_repeat": True,
+                "choices": [{"id": hake.id, "name": "Hake", "price_delta": 200, "allergens": ["fish"]}],
             },
         ],
     }
@@ -134,18 +141,21 @@ def test_with_menus_off_there_are_no_menus(table_code, hub_a):
 
 
 def test_a_dish_s_options_are_its_modifier_groups_without_what_the_kitchen_reads(table_code, dishes):
-    modifier_group("Sauces", min_choices=0, max_choices=2)
-    modifier_option("Sauces", "Aioli", price_delta=50, allergens=["egg"], kitchen_name="AIO")
-    modifier_option("Sauces", "Brava")
+    group = modifier_group("Sauces", min_choices=0, max_choices=2, allow_repeat=True)
+    aioli = modifier_option("Sauces", "Aioli", price_delta=50, allergens=["egg"], kitchen_name="AIO")
+    brava = modifier_option("Sauces", "Brava")
     modifier_link("Sauces", product_id=str(dishes["croquettes"].id))
     [sauces] = options(table_code, dishes["croquettes"])
+    # Each group and each option by its id: the order names the options chosen by them.
     assert sauces.model_dump() == {
+        "id": group.id,
         "name": "Sauces",
         "min_choices": 0,
         "max_choices": 2,
+        "allow_repeat": True,
         "options": [
-            {"name": "Aioli", "price_delta": 50, "allergens": ["egg"]},
-            {"name": "Brava", "price_delta": 0, "allergens": []},
+            {"id": aioli.id, "name": "Aioli", "price_delta": 50, "allergens": ["egg"]},
+            {"id": brava.id, "name": "Brava", "price_delta": 0, "allergens": []},
         ],
     }
     assert options(table_code, dishes["cola"]) == []
@@ -186,7 +196,7 @@ def test_the_phone_reads_the_menu_through_the_door_and_nothing_internal(client, 
     assert (body["table_number"], body["zone_name"]) == ("4", "Terrace")
     assert keys_of(body) == {
         "business_name", "table_number", "zone_name", "groups", "combos", "courses", "choices", "min_choices",
-        "max_choices", "items", "price_delta", *ITEM_FIELDS,
+        "max_choices", "allow_repeat", "items", "price_delta", *ITEM_FIELDS,
     }  # fmt: skip
     for internal in ("cost", "sku", "tax", "stock", "kitchen", "staff", "Staff meal", "Gone"):
         assert internal not in read.content.decode()

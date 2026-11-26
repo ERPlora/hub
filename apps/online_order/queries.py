@@ -134,11 +134,14 @@ def _combos(reader: OperationContext) -> list[dict]:
             "image_url": combo.image_url,
             "courses": [
                 {
+                    "id": course.id,
                     "name": course.name,
                     "min_choices": course.min_choices,
                     "max_choices": course.max_choices,
+                    "allow_repeat": course.allow_repeat,
                     "choices": [
                         {
+                            "id": choice.id,
                             "name": choice.product_name,
                             "price_delta": choice.price_delta,
                             "allergens": choice.allergens,
@@ -195,11 +198,13 @@ def public_options(ctx: OperationContext, data: PublicOptionsIn) -> dict:
         "product_id": data.product_id,
         "groups": [
             {
+                "id": group.id,
                 "name": group.name,
                 "min_choices": group.min_choices,
                 "max_choices": group.max_choices,
+                "allow_repeat": group.allow_repeat,
                 "options": [
-                    {"name": option.name, "price_delta": option.price_delta, "allergens": option.allergens}
+                    {"id": option.id, "name": option.name, "price_delta": option.price_delta, "allergens": option.allergens}
                     for option in group.options
                 ],
             }

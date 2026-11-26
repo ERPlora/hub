@@ -64,14 +64,17 @@ class MenuGroupOut(Schema):
 
 
 class MenuChoiceOut(AllergensOut):
+    id: UUID = Field(description="The dish as the set menu offers it: what the order names when it is picked.")
     name: str = Field(description="The dish one picks.")
     price_delta: int = Field(description="What picking it adds to the menu's price.", json_schema_extra=MONEY)
 
 
 class MenuCourseOut(Schema):
+    id: UUID = Field(description="The course.")
     name: str = Field(description="The course («Starters»).")
     min_choices: int = Field(description="Dishes to pick at least.")
     max_choices: int = Field(description="Dishes to pick at most.")
+    allow_repeat: bool = Field(description="Whether one dish may be picked more than once.")
     choices: list[MenuChoiceOut] = Field(description="The dishes on offer, those sold out left out.")
 
 
@@ -92,14 +95,17 @@ class PublicMenuOut(Schema):
 
 
 class OptionOut(AllergensOut):
+    id: UUID = Field(description="The option: what the order names when it is chosen.")
     name: str = Field(description="The option («Aioli»).")
     price_delta: int = Field(description="What it adds to the dish's price.", json_schema_extra=MONEY)
 
 
 class OptionGroupOut(Schema):
+    id: UUID = Field(description="The group.")
     name: str = Field(description="The group («Sauces»).")
     min_choices: int = Field(description="Options to choose at least; 1 or more = required.")
     max_choices: int = Field(description="Options to choose at most; 0 = no ceiling.")
+    allow_repeat: bool = Field(description="Whether one option may be chosen more than once.")
     options: list[OptionOut] = Field(description="Its options, in their order.")
 
 
