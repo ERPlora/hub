@@ -793,7 +793,7 @@ or replaces one of theirs is theirs, so its links open.
 Involved: INVOICE-F03, VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
-<!-- from WORKBOOK.md sha256:9b7526e4de98 -->
+<!-- from WORKBOOK.md sha256:38a88c89f151 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
@@ -820,7 +820,9 @@ service did not open"…). Someone else's, for an employee, is neither printed n
 assistant say "Invoice not found.". Asked of the assistant, it is only done if a system printer takes it; if not,
 its receipt says "Not done, it failed: Print in Invoicing." with the reason, "No system printer takes this invoice:
 open it to print it or save it as PDF." or, if its record cannot be read, "Its VeriFactu record could not be read,
-and an invoice never prints without its QR.".
+and an invoice never prints without its QR.". If the printer takes it but no device that is on prints its queue, the
+assistant says it waits in that printer's queue and will come out when a device set up to print it does, never that it
+has printed it.
 Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Mark an invoice as paid
