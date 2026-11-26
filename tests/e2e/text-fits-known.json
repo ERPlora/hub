@@ -19,22 +19,6 @@
     "issue": "ERPlora/hub#2642"
   },
   {
-    "box": "span.widget-bar-label",
-    "what": "Home on the phone: a product's name in a bar chart ends in «…».",
-    "screens": [
-      "/"
-    ],
-    "issue": "ERPlora/hub#2642"
-  },
-  {
-    "box": "ion-content.ios.content-ltr >> div.inner-scroll.scroll-y",
-    "what": "Settings of Appointments on the phone: a field's label is wider than the screen.",
-    "screens": [
-      "/appointment/settings"
-    ],
-    "issue": "ERPlora/hub#2642"
-  },
-  {
     "box": "span.pos-cat__name",
     "what": "The till: a category's name in the strip ends in «…».",
     "screens": [
