@@ -9,7 +9,20 @@ import { join } from 'node:path';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, ARTIFACTS, horizontalOverflow, hostPage, psql, shot, shown, signedInSpanish, testid, untilStill } from './helpers';
+import {
+  A,
+  api,
+  ARTIFACTS,
+  horizontalOverflow,
+  hostPage,
+  psql,
+  shot,
+  shown,
+  signedInSpanish,
+  testid,
+  THREE_SIZES,
+  untilStill,
+} from './helpers';
 
 test.use({ actionTimeout: 30_000 });
 
@@ -17,12 +30,6 @@ const STAMP = Date.now().toString(36).toUpperCase();
 const SKU = `E2E-BAK-${STAMP}`;
 const GROUP = `E2E Backup Doneness ${STAMP}`;
 const OPTIONS = ['Rare', 'Well done'];
-
-const SIZES = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-];
 
 const OWN_GROUPS = "select id from modifier_modifiergroup where name like 'E2E Backup %'";
 const OWN_PRODUCTS = "select id from inventory_product where sku like 'E2E-BAK-%'";
@@ -68,6 +75,20 @@ async function snap(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: shot(name), fullPage: false });
 }
 
+/** Settings › Data › Export with the group there: Modifiers' row does not say `nothing` (in the page's language) and,
+ *  with its data ticked, its part says `part` with its rows. */
+async function modifiersPart(context: BrowserContext, page: Page, texts: { nothing: string; part: string }): Promise<void> {
+  if ((await groupNow(context)).status !== 200) await makeGroup(context);
+  await page.goto(`${A}/settings?data=export#data`);
+  const modifiers = shown(page).locator('[data-testid="export-app"][data-id="modifier"]');
+  await expect(modifiers).toBeVisible();
+  await expect(modifiers).not.toContainText(texts.nothing);
+  await testid(page, 'export-data-modifier').click();
+  const part = shown(page).locator('[data-testid="export-table-modifier.group"]');
+  await expect(part).toContainText(`${texts.part} ·`);
+  await part.scrollIntoViewIfNeeded();
+}
+
 test.beforeAll(async ({ browser }) => {
   cleanUp();
   const owner = await hostPage(browser, A, { next: '/settings#data' });
@@ -83,20 +104,11 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(() => cleanUp());
 
-for (const size of SIZES) {
+for (const size of THREE_SIZES) {
   test(`a backup takes the modifier groups and brings them back at ${size.label}`, async ({ browser }) => {
     test.setTimeout(180_000);
     const { context, page } = await hostPage(browser, A, { viewport: { width: size.width, height: size.height }, next: '/settings#data' });
-    if ((await groupNow(context)).status !== 200) await makeGroup(context);
-
-    await page.goto(`${A}/settings?data=export#data`);
-    const modifiers = shown(page).locator('[data-testid="export-app"][data-id="modifier"]');
-    await expect(modifiers).toBeVisible();
-    await expect(modifiers).not.toContainText('Nothing of its own to copy');
-    await testid(page, 'export-data-modifier').click();
-    const part = shown(page).locator('[data-testid="export-table-modifier.group"]');
-    await expect(part).toContainText('Modifier groups ·');
-    await part.scrollIntoViewIfNeeded();
+    await modifiersPart(context, page, { nothing: 'Nothing of its own to copy', part: 'Modifier groups' });
     await snap(page, `BASE-F36-modifier-groups-${size.label}`);
 
     const [download] = await Promise.all([page.waitForEvent('download'), testid(page, 'export-submit').click()]);
@@ -122,22 +134,11 @@ for (const size of SIZES) {
     expect([after.option_count, after.link_count]).toEqual([before.option_count, before.link_count]);
     await context.close();
   });
-}
 
-for (const size of SIZES) {
   test(`in Spanish, Modifiers' data say «Grupos de suplementos» at ${size.label}`, async ({ browser }) => {
-    const { context, page } = await signedInSpanish(browser, { width: size.width, height: size.height }, '/settings?data=export#data');
-    if ((await groupNow(context)).status !== 200) await makeGroup(context);
-    await page.goto(`${A}/settings?data=export#data`);
-
-    const modifiers = shown(page).locator('[data-testid="export-app"][data-id="modifier"]');
-    await expect(modifiers).toContainText('Suplementos');
-    await expect(modifiers).not.toContainText('Nada propio que copiar');
-    await testid(page, 'export-data-modifier').click();
+    const { context, page } = await signedInSpanish(browser, { width: size.width, height: size.height }, '/settings#data');
+    await modifiersPart(context, page, { nothing: 'Nada propio que copiar', part: 'Grupos de suplementos' });
     await expect(testid(page, 'export-tables-modifier')).toContainText('Datos de Suplementos');
-    const part = shown(page).locator('[data-testid="export-table-modifier.group"]');
-    await expect(part).toContainText('Grupos de suplementos ·');
-    await part.scrollIntoViewIfNeeded();
     await snap(page, `BASE-F36-modifier-groups-es-${size.label}`);
     await context.close();
   });
