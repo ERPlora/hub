@@ -5,18 +5,13 @@
 // flow: FLOW-F08
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { A, capture, login, saveSessionForTheSweep, shown, signedInSpanish, THREE_SIZES } from './helpers';
 
-const SIZES = [
-  { label: '375x667', width: 375, height: 667 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '1280x720', width: 1280, height: 720 },
-] as const;
 const GUIDE = '/flow/automations/guide';
 /** The least room a «5.» or a bullet needs before the text of its item. */
 const MARKER_ROOM = 16;
 
-async function openGuide(browser: Browser, size: (typeof SIZES)[number], lang: 'en' | 'es'): Promise<Page> {
+async function openGuide(browser: Browser, size: (typeof THREE_SIZES)[number], lang: 'en' | 'es'): Promise<Page> {
   if (lang === 'es') return (await signedInSpanish(browser, size, GUIDE)).page;
   const context = await browser.newContext({ baseURL: A, viewport: size, locale: 'en-US' });
   const page = await context.newPage();
@@ -39,7 +34,7 @@ async function listOf(section: Locator, tag: 'ol' | 'ul') {
 }
 
 for (const lang of ['en', 'es'] as const) {
-  for (const size of SIZES) {
+  for (const size of THREE_SIZES) {
     test(`the guide numbers its first steps and bullets its limits, ${lang} at ${size.label}`, async ({ browser }) => {
       const page = await openGuide(browser, size, lang);
       try {
