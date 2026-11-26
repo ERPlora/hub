@@ -24,7 +24,7 @@ from base.schemas.access import (
 from base.throttle import client_key
 
 from .devices import device_of
-from .people import face_name
+from .people import faces_of
 
 
 # ── The way in: devices, PIN, badge, the business's dial and the person's profile ────────────────────────────────
@@ -124,12 +124,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
     device = device_of(ctx.request)
     offered = device is not None and access.pin_offered(device.mode, settings.pin_policy)
     wait = access.PIN_ADDRESS_LIMIT.wait(ctx.scope.key, client_key(ctx.request)) if offered else 0
-    people = [] if not offered or wait else pin_people(ctx.scope.key)
-    faces = sorted(
-        ({"id": str(credential.pk), "name": (name := face_name(user)), "initials": access.initials(name)}
-         for credential, user in people),
-        key=lambda face: face["name"].casefold(),
-    )
+    faces = [] if not offered or wait else faces_of(ctx.scope, pin_people(ctx.scope.key))
     return {
         "pin": offered and (bool(faces) or wait > 0),
         "pin_length": settings.pin_length,
