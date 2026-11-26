@@ -17,7 +17,7 @@ from live.operations import UnknownOperation, operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import Grant
+from apps.service.models.grants import Grant
 from apps.service.queries.grant_checks import redeem_refusal
 from apps.service.queries.grants import balance, find_grant, load_grant, lock_grant
 from apps.service.queries.records import SALES_UNAVAILABLE

@@ -26,7 +26,7 @@ from apps.appointment.services.writes import (
     _locked_card,
     _member_for_booking,
 )
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from base.business import business_zone
 
 #: The most a series books in one run (the current product's 50).

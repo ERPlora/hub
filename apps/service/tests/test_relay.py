@@ -20,7 +20,8 @@ from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 
-from apps.service.models import Assignment, Grant, Redemption
+from apps.service.models.catalog import Assignment
+from apps.service.models.grants import Grant, Redemption
 from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub
 
