@@ -155,9 +155,12 @@ test('SERVICE-F34: every image of the library shows its whole name under it, on 
     { width: 1180, height: 820 },
     { width: 1440, height: 900 },
   ];
-  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   await page.setViewportSize(sizes[3]);
+  // After a first login: in a fresh context it brings back the hub's cookies, the language among them.
+  await login(page, A, '/service/services');
+  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   const form = await editForm(page, colour);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
   await form.locator('[data-testid=service-form-image-library]').click();
   const library = dialog(page, 'service-form-image-library-modal');
   for (const [query, longest] of searches) {
