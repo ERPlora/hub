@@ -362,8 +362,9 @@ Pasos:
 1. En «Registros», elige el mes (y, si es responsable, la persona y el estado).
 2. Pulsa «Exportar CSV»; mientras tanto ve «Exportando…».
 3. Se descarga «attendance-2026-10.csv» con una línea por jornada del filtro, todas, no solo las que
-   caben en la pantalla: fecha, persona, entrada, salida, minutos de pausa, minutos trabajados, estado y
-   si la entrada y la salida fueron dentro del radio.
+   caben en la pantalla, en el idioma de quien lo exporta: fecha, persona, entrada, salida, minutos de
+   pausa, minutos trabajados, estado («Abierta», «Cerrada» o «Por revisar») y si la entrada y la salida
+   fueron dentro del radio («Sí» o «No»; en blanco si no se registró la ubicación).
 4. El fichero se abre con los acentos bien en una hoja de cálculo.
 Entra: las jornadas del filtro (ATTENDANCE-F06, ATTENDANCE-F07).
 Sale: el fichero descargado en el dispositivo; nada se guarda en el Hub.
