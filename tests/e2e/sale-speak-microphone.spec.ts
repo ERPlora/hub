@@ -30,11 +30,11 @@ const announced = (page: Page): Locator => key(page).locator('button');
 /** The till, and a tap on «Speak»: a toast says how to allow the microphone, and nothing records. */
 async function refuse(page: Page, label: string, notice: string): Promise<void> {
   await page.goto(`${A}/sale/pos`);
-  await expect(key(page)).toHaveText(label);
+  await expect(announced(page)).toHaveAccessibleName(label);
   await key(page).click();
   await expect(toastSaying(page, notice)).toBeVisible();
   await expect(announced(page)).toHaveAttribute('aria-pressed', 'false');
-  await expect(key(page)).toHaveText(label);
+  await expect(announced(page)).toHaveAccessibleName(label);
   await expect(page.locator('[data-testid="pos-speak-status"]')).toHaveCount(0);
 }
 

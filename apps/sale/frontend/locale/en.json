@@ -99,7 +99,6 @@
       "discountTicket": "Ticket discount",
       "total": "Total",
       "printPrebill": "Print bill",
-      "charge": "Charge",
       "chargeAmount": "Charge · {amount}",
       "chargeLinesOne": "Charge 1 line · {amount}",
       "chargeLines": "Charge {n} lines · {amount}",

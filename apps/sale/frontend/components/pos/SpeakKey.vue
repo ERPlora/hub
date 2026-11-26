@@ -32,6 +32,8 @@ const shown = computed(() => session.can('base.view_home') && available.value);
 const offline = ref(globalThis.navigator?.onLine === false);
 /** Greyed: offline and not recording (a recording can always be stopped). */
 const unavailable = computed(() => offline.value && !recording.value);
+/** The key is its icon alone; what it does now is its name and its tooltip. */
+const name = computed(() => (recording.value ? t('sale.pos.speak.stop') : t('sale.pos.speak.label')));
 // Ionic hands the key's aria-disabled to its native button only when it loads: losing or getting back the connection
 // afterwards has to reach that button too, the one a screen reader announces.
 const keyButton = useTemplateRef<{ $el: HTMLElement }>('keyButton');
@@ -73,7 +75,8 @@ onBeforeUnmount(() => {
       :aria-disabled="unavailable ? 'true' : 'false'"
       :data-aria-disabled="String(unavailable)"
       :disabled="transcribing"
-      :title="unavailable ? t('sale.pos.speak.offline') : undefined"
+      :aria-label="name"
+      :title="unavailable ? t('sale.pos.speak.offline') : name"
       @click="press"
     >
       <ion-spinner
@@ -87,7 +90,6 @@ onBeforeUnmount(() => {
         :src="recording ? ASSISTANT_ICONS.stop : ASSISTANT_ICONS.mic"
         aria-hidden="true"
       />
-      <span class="pos-speak__label">{{ recording ? t('sale.pos.speak.stop') : t('sale.pos.speak.label') }}</span>
     </ion-button>
     <div
       class="pos-speak__live"
@@ -117,25 +119,20 @@ onBeforeUnmount(() => {
   min-width: 3.4rem;
   height: 3.65rem;
   margin: 0;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1;
   --color: var(--ion-color-primary);
   --background: var(--ion-card-background);
   --border-radius: 12px;
 }
 .pos-speak__key::part(native) {
   display: inline-flex;
-  flex-direction: column;
-  gap: 0.2rem;
   align-items: center;
   justify-content: center;
   padding: 0 0.45rem;
 }
 .pos-speak__icon {
-  width: 1.25rem;
-  height: 1.25rem;
-  font-size: 1.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 1.5rem;
 }
 .pos-speak__key--on {
   --color: var(--ion-color-danger-contrast);

@@ -128,10 +128,10 @@ Empty: "No invoices yet.". Loading: "Loading…". Error: the message with "Retry
 action shows as a notice above the table.
 
 #### Invoice detail
-<!-- from WORKBOOK.md sha256:c24544971c9f -->
+<!-- from WORKBOOK.md sha256:946e8ba70aa3 -->
 Opens from a row of **Invoices** (`/invoice/invoices/<id>`). On top, "Invoice {number}" with the status
-tag and the buttons "Print / PDF", "Download PDF", "Send by email" (for whoever issues invoices) and "← Back". If the last
-email did not leave, the notice "The invoice was not sent by email" and why. If it is a full invoice, or a rectifying invoice of a full
+tag and the icon-only buttons "Print / PDF", "Download PDF" and "Send by email" (this one, for whoever issues invoices;
+each says its name when hovered) and "← Back". If the last email did not leave, the notice "The invoice was not sent by email" and why. If it is a full invoice, or a rectifying invoice of a full
 invoice, without the customer's tax ID, the notice "This invoice has no customer tax ID: the ticket
 printer cannot print it as a full invoice.". Below, "Type", "Series", "Issue date", "Operation date" (if
 it is another), "Due date" (if it has one), "Customer", "Customer tax ID", "Address", "Issuer", "Source" ("POS sale", "Manual",
@@ -975,7 +975,7 @@ tapped again.
 Involved: INVOICE-F16, BASE-F112
 
 ### INVOICE-F25 Download an invoice in PDF
-<!-- from WORKBOOK.md sha256:93d690dcb305 -->
+<!-- from WORKBOOK.md sha256:8079b60e9dbf -->
 Status: done
 Actor: employee (their invoices), manager, administrator, owner and accountancy firm (everyone's), assistant
 Screen: Invoice detail
@@ -994,8 +994,8 @@ Steps:
 5. The same can be asked of the assistant ("download FACT-2026-000003 as a PDF"): the file stays under its answer, with
    "Download" and its name.
 In: the invoice, its lines and, with VeriFactu, the QR of its record.
-Out: the file; the invoice does not change and the file is not kept in the Hub. While it is made, the button says
-"Preparing…".
+Out: the file; the invoice does not change and the file is not kept in the Hub. While it is made, the button spins
+and is called "Preparing…".
 If it fails: a notice says "The PDF could not be downloaded" and why, and it can be tapped again. If the VeriFactu record
 of an invoice that has one cannot be read, "Its VeriFactu record could not be read, and an invoice never prints without
 its QR."; if the server cannot make it, "The PDF cannot be made right now. Try again later.". Someone else's, for an

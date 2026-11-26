@@ -99,7 +99,6 @@
       "discountTicket": "Descuento del tique",
       "total": "Total",
       "printPrebill": "Imprimir cuenta",
-      "charge": "Cobrar",
       "chargeAmount": "Cobrar · {amount}",
       "chargeLinesOne": "Cobrar 1 línea · {amount}",
       "chargeLines": "Cobrar {n} líneas · {amount}",
