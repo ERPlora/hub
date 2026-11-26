@@ -116,7 +116,7 @@ for (const till of TILL_LANGUAGES) {
     expect(end.paper.bottom, 'the end of the ticket is reached above the footer').toBeLessThanOrEqual(end.footer.top + 0.5);
     expectInside(end, 'with the ticket scrolled to its end');
 
-    await bar.evaluate((style) => style.remove());
+    await bar.evaluate((style) => (style as Element).remove());
     for (const size of SIZES) {
       const label = `${size.width}x${size.height}`;
       await page.setViewportSize(size);
