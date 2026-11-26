@@ -17,6 +17,9 @@ from django.test import RequestFactory
 from django.utils import timezone
 from live import assistant as shared
 from live.context import OperationContext
+from live.errors import PermissionDenied
+from live.live_registry import live_registry
+from live.ninja import operation_ids
 from live.operations import get
 
 from base import access
@@ -24,6 +27,7 @@ from base.models.access import TrustedDevice
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests import card_turn
 from base.tests.card_turn import call
+from config.api import api
 
 __all__ = ["in_business_a"]
 
@@ -121,6 +125,20 @@ def test_removing_the_device_in_hand_says_as_devices_does_that_it_closes_the_per
 @pytest.mark.parametrize("read", ["base.device.unused", "base.device.removal"])
 def test_the_read_behind_the_card_is_not_a_tool_of_the_assistant(read):
     assert not shared.is_tool(get(read))
+
+
+@pytest.mark.parametrize("read", ["base.device.unused", "base.device.removal"])
+def test_the_read_behind_the_card_is_only_for_who_administers_the_business_and_only_on_the_card(read):
+    """It says which devices the business has and when they were used: no route of the API and no live query serve
+    it, and run as someone who cannot administer the business it refuses."""
+    op = get(read)
+    assert read not in operation_ids(api)
+    assert not live_registry.is_subscribable(read)
+    device, _ = a_device(days_ago=90)
+    data = {"id": device.pk} if "id" in op.input.model_fields else {}
+    someone = OperationContext(scope=A, actor="leo", permissions=frozenset({"base.view_home"}))
+    with pytest.raises(PermissionDenied):
+        op(someone, op.input(**data))
 
 
 def test_a_yes_to_a_card_whose_devices_changed_removes_nothing_and_draws_the_card_again():
