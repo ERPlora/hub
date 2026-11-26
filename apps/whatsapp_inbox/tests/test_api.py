@@ -12,7 +12,7 @@ from live.ninja import ensure_api_parity
 
 from apps.flow.tests.test_api import get, post
 from apps.whatsapp_inbox.api import router
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models.conversations import Message
 from apps.whatsapp_inbox.tests.conftest import A, HUB_DB, connect, receive
 from base.tests.routes import spa_routes
 from base.tenancy.context import current_alias
@@ -210,7 +210,7 @@ def test_sending_over_http_is_201_queued_and_a_closed_window_is_a_409(employee_c
         sent = post(employee_client, "/whatsapp_inbox/messages/send", {"id": conversation, "text": "¡Hola!", "client_message_id": key})
     assert (sent.status_code, sent.json()["status"]) == (201, "queued")
     assert Message.objects.get(pk=sent.json()["id"]).status == "sent"
-    from apps.whatsapp_inbox.models import Conversation
+    from apps.whatsapp_inbox.models.conversations import Conversation
 
     Conversation.objects.update(last_inbound_at="2026-10-01T10:00:00Z")
     refused = post(
