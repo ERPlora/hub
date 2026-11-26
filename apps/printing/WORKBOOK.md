@@ -575,6 +575,9 @@ Pasos:
    impresora y el dispositivo por su nombre, el trabajo como lo titula la cola (su documento y su número) y
    el documento de un trabajo nuevo con la palabra de la cola, nunca por un identificador; lo que quien
    pregunta no puede ver, o lo que ya no está (un dispositivo retirado), no sale en la tarjeta.
+3. Lo que deja en una cola que ningún dispositivo encendido imprime (ninguno dado de alta con esa impresora,
+   o el que la tiene, apagado) no lo da por impreso: dice que queda en la cola de esa impresora y que saldrá
+   cuando un dispositivo dado de alta la imprima.
 Entra: la petición.
 Sale: lo mismo que la pantalla.
 Si falla: lo mismo que la pantalla, con las palabras del servidor.
