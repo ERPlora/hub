@@ -47,3 +47,13 @@ def test_the_till_says_how_many_each_course_takes():
     make_option(course, make_product())
     [row] = list_for_sale(ctx_for("hub_employee"), ForSaleIn()).rows
     assert [(group.min_choices, group.max_choices, group.allow_repeat) for group in row.groups] == [(1, 2, True)]
+
+
+def test_each_choice_on_offer_says_its_dishs_allergens():
+    # A table's menu and the till name the allergens of each dish of a menu, as Inventory declares them.
+    combo = make_combo("Menu of the day")
+    mains = make_group(combo, "Mains")
+    make_option(mains, make_product("Hake", sku="HAK", allergens=["fish", "milk"]))
+    make_option(mains, make_product("Chicken", sku="CHI"))
+    [row] = run("combo.combo.for_sale", {}, ctx_for("hub_employee")).rows
+    assert [(o.product_name, o.allergens) for o in row.groups[0].options] == [("Hake", ["fish", "milk"]), ("Chicken", [])]

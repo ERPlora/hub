@@ -23,7 +23,6 @@
 Every read is of the business's own database, which holds its one site and its images.
 """
 
-from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
 
@@ -34,7 +33,7 @@ from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
 from live.errors import AppInactive, NotFound
-from live.operations import INTERNAL, get, operation, registry
+from live.operations import INTERNAL, operation
 
 from apps.website import reviews
 from apps.website.catalog_items import product_item, service_item
@@ -62,6 +61,7 @@ from apps.website.schemas import (
     Theme,
 )
 from base.apps_on import active_apps
+from base.catalog_groups import Group, every_row, in_order, product_categories, product_groups
 from base.operations import business_currency, business_name
 from base.qr import public_url
 from base.registry import hub_by_slug
@@ -80,10 +80,6 @@ PUBLIC_WINDOW = 60
 CATALOG_TTL = 60
 #: How long a rendered page is kept, in seconds (a publication changes its key: no stale read).
 PAGE_TTL = 3600
-#: The most items a catalog shows (and reads).
-MAX_ITEMS = 200
-#: The page size of the other apps' lists.
-PAGE = 100
 #: Each source (its app's label) and what the delegated context may read of it.
 SOURCES = {
     "service": frozenset({"service.view_service", "service.view_category"}),
@@ -257,7 +253,7 @@ def list_categories(ctx: OperationContext, data: CategoriesIn) -> dict:
     if not _source_on(ctx.scope, data.source):
         return {"categories": []}
     reader = replace(ctx, permissions=ctx.permissions | SOURCES[data.source])
-    rows = _service_categories(reader) if data.source == "service" else _product_categories(reader)
+    rows = _service_categories(reader) if data.source == "service" else product_categories(reader)
     return {"categories": [{"id": row.id, "name": row.name} for row in rows]}
 
 
@@ -299,7 +295,7 @@ def get_category(ctx: OperationContext, data: CategoryIn) -> dict:
         if not _source_on(ctx.scope, source):
             continue
         reader = replace(ctx, permissions=ctx.permissions | SOURCES[source])
-        rows = _service_categories(reader) if source == "service" else _product_categories(reader)
+        rows = _service_categories(reader) if source == "service" else product_categories(reader)
         found = next((row for row in rows if row.id == data.id), None)
         if found is not None:
             return {"id": found.id, "name": found.name}
@@ -513,55 +509,21 @@ def _source_on(scope: Scope, source: str) -> bool:
     return source in active_apps(scope)
 
 
-def _rows(ctx: OperationContext, name: str, limit: int = MAX_ITEMS, **params: Any) -> Iterator[Any]:
-    """Every row of the list operation ``name`` (page by page), up to ``limit``."""
-    if name not in registry:
-        return
-    op = get(name)
-    offset = 0
-    while offset < limit:
-        page = op(ctx, op.input(limit=min(PAGE, limit - offset), offset=offset, **params))
-        yield from page.rows
-        offset += len(page.rows)
-        if not page.rows or offset >= page.total:
-            return
-
-
 def _service_categories(ctx: OperationContext) -> list[Any]:
-    return list(_rows(ctx, "service.category.list", sort="sort_order"))
+    return list(every_row(ctx, "service.category.list", sort="sort_order"))
 
 
-def _product_categories(ctx: OperationContext) -> list[Any]:
-    return sorted(_rows(ctx, "inventory.category.list"), key=lambda row: (row.order, row.name.lower()))
-
-
-def _service_groups(ctx: OperationContext) -> list[tuple[str, str, list[dict]]]:
+def _service_groups(ctx: OperationContext) -> list[Group]:
     """Services' offered services by category, in the categories' order; those without one last."""
     order = {str(row.id): position for position, row in enumerate(_service_categories(ctx))}
     grouped: dict[str, tuple[str, list[dict]]] = {}
-    for row in _rows(ctx, "service.service.list_for_sale"):
+    for row in every_row(ctx, "service.service.list_for_sale"):
         category_id = str(row.category_id) if row.category_id else ""
         grouped.setdefault(category_id, (row.category_name or "", []))[1].append(service_item(row))
-    return _ordered(grouped, order)
+    return in_order(grouped, order)
 
 
-def _product_groups(ctx: OperationContext) -> list[tuple[str, str, list[dict]]]:
+def _product_groups(ctx: OperationContext) -> list[Group]:
     """Inventory's products on sale that it shows on the website, by category in their order; without one, last."""
-    categories = _product_categories(ctx)
-    order = {str(row.id): position for position, row in enumerate(categories)}
-    names = {str(row.id): row.name for row in categories}
-    links: dict[str, list[str]] = {}
-    for link in _rows(ctx, "inventory.product_category.list", limit=MAX_ITEMS * 5):
-        links.setdefault(str(link.product_id), []).append(str(link.category_id))
-    grouped: dict[str, tuple[str, list[dict]]] = {}
-    for row in _rows(ctx, "inventory.product.list_for_sale", show_on_website=True):
-        item = product_item(row)
-        for category_id in [cid for cid in links.get(str(row.id), []) if cid in names] or [""]:
-            grouped.setdefault(category_id, (names.get(category_id, ""), []))[1].append(item)
-    return _ordered(grouped, order)
-
-
-def _ordered(grouped: dict[str, tuple[str, list[dict]]], order: dict[str, int]) -> list[tuple[str, str, list[dict]]]:
-    """The groups in their categories' order; one whose category is unknown (none, or past the list) last."""
-    ranked = sorted(grouped.items(), key=lambda entry: (entry[0] == "", order.get(entry[0], len(order)), entry[1][0]))
-    return [(category_id, name, items) for category_id, (name, items) in ranked]
+    products = every_row(ctx, "inventory.product.list_for_sale", show_on_website=True)
+    return product_groups(ctx, products, product_item)

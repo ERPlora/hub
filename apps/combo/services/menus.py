@@ -213,7 +213,7 @@ def recover_combo(ctx: OperationContext, data: ComboRecoverIn) -> dict:
 
 # --- The menu's image (COMBO-F14, base.images) -------------------------------------------------------
 
-#: Where a menu's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
+#: Where a menu's own photos are kept under its hub's prefix: the folder ``public_media`` serves (apps.py).
 PHOTOS = "combo/combos/"
 
 
