@@ -1,7 +1,8 @@
 name: ci
 
 # Every push to a working branch runs the tests (test.yml), with the same check as deploy.yml:
-# "test / test". main and pre run them in deploy.yml, before they deploy.
+# "test / test". Its pytest compares the branch with origin/main and runs only the tests of the apps
+# it changes, when it changes nothing else. main and pre run the whole suite in deploy.yml, before they deploy.
 
 on:
   push:
@@ -18,3 +19,5 @@ concurrency:
 jobs:
   test:
     uses: ./.github/workflows/test.yml
+    with:
+      affected-base: origin/main
