@@ -608,7 +608,7 @@ Pasos:
    imprime desde un dispositivo nuevo en alguna impresora activa, también queda dado de alta, como «Dispositivo 1»,
    con las impresoras activas que usa. Solo se da de alta dentro de la app de ERPlora: en un navegador no se ofrece
    «Imprimir desde este dispositivo», porque desde él no se llega a ninguna impresora, y la nota dice qué hacer y
-   ofrece descargar la app (PRINTING-F21).
+   ofrece descargar la app.
 2. Con la app de ERPlora abierta en ese dispositivo —en cualquier pantalla y con la sesión de cualquiera—, la app
    se conecta a Impresión para imprimir: dice qué dispositivo es y cuáles son las impresoras de su alta, y desde ahí
    saca sola el papel de sus impresoras activas en cuanto llega a la cola, sin que nadie toque nada. En un navegador

@@ -616,7 +616,7 @@ If it fails: as in F07.
 Involved: CASH_REGISTER-F16, PRINTING-F22
 
 ### PRINTING-F18 Take the paper out: the device picks up and confirms the jobs
-<!-- from WORKBOOK.md sha256:bd71a2be5a63 -->
+<!-- from WORKBOOK.md sha256:42aeb864026b -->
 Status: done
 Actor: the owner, the administrator or the manager (they set up the device) and the device's app
 (it picks up)
@@ -629,7 +629,7 @@ Steps:
    prints from a new device on some active printer, it is also set up, as "Device 1",
    with the active printers it uses. It is only set up inside the ERPlora app: in a browser "Print from this device"
    is not offered, because no printer can be reached from it, and the note says what to do and offers to download the
-   app (PRINTING-F21).
+   app.
 2. With the ERPlora app open on that device —on any screen and with anybody's session—, the app
    connects to Printing to print: it says which device it is and which are the printers of its setup, and from there on
    it takes out on its own the paper of its active printers as soon as it reaches the queue, without anybody touching anything. In a browser
