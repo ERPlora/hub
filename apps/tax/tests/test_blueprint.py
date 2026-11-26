@@ -84,6 +84,21 @@ def test_a_backup_brings_the_own_tax_categories_and_their_rates_into_another_bus
     assert (part["key"], part["status"], part["created"]) == ("tax.category", "applied", 2)
 
 
+def test_an_exempt_rate_keeps_its_qualification_its_cause_its_regime_and_its_dates_in_another_business(ctx, hub_b):
+    call(ctx, "tax.category.create", key="service.course", name="Courses")
+    call(ctx, "tax.rule.create", country_code="ES", tax_category_key="service.course", rate_pct="0",
+         operation_class="exempt", exempt_reason="E1", regime_key="01", valid_from="2020-01-01", valid_to="2099-12-31")
+    file = exported(ctx, ["tax"])
+
+    with use_hub(hub_b):
+        theirs = owner_of(B, "bea")
+        loaded_back(theirs, file)
+
+        [rule] = call(theirs, "tax.rule.list", tax_category_key="service.course", limit=100).rows
+    assert (rule.operation_class, rule.exempt_reason, rule.regime_key) == ("exempt", "E1", "01")
+    assert (str(rule.valid_from), str(rule.valid_to)) == ("2020-01-01", "2099-12-31")
+
+
 def test_the_file_carries_only_the_own_categories_with_their_rules_and_components(ctx):
     assert "tax.category" not in data_of(ctx, ["tax"])
     own_taxes(ctx)
