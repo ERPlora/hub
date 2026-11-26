@@ -1,4 +1,4 @@
-"""Events of the schedule app (``<app>.<entity>.<fact>``): recorded by services.py, cited by live.py.
+"""Events of the schedule app (``<app>.<entity>.<fact>``): recorded by services/, cited by live.py.
 
 Their payloads carry ids and dates only, never a special day's name or a change's reason (free text
 where a business may write people's names). The schedule app reacts to no event of another app.
