@@ -1,6 +1,6 @@
-// «Delete zone?» (WORKBOOK «Zonas»; TABLE-F06): «N tables in this zone. A zone with tables cannot be
-// deleted: move or delete its tables first.», always said; with tables, «Delete zone» is off. Deleting
-// tells the page (`deleted`); a refusal stays in the dialog.
+// «Delete zone?» (WORKBOOK «Zonas»; TABLE-F06): an empty zone only says what deleting does; a zone with
+// tables says they must be moved or deleted first, and «Delete zone» is off. Deleting tells the page
+// (`deleted`); a refusal stays in the dialog.
 import { describe, expect, it } from 'vitest';
 
 import { click, mountTable, settle } from '../__tests__/mount-table';
@@ -20,11 +20,20 @@ describe('ZoneDeleteDialog', () => {
   it('deletes an empty zone and tells the page', async () => {
     const d = await dialog(zoneRow(), { '/api/table/zones/delete': [200, { id: 'z1' }] });
     expect(d.inDoc('zones-delete')?.getAttribute('aria-label')).toBe('Delete zone?');
-    expect(d.inDoc('zones-delete')?.textContent).toContain('0 tables in this zone.');
     await click(d.submit());
     expect(d.sent().map((call) => [call.path, call.body])).toEqual([['/api/table/zones/delete', { id: 'z1' }]]);
     expect(d.wrapper.emitted('deleted')).toHaveLength(1);
     expect(d.closed()).toBe(true);
+  });
+
+  it.each([
+    ['en', 'The zone leaves the plan and the lists.', /cannot be deleted|0 tables/],
+    ['es', 'La zona sale del plano y de las listas.', /no se puede borrar|0 mesas/],
+  ] as const)('an empty zone only says what deleting does (%s, hub#2534)', async (locale, impact, blocked) => {
+    const d = await dialog(zoneRow(), {}, locale);
+    expect(d.inDoc('zones-delete')?.textContent).toContain(impact);
+    expect(d.inDoc('zones-delete')?.textContent).not.toMatch(blocked);
+    expect(d.submit().disabled).toBeFalsy();
   });
 
   it('a zone with tables cannot be deleted', async () => {

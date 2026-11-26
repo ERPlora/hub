@@ -415,9 +415,10 @@ Pantalla: Zonas, Plano de sala (Editar plano)
 Pasos:
 1. En **Mesas → Zonas**, «Editar»: cambia Nombre, Descripción, Color, Orden o «Activa» y pulsa
    «Guardar cambios». En el plano, el lápiz («Editar zona») cambia Nombre y Descripción.
-2. Para borrarla (solo el administrador): «Borrar» abre «¿Borrar la zona?» con «N mesas en esta zona.
-   Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.» (con una sola, «1 mesa en esta
-   zona. … muévela o bórrala antes.»); con mesas, «Borrar zona» sale apagado.
+2. Para borrarla (solo el administrador): «Borrar» abre «¿Borrar la zona?». Sin mesas dice «La zona sale
+   del plano y de las listas.»; con mesas, «N mesas en esta zona. Una zona con mesas no se puede borrar:
+   mueve o borra antes sus mesas.» (con una sola, «1 mesa en esta zona. … muévela o bórrala antes.») y
+   «Borrar zona» sale apagado.
 3. Sin mesas, «Borrar zona» la quita de la lista y del plano.
 Entra: la zona elegida.
 Sale: la zona cambiada (avisa: `table.zone.updated`) o borrada (avisa: `table.zone.deleted`).

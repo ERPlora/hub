@@ -161,7 +161,7 @@
       },
       "delete": {
         "title": "Delete zone?",
-        "impact": "{count} table in this zone. A zone with tables cannot be deleted: move or delete it first. | {count} tables in this zone. A zone with tables cannot be deleted: move or delete its tables first.",
+        "impact": "The zone leaves the plan and the lists. | {count} table in this zone. A zone with tables cannot be deleted: move or delete it first. | {count} tables in this zone. A zone with tables cannot be deleted: move or delete its tables first.",
         "confirm": "Delete zone"
       },
       "loadError": "Could not load the zones"

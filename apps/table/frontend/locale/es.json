@@ -161,7 +161,7 @@
       },
       "delete": {
         "title": "¿Borrar la zona?",
-        "impact": "{count} mesa en esta zona. Una zona con mesas no se puede borrar: muévela o bórrala antes. | {count} mesas en esta zona. Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.",
+        "impact": "La zona sale del plano y de las listas. | {count} mesa en esta zona. Una zona con mesas no se puede borrar: muévela o bórrala antes. | {count} mesas en esta zona. Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.",
         "confirm": "Borrar zona"
       },
       "loadError": "No se pudieron cargar las zonas"
