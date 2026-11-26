@@ -8,7 +8,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, api, capture, horizontalOverflow, login, psql, shown, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
-import { rowAction } from './service-helpers';
+import { ownerPage, rowAction } from './service-helpers';
 import { pickSelect } from './tax-helpers';
 
 const RUN = stamp();
@@ -55,9 +55,7 @@ const sentBack = (settings: Settings) => ({
 });
 
 test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
+  const { context } = await ownerPage(browser, '/sale/pos');
   await turnOnMissing(context, A, ['tip'], turnedOn);
   // The pool takes cash: without the drawer on, no session has to be open for it.
   await drawerOff(context);
@@ -72,9 +70,7 @@ test.afterAll(async ({ browser }) => {
   cleanSales();
   cleanInventory();
   restoreDrawer();
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
+  const { context } = await ownerPage(browser, '/sale/pos');
   await api(context, A, 'POST', '/tip/settings', sentBack(before));
   await turnOffTurnedOn(context, A, turnedOn);
   await context.close();
