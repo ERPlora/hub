@@ -40,6 +40,5 @@ def device_health(ctx: OperationContext, params: CoverageIn) -> dict:
     configured, _waiting = waiting.coverage([usage])[usage]
     if not configured:
         return {"usage": usage, "state": "not_configured"}
-    there = device_reads.active_devices().filter(last_seen_at__gte=timezone.now() - device_reads.SEEN_WITHIN)
-    papers, _takeable = waiting._takeable(there, [usage])
+    papers, _takeable = waiting._takeable(device_reads.devices_on(timezone.now()), [usage])
     return {"usage": usage, "state": "ok" if (usage, PrintJob.Format.RECEIPT) in papers else "no_signal"}

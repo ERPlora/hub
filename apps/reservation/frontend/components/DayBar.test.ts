@@ -41,6 +41,14 @@ describe('DayBar', () => {
     expect((await setup({ figures: dayOut({ closed: true }) })).text('next-slot')).toContain('Closed this day');
   });
 
+  it('says what is left of the next slot in the singular or the plural', async () => {
+    const left = async (available: number, locale: 'en' | 'es') =>
+      (await setup({ now: '17:00', figures: dayOut({ slots: [slotLoad({ available })] }) }, locale)).text('next-slot');
+    expect(await left(1, 'es')).toBe('20:00–23:30 1 libre próxima franja');
+    expect(await left(2, 'es')).toBe('20:00–23:30 2 libres próxima franja');
+    expect(await left(1, 'en')).toBe('8:00 PM–11:30 PM 1 left next slot');
+  });
+
   it('steps the day, takes a picked date and comes back to today', async () => {
     const s = await setup({ day: '2026-10-16' });
     await click(s.find('reservation-day-prev').element);
