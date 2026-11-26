@@ -8,17 +8,10 @@ from django.apps import apps
 from django.utils import translation
 
 from apps.service import models, queries, schemas, services
-from apps.service.models import (
-    Assignment,
-    Category,
-    Grant,
-    GrantAdjustment,
-    Package,
-    PackageItem,
-    Redemption,
-    Service,
-    ServiceSettings,
-)
+from apps.service.models.catalog import Assignment, Category, Service
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
+from apps.service.models.packages import Package, PackageItem
+from apps.service.models.settings import ServiceSettings
 from base.tests.po import (
     catalogue_key,
     compiled_differences,

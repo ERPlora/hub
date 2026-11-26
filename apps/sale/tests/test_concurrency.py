@@ -251,7 +251,7 @@ def apply(order, grant):
 def test_two_tills_paying_with_the_last_session_one_wins_and_the_other_hears_why(
     last_session,
 ):
-    from apps.service.models import Redemption
+    from apps.service.models.grants import Redemption
 
     haircut, _lucia, grant = last_session
     first = run("sale.order.open", {"service_lines": [{"service_id": str(haircut.id)}]})
@@ -269,7 +269,7 @@ def test_two_tills_paying_with_the_last_session_one_wins_and_the_other_hears_why
 def test_a_second_voucher_on_a_line_waits_for_the_first_and_does_not_fit(coffee, last_session):
     # SERVICE-F14: read before the first grant's COMMIT, both would fit and the line would pay for more than it charged.
     # Another voucher for another customer: nothing but the line makes them wait for each other.
-    from apps.service.models import Grant
+    from apps.service.models.grants import Grant
 
     haircut, lucia, _grant = last_session
     marta = run("customer.customer.create", {"name": "Marta Ruiz"}, system_context(A))
@@ -344,7 +344,7 @@ def test_the_sale_of_a_voucher_said_twice_at_once_leaves_its_line_once(coffee, l
 def test_charging_a_check_and_voiding_it_at_once_spend_or_release_its_session(
     last_session,
 ):
-    from apps.service.models import Redemption
+    from apps.service.models.grants import Redemption
 
     haircut, lucia, grant = last_session
     order = run("sale.order.open", {"service_lines": [{"service_id": str(haircut.id)}]})
@@ -369,7 +369,7 @@ def test_charging_a_check_and_voiding_it_at_once_spend_or_release_its_session(
 def test_voiding_and_refunding_a_sale_paid_with_a_voucher_at_once_give_the_session_back_once(
     last_session,
 ):
-    from apps.service.models import Redemption
+    from apps.service.models.grants import Redemption
 
     haircut, lucia, grant = last_session
     order = run("sale.order.open", {"service_lines": [{"service_id": str(haircut.id)}]})

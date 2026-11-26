@@ -10,7 +10,7 @@ from live.context import system_context
 from live.operations import get as operation
 
 from apps.flow.tests.test_api import get, post
-from apps.service.models import Grant, GrantAdjustment, Redemption
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
 from base.tests.colleagues import ADDRESS, NAMELESS, SHOWN, signed_in
 
 from .conftest import HUB_DB, A
