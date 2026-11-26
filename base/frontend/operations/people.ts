@@ -109,7 +109,7 @@ declare module '@erplora/ui/sdk' {
     'base.person.badge_set': { input: { person: string; badge: string }; output: PersonDetail };
     'base.person.badge_remove': { input: { person: string }; output: PersonDetail };
     'base.role.list': { input: NoInput; output: { roles: HubRoleRow[] } };
-    'base.role.detail': { input: { role: string; offset?: number }; output: RoleDetail };
+    'base.role.detail': { input: { role: string }; output: RoleDetail };
     'base.role.create': { input: { based_on: string; name: string; description?: string }; output: HubRoleRow };
     'base.role.update': { input: RoleChange; output: HubRoleRow };
     'base.role.delete': { input: { role: string }; output: { key: string } };

@@ -570,7 +570,7 @@ declare module '@erplora/ui/sdk' {
     'flow.draft.dismiss': { input: DraftRefIn; output: DraftOut };
     'flow.catalog.read': { input: { apps?: string[]; names?: string[]; only_names?: boolean }; output: CatalogOut };
     'flow.event.sample': { input: SampleIn; output: SampleOut };
-    'flow.recipe.list': { input: { offset?: number }; output: RecipeListOut };
+    'flow.recipe.list': { input: Record<string, never>; output: RecipeListOut };
     'flow.recipe.enable': { input: RecipeRefIn; output: RecipeEnabledOut };
     'flow.recipe.disable': { input: RecipeRefIn; output: FlowOut };
     'flow.recipe.restore': { input: RecipeRefIn; output: FlowOut };
