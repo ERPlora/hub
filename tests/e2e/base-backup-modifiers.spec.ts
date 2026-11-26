@@ -13,10 +13,10 @@ import {
   A,
   api,
   ARTIFACTS,
+  capture,
   horizontalOverflow,
   hostPage,
   psql,
-  shot,
   shown,
   signedInSpanish,
   testid,
@@ -72,7 +72,7 @@ async function snap(page: Page, name: string): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
   await untilStill(page);
   expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(name), fullPage: false });
+  await capture(page, name);
 }
 
 /** Settings › Data › Export with the group there: Modifiers' row does not say `nothing` (in the page's language) and,
