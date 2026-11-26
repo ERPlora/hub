@@ -11,6 +11,8 @@ on:
     # 01:47 UTC, off the hour (GitHub delays the busy ones), apart from the SaaS's nightly at 03:17.
     - cron: "47 1 * * *"
   workflow_dispatch:
+  push:
+    branches: [fix/erplora-next-242-hub-nightly-e2e]
 
 permissions:
   contents: read
