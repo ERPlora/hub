@@ -8,10 +8,9 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { A, capture, shown } from './helpers';
 import { cleanTill, dishForTheTill, stamp, tillIn, TILL_LANGUAGES } from './sale-helpers';
 import type { Product } from './inventory-helpers';
+import { CHROME_LANDSCAPE, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
 
 const RUN = stamp();
-/** The tablet's screen with Chrome's address bar shown: what the page has, and what `100vh` counts. */
-const CHROME_LANDSCAPE = { width: 1280, page: 665, withoutBar: 721 };
 const SIZES = [
   { width: 1280, height: 665 },
   { width: 1280, height: 720 },
@@ -19,20 +18,8 @@ const SIZES = [
   { width: 820, height: 1180 },
   { width: 375, height: 667 },
 ] as const;
-
-interface Box {
-  top: number;
-  bottom: number;
-}
-
-interface DocumentFit {
-  screen: number;
-  window: Box;
-  close: Box;
-  print: Box;
-  footer: Box;
-  paper: Box;
-}
+/** What always shows inside the ticket's window. */
+const ON_VIEW = ['✕', 'print button'] as const;
 
 let dish: Product;
 
@@ -42,40 +29,18 @@ test.beforeAll(async ({ browser }) => {
 
 test.afterAll(() => cleanTill());
 
-/** Where the window (Ionic's wrapper, in the modal's shadow root), its ✕, its print button, its footer and the end of
- *  the paper sit, and the height the page has (the modal's own box, which covers it). */
-function fitOf(modal: Locator): Promise<DocumentFit> {
-  return modal.evaluate((el) => {
-    const box = (part: Element | null | undefined): Box => {
-      if (!part) throw new Error('the document window lost one of its parts');
-      const { top, bottom } = part.getBoundingClientRect();
-      return { top, bottom };
-    };
-    return {
-      screen: el.getBoundingClientRect().height,
-      window: box(el.shadowRoot?.querySelector('.modal-wrapper')),
-      close: box(el.querySelector('[data-testid=sale-document-close]')),
-      print: box(el.querySelector('[data-testid=sale-document-print]')),
-      footer: box(el.querySelector('.sale-doc-modal__footer')),
-      paper: box(el.querySelector('[data-testid=sale-receipt]')),
-    };
+/** Where the window, its ✕, its print button, its footer and the end of the paper sit, and the height the page has. */
+function fitOf(modal: Locator): Promise<WindowFit> {
+  return windowFit(modal, {
+    '✕': '[data-testid=sale-document-close]',
+    'print button': '[data-testid=sale-document-print]',
+    footer: '.sale-doc-modal__footer',
+    paper: '[data-testid=sale-receipt]',
   });
 }
 
-function expectInside(fit: DocumentFit, where: string): void {
-  expect(fit.window.top, `the window starts on the screen ${where}`).toBeGreaterThanOrEqual(-0.5);
-  expect(fit.window.bottom, `the window ends on the screen ${where}`).toBeLessThanOrEqual(fit.screen + 0.5);
-  for (const [name, part] of [
-    ['✕', fit.close],
-    ['print button', fit.print],
-  ] as const) {
-    expect(part.top, `the ${name} starts inside the window ${where}`).toBeGreaterThanOrEqual(fit.window.top - 0.5);
-    expect(part.bottom, `the ${name} ends inside the window ${where}`).toBeLessThanOrEqual(fit.window.bottom + 0.5);
-  }
-}
-
 /** The ticket scrolled to its end inside the window: its last line ends above the footer. */
-async function scrolledToTheEnd(modal: Locator): Promise<DocumentFit> {
+async function scrolledToTheEnd(modal: Locator): Promise<WindowFit> {
   await modal.locator('ion-content.sale-doc-modal__body').evaluate(async (content) => {
     await (content as HTMLElement & { scrollToBottom(duration?: number): Promise<void> }).scrollToBottom(0);
   });
@@ -104,17 +69,16 @@ for (const till of TILL_LANGUAGES) {
     const context = await browser.newContext({ baseURL: A, locale: till.locale, viewport: { width: CHROME_LANDSCAPE.width, height: CHROME_LANDSCAPE.withoutBar } });
     const page = await context.newPage();
     await tillIn(page, context, till.lang);
-    // Chrome's address bar, as on the tablet: the page is 56 px shorter than what `100vh` counts.
-    const bar = await page.addStyleTag({ content: `body { height: ${CHROME_LANDSCAPE.page}px !important; max-height: ${CHROME_LANDSCAPE.page}px !important; }` });
+    const bar = await underAddressBar(page);
     const modal = await chargeDish(page);
 
     const fit = await fitOf(modal);
     expect(fit.screen, 'the page is as tall as the screen under the address bar').toBe(CHROME_LANDSCAPE.page);
-    expectInside(fit, 'under the address bar');
+    expectWindowOnScreen(fit, ON_VIEW, 'under the address bar');
     await capture(page, `SALE-DOCUMENT-FIT-${till.lang}-1280x665-chrome`);
     const end = await scrolledToTheEnd(modal);
-    expect(end.paper.bottom, 'the end of the ticket is reached above the footer').toBeLessThanOrEqual(end.footer.top + 0.5);
-    expectInside(end, 'with the ticket scrolled to its end');
+    expect(end.parts.paper.bottom, 'the end of the ticket is reached above the footer').toBeLessThanOrEqual(end.parts.footer.top + 0.5);
+    expectWindowOnScreen(end, ON_VIEW, 'with the ticket scrolled to its end');
 
     await bar.evaluate((style) => (style as Element).remove());
     for (const size of SIZES) {
@@ -122,7 +86,7 @@ for (const till of TILL_LANGUAGES) {
       await page.setViewportSize(size);
       const at = await fitOf(modal);
       expect(at.screen, `the page fills the window at ${label}`).toBe(size.height);
-      expectInside(at, `at ${label}`);
+      expectWindowOnScreen(at, ON_VIEW, `at ${label}`);
       await capture(page, `SALE-DOCUMENT-FIT-${till.lang}-${label}`);
     }
     await context.close();

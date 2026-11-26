@@ -1,7 +1,9 @@
 // flow: INVENTORY-F25, INVENTORY-F29 — the product sheet on a low screen. A tablet in landscape is 1280×761 CSS px,
 // and in Spanish the sheet's six actions wrap into several rows. Every action shows inside the window and the barcode
-// is reached by scrolling the sheet above them, never hidden under them (hub#2012). The same holds on a desktop, a
-// tablet in portrait and a low phone, with a screenshot at each size.
+// is reached by scrolling the sheet above them, never hidden under them (hub#2012). In Chrome on that tablet the
+// address bar leaves the page 665 px high while `100vh` still counts 721: the window fits the page, with its ✕ and its
+// last row of actions on view. The same holds on a desktop, a tablet in portrait and a low phone, with a screenshot at
+// each size.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { capture, signedInSpanish } from './helpers';
@@ -14,6 +16,7 @@ import {
   searchProducts,
   stamp,
 } from './inventory-helpers';
+import { CHROME_LANDSCAPE, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
 import { rowAction } from './service-helpers';
 
 const RUN = stamp();
@@ -24,43 +27,31 @@ const SIZES = [
   { width: 375, height: 667 },
 ] as const;
 const ACTIONS = ['print-label', 'receive', 'count', 'write-off', 'sold-out', 'close-button'] as const;
+/** What always shows inside the sheet's window: its ✕, its footer and every action. */
+const ON_VIEW = ['✕', 'footer', ...ACTIONS] as const;
 
-interface Box {
-  top: number;
-  bottom: number;
+/** Where the sheet's window, its ✕, its fields, its barcode, its footer and its actions sit on screen. */
+function fitOf(sheet: Locator): Promise<WindowFit> {
+  return windowFit(sheet, {
+    '✕': '[data-testid=inventory-product-detail-close]',
+    footer: '.ep-form-modal__footer',
+    body: '.ep-form-modal__body',
+    barcode: '[data-testid=inventory-barcode]',
+    ...Object.fromEntries(ACTIONS.map((id) => [id, `[data-testid=inventory-product-detail-${id}]`])),
+  });
 }
 
-interface SheetFit {
-  window: Box;
-  footer: Box;
-  body: Box;
-  barcode: Box;
-  actions: Box[];
-}
-
-/** Where the sheet's window (Ionic's wrapper, in the modal's shadow root), its parts and its actions sit on screen. */
-function fitOf(sheet: Locator): Promise<SheetFit> {
-  return sheet.evaluate((modal, ids) => {
-    const box = (el: Element | null | undefined): { top: number; bottom: number } => {
-      if (!el) throw new Error('the product sheet lost one of its parts');
-      const { top, bottom } = el.getBoundingClientRect();
-      return { top, bottom };
-    };
-    return {
-      window: box(modal.shadowRoot?.querySelector('.modal-wrapper')),
-      footer: box(modal.querySelector('.ep-form-modal__footer')),
-      body: box(modal.querySelector('.ep-form-modal__body')),
-      barcode: box(modal.querySelector('[data-testid=inventory-barcode]')),
-      actions: ids.map((id) => box(modal.querySelector(`[data-testid=inventory-product-detail-${id}]`))),
-    };
-  }, ACTIONS as readonly string[]);
-}
-
-/** Scrolls the sheet's fields to their end, where the barcode is. */
-async function scrollToBarcode(sheet: Locator): Promise<void> {
+/** Scrolls the sheet's fields to their end, where the barcode is, and says where it all sits then. */
+async function scrolledToBarcode(sheet: Locator): Promise<WindowFit> {
   await sheet.locator('.ep-form-modal__body').evaluate((body) => {
     body.scrollTop = body.scrollHeight;
   });
+  return fitOf(sheet);
+}
+
+function expectBarcodeReached({ parts }: WindowFit): void {
+  expect(parts.barcode.bottom, 'the barcode is not under the actions').toBeLessThanOrEqual(parts.footer.top + 0.5);
+  expect(parts.barcode.bottom, 'the barcode is inside the fields').toBeLessThanOrEqual(parts.body.bottom + 0.5);
 }
 
 async function openSheet(page: Page, product: { id: string; sku: string }): Promise<Locator> {
@@ -79,19 +70,12 @@ test('INVENTORY-F25: on a tablet in landscape the product sheet shows all its ac
   for (const id of ACTIONS) await expect(sheet.locator(`[data-testid=inventory-product-detail-${id}]`)).toBeVisible();
 
   const fit = await fitOf(sheet);
-  const rows = new Set(fit.actions.map((action) => Math.round(action.top))).size;
+  const rows = new Set(ACTIONS.map((id) => Math.round(fit.parts[id].top))).size;
   expect(rows, 'the six actions wrap, as on the tablet').toBeGreaterThan(1);
-  expect(fit.footer.bottom, 'the footer ends inside the window').toBeLessThanOrEqual(fit.window.bottom + 0.5);
-  fit.actions.forEach((action, at) => {
-    expect(action.top, `${ACTIONS[at]} starts inside the window`).toBeGreaterThanOrEqual(fit.window.top);
-    expect(action.bottom, `${ACTIONS[at]} ends inside the window`).toBeLessThanOrEqual(fit.window.bottom + 0.5);
-  });
+  expectWindowOnScreen(fit, ON_VIEW, 'at 1280x761');
   await capture(page, 'FIX-INVENTORY-SHEET-FIT-1280x761');
 
-  await scrollToBarcode(sheet);
-  const scrolled = await fitOf(sheet);
-  expect(scrolled.barcode.bottom, 'the barcode is not under the actions').toBeLessThanOrEqual(scrolled.footer.top + 0.5);
-  expect(scrolled.barcode.bottom, 'the barcode is inside the fields').toBeLessThanOrEqual(scrolled.body.bottom + 0.5);
+  expectBarcodeReached(await scrolledToBarcode(sheet));
   await capture(page, 'FIX-INVENTORY-SHEET-FIT-1280x761-barcode');
 
   for (const size of SIZES) {
@@ -99,7 +83,34 @@ test('INVENTORY-F25: on a tablet in landscape the product sheet shows all its ac
     await page.setViewportSize(size);
     await capture(page, `FIX-INVENTORY-SHEET-FIT-${label}`);
     const at = await fitOf(sheet);
-    expect(at.footer.bottom, `the footer ends inside the window at ${label}`).toBeLessThanOrEqual(at.window.bottom + 0.5);
+    expect(at.screen, `the page fills the window at ${label}`).toBe(size.height);
+    expectWindowOnScreen(at, ON_VIEW, `at ${label}`);
   }
+  await context.close();
+});
+
+test('INVENTORY-F29: in Chrome on a tablet in landscape, under the address bar, the product sheet fits the page with its ✕ and «Marcar agotado» on view', async ({
+  browser,
+}) => {
+  const viewport = { width: CHROME_LANDSCAPE.width, height: CHROME_LANDSCAPE.withoutBar };
+  const { context, page } = await signedInSpanish(browser, viewport, '/inventory/products');
+  const product = await createProduct(context, { name: `E2E Ficha Chrome ${RUN}`, sku: `E2E-CHROME-${RUN}` });
+  const bar = await underAddressBar(page);
+  const sheet = await openSheet(page, product);
+
+  const fit = await fitOf(sheet);
+  expect(fit.screen, 'the page is as tall as the screen under the address bar').toBe(CHROME_LANDSCAPE.page);
+  expectWindowOnScreen(fit, ON_VIEW, 'under the address bar');
+  await capture(page, 'FIX-INVENTORY-SHEET-FIT-1280x665-chrome');
+  const scrolled = await scrolledToBarcode(sheet);
+  expectBarcodeReached(scrolled);
+  expectWindowOnScreen(scrolled, ON_VIEW, 'with the barcode scrolled into view under the address bar');
+
+  await bar.evaluate((style) => (style as Element).remove());
+  await page.setViewportSize({ width: CHROME_LANDSCAPE.width, height: CHROME_LANDSCAPE.page });
+  const low = await fitOf(sheet);
+  expect(low.screen, 'the page fills a 1280x665 window').toBe(CHROME_LANDSCAPE.page);
+  expectWindowOnScreen(low, ON_VIEW, 'at 1280x665');
+  await capture(page, 'FIX-INVENTORY-SHEET-FIT-1280x665');
   await context.close();
 });
