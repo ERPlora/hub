@@ -2669,6 +2669,7 @@
       "carts": "Carts",
       "orders": "Orders",
       "queued": "In the print queue",
+      "waits_for_device": "Waiting for a device to print it",
       "report": "Report",
       "printers": "Printers",
       "this_device": "This device",
