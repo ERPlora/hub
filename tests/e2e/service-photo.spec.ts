@@ -61,15 +61,32 @@ async function editForm(page: Page, service: Service): Promise<Locator> {
   return form;
 }
 
-/** The names under the library's images that do not show whole: cut with «…», short of lines, or past their tile. */
+/**
+ * The service's form with the Hub in `language`, as the language picker of «My profile» leaves it; the business has no
+ * language of its own here. The cookie goes after a first login: in a fresh context, the login brings back the hub's
+ * cookies, the language among them.
+ */
+async function editFormIn(page: Page, service: Service, language: 'en' | 'es'): Promise<Locator> {
+  await login(page, A, '/service/services');
+  await page.context().addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
+  const form = await editForm(page, service);
+  await expect(page.locator('html')).toHaveAttribute('lang', language);
+  return form;
+}
+
+/**
+ * The names of the library's images that do not show whole right under their image: cut with «…», short of lines,
+ * past their tile, or pushed down away from the image by a taller tile of the same row.
+ */
 async function cutNames(library: Locator): Promise<string[]> {
   return library.locator('[data-testid^=service-form-image-library-modal-image-] span').evaluateAll((names) =>
     names
       .filter((name) => {
         const tile = name.closest('button')!.getBoundingClientRect();
+        const image = name.previousElementSibling!.getBoundingClientRect();
         const box = name.getBoundingClientRect();
         const cut = name.scrollWidth > name.clientWidth + 1 || name.scrollHeight > name.clientHeight + 1;
-        return cut || box.left < tile.left - 1 || box.right > tile.right + 1;
+        return cut || box.left < tile.left - 1 || box.right > tile.right + 1 || box.top - image.bottom > 8;
       })
       .map((name) => name.textContent!.trim()),
   );
@@ -122,10 +139,7 @@ test('SERVICE-F34: a library image, Hair and Beauty first, is the service’s ph
 test('SERVICE-F34: the library names its images in the language the person reads the Hub in', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
   for (const [language, title] of [['es', 'Mechas'], ['en', 'Highlights']] as const) {
-    // As the language picker of «My profile» leaves it; the business has no language of its own here.
-    await page.context().addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
-    const form = await editForm(page, colour);
-    await expect(page.locator('html')).toHaveAttribute('lang', language);
+    const form = await editFormIn(page, colour, language);
     await form.locator('[data-testid=service-form-image-library]').click();
     const library = dialog(page, 'service-form-image-library-modal');
     await library.locator('[data-testid=service-form-image-library-modal-search] input').fill('Mechas');
@@ -156,11 +170,7 @@ test('SERVICE-F34: every image of the library shows its whole name under it, on 
     { width: 1440, height: 900 },
   ];
   await page.setViewportSize(sizes[3]);
-  // After a first login: in a fresh context it brings back the hub's cookies, the language among them.
-  await login(page, A, '/service/services');
-  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  const form = await editForm(page, colour);
-  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+  const form = await editFormIn(page, colour, 'es');
   await form.locator('[data-testid=service-form-image-library]').click();
   const library = dialog(page, 'service-form-image-library-modal');
   for (const [query, longest] of searches) {
