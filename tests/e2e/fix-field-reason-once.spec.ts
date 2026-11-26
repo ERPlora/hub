@@ -124,14 +124,15 @@ for (const language of LANGUAGES) {
 
   test(`hub#2535 BASE-F127 (${language}): a role duplicated with the name of another role says why once, under the name`, async ({ browser }) => {
     const { page, close } = await signedIn(browser, language, '/employees#roles');
-    const own = await api<{ key: string; name: string }>(page.context(), A, 'POST', '/roles', { based_on: 'hub_employee', name: uniqueName('E2E2535 Caja') });
+    const taken = uniqueName('E2E2535 Caja');
+    const own = await api<{ key: string }>(page.context(), A, 'POST', '/roles', { based_on: 'hub_employee', name: taken });
     expect(own.status, JSON.stringify(own.data)).toBe(200);
     try {
       await page.reload();
       await rowAction(page, 'roles', 'hub_employee', 'duplicate');
       const modal = dialog(page, 'role-new');
       const name = modal.locator('[data-testid=role-new-name]');
-      await name.locator('input').fill(own.data.name.toLowerCase());
+      await name.locator('input').fill(taken.toLowerCase());
       await modal.locator('[data-testid=role-new-submit]').click();
       await saidOnceUnder(page, modal, name, modal.locator('[data-testid=role-new-error]'), ROLE_TAKEN[language], `role-${language}`);
     } finally {
