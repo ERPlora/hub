@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // The screens screens-text-fits.spec.ts walks: those of every app the salon's and the restaurant's QA journeys
 // (qa/journeys/) cite, among the routes the Hub registers, so a new screen or a new app in a journey is walked with
 // no list to keep by hand. Here the routes are the ones base and the apps declare in their routes.ts.
