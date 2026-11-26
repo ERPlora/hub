@@ -142,12 +142,12 @@ def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> s
 
 
 def setup_block(status: dict | None) -> str:
-    """The checklist «Finish setting up your business» as the model reads it: what is pending, what
+    """The Home's checklist as the model reads it, named by its title as the person sees it: what is pending, what
     blocks invoicing, what is done, and what only an administrator can do. ``None``: it could not be read."""
     if status is None:
         return "The checklist of this business could not be read now: do not say the business is set up."
     lines = [
-        "The person is setting up the business. Its checklist «Finish setting up your business», read now "
+        f"The person is setting up the business. Its checklist «{status['title']}», read now "
         f"({status['total'] - status['pending'] - status['unavailable']} of {status['total']} done):"
     ]
     for item in status["items"]:
