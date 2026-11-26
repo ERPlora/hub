@@ -947,7 +947,7 @@ If it fails: without the list, as in "My apps".
 Involved: APPS-F01, APPS-F07, BASE-F14, BASE-F20
 
 ### BASE-F18 Turn on an app
-<!-- from WORKBOOK.md sha256:cdbe0b45b120 -->
+<!-- from WORKBOOK.md sha256:8e30f1c5b8b2 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -964,9 +964,10 @@ In: the chosen app, the ones it needs and what the business has subscribed to on
 Out: the app running in this business, chosen by it: it counts towards its plan's limit of apps.
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have reached the
 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for the owner in the browser (not in
-the installed app). A paid app not subscribed to offers no "Turn on". Neither does an app this business cannot use: it
-shows "Not available" and, for whoever runs the business, the reason below it ("VeriFactu is only for businesses in
-Spain."). Any other failure shows in a notice with the app's name and the reason, which stays until it is closed.
+the installed app). The limit never stops an app the business's country requires (VeriFactu in Spain): it turns on
+even with the plan at its limit. A paid app not subscribed to offers no "Turn on". Neither does an app this business
+cannot use: it shows "Not available" and, for whoever runs the business, the reason below it ("VeriFactu is only for
+businesses in Spain."). Any other failure shows in a notice with the app's name and the reason, which stays until it is closed.
 Involved: APPS-F07, VERIFACTU-F01, BASE-F19, BASE-F20
 
 ### BASE-F19 Know what else comes with an app

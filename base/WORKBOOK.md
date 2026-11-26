@@ -907,7 +907,8 @@ Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en 
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
 límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para el propietario en el
-navegador (en la app instalada no sale). Una app de pago sin contratar no ofrece «Activar». Una app que
+navegador (en la app instalada no sale). El límite nunca frena una app que el país del negocio exige (VeriFactu en
+España): se activa aunque el plan esté en su límite. Una app de pago sin contratar no ofrece «Activar». Una app que
 este negocio no puede usar tampoco: sale «No disponible» y, para quien administra, el motivo debajo («VeriFactu solo
 es para negocios de España.»). Cualquier otro fallo sale en un aviso con el nombre de la app y el
 motivo, que se queda hasta cerrarlo.
@@ -4326,8 +4327,8 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   (`POST /api/apps/enable|disable`, `base.administer_hub`: cierre de `requires`, 409 `base.app_required`, negativas
   `can_disable` y `can_enable` del `LiveAppConfig` → 409 `base.app_vetoed`, que `base.app.list` adelanta en el `refusal`
   de cada fila, con cada gancho una sola vez por lista (hub#618, hub#694), y la de una app que otra en marcha necesita
-  dice el motivo de esa otra, nunca «Desactiva antes» (`app_off_refusal`, hub#619), 402 `base.app_limit_reached` con `max_apps`/`enabled`;
-  bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
+  dice el motivo de esa otra, nunca «Desactiva antes» (`app_off_refusal`, hub#619), 402 `base.app_limit_reached` con `max_apps`/`enabled`,
+  nunca para una app que el país del negocio exige, `mandatory_in`; bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
   (caché `base.apps_off:<host>`, olvidada al COMMIT). Una app cuyas tablas la BD del hub aún no tiene (`Hub.schema_apps`;
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
   `creating` (el OpenAPI documenta 200 y 202 con el mismo esquema, hub#705): el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,
