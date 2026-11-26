@@ -7,6 +7,8 @@ import { withMenu } from '../../../../base/frontend/__tests__/app-menu';
 import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
 import appointmentEn from '../../../appointment/frontend/locale/en.json';
 import appointmentEs from '../../../appointment/frontend/locale/es.json';
+import serviceEn from '../../../service/frontend/locale/en.json';
+import serviceEs from '../../../service/frontend/locale/es.json';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 
@@ -57,7 +59,7 @@ export async function mountOnlineBooking(component: Component, options: MountOpt
   return mountInShell(component, options, {
     path: '/online_booking/bookings',
     session: OWNER,
-    messages: { en: { ...appointmentEn, ...en }, es: { ...appointmentEs, ...es } },
+    messages: { en: { ...appointmentEn, ...serviceEn, ...en }, es: { ...appointmentEs, ...serviceEs, ...es } },
   });
 }
 

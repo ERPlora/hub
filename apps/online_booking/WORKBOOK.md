@@ -117,8 +117,8 @@ Página `/p/<negocio>/book` en la dirección del negocio: la abre cualquiera, si
 (sin su menú). Arriba, el nombre del negocio, su logo (el que se sube en Ajustes, servido desde la dirección del
 propio negocio; sin logo, solo el nombre) y su color. También «Reserva online» y «Elige tus servicios, un día y una hora
 libre, y deja tu nombre y tu móvil.»; debajo, el título y el mensaje de bienvenida de los Ajustes y el recorrido:
-servicios con su precio y su duración, profesional o «Sin preferencia», día, horas libres, nombre, móvil, email,
-nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el enlace a la política de privacidad.
+servicios con su precio (con su tarifa, como en el TPV: «Desde 65,00 €») y su duración, profesional o «Sin
+preferencia», día, horas libres, nombre, móvil, email, nota y **Reservar**. Junto a **Reservar**, el aviso de quién usa sus datos y el enlace a la política de privacidad.
 Si no hay nada que reservar online, solo sale el aviso, sin la invitación ni el formulario. Al reservar, el número
 de la cita, el mensaje de confirmación, **Ver mi reserva**, **Cancelar la reserva** y **Reservar otra**. Con la
 dirección de otro negocio, o la de este en la de otro, no hay página. La confirmación da como enlace la dirección
@@ -172,8 +172,9 @@ Pasos:
 1. Abre la página del negocio: su nombre, su logo (el de los Ajustes, desde la dirección del propio negocio; sin
    logo, solo el nombre), título, mensaje de bienvenida y color.
 2. Elige uno o varios servicios (hasta 5) de los **reservables online**, con su precio (en la moneda del negocio,
-   la de su país: «20,00 zł» en Polonia; agrupado desde cuatro cifras: «1.234,56 €») y su duración si
-   Servicios los enseña («Mostrar precios», «Mostrar duración»).
+   la de su país: «20,00 zł» en Polonia; agrupado desde cuatro cifras: «1.234,56 €»), con su tarifa como en el
+   TPV («Desde 65,00 €», «65,00 € / hora», «Variable · 65,00 €» o «Gratis»), y su duración si Servicios los
+   enseña («Mostrar precios», «Mostrar duración»; sin precios, tampoco la tarifa).
 3. Si el negocio lo permite, elige profesional entre los que hacen todos esos servicios, o «Sin
    preferencia».
 4. Toca el día en el calendario, que se abre entero en el centro de la pantalla, y queda elegido sin pulsar más:
@@ -523,7 +524,7 @@ sus llamadas van a `POST /p/<slug>/api/<operación>`. Esta app le da las operaci
 | Qué | Operación | Entrada → salida |
 |---|---|---|
 | Textos y reglas de la página | `online_booking.public.page` | nada → nombre del negocio, enlace de privacidad, título, bienvenida, color, logo, email obligatorio, elegir profesional, notas, política de cancelación, antelaciones, si la clienta puede cancelar, zona horaria |
-| Servicios reservables online | `online_booking.public.services` | búsqueda, página (≤ 100) → servicios con categoría, precio y duración (o `null` si Servicios no los enseña) y sus profesionales (vacío si no se elige) |
+| Servicios reservables online | `online_booking.public.services` | búsqueda, página (≤ 100) → servicios con categoría, precio y su tarifa (`pricing_type`) y duración (o `null` si Servicios no los enseña) y sus profesionales (vacío si no se elige) |
 | Horas libres | `online_booking.public.slots` | servicios, día, profesional opcional → horas (con los profesionales libres si se elige) |
 | Reservar | `online_booking.public.book` | servicios, profesional opcional, hora de pared, nombre, móvil, email, nota y campo trampa vacío → número, estado, hora, servicios, profesional, mensaje y **`token`** (se enseña una vez) |
 | Ver la reserva | `online_booking.public.booking` | `token` → nombre y logo del negocio, número, estado, hora, servicios, profesional, si puede cancelar y hasta cuándo (nunca el nombre de la ficha) |

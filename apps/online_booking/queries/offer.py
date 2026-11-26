@@ -11,6 +11,7 @@ from apps.appointment.queries.booking import bookable_members, check_member
 from apps.appointment.schemas.availability import SlotsIn
 from apps.online_booking.models import Settings
 from apps.online_booking.schemas import PublicServicePage, PublicServicesIn, PublicSlotsIn, PublicSlotsOut
+from apps.online_booking.service_price import shown_price
 from apps.service.models.catalog import Service
 from apps.service.queries.settings import current_settings as service_settings
 from apps.staff.models import Member
@@ -114,7 +115,7 @@ def public_services(ctx: OperationContext, params: PublicServicesIn) -> dict:
             "name": service.name,
             "description": service.short_description or service.description,
             "category": service.category.name if service.category else "",
-            "price": service.price if shown.show_prices else None,
+            **shown_price(service, shown.show_prices),
             "duration_minutes": service.duration_minutes
             if shown.show_duration
             else None,

@@ -13,6 +13,7 @@ import { computed, inject, onMounted, ref, watch } from 'vue';
 
 import { dayOf, formatTime, timeOf } from '../../../appointment/frontend/lib/clock';
 import { formatMoney, useBusinessMoney } from '../../../appointment/frontend/lib/format';
+import { useServicePrice } from '../../../service/frontend/composables/useServicePrice';
 import BookingResult from '../components/BookingResult.vue';
 import PublicBookingHeader from '../components/PublicBookingHeader.vue';
 import PublicBookingSubmit from '../components/PublicBookingSubmit.vue';
@@ -38,6 +39,7 @@ const api = door?.api ?? useLiveClient().api;
 const t = useT();
 const locale = useLocale();
 const money = door?.money ?? useBusinessMoney();
+const servicePrice = useServicePrice();
 // The customer's words on the public page; the team's on its preview.
 const heading = computed(() => (door ? t('online_booking.door.title') : t('online_booking.preview.title')));
 const intro = computed(() => (door ? t('online_booking.door.intro') : t('online_booking.preview.intro')));
@@ -65,7 +67,9 @@ onMounted(async () => {
 
 function priceAndLength(service: PublicServiceOut): string {
   const parts = [
-    service.price === null ? '' : formatMoney(service.price, locale.value, money.value),
+    service.price === null || service.pricing_type === null
+      ? ''
+      : servicePrice(formatMoney(service.price, locale.value, money.value), service.pricing_type),
     service.duration_minutes === null ? '' : t('online_booking.preview.minutes', { n: service.duration_minutes }),
   ];
   return parts.filter(Boolean).join(' · ');

@@ -28,6 +28,7 @@ from apps.customer.schemas.contact import EMAIL, PHONE
 from apps.customer.schemas.fields import Email
 from apps.online_booking.logo import LogoFieldsOut, LogoName
 from apps.online_booking.public_page import LinkOwnerOut, PageOwnerOut, TrapIn
+from apps.online_booking.service_price import ServicePriceOut
 
 T = TypeVar("T")
 
@@ -369,14 +370,11 @@ class ProfessionalOut(Schema):
     name: str
 
 
-class PublicServiceOut(Schema):
+class PublicServiceOut(ServicePriceOut):
     id: UUID
     name: str
     description: str
     category: str = Field(description="Its category's name; empty without one.")
-    price: int | None = Field(
-        description="In cents; empty when the business does not show prices.", json_schema_extra={"money": True}
-    )
     duration_minutes: int | None = Field(
         description="Empty when the business does not show durations."
     )

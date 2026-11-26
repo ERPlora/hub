@@ -193,12 +193,6 @@
       "removeLine": "Quitar esta línea",
       "services": "Servicios",
       "serviceMinutes": "{minutes} min",
-      "servicePrice": {
-        "hourly": "{price} / hora",
-        "from": "Desde {price}",
-        "variable": "Variable · {price}",
-        "free": "Gratis"
-      },
       "noServices": "Sin servicios.",
       "servicesLoadFailed": "No se han podido cargar los servicios.",
       "servicePriceTitle": "Importe de {name}",
