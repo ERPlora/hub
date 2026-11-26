@@ -5,7 +5,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import ServiceSettings
+from apps.service.models.settings import ServiceSettings
 from apps.service.queries.settings import settings_row
 from apps.service.schemas.settings import SettingsIn, SettingsOut
 from apps.service.services.writes import _apply, _changes, _tax_category

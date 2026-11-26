@@ -45,7 +45,7 @@ def test_the_page_offers_the_services_booked_online_with_who_does_them(salon):
 def test_the_page_hides_prices_durations_and_professionals_when_the_business_does(
     salon,
 ):
-    from apps.service.models import ServiceSettings
+    from apps.service.models.settings import ServiceSettings
 
     ServiceSettings.objects.create(show_prices=False, show_duration=False)
     make_page(allow_staff_selection=False)

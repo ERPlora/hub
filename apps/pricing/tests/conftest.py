@@ -122,7 +122,7 @@ def make_customer(name: str = "Lucía Pérez", groups=(), **fields):
 
 
 def make_service(name: str = "Haircut", price: int = 1800, **fields):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     fields.setdefault("pricing_type", "fixed")
     return Service.objects.create(name=name, price=price, **fields)

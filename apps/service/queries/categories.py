@@ -8,7 +8,7 @@ from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.service.models import Category
+from apps.service.models.catalog import Category
 from apps.service.queries.reads import _page, _resolve
 from apps.service.schemas.categories import CategoryListIn, CategoryOut, CategoryPage
 from apps.service.schemas.fields import CategoryRefIn
