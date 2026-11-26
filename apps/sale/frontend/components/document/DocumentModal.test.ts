@@ -168,4 +168,12 @@ describe('DocumentModal', () => {
   it('has no OutfitKit tag', () => {
     expect(source).not.toMatch(/<ok[-]/);
   });
+
+  // In Chrome on a tablet or a phone, `100vh` also counts the screen under the address bar: a window capped by it was
+  // taller than the page, with its ✕ and its print button cut off (hub#2543; measured in sale-document-fits-low-screen.spec.ts).
+  it('is never taller than the page it opens on', () => {
+    const rule = /ion-modal\.sale-doc-modal\s*\{([^}]*)\}/.exec(source)?.[1] ?? '';
+    expect(rule).toMatch(/--height:\s*min\(720px,\s*100%\);/);
+    expect(rule).not.toMatch(/\d+[ds]?vh/);
+  });
 });
