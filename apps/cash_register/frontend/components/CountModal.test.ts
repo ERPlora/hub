@@ -78,6 +78,22 @@ describe('CountModal', () => {
     expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
   });
 
+  it('with nothing counted it sends nothing and says so under the boxes, until a box is counted (hub#2572)', async () => {
+    const s = await setup('es');
+    await s.result(CURRENCY, EUR);
+    expect(prop(s.inDoc('cash-register-count-submit'), 'disabled')).toBe(false);
+    expect(s.inDoc('cash-register-count-nothing')).toBeNull();
+    await ionValue(s.box('50'), '0', 'ionInput');
+    await s.submit();
+    expect(s.sent()).toEqual([]);
+    expect(s.inDoc('cash-register-count-nothing')?.textContent).toContain('Cuenta el cajón: indica los billetes y monedas o el total.');
+    expect(vi.mocked(toastSuccess)).not.toHaveBeenCalled();
+    expect(s.wrapper.emitted('counted')).toBeUndefined();
+    expect(s.wrapper.emitted('update:open')).toBeUndefined();
+    await ionValue(s.box('0.50'), '1', 'ionInput');
+    expect(s.inDoc('cash-register-count-nothing')).toBeNull();
+  });
+
   it('an opening count is sent as such', async () => {
     const s = await setup();
     await s.result(CURRENCY, EUR);
@@ -118,6 +134,7 @@ describe('CountModal', () => {
   it('the server’s refusal is read in the window', async () => {
     const s = await setup();
     await s.result(CURRENCY, EUR);
+    await ionValue(s.box('20'), '1', 'ionInput');
     s.answer(409, { error: { code: 'cash_register.session_not_open', message: 'That cash session is closed: a closed session takes no new movements.' } });
     await s.submit();
     expect(s.inDoc('cash-register-count-error')?.textContent).toContain('That cash session is closed');

@@ -9,7 +9,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
-import { rowAction } from './service-helpers';
+import { capturedAtSizes, FLOW_VIEWPORTS, rowAction } from './service-helpers';
 import { createProduct, dialog, fill, pick, type Product } from './inventory-helpers';
 import { cleanDocumentsOf, newestSaleOf, shots, stamp } from './sale-helpers';
 
@@ -164,7 +164,14 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: a shift from the float to the close
   await rowAction(page, 'cash-register-sessions', opened.id, 'count');
   const count = dialog(page, 'cash-register-count');
   await expect(count).toBeVisible();
+  // With nothing counted, «Register count» records nothing and says why under the boxes (hub#2572): the detail
+  // ends up with the one count below.
+  await count.locator('[data-testid=cash-register-count-submit]').click();
+  const nothing = count.locator('[data-testid=cash-register-count-nothing]');
+  await capturedAtSizes(page, 'APP-CASH_REGISTER-F06-nothing-counted', FLOW_VIEWPORTS, () => expect(nothing).toBeVisible());
+  await page.setViewportSize({ width: 1440, height: 900 });
   await fill(count, 'cash-register-count-denom-100', '1');
+  await expect(nothing).toBeHidden();
   await fill(count, 'cash-register-count-denom-10', '1');
   await expect(count.locator('[data-testid=cash-register-count-total]')).toContainText(/110[.,]00/);
   await page.screenshot({ path: shot('cash-register-count-1440') });
