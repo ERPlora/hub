@@ -167,9 +167,10 @@ def _note_bill_requested(ctx: OperationContext, order: Order) -> None:
     output=PaperOut,
     expose_api=True,
     ai=AI(
-        description="Print a sale's receipt (or its full invoice) again on the receipt printer, marked «DUPLICATE», by "
-        "the sale's id or number. With no receipt printer for it, its fiscal document still pending or its VeriFactu "
-        "record unreadable, it fails and says why: nothing was printed. It creates no sale nor fiscal document.",
+        description="Print a sale's receipt (or its full invoice) again on the receipt printer, marked as a "
+        "duplicate, by the sale's id or number. With no receipt printer for it, its fiscal document still pending "
+        "or its VeriFactu record unreadable, it fails and says why: nothing was printed. It creates no sale nor fiscal "
+        "document.",
         risk="normal",
         asks={
             "en": (
@@ -207,7 +208,8 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
     ai=AI(
         description="Print the bill of an open check for the table (not an invoice: no number, no payment) on the "
         "receipt printer. Each call prints one. With no receipt printer for it, it fails and says why: nothing was "
-        "printed. Once printed, its table shows «Bill requested» on the floor plan until the check is charged in full.",
+        "printed. Once printed, its table shows on the floor plan that the bill was requested until the check is "
+        "charged in full.",
         risk="normal",
         asks={
             "en": (

@@ -29,7 +29,7 @@ SKU_NOT_BARCODE = _(
     expose_api=True,
     ai={
         "description": "Print the barcode label of a product (its name, its SKU as the code and its price) on the "
-        "printer of the «Label» function, named by its id, SKU or name; each call prints one label.",
+        "printer of the label function, named by its id, SKU or name; each call prints one label.",
         "risk": "normal",
         "check": "inventory.product.get",
         "asks": {
