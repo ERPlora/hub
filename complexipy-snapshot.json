@@ -30,16 +30,6 @@
     ]
   },
   {
-    "path": "apps/attendance/queries/days.py",
-    "file_name": "days.py",
-    "functions": [
-      {
-        "name": "scoped_records",
-        "complexity": 18
-      }
-    ]
-  },
-  {
     "path": "apps/cart_checkout/tests/test_integration_assistant.py",
     "file_name": "test_integration_assistant.py",
     "functions": [

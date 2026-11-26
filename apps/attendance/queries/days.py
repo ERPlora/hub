@@ -25,7 +25,7 @@ from live.context import OperationContext
 from live.errors import NotFound, PermissionDenied
 
 from apps.attendance.models import Break, Correction, Record
-from base.queries.ownership import only_theirs
+from base.only_theirs import only_theirs
 from apps.attendance.schemas import RecordListIn
 from base.ordering import list_order_for
 

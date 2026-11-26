@@ -3,9 +3,7 @@ rows belong to someone (``Owned``), which give a person only theirs unless they 
 own / view all»: Square, Toast, Odoo). An app declares its own in ``apps/<app>/queries/ownership.py``, and
 ``tests/test_guardrails_ownership.py`` keeps its reads going through that declaration."""
 
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
-from contextvars import ContextVar
+from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -15,14 +13,13 @@ from live.meta import all_live_app_configs
 
 from base.api_keys import KeyCaller
 from base.apps_on import active_apps
+from base.only_theirs import only_theirs
 from base.permissions import is_a_person
 from base.sensitive import VIEW_BUSINESS_TOTALS
 
 
 #: Every «see everyone's» permission an ``Owned`` names: of them, an API key holds those its maker holds (BASE-F125).
 _SEE_ALL: set[str] = set()
-#: Whether the read running answered only the caller's own, while someone listens (``hearing_only_theirs``).
-_ONLY_THEIRS: ContextVar[list[bool] | None] = ContextVar("only_theirs", default=None)
 
 
 @dataclass(frozen=True)
@@ -63,25 +60,6 @@ def _reads_as(ctx: OperationContext) -> str | None:
     if isinstance(ctx.actor, KeyCaller) and ctx.actor.owner:
         return ctx.actor.owner
     return None
-
-
-def only_theirs() -> None:
-    """Says that the read running answers only the caller's own, as their role lets them see no one else's: the
-    assistant tells the model so, which otherwise takes the rows it does not get for none (hub#2688)."""
-    heard = _ONLY_THEIRS.get()
-    if heard is not None:
-        heard.append(True)
-
-
-@contextmanager
-def hearing_only_theirs() -> Iterator[list[bool]]:
-    """What runs inside answered only the caller's own when the list it gives is not empty (``only_theirs``)."""
-    heard: list[bool] = []
-    token = _ONLY_THEIRS.set(heard)
-    try:
-        yield heard
-    finally:
-        _ONLY_THEIRS.reset(token)
 
 
 def see_all_permissions() -> frozenset[str]:

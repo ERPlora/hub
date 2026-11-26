@@ -3,7 +3,7 @@
 A read keeps a person to their own when it asks a permission (``ctx.has``, ``<DECLARATION>.sees_all``) and who the
 caller is (``own_member``, ``actor_user``, ``me``…). Its answer then lacks everyone else's rows, and the model, which
 never sees that rule, takes the missing rows for none. So where such a read narrows it calls
-``base.queries.ownership.only_theirs``, as an ``Owned`` declaration does by itself, and the assistant's tool result says
+``base.only_theirs.only_theirs``, as an ``Owned`` declaration does by itself, and the assistant's tool result says
 the answer holds only the person's own.
 
 Every read door that asks both and never says so is in :data:`NOT_A_NARROWING`, closed and with its reason; what the
@@ -77,7 +77,7 @@ def test_every_read_that_keeps_a_role_to_its_own_says_so_or_is_listed_with_its_r
     silent = silent_narrowings(REPO) - set(NOT_A_NARROWING)
     assert silent == set(), (
         f"{sorted(silent)} ask a permission and who the caller is: where a read keeps the caller to their own, call "
-        "base.queries.ownership.only_theirs() (or read through an Owned declaration), so the assistant says it can "
+        "base.only_theirs.only_theirs() (or read through an Owned declaration), so the assistant says it can "
         "only see theirs; if no read is kept to their own, add it to NOT_A_NARROWING with a reason a reviewer can weigh"
     )
 

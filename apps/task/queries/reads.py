@@ -16,7 +16,7 @@ from live.errors import Conflict, NotFound
 from apps.staff.queries.reads import actor_user_id, own_member
 from base.business import business_zone
 from base.models import HubUser
-from base.queries.ownership import only_theirs
+from base.only_theirs import only_theirs
 from apps.task.models import Project, Task
 from apps.task.schemas import PageIn
 

@@ -6,7 +6,7 @@ from live.operations import operation
 from apps.appointment.schemas.agenda import LanesIn, LanesOut
 from apps.staff.models import Member
 from base.business import zone_name
-from base.queries.ownership import only_theirs
+from base.only_theirs import only_theirs
 
 from .access import VIEW_OWN, own_staff_id
 from .business import day_bounds

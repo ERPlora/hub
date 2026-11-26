@@ -9,7 +9,7 @@ import pytest
 from live.operations import get
 
 from base import assistant
-from base.assistant.only_theirs import ONLY_THEIRS
+from base.only_theirs import ONLY_THEIRS
 
 from .conftest import HUB_DB, MONDAY, at, ctx_for, employee_linked_to, make_appointment, make_customer, make_member
 from .conftest import make_service

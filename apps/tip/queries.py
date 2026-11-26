@@ -16,7 +16,7 @@ from apps.tip.models import Settings, Tip
 from apps.tip.schemas import SettingsOut, SuggestionIn, SuggestionOut, TipListIn, TipOut, TipPage, TipRefIn
 from base.business import business_zone
 from base.operations import call
-from base.queries.ownership import only_theirs
+from base.only_theirs import only_theirs
 
 
 TIP_NOT_FOUND = _("That tip no longer exists.")

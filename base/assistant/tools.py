@@ -17,10 +17,9 @@ from live.operations import Operation
 from base import activation, approvals, entitlement
 from base.business import DEFAULT_CURRENCY, business_zone, currency_decimals
 from base.operations import business_currency
+from base.only_theirs import hearing, told
 from base.permissions import refused_outright
-from base.queries.ownership import hearing_only_theirs
 
-from . import only_theirs
 from .relevance import FIND_TOOLS
 
 #: Never from the chat (the old hub's «destructive actions of the hub itself»): emptying the business; a file.
@@ -62,11 +61,11 @@ def run(ctx: OperationContext, op: Operation, arguments: str) -> shared.ToolOutc
         business = business_currency(ctx.scope)
     except NotFound:
         business = DEFAULT_CURRENCY
-    with hearing_only_theirs() as heard:
+    with hearing() as heard:
         outcome = shared.run_tool(
             ctx, op, arguments, zone=business_zone(), money=lambda named: _with_decimals(named or business)
         )
-    return only_theirs.told(outcome) if heard and op.kind == "query" else outcome
+    return told(outcome) if heard and op.kind == "query" else outcome
 
 
 def _with_decimals(currency: str) -> tuple[str, int]:

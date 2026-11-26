@@ -10,7 +10,7 @@ from decimal import Decimal
 from live.operations import get
 
 from base import assistant
-from base.assistant.only_theirs import ONLY_THEIRS
+from base.only_theirs import ONLY_THEIRS
 
 from .conftest import HUB_DB, ctx_for, make_member
 

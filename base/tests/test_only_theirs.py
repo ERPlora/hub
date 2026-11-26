@@ -2,7 +2,7 @@
 
 An employee without «see everyone's» gets only her own rows, as her screens show. The model never sees that rule: an
 answer without a colleague's rows reads to it as «she has none», and it says so. So whatever decides that a read
-answers only the caller's own marks it (``base.queries.ownership.only_theirs``), and the assistant's tool result
+answers only the caller's own marks it (``base.only_theirs.only_theirs``), and the assistant's tool result
 carries ``only_theirs``, which tells the model to say it can only see the person's own.
 """
 
@@ -16,8 +16,7 @@ from live.operations import Operation, get
 from ninja import Schema
 
 from base import assistant
-from base.assistant.only_theirs import ONLY_THEIRS
-from base.queries.ownership import only_theirs
+from base.only_theirs import ONLY_THEIRS, only_theirs
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 
 __all__ = ["in_business_a"]

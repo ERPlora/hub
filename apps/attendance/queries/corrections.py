@@ -8,7 +8,7 @@ from live.operations import operation
 
 from apps.attendance.models import Correction, Record
 from apps.attendance.schemas import CorrectionListIn, CorrectionPage
-from base.queries.ownership import only_theirs
+from base.only_theirs import only_theirs
 
 from .days import visible_record
 from .reads import VIEW_ALL, _own_days, _page
