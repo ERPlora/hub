@@ -2,13 +2,13 @@
 // (journey-screens.ts), in Spanish and with names as long as real ones (text-fits-seed.ts), at the three sizes, reads
 // its texts whole (text-cut.ts): no text cut by its box with no title to read it whole, no short word split over two
 // lines. The agenda «By professional», day and week, sits behind a switch of its screen and is opened by hand. A site
-// already known is in text-fits-known.ts with its issue; anything else fails, with a screenshot of where it showed.
+// already known is in text-fits-known.json with its issue; anything else fails, with a screenshot of where it showed.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, settled, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { journeyApps, registeredRoutes, screensAmong } from './journey-screens';
 import { cutTexts } from './text-cut';
-import { KNOWN_SITES } from './text-fits-known';
+import { KNOWN_SITES, staleScreens } from './text-fits-known';
 import { BOOKED_DAY, removeLongTexts, seedLongTexts } from './text-fits-seed';
 
 const SIZES = [
@@ -90,6 +90,5 @@ test('every screen of the salon and restaurant journeys reads its texts whole, i
     seen.push(...(await measured(page, screen)));
   }
   expect(seen.filter((cut) => !known(cut)).map(described), 'texts cut where no site is known').toEqual([]);
-  const stale = KNOWN_SITES.filter((site) => !seen.some((cut) => cut.box === site.box && site.screens.includes(cut.screen)));
-  expect(stale, 'known sites that no longer cut: take them out of text-fits-known.ts').toEqual([]);
+  expect(staleScreens(seen), 'known sites that no longer cut there: take those screens out of text-fits-known.json').toEqual([]);
 });

@@ -1,42 +1,25 @@
-// The sites screens-text-fits.spec.ts already knows cut a text, each with the issue that fixes it. A site is a box
-// that cuts on the screens listed, at whatever size. The list only shrinks: a text cut anywhere else fails the spec,
-// and so does a site that no longer cuts on any of its screens, until its entry goes.
+// The sites screens-text-fits.spec.ts already knows cut a text (text-fits-known.json), each with what it is and the
+// issue that fixes it. A site is a box on the screens listed, at whatever size. The spec fails on a text cut anywhere
+// else, and on a site that no longer cuts on one of its screens until that screen leaves the list;
+// tests/test_guardrails_text_fits.py refuses a box or a screen the list did not have on main.
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 export interface KnownSite {
   box: string;
   screens: readonly string[];
   issue: string;
+  what: string;
 }
 
-/** The class of fault these all belong to; each site moves to its own issue when it is taken up. */
-const CLASS = 'ERPlora/hub#2642';
+export const KNOWN_SITES: readonly KnownSite[] = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'text-fits-known.json'), 'utf8'),
+) as KnownSite[];
 
-export const KNOWN_SITES: readonly KnownSite[] = [
-  {
-    // The title of the topbar on the phone ends in «…» when it is longer than the room left by its buttons.
-    box: 'ion-title.ios.title-default >> div.toolbar-title',
-    screens: [
-      '/api-docs',
-      '/customer/fields',
-      '/customer/groups',
-      '/customer/preview/customer-search',
-      '/customer/tags',
-      '/online_booking/preview',
-      '/verifactu/config',
-      '/verifactu/contingency',
-      '/verifactu/events',
-      '/verifactu/records',
-      '/verifactu/recovery',
-      '/verifactu/settings',
-    ],
-    issue: CLASS,
-  },
-  // Home on the phone: the name of a product in a bar chart.
-  { box: 'span.widget-bar-label', screens: ['/'], issue: CLASS },
-  // Settings of Appointments on the phone: a field's label wider than the screen.
-  { box: 'ion-content.ios.content-ltr >> div.inner-scroll.scroll-y', screens: ['/appointment/settings'], issue: CLASS },
-  // The till: a category's name in the strip, and a product's name in its tile.
-  { box: 'span.pos-cat__name', screens: ['/sale/pos'], issue: 'ERPlora/hub#2409' },
-  { box: 'span.pos-tile__name', screens: ['/sale/pos'], issue: CLASS },
-  // System on the phone: the names of the usage figures, a word or two a line.
-  { box: 'span.system-usage-name', screens: ['/system'], issue: CLASS },
-];
+/** The screens of each known site where it no longer cuts, as `<box> on <screen>`. */
+export function staleScreens(cuts: readonly { box: string; screen: string }[]): string[] {
+  return KNOWN_SITES.flatMap((site) =>
+    site.screens.filter((screen) => !cuts.some((cut) => cut.box === site.box && cut.screen === screen)).map((screen) => `${site.box} on ${screen}`),
+  );
+}

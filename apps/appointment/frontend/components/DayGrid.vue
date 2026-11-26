@@ -45,8 +45,8 @@ const emit = defineEmits<{
 const t = useT();
 const locale = useLocale();
 
-/** 240 px an hour, so half an hour holds a customer's name on one line; 56 px a row. */
-const PX_PER_MINUTE = 4;
+/** 120 px an hour, as the market's agendas: half an hour keeps the first name, the day stays on screen; 56 px a row. */
+const PX_PER_MINUTE = 2;
 const LANE_HEIGHT = 56;
 const DRAG_THRESHOLD = 5;
 const TOUCH_HOLD_MS = 400;
