@@ -6,7 +6,7 @@ import httpx
 import pytest
 import respx
 
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models.conversations import Message
 from apps.whatsapp_inbox.tests.conftest import HOST, A, HUB_DB, connect, receive
 from base.tenancy.context import current_alias
 
