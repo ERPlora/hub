@@ -8,8 +8,8 @@ from apps.demo.schemas import ItemRefIn as DemoItemRefIn
 from apps.printing.schemas.devices import DeviceOut as PrintingDeviceOut
 from apps.printing.schemas.jobs import JobCreateIn
 from apps.sale.schemas.settings import SettingsOut as SaleSettingsOut
-from apps.table.schemas import SettingsIn as TableSettingsIn
-from apps.table.schemas import SettingsOut as TableSettingsOut
+from apps.table.schemas.settings import SettingsIn as TableSettingsIn
+from apps.table.schemas.settings import SettingsOut as TableSettingsOut
 from base.schemas.devices import DeviceOut as BaseDeviceOut
 from config.api import build_api
 

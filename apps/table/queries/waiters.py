@@ -7,7 +7,7 @@ from live.operations import operation
 
 from apps.table.models import TableSession
 from .paging import _page
-from apps.table.schemas import WaiterListIn, WaiterPage
+from apps.table.schemas.waiters import WaiterListIn, WaiterPage
 
 
 @operation(

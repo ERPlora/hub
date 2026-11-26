@@ -14,7 +14,7 @@ from apps.table.models import Zone
 from .floor import tables_now
 from .lookups import find_zone
 from .paging import _page
-from apps.table.schemas import ZoneListIn, ZoneOut, ZonePage, ZoneRefIn
+from apps.table.schemas.zones import ZoneListIn, ZoneOut, ZonePage, ZoneRefIn
 from base.ordering import list_order_for
 
 ZONE_ORDER = {

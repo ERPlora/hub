@@ -42,7 +42,6 @@
 600 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
 409 apps/table/frontend/operations.d.ts ERPlora/erplora-next#74
-825 apps/table/schemas/__init__.py ERPlora/erplora-next#74
 311 apps/tax/frontend/operations.d.ts ERPlora/erplora-next#74
 587 apps/verifactu/admin.py ERPlora/erplora-next#74
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74

@@ -6,7 +6,7 @@ from uuid import UUID
 
 from ninja import Field, Schema
 
-from apps.table.schemas import Page, Shape, TableStatus
+from apps.table.schemas.fields import Page, Shape, TableStatus
 
 
 class HoldShownOut(Schema):

@@ -1,6 +1,6 @@
 """Input and output schemas of Online orders' operations (OpenAPI, live params, 422 per field).
 
-A table is said as Tables says it (``apps.table.schemas.TableRefIn``: its id, or its number and, if the number
+A table is said as Tables says it (``apps.table.schemas.tables.TableRefIn``: its id, or its number and, if the number
 repeats, its zone), so the assistant's card names it as the floor plan does. The table's page names it by the code its
 QR carries, and reads only what a customer may see of the menu: never a cost, a stock, a tax or what the kitchen reads."""
 
