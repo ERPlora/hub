@@ -46,8 +46,7 @@ const totalText = computed(() => money(props.total));
 const chargeLabel = computed(() => {
   const n = props.markedLines ?? 0;
   if (!n) return t('sale.pos.chargeAmount', { amount: totalText.value });
-  const amount = money(props.markedTotal);
-  return n === 1 ? t('sale.pos.chargeLinesOne', { amount }) : t('sale.pos.chargeLines', { n, amount });
+  return t('sale.pos.chargeLines', { n, amount: money(props.markedTotal) });
 });
 const discountLabel = computed(() => {
   const percent = Number(props.discountPercent) > 0 ? ` −${formatPercent(props.discountPercent, locale.value)}` : '';

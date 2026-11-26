@@ -185,7 +185,7 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
           :label="t('whatsapp_inbox.settings.sent')"
           :value="channel.monthly_usage"
           :max="channel.monthly_limit"
-          :hint="t('whatsapp_inbox.settings.usage', { used: channel.monthly_usage, limit: channel.monthly_limit })"
+          :hint="t('whatsapp_inbox.settings.usage', { used: channel.monthly_usage, count: channel.monthly_limit })"
         />
         <p
           v-if="channel.cap_reached"
