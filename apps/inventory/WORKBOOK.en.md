@@ -135,7 +135,7 @@ lost, mark it sold out or delete it. Tapping the row opens its card, with the ba
 The table's buttons import and export the catalog as a CSV file.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:26c3f8b6b683 -->
+<!-- from WORKBOOK.md sha256:de523566fa33 -->
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
 Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
@@ -155,12 +155,14 @@ is, "Put back on sale", "Hide from website" or, if it already is, "Show on websi
 can change products) and "Delete". Tapping the row opens the
 product's card. If the row has no room, the ones in sight go to the "⋮" too.
 
-The **+** and "Edit" open the form's side panel: Name, SKU (locked when editing: "The SKU is the
-product's identity: it is not edited"), Price, "Cost (<currency>)", "Initial stock" (only when
+The **+** and "Edit" open the form's side panel: Name, SKU (when creating, with the note "Leave it empty to
+number it automatically (10000, 10001…)."; locked when editing: "The SKU is the product's identity: it is not
+edited"), Price, "Cost (<currency>)", "Initial stock" (only when
 creating), "Low stock threshold", "EAN-13", "Description", "Type" ("Physical" or "Service", only when
 creating), the "Track stock for this item" box with its note, "Unit of measure", "Tax category"
 ("Pick a tax category"), "Categories" (if there are any) and the "Show on website" box (ticked when
-creating), and "Save" / "Save changes" ("Saving…").
+creating), and "Save" / "Save changes" ("Saving…"). While the name or the tax category is missing, the button
+is off and what is missing shows above the buttons, one thing at a time.
 
 The item's photo (INVENTORY-F30 to F32): the table has the "Photo" column, before the name, with the
 photo's thumbnail or the initials over its colour, and the cards their "Photo" line; the product's card
@@ -336,14 +338,18 @@ same, in the browser too (hub#1023).
 All the flows are common to both verticals (restaurant and hair salon).
 
 ### INVENTORY-F01 Create a product
-<!-- from WORKBOOK.md sha256:95d688133d98 -->
+<!-- from WORKBOOK.md sha256:797c2ab1ac47 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
 Steps:
 1. In **Products**, tap **+**: the form's panel opens, with the cursor in Name; if you already went to
    another field while it opens, the cursor stays where you are and what you type goes there.
-2. Type Name, SKU and Price. The price takes "2.20", "1,234.56" or whatever is pasted from the
+2. Type Name and Price. The SKU is optional ("Leave it empty to number it automatically (10000, 10001…)."):
+   left empty, the product gets the catalog's next number of its own, from 10000 (one more than the highest of 5 to
+   9 digits a product already has, a deleted one too; a barcode used as SKU does not count), and that number is
+   its SKU for good, as a typed one is. The assistant and the API do the same when they give none. The
+   price takes "2.20", "1,234.56" or whatever is pasted from the
    screen; on leaving the field it is rewritten in the business's format. Optional are "Cost
    (EUR)" (in the business's currency: "Cost (PLN)" in Poland), "Initial stock", "Low stock threshold"
    (empty = 10), "EAN-13" and "Description".
@@ -370,7 +376,9 @@ setup step "Your catalog" is done (INVENTORY-F28). Through the assistant or the 
 already inactive, out of the till until it is activated (INVENTORY-F03), as one that was inactive comes
 back when it is recovered from a separate copy (BASE-F114). A backup or a template of "Data and backups" (BASE-F35)
 keeps which products are a "Service", and when it is loaded (BASE-F31) they still are.
-If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
+If it fails: "Save" is off while Name or tax category are missing, and above the buttons it says what is
+missing, one thing at a time: "Enter the name to continue." and then "Choose the tax category to
+continue.". It is also off, with no sentence, while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
 as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up. With no tax categories it says
@@ -388,7 +396,7 @@ the products the business no longer has at all, each by this same creation; a de
 INVENTORY-F34)
 
 ### INVENTORY-F02 Edit a product
-<!-- from WORKBOOK.md sha256:3c49452c412e -->
+<!-- from WORKBOOK.md sha256:0f033bce1899 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -407,7 +415,9 @@ categories.
 Out: the product changed, with its categories, in a single step. Inventory tells of the change and of
 each category added or removed. The new price is for what is added to a bill from now on: an open
 bill keeps the price from when it was ordered (Sales decides it).
-If it fails: the same refusals as creating, inside the panel, and nothing is saved.
+If it fails: the same refusals as creating, inside the panel, and nothing is saved. With the name erased, or
+with the tax category Taxes deactivated still set, "Save changes" is off and says what is missing, as when
+creating.
 Asked of the assistant, a product the business does not have, or a name that fits several, draws no card: the
 assistant says which one is not there or asks which one it is (as in every action of Inventory, see "Services").
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock

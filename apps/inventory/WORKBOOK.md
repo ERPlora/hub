@@ -158,12 +158,13 @@ ya lo está, «Volver a poner a la venta», «Ocultar de la página web» o, si 
 (estos dos pares, para quien puede cambiar productos) y «Eliminar». Tocar la
 fila abre la ficha. Si la fila no tiene sitio, también los de la vista pasan al «⋮».
 
-El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
-SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
+El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (al crear, con la nota «Déjalo vacío
+para numerarlo solo (10000, 10001…).»; bloqueado al editar: «El SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
 crear), «Umbral stock bajo», «EAN-13», «Descripción», «Tipo» («Físico» o «Servicio», solo al
 crear), la casilla «Controlar stock de este artículo» con su nota, «Unidad de medida», «Categoría
 fiscal» («Elige una categoría fiscal»), «Categorías» (si hay alguna) y la casilla «Mostrar en la página web»
-(marcada en un alta), y «Guardar» / «Guardar cambios» («Guardando…»).
+(marcada en un alta), y «Guardar» / «Guardar cambios» («Guardando…»). Mientras falta el nombre o la categoría
+fiscal, el botón está apagado y encima de los botones sale qué falta, una cosa cada vez.
 
 La foto del artículo (INVENTORY-F30 a F32): la tabla lleva la columna «Foto», delante del nombre, con la
 miniatura de la foto o las iniciales sobre su color, y las tarjetas su línea «Foto»; la ficha la enseña
@@ -333,7 +334,11 @@ Pantalla: Productos
 Pasos:
 1. En **Productos**, pulsa **+**: se abre el panel del formulario, con el cursor en Nombre; si mientras
    se abre ya has entrado en otro campo, el cursor se queda donde estás y lo que escribes va ahí.
-2. Escribe Nombre, SKU y Precio. El precio admite «2,20», «1.234,56» o lo que se pegue de la
+2. Escribe Nombre y Precio. El SKU es opcional («Déjalo vacío para numerarlo solo (10000, 10001…).»): vacío,
+   el producto recibe el siguiente número propio del catálogo, a partir de 10000 (uno más que el mayor de 5 a 9
+   cifras que ya tenga un producto, también uno eliminado; un código de barras usado como SKU no cuenta), y ese
+   número es su SKU para siempre, como uno escrito. Lo hace también el asistente o la API si no lo dicen. El
+   precio admite «2,20», «1.234,56» o lo que se pegue de la
    pantalla; al salir del campo se reescribe en el formato del negocio. Son opcionales «Coste
    (EUR)» (en la moneda del negocio: «Coste (PLN)» en Polonia), «Stock inicial», «Umbral stock bajo» (vacío = 10), «EAN-13» y «Descripción».
 3. Elige «Tipo» («Físico» o «Servicio»), la «Unidad de medida» («Unidad (ud)» de entrada) y la
@@ -360,7 +365,9 @@ TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28
 se puede dar de alta ya desactivado, fuera del TPV hasta que se active (INVENTORY-F03), como vuelve uno
 que estaba desactivado al recuperarse desde una copia aparte (BASE-F114). Una copia de seguridad o una plantilla de
 «Datos y copias» (BASE-F35) guarda qué productos son «Servicio», y al cargarla (BASE-F31) lo siguen siendo.
-Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
+Si falla: «Guardar» está apagado mientras falten Nombre o categoría fiscal, y encima de los botones dice qué
+falta, una cosa cada vez: «Escribe el nombre para continuar.» y después «Elige la categoría fiscal para
+continuar.». También está apagado, sin frase, mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
 como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende. Sin categorías
@@ -397,7 +404,9 @@ las categorías de producto.
 Sale: el producto cambiado, con sus categorías, en un solo paso. Inventario avisa del cambio y de
 cada categoría añadida o quitada. El precio nuevo vale para lo que se añada a una cuenta desde
 ahora: una cuenta abierta conserva el precio de cuando se pidió (lo decide Ventas).
-Si falla: los mismos rechazos que el alta, dentro del panel, y no se guarda nada.
+Si falla: los mismos rechazos que el alta, dentro del panel, y no se guarda nada. Con el nombre borrado, o con
+la categoría fiscal que Impuestos desactivó todavía puesta, «Guardar cambios» está apagado y dice qué falta,
+como en el alta.
 Pedido al asistente, un producto que el negocio no tiene, o un nombre que vale para varios, no saca tarjeta: el
 asistente dice cuál no está o pregunta cuál es (como en toda acción de Inventario, ver «Servicios»).
 La categoría fiscal no se puede vaciar: el campo no tiene opción vacía. La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
