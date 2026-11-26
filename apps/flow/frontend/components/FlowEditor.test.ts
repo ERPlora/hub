@@ -271,6 +271,19 @@ describe('FlowEditor: the switch, a run by hand, the permissions and an unreadab
     expect(mocks.toastSuccess).not.toHaveBeenCalled();
   });
 
+  it('a run by hand stopped by a missing permission says what to do once, as the History does', async () => {
+    const on = { ...FLOW, enabled: true };
+    const why = 'It tried to do something you have not allowed it to do («Create a task»), so it stopped.';
+    const s = await setup(
+      { flow: on, initial: fromFlow(on) },
+      { '/api/flow/flows/run': [200, { id: 'r1', status: 'failed', error_code: 'flow.not_allowed', error_message: why }] },
+    );
+    mocks.confirm.mockResolvedValue(true);
+    await click(s.find('flow-editor-run').element);
+    await settle();
+    expect(s.find('flow-editor-error').text()).toBe(`It ran and stopped by an error: ${why} Open Permissions and allow what it needs.`);
+  });
+
   it('with unsaved changes «Run now» waits for the save: it would run the saved version', async () => {
     const on = { ...FLOW, enabled: true };
     const s = await setup({ flow: on, initial: fromFlow(on) });
