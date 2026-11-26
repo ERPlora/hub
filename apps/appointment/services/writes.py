@@ -26,7 +26,7 @@ from apps.appointment.queries.booking import check_member, lines_for, resolve_se
 from apps.appointment.queries.business import now, today
 from apps.appointment.queries.reads import CUSTOMER_SOURCES
 from apps.customer.queries.reads import find_customer
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.staff.models import Member
 from apps.staff.queries.reads import resolve_member
 from base.business import business_zone

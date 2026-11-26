@@ -15,7 +15,7 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import Grant, Redemption
+from apps.service.models.grants import Grant, Redemption
 from apps.service.queries.catalog import find_service
 from apps.service.queries.grant_checks import redeem_refusal
 from apps.service.queries.grants import SESSION_NOT_FOUND, balance, find_grant, session_rows, lock_grant, session_value

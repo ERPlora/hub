@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.operations import operation
 
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.service.queries.reads import _bounds, _page, _resolve
 from apps.service.schemas.catalog import (
     CatalogStatusOut,

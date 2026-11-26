@@ -12,7 +12,7 @@ from live.errors import Conflict
 from live.operations import get
 
 from apps.service import queries
-from apps.service.models import Category, Service
+from apps.service.models.catalog import Category, Service
 from apps.service.schemas.recovery import CategoryRecoverIn
 from apps.service.services.category_recovery import SERVICE_CHANGED_LEFT, SERVICE_MOVED_LEFT, SUBCATEGORY_CHANGED_LEFT
 from base.recovery import actor_of, giving_back
