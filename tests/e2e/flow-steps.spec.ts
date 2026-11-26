@@ -11,7 +11,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, psql, shot, shown } from './helpers';
-import { choose, confirmDialog, idFromUrl, manualFlow, openRun, signedIn, workerCalls } from './flow-helpers';
+import { choose, confirmDialog, grantAllAndSwitchOn, idFromUrl, manualFlow, openRun, signedIn, workerCalls } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { pick } from './task-helpers';
 import { toastSaying } from './toast-helpers';
@@ -178,11 +178,7 @@ for (const viewport of VIEWPORTS) {
       await expect(shown(page).locator('[data-testid=flow-step-open-s1]')).toContainText(`Ask: ${questionTitle}`);
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F28');
-      await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
-      await shown(page).locator('[data-testid=flow-perm-grantall]').click();
-      await shown(page).locator('[data-testid=flow-editor-enabled]').click();
-      await shown(page).locator('[data-testid=flow-editor-save]').click();
-      await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
+      await grantAllAndSwitchOn(page);
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?');
       await expect(toastSaying(page, 'waiting for an answer in “Waiting for your answer”')).toBeVisible();
