@@ -197,7 +197,7 @@ def test_a_service_taken_off_online_booking_in_services_leaves_the_page(salon):
 
 
 def test_the_professionals_own_length_and_price_are_what_is_booked(salon):
-    from apps.service.models import Assignment
+    from apps.service.models.catalog import Assignment
 
     Assignment.objects.filter(service=salon.cut, member=salon.bea).update(
         custom_duration=45, custom_price=2500

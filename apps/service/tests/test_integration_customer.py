@@ -10,7 +10,7 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.service import events
-from apps.service.models import Grant
+from apps.service.models.grants import Grant
 
 from .conftest import HUB_DB, A, ctx_for, make_package, make_service, make_tax
 

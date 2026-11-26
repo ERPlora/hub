@@ -10,7 +10,7 @@ from live.errors import PermissionDenied
 from live.operations import get as operation
 
 from apps.flow.tests.test_api import get
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.service.schemas.catalog import ServiceIn, ServicePatchIn
 from base.sensitive import VIEW_COSTS
 

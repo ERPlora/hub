@@ -13,7 +13,7 @@ from live.models import OutboxEvent
 
 from apps.sale.models import Order, OrderLine, Refund, Sale, SaleCounter, SaleLine
 from apps.sale.tests.conftest import HUB_DB, A, charge, charged_with_voucher, check, ctx_for, last_event, pay_with, refund, run, svc, voucher
-from apps.service.models import Grant, Redemption
+from apps.service.models.grants import Grant, Redemption
 
 pytestmark = HUB_DB
 

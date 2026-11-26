@@ -22,7 +22,7 @@ from apps.inventory.models import Product
 from apps.inventory.tests.test_recovery import CATEGORIES, LINKS, PRODUCTS, a_tax_key, direct, gone_altogether
 from apps.pricing import queries
 from apps.pricing.models import PriceItem
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.service.tests.test_recovery import CATEGORIES as SERVICE_CATEGORIES
 from apps.service.tests.test_recovery import NO_LINKS, SERVICES
 from base.recovery import actor_of
