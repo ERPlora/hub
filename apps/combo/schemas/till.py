@@ -24,6 +24,7 @@ from apps.combo.schemas.fields import (
     _named,
 )
 from apps.combo.schemas.references import ComboRefIn
+from base.allergens import AllergensOut
 
 
 class ForSaleIn(PageIn):
@@ -89,7 +90,7 @@ class ResolveIn(ComboRefIn):
     )
 
 
-class SaleOptionOut(Schema):
+class SaleOptionOut(AllergensOut):
     id: UUID
     product_id: UUID
     product_name: str
