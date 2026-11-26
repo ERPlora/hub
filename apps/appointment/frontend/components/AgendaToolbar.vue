@@ -1,10 +1,10 @@
 <script setup lang="ts">
 // The agenda's bar (WORKBOOK «Agenda»): the day (‹ date › and «Today», and the calendar to jump to a date;
-// in a week, the week), «Filter by status», «N to confirm» when customers' bookings wait (a tap filters the
-// pending ones), the «List · By professional · Repeating» switch (icons only on a phone) and, for the
-// first two, «Day · Week». A device on another zone than the business is told the agenda shows the
-// business's clock. One or two rows, as the old agenda: on a phone, ‹ the day's
-// field › and «Today», then the filter and the switches; the long date only where it fits.
+// in a week, the week), «Filter by status», «N to confirm» when customers' bookings wait (a tap shows them all, of
+// every day, where the rest of the bar does not apply), the «List · By professional · Repeating» switch (icons only on
+// a phone) and, for the first two, «Day · Week». A device on another zone than the business is told the agenda shows
+// the business's clock. One or two rows, as the old agenda: on a phone, ‹ the day's field › and «Today», then the
+// filter and the switches; the long date only where it fits.
 import { DateField } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonLabel, IonSegment, IonSegmentButton, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -36,6 +36,7 @@ const day = defineModel<string>('day', { required: true });
 const view = defineModel<AgendaView>('view', { required: true });
 const span = defineModel<AgendaSpan>('span', { required: true });
 const status = defineModel<string>('status', { required: true });
+const onlyToConfirm = defineModel<boolean>('onlyToConfirm', { default: false });
 
 const t = useT();
 const locale = useLocale();
@@ -47,6 +48,7 @@ const label = computed(() =>
     : formatDay(day.value, locale.value),
 );
 const otherZone = computed(() => deviceZoneDiffers(props.zone));
+const showsDay = computed(() => view.value !== 'series' && !onlyToConfirm.value);
 
 function jump(value: string): void {
   if (value) day.value = value;
@@ -59,7 +61,7 @@ function jump(value: string): void {
     data-testid="appointment-toolbar"
   >
     <div
-      v-if="view !== 'series'"
+      v-if="showsDay"
       class="agenda-toolbar__day"
     >
       <ion-button
@@ -114,12 +116,13 @@ function jump(value: string): void {
         size="small"
         color="warning"
         data-testid="appointment-toolbar-to-confirm"
-        @click="status = 'pending'"
+        :aria-pressed="onlyToConfirm ? 'true' : 'false'"
+        @click="onlyToConfirm = !onlyToConfirm"
       >
         {{ t('appointment.toolbar.toConfirm', { n: toConfirm }) }}
       </ion-button>
       <ion-select
-        v-if="view !== 'series'"
+        v-if="showsDay"
         data-testid="appointment-toolbar-status"
         class="agenda-toolbar__status"
         :value="status"
@@ -142,7 +145,7 @@ function jump(value: string): void {
         </ion-select-option>
       </ion-select>
       <ion-segment
-        v-if="view !== 'series'"
+        v-if="showsDay"
         data-testid="appointment-toolbar-span"
         :value="span"
         :aria-label="$t('appointment.views.label')"
@@ -164,6 +167,7 @@ function jump(value: string): void {
       <!-- The bar changes with the view, so the view changes on the click and not as the finger lifts: the click
            that follows a touch would land on whatever the new view puts under the finger. -->
       <ion-segment
+        v-if="!onlyToConfirm"
         data-testid="appointment-toolbar-view"
         :value="view"
         :swipe-gesture="false"

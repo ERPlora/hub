@@ -130,6 +130,62 @@ describe('AgendaPage', () => {
     },
   );
 
+  // APPOINTMENT-F03, hub#2640: «N to confirm» counts the bookings to confirm of any day, and lists those same ones with
+  // their day, read from the same query; they leave the list once confirmed.
+  const TO_CONFIRM = 'appointment.appointment.list_to_confirm';
+  const tomorrows = row('p1', { status: 'pending', booked_by_customer: true, start: '2026-10-20T12:00:00+02:00' });
+
+  it('«N to confirm» lists every booking to confirm, whatever its day, and «Back to the agenda» leaves it', async () => {
+    const s = await setup();
+    expect(s.params(TO_CONFIRM)).toEqual([]);
+    s.toolbar().vm.$emit('update:onlyToConfirm', true);
+    await s.reopen();
+    expect(s.params(TO_CONFIRM)).toEqual([{ limit: 100, offset: 0 }]);
+    await s.result(TO_CONFIRM, { ...page([tomorrows], 1, 100), timezone: 'Europe/Madrid' });
+    expect(s.toolbar().props('onlyToConfirm')).toBe(true);
+    expect(s.wrapper.findComponent(AppointmentList).props()).toMatchObject({
+      rows: [tomorrows],
+      withDay: true,
+      canAdd: false,
+      emptyMessage: 'No appointments left to confirm.',
+    });
+    expect(s.find('appointment-to-confirm-notice').text()).toContain('the appointments waiting for your confirmation, whatever their day');
+
+    await s.find('appointment-to-confirm-back').trigger('click');
+    await s.clock.advance(2000);
+    await s.reopen();
+    expect(s.toolbar().props('onlyToConfirm')).toBe(false);
+    expect(s.params(TO_CONFIRM)).toEqual([]);
+    expect(s.wrapper.findComponent(AppointmentList).props('withDay')).toBe(false);
+  });
+
+  it('a booking confirmed from that list is sent, and the list follows without it', async () => {
+    const s = await setup();
+    s.toolbar().vm.$emit('update:onlyToConfirm', true);
+    await s.reopen();
+    await s.result(TO_CONFIRM, { ...page([tomorrows], 1, 100), timezone: 'Europe/Madrid' });
+    s.answer(200, { ...tomorrows, status: 'confirmed' });
+    s.wrapper.findComponent(AppointmentList).vm.$emit('action', { actionId: 'confirm', row: tomorrows });
+    await settle();
+    expect(s.sent().at(-1)).toMatchObject({ path: '/api/appointment/appointments/confirm', body: { id: 'p1' } });
+    await s.result(TO_CONFIRM, { ...page([], 0, 100), timezone: 'Europe/Madrid' });
+    expect(s.wrapper.findComponent(AppointmentList).props('rows')).toEqual([]);
+  });
+
+  it('the bell’s «Confirm the appointments» opens that list, also when the agenda is already open', async () => {
+    const m = await openOn('/appointment/agenda?to_confirm=1');
+    expect(m.params(TO_CONFIRM)).toEqual([{ limit: 100, offset: 0 }]);
+    expect(m.router.currentRoute.value.query).toEqual({});
+
+    m.find('appointment-to-confirm-back').trigger('click');
+    await m.clock.advance(2000);
+    await m.reopen();
+    expect(m.params(TO_CONFIRM)).toEqual([]);
+    await m.router.push('/appointment/agenda?to_confirm=1');
+    await m.reopen();
+    expect(m.params(TO_CONFIRM)).toEqual([{ limit: 100, offset: 0 }]);
+  });
+
   it('filters by status and steps the day', async () => {
     const s = await setup();
     s.toolbar().vm.$emit('update:status', 'pending');
