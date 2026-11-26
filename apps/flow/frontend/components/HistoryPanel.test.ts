@@ -40,11 +40,13 @@ const run = (id: string, over: Partial<RunOut> = {}): RunOut => ({
   ...over,
 });
 
+const NOT_ALLOWED = 'It tried to do something you have not allowed it to do («Create a task»), so it stopped.';
+const ADVICE = 'Open Permissions and allow what it needs.';
 const FAILED = run('r2', {
   status: 'failed',
   error_code: 'flow.not_allowed',
-  error_message: 'It tried to do something you have not allowed it to do («task.task.create»), so it stopped.',
-  log: [{ step: 's1', kind: 'command', operation: 'task.task.create', outcome: 'failed', at: '2026-10-15T11:00:00+02:00', error: { code: 'flow.not_allowed', message: 'Not allowed.' } }],
+  error_message: NOT_ALLOWED,
+  log: [{ step: 's1', kind: 'command', operation: 'task.task.create', outcome: 'failed', at: '2026-10-15T11:00:00+02:00', error: { code: 'flow.not_allowed', message: NOT_ALLOWED } }],
 });
 
 async function setup(rows: RunOut[], failed = 0, total = rows.length) {
@@ -99,8 +101,17 @@ describe('HistoryPanel', () => {
     const m = await setup([FAILED], 1);
     const failed = m.find('flow-run-r2');
     expect(failed.text()).toContain('Stopped by an error');
-    expect(m.find('flow-run-trouble-r2').text()).toContain('It tried to do something you have not allowed it to do');
-    expect(m.find('flow-run-trouble-r2').text()).toContain('Open Permissions and allow what it needs.');
+    expect(m.find('flow-run-trouble-r2').text()).toContain(NOT_ALLOWED);
+    expect(m.find('flow-run-trouble-r2').text()).toContain(ADVICE);
+  });
+
+  it('a run resumed and stopped again by a missing permission says what to do once, with its steps open', async () => {
+    const failedAgain = { step: 's1', kind: 'command', operation: 'task.task.create', outcome: 'failed', at: '2026-10-15T12:00:00+02:00', error: { code: 'flow.not_allowed', message: NOT_ALLOWED } } as const;
+    const resumed = { step: 's1', kind: 'command', operation: 'task.task.create', outcome: 'resumed', at: '2026-10-15T12:00:00+02:00', by: 'ana' } as const;
+    const m = await setup([{ ...FAILED, log: [...FAILED.log, resumed, failedAgain] }], 1);
+    await click(m.find('flow-run-toggle-r2').element);
+    expect(m.find('flow-run-steps-r2').text()).toContain(`Create a task: ${NOT_ALLOWED}`);
+    expect(m.find('flow-run-r2').text().split(ADVICE)).toHaveLength(2);
   });
 
   it('opens to its steps in words', async () => {
