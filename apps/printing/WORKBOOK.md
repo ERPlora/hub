@@ -148,13 +148,16 @@ alta aquí imprimen la cola, con la sesión de cualquiera: da de alta el que est
 dispositivo.». Debajo, una nota sobre el dispositivo en el que se mira: «Este dispositivo imprime para: Caja,
 Cocina.» (en verde); si no está dado de alta, a quien gestiona las impresoras «Este dispositivo todavía no imprime:
 «Imprimir desde este dispositivo» lo da de alta con las impresoras a las que llega.» y al resto «Este dispositivo no
-imprime aquí: quien gestiona las impresoras lo da de alta desde él.».
+imprime aquí: quien gestiona las impresoras lo da de alta desde él.». En un navegador, a todos y en ámbar: «Un
+navegador no imprime: el papel lo saca la app de ERPlora. Instálala en el dispositivo que está junto a las impresoras
+y dalo de alta desde la app, en Impresión → Dispositivos.», con un botón por sistema para descargarla debajo, como en
+PRINTING-F21.
 
 La tabla (o tarjetas en el móvil), por nombre: Nombre (con «Este dispositivo» en el suyo), Impresoras (una
 inactiva, «Cocina (inactiva)»), Visto por última vez («hace 3 min» o «Nunca») y Dado de alta por. Quien gestiona
-las impresoras ve arriba «Imprimir desde este dispositivo» (solo si este no está dado de alta) y en cada fila
-«Editar» y «Retirar». Vacía: «Todavía no imprime ningún dispositivo. Da de alta el que está junto a las impresoras
-desde ese dispositivo.». Error al cargar: «No se pudieron cargar los dispositivos.» con «Reintentar».
+las impresoras ve arriba «Imprimir desde este dispositivo» (solo dentro de la app y si este no está dado de alta) y en
+cada fila «Editar» y «Retirar». Vacía: «Todavía no imprime ningún dispositivo. Da de alta el que está junto a las
+impresoras desde ese dispositivo.». Error al cargar: «No se pudieron cargar los dispositivos.» con «Reintentar».
 
 La ventana **Imprimir desde este dispositivo / Editar dispositivo** explica «Solo imprimen los dispositivos dados
 de alta aquí, con la sesión de cualquiera. Elige las impresoras a las que llega este dispositivo: en su red, por
@@ -603,7 +606,9 @@ Pasos:
    impresoras a las que llega. Desde ese momento ese dispositivo imprime con la sesión de cualquiera: la lista lo
    marca «Este dispositivo» y la nota dice «Este dispositivo imprime para: …». Si quien gestiona las impresoras
    imprime desde un dispositivo nuevo en alguna impresora activa, también queda dado de alta, como «Dispositivo 1»,
-   con las impresoras activas que usa.
+   con las impresoras activas que usa. Solo se da de alta dentro de la app de ERPlora: en un navegador no se ofrece
+   «Imprimir desde este dispositivo», porque desde él no se llega a ninguna impresora, y la nota dice qué hacer y
+   ofrece descargar la app (PRINTING-F21).
 2. Con la app de ERPlora abierta en ese dispositivo —en cualquier pantalla y con la sesión de cualquiera—, la app
    se conecta a Impresión para imprimir: dice qué dispositivo es y cuáles son las impresoras de su alta, y desde ahí
    saca sola el papel de sus impresoras activas en cuanto llega a la cola, sin que nadie toque nada. En un navegador
@@ -648,9 +653,11 @@ copias pasa de los 90 s y el trabajo ya había vuelto a la cola) se acepta: el p
 vez. Una confirmación o un fallo de otro dispositivo, o de una entrega que no es la suya, se rechaza y no cambia
 nada. Dar de alta sin nombre o sin impresoras activas avisa en su campo, y el aviso se quita en cuanto se cambia
 ese campo (se escribe el nombre, se marca una impresora), sin volver a pulsar «Guardar»; el del otro se queda hasta
-que se cambia el suyo. Solo se da de alta desde el propio dispositivo. La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
+que se cambia el suyo. Solo se da de alta desde el propio dispositivo, y en un navegador no: no sale «Imprimir desde
+este dispositivo», así que la cola sigue diciendo que ningún dispositivo dado de alta lo imprime y el Inicio sigue
+con «Configura la impresora». La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
 cualquiera se haría pasar por la caja.
-Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F22
+Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F21, PRINTING-F22
 
 ### PRINTING-F19 Ver el estado de una impresora
 Estado: hecho

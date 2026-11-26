@@ -1,12 +1,14 @@
 // Printing → Devices (PRINTING-F18; WORKBOOK «Pantallas · Dispositivos»): the devices set up to print, live, by
 // name — Name (this device marked), Printers, Last seen and Set up by —, and what the device the page runs on
-// does. Whoever sets up the printers sets this device up («Print from this device»), edits any device and
-// retires it after asking; everybody else reads.
+// does. Inside the ERPlora app, whoever sets up the printers sets this device up («Print from this device»); in a
+// browser, which reaches no printer, nobody does: the page says why and where to get the app. From either, they edit
+// any device and retire it after asking; everybody else reads.
 import { DataTable, type DataTableAction, type DataTableColumn } from '@erplora/ui/components';
 import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
+import { embedHubHome, forgetHubHome } from '../../../../base/frontend/__tests__/hub-home';
 import { EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountPrinting, words } from '../__tests__/mount-printing';
 import DeviceModal from '../components/DeviceModal.vue';
 import type { DeviceOut, PrinterOut } from '../operations';
@@ -17,9 +19,14 @@ vi.mock('@erplora/ui/components', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   useConfirm: () => ({ confirm: mocks.confirm }),
 }));
+type Win = { __TAURI__?: unknown };
+/** The ERPlora app's bridge, which a browser lacks: only through it does a device reach a printer. */
+const inTheApp = () => ((window as Win).__TAURI__ = { core: { invoke: vi.fn() } });
 afterEach(() => {
   mocks.confirm.mockReset();
   vi.useRealTimers();
+  delete (window as Win).__TAURI__;
+  forgetHubHome();
 });
 
 const LIST = 'printing.device.list';
@@ -93,6 +100,7 @@ describe('DevicesPage', () => {
   });
 
   it('says what the device the page runs on prints, or that it prints nothing and who sets it up', async () => {
+    inTheApp();
     const s = await setup();
     await s.result(LIST, page([THIS, OTHER]));
     expect(s.find('printing-devices-this').text()).toBe('This device prints for: Till, Kitchen (inactive).');
@@ -109,6 +117,7 @@ describe('DevicesPage', () => {
   });
 
   it('whoever sets up printers sets this device up (once), edits and retires; the employee reads', async () => {
+    inTheApp();
     const s = await setup({ session: MANAGER });
     await s.result(LIST, page([OTHER]));
     expect(s.prop('addable')).toBe(true);
@@ -124,6 +133,7 @@ describe('DevicesPage', () => {
   });
 
   it('sets up and edits through the device window, with the active printers of the business', async () => {
+    inTheApp();
     const s = await setup();
     await s.result(LIST, page([OTHER]));
     expect(s.params(PRINTERS)).toEqual([{ limit: 100 }]);
@@ -134,6 +144,39 @@ describe('DevicesPage', () => {
     s.table().vm.$emit('action', { actionId: 'edit', row: OTHER });
     await flush();
     expect(s.wrapper.findComponent(DeviceModal).props()).toMatchObject({ open: true, device: OTHER });
+  });
+
+  it('in a browser, nobody sets it up to print: it says why, what to do and where to get the app', async () => {
+    embedHubHome({ name: 'Bar', app_downloads: { windows: 'http://localhost:8001/app/download/windows/' } });
+    const browser =
+      'A browser cannot print: the paper comes out of the ERPlora app. Install it on the device next to the printers and set that device up from the app, in Printing → Devices.';
+    const manager = await setup({ session: MANAGER });
+    await manager.result(LIST, page([OTHER]));
+    expect(manager.prop('addable')).toBe(false);
+    expect(manager.find('printing-devices-this').text()).toContain(browser);
+    expect(manager.find('printing-devices-download-windows').exists()).toBe(true);
+    // From the browser they still edit or retire any device, a browser set up before included.
+    expect(manager.actions(OTHER)).toEqual(['edit', 'retire']);
+    await manager.result(LIST, page([THIS, OTHER]), {}, 2);
+    expect(manager.find('printing-devices-this').text()).toContain(browser);
+    expect(manager.actions(THIS)).toEqual(['edit', 'retire']);
+    const employee = await setup({ session: EMPLOYEE });
+    await employee.result(LIST, page([OTHER]));
+    expect(employee.find('printing-devices-this').text()).toContain(browser);
+    const es = await setup({ session: MANAGER, locale: 'es' });
+    await es.result(LIST, page([OTHER]));
+    expect(es.find('printing-devices-this').text()).toContain(
+      'Un navegador no imprime: el papel lo saca la app de ERPlora. Instálala en el dispositivo que está junto a las impresoras y dalo de alta desde la app, en Impresión → Dispositivos.',
+    );
+  });
+
+  it('inside the app, no download: it would be the app offering itself', async () => {
+    inTheApp();
+    embedHubHome({ name: 'Bar', app_downloads: { windows: 'http://localhost:8001/app/download/windows/' } });
+    const s = await setup({ session: MANAGER });
+    await s.result(LIST, page([OTHER]));
+    expect(s.prop('addable')).toBe(true);
+    expect(s.find('printing-devices-download-windows').exists()).toBe(false);
   });
 
   it('retires a device after asking, and says so; «Back» leaves it', async () => {

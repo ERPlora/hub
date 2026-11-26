@@ -139,17 +139,20 @@ the devices on this list print, with anybody's session. From that device, "Print
 the printers it reaches; the list says when each one was last seen, and on each row you can change it or retire it.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:f7e1351a88f5 -->
+<!-- from WORKBOOK.md sha256:4d7505a7b23e -->
 Menu **Printing → Devices**. Title "Devices that print" and the sentence "Only the devices set up here
 print the queue, with anybody’s session: set up the one next to the printers from that
 device.". Underneath, a note about the device it is being looked at on: "This device prints for: Till,
 Kitchen." (in green); if it is not set up, to whoever manages the printers "This device does not print yet:
 «Print from this device» sets it up with the printers it reaches." and to everybody else "This device does not
-print here: someone who manages the printers sets it up from it.".
+print here: someone who manages the printers sets it up from it.". In a browser, to everybody and in amber: "A
+browser cannot print: the paper comes out of the ERPlora app. Install it on the device next to the printers and set
+that device up from the app, in Printing → Devices.", with one button per system to download it underneath, as in
+PRINTING-F21.
 
 The table (or cards on the phone), by name: Name (with "This device" on its own), Printers (an
 inactive one, "Kitchen (inactive)"), Last seen ("3 min ago" or "Never") and Set up by. Whoever manages
-the printers sees "Print from this device" at the top (only if this one is not set up) and on each row
+the printers sees "Print from this device" at the top (only inside the app and if this one is not set up) and on each row
 "Edit" and "Retire". Empty: "No device prints yet. Set up the one next to the printers
 from that device.". Error when loading: "Could not load the devices." with "Retry".
 
@@ -613,7 +616,7 @@ If it fails: as in F07.
 Involved: CASH_REGISTER-F16, PRINTING-F22
 
 ### PRINTING-F18 Take the paper out: the device picks up and confirms the jobs
-<!-- from WORKBOOK.md sha256:1fb7664a2a38 -->
+<!-- from WORKBOOK.md sha256:bd71a2be5a63 -->
 Status: done
 Actor: the owner, the administrator or the manager (they set up the device) and the device's app
 (it picks up)
@@ -624,7 +627,9 @@ Steps:
    printers it reaches. From that moment that device prints with anybody's session: the list
    marks it "This device" and the note says "This device prints for: …". If whoever manages the printers
    prints from a new device on some active printer, it is also set up, as "Device 1",
-   with the active printers it uses.
+   with the active printers it uses. It is only set up inside the ERPlora app: in a browser "Print from this device"
+   is not offered, because no printer can be reached from it, and the note says what to do and offers to download the
+   app (PRINTING-F21).
 2. With the ERPlora app open on that device —on any screen and with anybody's session—, the app
    connects to Printing to print: it says which device it is and which are the printers of its setup, and from there on
    it takes out on its own the paper of its active printers as soon as it reaches the queue, without anybody touching anything. In a browser
@@ -669,9 +674,10 @@ copies goes past the 90 s and the job had already gone back to the queue) is acc
 again. A confirmation or a failure from another device, or from a hand-out that is not its own, is refused and changes
 nothing. Setting up without a name or without active printers warns in its field, and the notice goes as soon as
 that field changes (the name is typed, a printer is ticked), without tapping "Save" again; the other's stays until
-its own changes. It is only set up from the device itself. The queue and the list name each device by its name, never by its identifier: with it
+its own changes. It is only set up from the device itself, and not in a browser: "Print from this device" is not
+there, so the queue keeps saying that no device set up here prints it and the Home keeps "Set up your printer". The queue and the list name each device by its name, never by its identifier: with it
 anybody could pretend to be the till.
-Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F22
+Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F21, PRINTING-F22
 
 ### PRINTING-F19 See the state of a printer
 <!-- from WORKBOOK.md sha256:4c410470a0af -->
