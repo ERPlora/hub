@@ -35,6 +35,12 @@ describe('paintAppearance', () => {
     expect(html.classList.contains('ion-palette-dark')).toBe(true);
   });
 
+  it('a palette alone of their own is theirs, not the business’s', () => {
+    paintAppearance({ ...BUSINESS, palette: 'forest' });
+    expect(themePalette.value).toBe('forest');
+    expect(hasLocalPalette.value).toBe(true);
+  });
+
   it('nothing of their own goes back to the business’s appearance', () => {
     paintAppearance({ theme_mode: 'dark', palette: 'forest', ui_scale: 120 });
     paintAppearance(BUSINESS);
