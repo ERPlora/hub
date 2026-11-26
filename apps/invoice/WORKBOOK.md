@@ -468,7 +468,11 @@ Pasos:
    sale su documento y la venta deja de estar pendiente. Por la API o el asistente se pide igual, por el
    número de la venta, a Ventas o a Facturación: en los dos casos la venta lleva su documento en cuanto se
    emite.
-4. Si todavía no se puede, «Emitir ahora» dice por qué y no cambia nada.
+4. Si el aviso de esa venta a Facturación ya estaba en Sistema › Eventos caídos, se va de ahí y de la
+   campana en cuanto sale su documento, sin reenviarlo ni descartarlo a mano: el hub lo da por entregado y
+   no emite otro documento. Lo mismo con el de su anulación o el de cada devolución cuando sale su
+   rectificativa.
+5. Si todavía no se puede, «Emitir ahora» dice por qué y no cambia nada.
 Entra: la venta que espera su documento.
 Sale: lo de INVOICE-F01 o INVOICE-F02, fechado el día en que por fin se emite (la fecha de operación
 sigue siendo la del cobro); la venta lleva su número desde ese mismo momento (avisa
@@ -478,7 +482,7 @@ sigue sin poder, la anulación o la devolución sigue adelante y los dos documen
 hub los reintenta y «Emitir ahora» los emite en orden (INVOICE-F07, INVOICE-F09). Pedir a Facturación la
 rectificativa de esa anulación o de esa devolución la deja también en Ventas al momento. Pedir otra vez un
 documento que ya salió no emite otro ni gasta número.
-Implicados: SALE-F01, SALE-F29
+Implicados: SALE-F01, SALE-F29, BASE-F43
 
 ### INVOICE-F07 Anular una venta cobrada que ya tiene su tique
 Estado: hecho — Ventas la pide dentro de la misma anulación
