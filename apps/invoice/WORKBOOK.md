@@ -468,7 +468,11 @@ Pasos:
    sale su documento y la venta deja de estar pendiente. Por la API o el asistente se pide igual, por el
    número de la venta, a Ventas o a Facturación: en los dos casos la venta lleva su documento en cuanto se
    emite.
-4. Si todavía no se puede, «Emitir ahora» dice por qué y no cambia nada.
+4. Si el aviso de esa venta a Facturación ya estaba en Sistema › Eventos caídos, se va de ahí y de la
+   campana en cuanto sale su documento, sin reenviarlo ni descartarlo a mano: el hub lo da por entregado y
+   no emite otro documento. Lo mismo con el de su anulación o el de cada devolución cuando sale su
+   rectificativa.
+5. Si todavía no se puede, «Emitir ahora» dice por qué y no cambia nada.
 Entra: la venta que espera su documento.
 Sale: lo de INVOICE-F01 o INVOICE-F02, fechado el día en que por fin se emite (la fecha de operación
 sigue siendo la del cobro); la venta lleva su número desde ese mismo momento (avisa
@@ -478,7 +482,7 @@ sigue sin poder, la anulación o la devolución sigue adelante y los dos documen
 hub los reintenta y «Emitir ahora» los emite en orden (INVOICE-F07, INVOICE-F09). Pedir a Facturación la
 rectificativa de esa anulación o de esa devolución la deja también en Ventas al momento. Pedir otra vez un
 documento que ya salió no emite otro ni gasta número.
-Implicados: SALE-F01, SALE-F29
+Implicados: SALE-F01, SALE-F29, BASE-F43
 
 ### INVOICE-F07 Anular una venta cobrada que ya tiene su tique
 Estado: hecho — Ventas la pide dentro de la misma anulación
@@ -780,7 +784,9 @@ aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora n
 se descarga: la API y el asistente dicen «Factura no encontrada.». Pedida al asistente, solo se hace si una impresora
 del sistema la recibe; si no, su recibo dice «No se hizo, falló: Imprimir en Facturación.» con el motivo, «Ninguna
 impresora del sistema recibe esta factura: ábrela para imprimirla o guardarla en PDF.» o, si no se puede leer su
-registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.».
+registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.». Si la impresora la
+recibe pero ningún dispositivo encendido imprime su cola, el asistente dice que queda en la cola de esa impresora y que
+saldrá cuando un dispositivo dado de alta la imprima, nunca que la ha impreso.
 Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Marcar una factura como pagada
