@@ -2666,6 +2666,7 @@
       "carts": "Carritos",
       "orders": "Pedidos",
       "queued": "En la cola de impresión",
+      "waits_for_device": "Esperando a un dispositivo que lo imprima",
       "report": "Informe",
       "printers": "Impresoras",
       "this_device": "Este dispositivo",

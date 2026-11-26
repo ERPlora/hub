@@ -107,6 +107,11 @@ class PaperOut(Schema):
     )
     job_id: UUID | None = Field(description="Its job in the printing queue.")
     printer: str | None = Field(description="The printer it went to.")
+    waits_for_device: bool = Field(
+        description="True: queued, but nothing has come out yet, as no device that prints that printer is on now (none "
+        "is set up in Printing › Devices, or the ones there gave no news in the last 90 s): it waits in the queue and "
+        "prints once one is."
+    )
 
 
 class LetterheadIn(Schema):
