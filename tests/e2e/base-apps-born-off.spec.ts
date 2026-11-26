@@ -5,8 +5,8 @@
 //   - Apps says nothing is on: «My apps» is empty with its notice, and an app of the catalogue is «Off» in «Add apps»;
 //   - the Home offers the card; «Use this one» on the restaurant ends in «Your apps and your catalogue are ready», and
 //     the Home's «My apps» has the apps it turned on without a reload;
-//   - the template's apps are on (its roots chosen, what they need along), «Active» in «My apps», and its products
-//     and tables are in, through the apps' own lists.
+//   - the template's apps are on, each one chosen as if turned on in Apps (Taxes comes along, as at a sign-up),
+//     «Active» in «My apps», and its products and tables are in, through the apps' own lists.
 // `a` is emptied of what a template brings first, and after each test the load
 // is undone and `a` gets back its rows with every app on (the ones `seed_local_hubs` wrote, as every other spec finds
 // it). Each step leaves a capture at each width.
@@ -122,7 +122,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const after = await api<{ apps: App[] }>(context, A, 'GET', '/apps');
       const on = after.data.apps.filter((app) => app.state === 'on').map((app) => app.id);
       expect(on.sort()).toEqual([...wanted].sort());
-      expect(after.data.apps.filter((app) => app.chosen).length).toBeLessThan(wanted.length); // what came along is not chosen
+      // Each one chosen, as if turned on in Apps: turning one off never takes the others along. Taxes comes along
+      // with the first that needs it, as at a sign-up: what the country requires takes no place of the plan's limit.
+      const chosen = after.data.apps.filter((app) => app.chosen).map((app) => app.id);
+      expect(chosen.sort()).toEqual(wanted.filter((id) => id !== 'tax').sort());
       for (const list of ['/inventory/products', '/table/tables']) {
         const rows = await api<{ rows: unknown[] }>(context, A, 'GET', `${list}?limit=100&offset=0`);
         expect(rows.status, list).toBe(200);

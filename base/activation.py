@@ -16,8 +16,8 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
 - **What a business is born with**: its sign-up writes every module down, off but
   the apps its country requires that say the platform may turn them on by itself (:func:`born_on`: Taxes, in every
   country), on with what they need and none chosen (:func:`born`), a demo too. Never one that binds the business to a
-  tax authority (VeriFactu): its owner turns it on, asked by the Home. A vertical's template turns on its modules with
-  their roots chosen (:func:`template`; 13 of 21 for the restaurant): the modules on that no other module on needs.
+  tax authority (VeriFactu): its owner turns it on, asked by the Home. A template or a copy turns on its modules as
+  Apps does, each one chosen but :func:`born_on`'s, which come along (``base.blueprint.import``).
 - **Every module on** (:func:`every_on`), its roots chosen: what a hub without rows had before hubs started with every
   module off. The migration ``base.0017`` writes it down for every hub of before, so none loses an app,
   and the developer's local hubs ``a`` and ``b`` are seeded with it. The platform always has it, rows or not: a scope

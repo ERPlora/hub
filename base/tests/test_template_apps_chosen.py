@@ -2,6 +2,7 @@
 BASE-F18): turning one of them off never takes the others with it (BASE-F23). What a load brings only because an app
 it turns on needs it still goes off with that app, and what was on before the load is left as it was."""
 
+import pytest
 from live.operations import get
 
 from base import activation
@@ -61,9 +62,12 @@ def test_what_comes_only_because_an_app_of_the_load_needs_it_still_goes_off_with
     assert modules_on() == {"tax"}
 
 
-def test_a_spanish_restaurant_on_the_free_plan_loads_its_template_and_still_turns_verifactu_on(born, load):
-    """Free allows 20 chosen apps on erplora.com: the restaurant's (Taxes aside, on since the sign-up) and VeriFactu."""
-    born_with_taxes()
+@pytest.mark.parametrize("taxes_on", [True, False], ids=["born-with-taxes", "born-before-taxes-came-on"])
+def test_a_spanish_restaurant_on_the_free_plan_loads_its_template_and_still_turns_verifactu_on(born, load, taxes_on):
+    """Free allows 20 chosen apps on erplora.com: the restaurant's and VeriFactu. Taxes, which the business's country
+    requires, takes none of them, whether the business was born with it on or the template turns it on."""
+    if taxes_on:
+        born_with_taxes()
     with_max_apps(A.key, 20)
 
     loaded = load(born, template="restaurant.es")
@@ -71,3 +75,4 @@ def test_a_spanish_restaurant_on_the_free_plan_loads_its_template_and_still_turn
 
     assert loaded.status == "complete"
     assert "verifactu" in modules_on()
+    assert AppActivation.objects.get(host=A.key, app="tax").chosen is False

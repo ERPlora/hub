@@ -1186,10 +1186,13 @@ Pasos:
      duplica ni se sobrescribe. Si una app de la plantilla aún se está preparando, lo suyo entra solo en
      cuanto queda lista, sin volver ni pulsar nada.
 Entra: la plantilla o el fichero y las apps marcadas.
-Sale: las apps marcadas que estaban desactivadas, activadas antes de cargar, con las que necesitan y dentro
-del tope de apps del plan, como si se activaran en Apps (`base.app.enabled`); en cada app marcada, lo que
-trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus categorías, productos, servicios,
-zonas, mesas y, desde una copia de seguridad, clientes), y el informe guardado (`base.blueprint.imported`).
+Sale: las apps marcadas que estaban desactivadas, activadas antes de cargar y dentro del tope de apps del plan,
+cada una elegida por el negocio como si se activara en Apps (`base.app.enabled`): cuentan para el límite de
+apps del plan y desactivar otra no se las lleva; las que necesitan y no se marcaron llegan con ellas, e Impuestos,
+que el país exige, llega con las que la necesitan sin contar para el plan, como al darse de alta. En cada app
+marcada, lo que trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus categorías, productos,
+servicios, zonas, mesas y, desde una copia de seguridad, clientes), y el informe guardado
+(`base.blueprint.imported`).
 Si falla: «La importación falló:» con el motivo y se queda en la revisión; sin ninguna app marcada, «Elige al
 menos una app.» y no se puede importar; si ninguna de sus apps se puede activar aquí, «Nada de este fichero
 puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una app que no se pudo activar (el
@@ -4313,8 +4316,11 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   enciende sola, con sus filas escritas al nacer (Impuestos, hub#997); un hub sin filas lo tiene todo apagado; los hubs
   anteriores a la migración `base/0017` conservan todo encendido con sus raíces elegidas, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
   ERPlora y el ámbito del worker lo tienen todo encendido siempre, `activation.is_platform`; `base/activation.py`).
-  `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto (sus raíces, elegidas, por
-  `base.app.enable`: tope, derechos y evento); la que no puede encender sale `inactive` con su `reason` en el
+  `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto, cada una elegida, por
+  `base.app.enable` y primero lo que necesita cada una (tope, derechos y evento), salvo las que la plataforma enciende
+  al darse de alta (`activation.born_on`: Impuestos), que van al final y llegan sin elegir con las que las necesitan;
+  la que ya estaba encendida se queda como estaba, y los negocios montados antes con una plantilla o una copia las
+  tienen elegidas desde la migración `base/0033`. La que no puede encender sale `inactive` con su `reason` en el
   informe. La que nunca se enciende en este negocio (`can_enable`) no se promete en la revisión (`inactive`, no `turns_on`)
   y, sin filas suyas en el blueprint, no deja la carga a medias ni ofrece un reintento que no cambiaría nada (hub#694). `base.app.enable`/`base.app.disable`
   (`POST /api/apps/enable|disable`, `base.administer_hub`: cierre de `requires`, 409 `base.app_required`, negativas

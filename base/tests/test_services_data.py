@@ -474,9 +474,10 @@ def test_a_template_turns_on_its_apps_and_then_loads_them(born, load):
     loaded = load(born, template="restaurant.es")
 
     assert modules_on() == set(apps)
-    # Each one is turned on as in Apps: chosen, with its own event.
-    assert chosen() == set(apps)
-    assert enabled_events() == sorted(apps)
+    # Each one is turned on as in Apps: chosen, with its own event. Taxes comes along with the first that needs it, as
+    # at a business's sign-up: what its country requires takes no place of the plan's limit.
+    assert chosen() == set(apps) - {"tax"}
+    assert enabled_events() == sorted(set(apps) - {"tax"})
     assert (loaded.status, loaded.rows) == ("complete", 34)
     assert total(born, "inventory.product.list") == 16
     assert total(born, "table.table.list") == 10

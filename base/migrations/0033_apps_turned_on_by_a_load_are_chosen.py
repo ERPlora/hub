@@ -26,11 +26,10 @@ def _apps_loads_turned_on(reports) -> set[str]:
 
 
 def choose_what_loads_turned_on(apps, schema_editor):
-    alias = schema_editor.connection.alias
-    reports = apps.get_model("base", "ImportBatch").objects.using(alias).values_list("report", flat=True)
-    loaded = _apps_loads_turned_on(reports)
+    loads = apps.get_model("base", "ImportBatch").objects.using(schema_editor.connection.alias)
+    loaded = _apps_loads_turned_on(loads.values_list("report", flat=True))
     if loaded:
-        apps.get_model("base", "AppActivation").objects.using(alias).filter(
+        apps.get_model("base", "AppActivation").objects.using(schema_editor.connection.alias).filter(
             app__in=sorted(loaded), state__in=WANTED, chosen=False
         ).update(chosen=True)
 
