@@ -1,9 +1,10 @@
-// flow: BASE-F35, BASE-F36, BASE-F30, BASE-F31 — a backup of the business takes Modifiers' groups, on hub `a` with the
-// real Inventory: in Settings › Data › Export the Modifiers row no longer says «Nothing of its own to copy» and its data
-// show «Modifier groups» with its rows; the file downloaded carries the group with its options and the product it
-// applies to, by its code; loaded again from Import once the group is deleted, the group comes back as it was. Each
-// screen in 390×844, 834×1112 and 1440×900. Its data are named `E2E Backup …` / `E2E-BAK-…` and `afterAll` deletes
-// exactly them. In Spanish too, at each size: «Grupos de suplementos», never «Nada propio que copiar».
+// flow: BASE-F35, BASE-F36, BASE-F30, BASE-F31 — a backup of the business takes what Modifiers and Menus and combos
+// have, on hub `a` with the real Inventory: in Settings › Data › Export neither row says «Nothing of its own to copy»
+// and their data show «Modifier groups» and «Menus» with their rows; the file downloaded carries the group with its
+// options and the product it applies to, and the menu with its course and the product to choose, by its code; loaded
+// again from Import once both are deleted, they come back as they were. Each screen in 390×844, 834×1112 and
+// 1440×900. Its data are named `E2E Backup …` / `E2E-BAK-…` and `afterAll` deletes exactly them. In Spanish too, at
+// each size: «Grupos de suplementos» and «Menús», never «Nada propio que copiar».
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
@@ -29,9 +30,11 @@ test.use({ actionTimeout: 30_000 });
 const STAMP = Date.now().toString(36).toUpperCase();
 const SKU = `E2E-BAK-${STAMP}`;
 const GROUP = `E2E Backup Doneness ${STAMP}`;
+const MENU = `E2E Backup Menu ${STAMP}`;
 const OPTIONS = ['Rare', 'Well done'];
 
 const OWN_GROUPS = "select id from modifier_modifiergroup where name like 'E2E Backup %'";
+const OWN_MENUS = "select id from combo_combo where name like 'E2E Backup %'";
 const OWN_PRODUCTS = "select id from inventory_product where sku like 'E2E-BAK-%'";
 
 function cleanUp(): void {
@@ -40,6 +43,9 @@ function cleanUp(): void {
       `delete from modifier_modifierlink where group_id in (${OWN_GROUPS}) or product_id in (${OWN_PRODUCTS})`,
       `delete from modifier_modifieroption where group_id in (${OWN_GROUPS})`,
       "delete from modifier_modifiergroup where name like 'E2E Backup %'",
+      `delete from combo_choiceoption where product_id in (${OWN_PRODUCTS})`,
+      `delete from combo_choicegroup where combo_id in (${OWN_MENUS})`,
+      "delete from combo_combo where name like 'E2E Backup %'",
       `delete from inventory_stockmovement where product_id in (${OWN_PRODUCTS})`,
       `delete from inventory_productcategory where product_id in (${OWN_PRODUCTS})`,
       "delete from inventory_product where sku like 'E2E-BAK-%'",
@@ -49,12 +55,31 @@ function cleanUp(): void {
 
 interface Group {
   id: string;
-  name: string;
   option_count: number;
   link_count: number;
 }
 
-async function makeGroup(context: BrowserContext): Promise<void> {
+interface Menu {
+  id: string;
+  groups: { name: string; options: { sku: string }[] }[];
+}
+
+/** Each app the spec exports: the row of Export, its part, what it reads back and how it deletes it. */
+const APPS = {
+  modifier: {
+    part: 'modifier.group',
+    detail: `/modifier/groups/detail?group=${encodeURIComponent(GROUP)}`,
+    remove: '/modifier/groups/delete',
+  },
+  combo: {
+    part: 'combo.combo',
+    detail: `/combo/combos/detail?combo=${encodeURIComponent(MENU)}`,
+    remove: '/combo/combos/delete',
+  },
+} as const;
+type App = keyof typeof APPS;
+
+async function make(context: BrowserContext): Promise<void> {
   const group = await api<Group>(context, A, 'POST', '/modifier/groups', { name: GROUP, min_choices: 1, max_choices: 1 });
   expect(group.status).toBe(201);
   for (const [index, name] of OPTIONS.entries()) {
@@ -62,10 +87,13 @@ async function makeGroup(context: BrowserContext): Promise<void> {
     expect((await api(context, A, 'POST', '/modifier/options', option)).status).toBe(201);
   }
   expect((await api(context, A, 'POST', '/modifier/links/attach', { group_id: group.data.id, product: SKU })).status).toBe(201);
+  expect((await api(context, A, 'POST', '/combo/combos', { name: MENU, price: 1450, supply_kind: 'goods' })).status).toBe(201);
+  expect((await api(context, A, 'POST', '/combo/groups', { combo: MENU, name: 'Main' })).status).toBe(201);
+  expect((await api(context, A, 'POST', '/combo/options', { combo: MENU, group: 'Main', product: SKU })).status).toBe(201);
 }
 
-async function groupNow(context: BrowserContext): Promise<{ status: number; data: Group }> {
-  return api<Group>(context, A, 'GET', `/modifier/groups/detail?group=${encodeURIComponent(GROUP)}`);
+async function now<T>(context: BrowserContext, app: App): Promise<{ status: number; data: T }> {
+  return api<T>(context, A, 'GET', APPS[app].detail);
 }
 
 async function snap(page: Page, name: string): Promise<void> {
@@ -75,18 +103,24 @@ async function snap(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: shot(name), fullPage: false });
 }
 
-/** Settings › Data › Export with the group there: Modifiers' row does not say `nothing` (in the page's language) and,
- *  with its data ticked, its part says `part` with its rows. */
-async function modifiersPart(context: BrowserContext, page: Page, texts: { nothing: string; part: string }): Promise<void> {
-  if ((await groupNow(context)).status !== 200) await makeGroup(context);
+/** Settings › Data › Export with the spec's rows there: neither app's row says `nothing` (in the page's language) and,
+ *  with their data ticked, each part says its label with its rows. */
+async function partsOf(context: BrowserContext, page: Page, nothing: string, labels: Record<App, string>): Promise<void> {
+  if ((await now(context, 'modifier')).status !== 200) await make(context);
   await page.goto(`${A}/settings?data=export#data`);
-  const modifiers = shown(page).locator('[data-testid="export-app"][data-id="modifier"]');
-  await expect(modifiers).toBeVisible();
-  await expect(modifiers).not.toContainText(texts.nothing);
-  await testid(page, 'export-data-modifier').click();
-  const part = shown(page).locator('[data-testid="export-table-modifier.group"]');
-  await expect(part).toContainText(`${texts.part} ·`);
-  await part.scrollIntoViewIfNeeded();
+  for (const app of Object.keys(APPS) as App[]) {
+    const row = shown(page).locator(`[data-testid="export-app"][data-id="${app}"]`);
+    await expect(row).toBeVisible();
+    await expect(row).not.toContainText(nothing);
+    await testid(page, `export-data-${app}`).click();
+    await expect(shown(page).locator(`[data-testid="export-table-${APPS[app].part}"]`)).toContainText(`${labels[app]} ·`);
+  }
+  await shown(page).locator('[data-testid="export-table-combo.combo"]').scrollIntoViewIfNeeded();
+}
+
+/** The rows of `part` the file `saved` carries. */
+function rowsIn(saved: string, part: string): { name: string; [key: string]: unknown }[] {
+  return JSON.parse(execFileSync('unzip', ['-p', saved, `data/${part}.json`], { encoding: 'utf8' }));
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -105,41 +139,50 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(() => cleanUp());
 
 for (const size of THREE_SIZES) {
-  test(`a backup takes the modifier groups and brings them back at ${size.label}`, async ({ browser }) => {
+  test(`a backup takes the modifier groups and the menus and brings them back at ${size.label}`, async ({ browser }) => {
     test.setTimeout(180_000);
     const { context, page } = await hostPage(browser, A, { viewport: { width: size.width, height: size.height }, next: '/settings#data' });
-    await modifiersPart(context, page, { nothing: 'Nothing of its own to copy', part: 'Modifier groups' });
-    await snap(page, `BASE-F36-modifier-groups-${size.label}`);
+    await partsOf(context, page, 'Nothing of its own to copy', { modifier: 'Modifier groups', combo: 'Menus' });
+    await snap(page, `BASE-F36-backup-apps-${size.label}`);
 
     const [download] = await Promise.all([page.waitForEvent('download'), testid(page, 'export-submit').click()]);
-    const saved = join(ARTIFACTS, `backup-modifiers-${size.label}-${download.suggestedFilename()}`);
+    const saved = join(ARTIFACTS, `backup-apps-${size.label}-${download.suggestedFilename()}`);
     await download.saveAs(saved);
-    const groups = JSON.parse(execFileSync('unzip', ['-p', saved, 'data/modifier.group.json'], { encoding: 'utf8' }));
-    const mine = groups.find((row: { name: string }) => row.name === GROUP);
-    expect(mine.options.map((option: { name: string }) => option.name)).toEqual(OPTIONS);
-    expect(mine.products).toEqual([SKU]);
+    const group = rowsIn(saved, 'modifier.group').find((row) => row.name === GROUP);
+    expect((group?.options as { name: string }[]).map((option) => option.name)).toEqual(OPTIONS);
+    expect(group?.products).toEqual([SKU]);
+    const menu = rowsIn(saved, 'combo.combo').find((row) => row.name === MENU);
+    expect(menu?.courses).toEqual([expect.objectContaining({ name: 'Main', choices: [expect.objectContaining({ product: SKU })] })]);
 
-    const before = (await groupNow(context)).data;
-    expect((await api(context, A, 'POST', '/modifier/groups/delete', { id: before.id })).status).toBe(200);
+    const groupBefore = (await now<Group>(context, 'modifier')).data;
+    const menuBefore = (await now<Menu>(context, 'combo')).data;
+    expect((await api(context, A, 'POST', APPS.modifier.remove, { id: groupBefore.id })).status).toBe(200);
+    expect((await api(context, A, 'POST', APPS.combo.remove, { id: menuBefore.id })).status).toBe(200);
     await testid(page, 'data-section-import').click();
     await testid(page, 'import-file').setInputFiles(saved);
     await expect(testid(page, 'review')).toBeVisible();
     await testid(page, 'review-import').click();
-    const loaded = shown(page).locator('[data-testid="report-app"][data-id="modifier"] [data-testid="report-app-status"]');
-    await expect(loaded).toContainText('Applied');
-    await loaded.scrollIntoViewIfNeeded();
-    await snap(page, `BASE-F31-modifier-groups-back-${size.label}`);
+    for (const app of Object.keys(APPS)) {
+      const loaded = shown(page).locator(`[data-testid="report-app"][data-id="${app}"] [data-testid="report-app-status"]`);
+      await expect(loaded).toContainText('Applied');
+    }
+    await shown(page).locator('[data-testid="report-app"][data-id="modifier"]').scrollIntoViewIfNeeded();
+    await snap(page, `BASE-F31-backup-apps-back-${size.label}`);
 
-    const after = (await groupNow(context)).data;
-    expect([after.option_count, after.link_count]).toEqual([before.option_count, before.link_count]);
+    const groupAfter = (await now<Group>(context, 'modifier')).data;
+    expect([groupAfter.option_count, groupAfter.link_count]).toEqual([groupBefore.option_count, groupBefore.link_count]);
+    const menuAfter = (await now<Menu>(context, 'combo')).data;
+    expect(menuAfter.groups.map((course) => [course.name, course.options.map((option) => option.sku)])).toEqual(
+      menuBefore.groups.map((course) => [course.name, course.options.map((option) => option.sku)]),
+    );
     await context.close();
   });
 
-  test(`in Spanish, Modifiers' data say «Grupos de suplementos» at ${size.label}`, async ({ browser }) => {
+  test(`in Spanish, the data say «Grupos de suplementos» and «Menús» at ${size.label}`, async ({ browser }) => {
     const { context, page } = await signedInSpanish(browser, { width: size.width, height: size.height }, '/settings#data');
-    await modifiersPart(context, page, { nothing: 'Nada propio que copiar', part: 'Grupos de suplementos' });
-    await expect(testid(page, 'export-tables-modifier')).toContainText('Datos de Suplementos');
-    await snap(page, `BASE-F36-modifier-groups-es-${size.label}`);
+    await partsOf(context, page, 'Nada propio que copiar', { modifier: 'Grupos de suplementos', combo: 'Menús' });
+    await expect(testid(page, 'export-tables-combo')).toContainText('Datos de Menús y combos');
+    await snap(page, `BASE-F36-backup-apps-es-${size.label}`);
     await context.close();
   });
 }
