@@ -8,7 +8,7 @@
 // dropped. A tap on an image emits `pick` and closes; «Upload photo» emits `upload` (the field opens the device's
 // picker) and closes too. Hooks (`testid`): the root, `-search`, `-folders`, `-folder-<key>`, `-loading`, `-empty`,
 // `-error`, `-retry`, `-image-<folder>-<name>`, `-count`, `-more`, `-upload`, `-close`.
-import { EmptyState, InlineFeedback } from '@erplora/ui/components';
+import { EmptyState, InlineFeedback, syncSearchbarInputName } from '@erplora/ui/components';
 import { useLiveClient } from '@erplora/ui/sdk';
 import {
   IonButton,
@@ -25,7 +25,7 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/vue';
-import { computed, ref, shallowRef, watch } from 'vue';
+import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
 import type { CatalogImage } from '../operations/catalog_images';
@@ -50,8 +50,15 @@ const props = withDefaults(
 const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ pick: [image: CatalogImage]; upload: [] }>();
 
-const { t } = useBaseI18n();
+const { t, locale } = useBaseI18n();
 const client = useLiveClient();
+
+// The search box named by its hint, in the person's language: Ionic names its input «search text» in English.
+// Again when the language changes and when the window, opened again, creates it again.
+const searchToolbar = useTemplateRef<{ $el: Element }>('searchToolbar');
+watch([searchToolbar, locale], ([toolbar]) => syncSearchbarInputName(toolbar?.$el, () => t('base.imageLibrary.search')), {
+  flush: 'post',
+});
 
 const text = ref('');
 const folder = ref<string>(ALL);
@@ -163,7 +170,7 @@ const tid = (part: string) => `${props.testid}-${part}`;
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
-      <ion-toolbar>
+      <ion-toolbar ref="searchToolbar">
         <ion-searchbar
           :data-testid="tid('search')"
           :value="text"
