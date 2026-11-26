@@ -475,7 +475,7 @@ or the customer themselves with the code of their ticket.
 Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
-<!-- from WORKBOOK.md sha256:6954ac8ae03c -->
+<!-- from WORKBOOK.md sha256:22172139dd57 -->
 Status: done
 Actor: system, employee, manager, administrator, assistant
 Screen: none
@@ -492,7 +492,11 @@ Steps:
    that sale: its document comes out and the sale is no longer pending. Through the API or the assistant
    it is asked the same way, by the sale's number, of Sales or of Invoicing: in both cases the sale carries
    its document as soon as it is issued.
-4. If it still cannot be done, "Issue now" says why and changes nothing.
+4. If that sale's notice to Invoicing was already in System › Failed events, it leaves it and the bell as
+   soon as its document comes out, without resending or discarding it by hand: the hub takes it as
+   delivered and issues no other document. The same with its void's or each refund's once its rectifying
+   invoice comes out.
+5. If it still cannot be done, "Issue now" says why and changes nothing.
 In: the sale waiting for its document.
 Out: that of INVOICE-F01 or INVOICE-F02, dated the day it is finally issued (the operation date is still
 that of the charge); the sale carries its number from that very moment (announces
@@ -502,7 +506,7 @@ operation; if it still cannot, the void or the refund goes ahead and both docume
 hub retries them and "Issue now" issues them in order (INVOICE-F07, INVOICE-F09). Asking Invoicing for
 the rectifying invoice of that void or that refund also leaves it in Sales at once. Asking again for a
 document that already came out issues no other and uses no number.
-Involved: SALE-F01, SALE-F29
+Involved: SALE-F01, SALE-F29, BASE-F43
 
 ### INVOICE-F07 Void a charged sale that already has its ticket
 <!-- from WORKBOOK.md sha256:f006da9259db -->
