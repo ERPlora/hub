@@ -9,7 +9,7 @@ from live.outbox import record_event
 
 from apps.customer.models import Customer
 from apps.service import events
-from apps.service.models import Grant, GrantAdjustment, Redemption
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
 from apps.service.queries.reads import SYSTEM
 from apps.service.schemas.customer_reactions import ForgetCustomerIn, ForgottenOut, ReassignedOut, ReassignIn
 

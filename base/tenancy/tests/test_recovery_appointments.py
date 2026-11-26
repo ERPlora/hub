@@ -39,7 +39,7 @@ class Salon:
     """A business with its cards (``Recoveries.business``), a professional who takes bookings and a cut."""
 
     def __init__(self, recoveries, every_app_on, *cards: dict):
-        from apps.service.models import Service
+        from apps.service.models.catalog import Service
         from apps.staff.models import Member
 
         self.recoveries = recoveries

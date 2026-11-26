@@ -3,7 +3,9 @@
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.service.models import Grant, PackageItem, Service
+from apps.service.models.catalog import Service
+from apps.service.models.grants import Grant
+from apps.service.models.packages import PackageItem
 from apps.service.queries.catalog import find_service
 from apps.service.queries.grants import Balance, balance, find_grant
 from apps.service.schemas.fields import ByIdIn
