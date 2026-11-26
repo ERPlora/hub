@@ -33,31 +33,32 @@ def _not_printed(ctx: OperationContext, message, code: str) -> Conflict:
 
 
 def _queue_paper(ctx: OperationContext, request: dict) -> dict:
-    job = _queued_job(ctx, request)
-    if job is None:
+    answer = _queued_job(ctx, request)
+    if answer is None:
         raise _not_printed(ctx, NO_PRINTER, "invoice.no_printer")
-    return {"job_id": job.id, "printer": job.printer_name}
+    job = answer.job
+    return {"job_id": job.id, "printer": job.printer_name, "waits_for_device": answer.waits_for_device}
 
 
 def _queued_job(ctx: OperationContext, request: dict):
     """Asks Printing for one page by its operation's name (no ``requires``: Printing may not be on), in a savepoint
-    of its own. A job no printer would take (it would wait in the queue for ever) is undone. ``None`` when no printer
-    takes the page: Printing off, absent, refusing, failing or without a printer for it."""
+    of its own, and gives its answer. A job no printer would take (it would wait in the queue for ever) is undone.
+    ``None`` when no printer takes the page: Printing off, absent, refusing, failing or without a printer for it."""
     try:
         op = get_operation(PRINT_JOB)
     except UnknownOperation:
         return None
     try:
         with atomic():
-            job = op(ctx, op.input.model_validate(request)).job
-            if job is None or job.printer_id is None:
+            answer = op(ctx, op.input.model_validate(request))
+            if answer.job is None or answer.job.printer_id is None:
                 raise _Unprintable
     except (_Unprintable, AppInactive):
         return None
     except (OperationError, DatabaseError) as failure:
         logger.warning("invoice: Printing did not queue %s (%s)", request["job_key"], failure)
         return None
-    return job
+    return answer
 
 
 @operation(
@@ -80,8 +81,9 @@ def _queued_job(ctx: OperationContext, request: dict):
         },
         "description": "Print an invoice's A4 page (by its id or number) on the system printer, in the reader's "
         "language and with its VeriFactu QR; duplicate marks it as a copy. Each call prints one. With no system "
-        "printer for it (or its VeriFactu record unreadable) it fails and says why: nothing was printed. It issues "
-        "nothing.",
+        "printer for it (or its VeriFactu record unreadable) it fails and says why: nothing was printed. Queued with "
+        "waits_for_device, nothing has come out yet: say it waits in that printer's queue and prints once a device set "
+        "up in Printing › Devices prints it, never that it was printed. It issues nothing.",
         "risk": "normal",
     },
 )

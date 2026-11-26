@@ -21,7 +21,7 @@ from apps.printing.queries.jobs import actor, job_row
 from apps.printing.queries.printers import find_printer
 from apps.printing.queries.settings import current_settings
 from apps.printing.queries.waiting import waits_for_device
-from apps.printing.schemas.jobs import JobCreateIn, JobCreateOut, JobOut
+from apps.printing.schemas.jobs import JobCreateIn, JobCreateOut, PrinterTestOut
 from apps.printing.schemas.printers import PrinterRefIn
 from base import operations as platform
 from base.business import business_zone
@@ -184,7 +184,7 @@ def _copies(data: JobCreateIn, settings) -> int:
     repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
     permission="printing.print",
     input=PrinterRefIn,
-    output=JobOut,
+    output=PrinterTestOut,
     expose_api=True,
     ai={
         "asks": {
@@ -200,7 +200,8 @@ def _copies(data: JobCreateIn, settings) -> int:
             ),
         },
         "description": "Print a test page on a printer, named by its name or id («test the kitchen printer»): the device "
-        "next to it prints the sheet with the printer's address and the time, or an A4 page on the system printer.",
+        "next to it prints the sheet with the printer's address and the time, or an A4 page on the system printer. With "
+        "waits_for_device, nothing has come out yet: say the page waits in that printer's queue, never that it printed.",
         "risk": "normal",
     },
 )
@@ -237,4 +238,4 @@ def test_printer(ctx: OperationContext, data: PrinterRefIn) -> dict:
         reference=printer.name[:64],
     )
     _queued(ctx, job)
-    return job_row(job)
+    return {**job_row(job), "waits_for_device": waits_for_device(job)}

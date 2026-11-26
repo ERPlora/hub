@@ -190,6 +190,13 @@ def test_a_job_a_device_has_or_printed_waits_for_nothing_and_neither_does_no_job
 # ── PRINTING-F05 Test page ──────────────────────────────────────────────────────────────────────
 
 
+def test_a_test_page_says_whether_it_waits_for_a_device_as_any_job():
+    till = printer("Till")
+    assert run("printing.printer.test", {"printer": "Till"}).waits_for_device is True
+    reaches(till)
+    assert run("printing.printer.test", {"printer": "Till"}).waits_for_device is False
+
+
 def test_a_test_page_is_a_job_of_its_printer():
     kitchen = printer("Kitchen", usage="kitchen")
     out = run("printing.printer.test", {"printer": "Kitchen"}, ctx_for(language="es"))
