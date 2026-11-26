@@ -57,6 +57,13 @@ def the_own(ctx) -> dict:
     return own
 
 
+def a_book_of_its_own(ctx) -> str:
+    """The file of a business whose atlas is of a tax category of its own, with Inventory and Taxes marked."""
+    own_taxes(ctx)
+    call(ctx, "inventory.product.create", name="Atlas", sku="ATL", price=2500, tax_category_key=BOOKS)
+    return exported(ctx, ["inventory", "tax"])
+
+
 def factory(ctx) -> int:
     return call(ctx, "tax.category.list", is_system=True, limit=1).total
 
@@ -118,9 +125,7 @@ def test_a_file_never_touches_a_factory_category_even_if_it_names_one(ctx):
 
 
 def test_a_product_of_an_own_category_loads_after_it_in_another_business(ctx, hub_b):
-    own_taxes(ctx)
-    call(ctx, "inventory.product.create", name="Atlas", sku="ATL", price=2500, tax_category_key=BOOKS)
-    file = exported(ctx, ["inventory", "tax"])
+    file = a_book_of_its_own(ctx)
 
     with use_hub(hub_b):
         theirs = owner_of(B, "bea")
@@ -131,9 +136,7 @@ def test_a_product_of_an_own_category_loads_after_it_in_another_business(ctx, hu
 
 
 def test_undoing_the_load_counts_and_removes_only_what_is_not_tax(ctx, hub_b):
-    own_taxes(ctx)
-    call(ctx, "inventory.product.create", name="Atlas", sku="ATL", price=2500, tax_category_key=BOOKS)
-    file = exported(ctx, ["inventory", "tax"])
+    file = a_book_of_its_own(ctx)
 
     with use_hub(hub_b):
         theirs = owner_of(B, "bea")
