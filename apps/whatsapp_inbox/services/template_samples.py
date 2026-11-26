@@ -14,7 +14,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.whatsapp_inbox import events, samples
-from apps.whatsapp_inbox.models import TemplateSample
+from apps.whatsapp_inbox.models.templates import TemplateSample
 from apps.whatsapp_inbox.queries.template_samples import sample_out
 from apps.whatsapp_inbox.schemas.template_samples import TemplateSampleOut, TemplateSampleUploadIn
 from base.files.store import STORE_ERRORS

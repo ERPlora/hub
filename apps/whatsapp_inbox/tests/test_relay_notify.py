@@ -28,7 +28,7 @@ from apps.appointment.tests.conftest import ctx_for as appointment_ctx
 from apps.customer.models import Customer
 from apps.flow.models import FlowRun
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, A, B, card, connect, ctx_for, receive, run, template
 from base.tenancy.context import use_hub
 
