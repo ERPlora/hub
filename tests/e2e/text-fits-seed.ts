@@ -3,6 +3,7 @@
 import { type BrowserContext, expect } from '@playwright/test';
 
 import { aMonday, salonCleanUpWhere } from './appointment-helpers';
+import { forgetSessions, freshSession } from './cash-session-helpers';
 import { cardDeletes } from './customer-helpers';
 import { A, api, psql } from './helpers';
 import { createProduct } from './inventory-helpers';
@@ -33,11 +34,16 @@ const CATEGORY = 'Entrantes y raciones para compartir';
 const PRODUCT = 'Croquetas caseras de jamón ibérico de bellota';
 const ZONE = 'Terraza cubierta del patio interior';
 
+/** The cash session the seed opens, so the till shows its tiles rather than the door to open one. */
+const opened = new Set<string>();
+
 const quoted = (names: string[]): string => names.map((name) => `'${name}'`).join(', ');
 const SALON_NAMES = `in (${quoted([...CUSTOMERS, ...SERVICES.map((s) => s.name), ...STAFF.map((s) => s.first_name), OPEN_DAY])})`;
 
 /** Takes away what `seedLongTexts` puts, also what a run that fell left behind. */
 export async function removeLongTexts(context: BrowserContext): Promise<void> {
+  forgetSessions(opened);
+  opened.clear();
   psql(
     [
       ...salonCleanUpWhere(SALON_NAMES),
@@ -85,10 +91,11 @@ async function seedSalon(context: BrowserContext): Promise<void> {
   }
 }
 
-/** The restaurant's long names: a category with its product, and a zone with a table. */
+/** The restaurant's long names: a category with its product, open at the till, and a zone with a table. */
 async function seedRestaurant(context: BrowserContext): Promise<void> {
   const category = await post<{ id: string }>(context, '/inventory/categories', { name: CATEGORY });
   await createProduct(context, { name: PRODUCT, sku: `TXT-${Date.now().toString(36)}`, category_ids: [category.id] });
+  await freshSession(context, opened);
   const zone = await post<{ id: string }>(context, '/table/zones', { name: ZONE });
   await post(context, '/table/tables', { zone_id: zone.id, number: '12', capacity: 6 });
 }
