@@ -20,7 +20,7 @@ from apps.reservation.schemas.reservations import (
     ReservationPage,
     ReservationRefIn,
 )
-from apps.schedule.queries import day_label
+from apps.schedule.queries.outputs import day_label
 from apps.table.queries import floor
 from base.ordering import list_order_for
 from base.text_search import contains_text
