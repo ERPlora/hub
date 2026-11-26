@@ -10,7 +10,9 @@ from django.utils.translation import gettext as gettext_
 from django.utils.translation import override
 
 from apps.whatsapp_inbox import queries, schemas, services
-from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.conversations import Conversation, Message, Note
+from apps.whatsapp_inbox.models.templates import Template
 from apps.whatsapp_inbox.tests.conftest import HOST, A, HUB_DB, receive
 from base.tests.po import (
     catalogue_key,
