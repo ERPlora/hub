@@ -9,7 +9,8 @@ from live.operations import get, operation
 from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, gateway
-from apps.whatsapp_inbox.models import Conversation, Message, Template, TemplateSample
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
+from apps.whatsapp_inbox.models.templates import Template, TemplateSample
 from apps.whatsapp_inbox.queries.reasons import (
     HEADER_SAMPLE_MISSING_CODE,
     SAAS_UNREACHABLE_CODE,
