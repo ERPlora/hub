@@ -2,10 +2,20 @@
 // The interface size of My profile (BASE-F64) is a `zoom` on <html>. At every size a small window opens right beside
 // what opens it, as at 100 %: the person's menu under its card (Ionic places it) and the list of a field under the
 // field (the shared Combo places it, here the country of a customer card). Its gap and its offset grow with the
-// interface, and nothing else moves it. Measured as boxes, at the three window sizes, in English and Spanish.
+// interface, and nothing else moves it. Measured as boxes, at four window sizes, in English and Spanish.
 import { type BrowserContext, type Page, expect, test } from '@playwright/test';
 
-import { A, api, capture, login, record, shown, turnOffTurnedOn, turnOnMissing } from './helpers';
+import {
+  A,
+  api,
+  capture,
+  login,
+  record,
+  saveSessionForTheSweep,
+  shown,
+  turnOffTurnedOn,
+  turnOnMissing,
+} from './helpers';
 
 interface Size {
   label: string;
@@ -17,6 +27,7 @@ const SIZES: Size[] = [
   { label: '375x667', width: 375, height: 667 },
   { label: '820x1180', width: 820, height: 1180 },
   { label: '1280x720', width: 1280, height: 720 },
+  { label: '1440x900', width: 1440, height: 900 },
 ];
 
 const SCALES = [80, 100, 110, 120] as const;
@@ -157,6 +168,7 @@ for (const size of SIZES) {
     const context = await browser.newContext({ baseURL: A, viewport: size, locale: 'en-US' });
     const page = await context.newPage();
     await login(page, A, '/');
+    await saveSessionForTheSweep(context);
     const before = await appearance(context);
     try {
       const measured: Record<number, { gap: number; offset: number }> = {};
