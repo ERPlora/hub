@@ -11,7 +11,7 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, samples
-from apps.whatsapp_inbox.models import Template, TemplateSample, hub_writes
+from apps.whatsapp_inbox.models.templates import Template, TemplateSample, hub_writes
 from apps.whatsapp_inbox.queries.channel import channel, send_blocked
 from apps.whatsapp_inbox.queries.templates import TEMPLATE_GONE, live_templates, template_out, templates_of
 from apps.whatsapp_inbox.schemas.templates import (
