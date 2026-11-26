@@ -7,7 +7,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events
-from apps.whatsapp_inbox.models import Note
+from apps.whatsapp_inbox.models.conversations import Note
 from apps.whatsapp_inbox.queries.conversations import find_conversation
 from apps.whatsapp_inbox.queries.notes import NOTE_NOT_FOUND, may_delete_note, note_out
 from apps.whatsapp_inbox.queries.reads import actor_id, person_name

@@ -962,7 +962,9 @@ Pasos:
    dice: «La etiqueta espera en la cola de impresión: ninguna impresora tiene la función «Etiqueta».
    Asígnasela a una en Impresión.».
 Entra: el SKU, el nombre y el precio del producto; la impresora con la función «Etiqueta», de
-Impresión. También se pide por el asistente («imprime la etiqueta del champú») o por la API.
+Impresión. También se pide por el asistente («imprime la etiqueta del champú») o por la API. Si ningún dispositivo
+encendido imprime esa cola, el asistente dice que la etiqueta queda en la cola y que saldrá cuando un dispositivo dado
+de alta la imprima, nunca que la ha impreso.
 Sale: un trabajo de etiqueta en la cola de Impresión, con el precio en la moneda del negocio.
 Si falla: quien no llega a la cola de impresión (Impresión no está activa, o no puede imprimir) ve el
 diálogo de imprimir del dispositivo con el código, el SKU y el nombre, sin precio: el del navegador o, en

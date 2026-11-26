@@ -1,11 +1,13 @@
 """Asking for a print (PRINTING-F05, F07–F13, F16): the job, its key, its printer, its paper's envelope and the test
 page."""
 
+import datetime as dt
+
 import pytest
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 
 from apps.printing.models import PrintJob
-from apps.printing.tests.conftest import HUB_DB, RECEIPT, ctx_for, enqueue, printer, run
+from apps.printing.tests.conftest import HUB_DB, RECEIPT, ctx_for, enqueue, printer, reaches, run
 from apps.printing.tests.test_services import ITEM, STAMPED, events, job
 
 pytestmark = HUB_DB
@@ -149,7 +151,50 @@ def test_whoever_prints_asks_for_a_print_and_nobody_else():
         run("printing.job.create", {"document_type": "receipt", "document": RECEIPT}, ctx_for("nobody"))
 
 
+# ── Whether a device is there to print it (PRINTING-F16) ────────────────────────────────────────
+# hub#2563: with a receipt printer and no device to print its queue, the assistant said «I reprinted the ticket» of a
+# job that only waited. The answer says whether a device that is on prints it now, as the bell counts it.
+
+
+def test_a_job_no_device_prints_waits_for_one():
+    assert enqueue().waits_for_device is True
+    printer("Till")
+    assert enqueue().waits_for_device is True
+
+
+def test_a_job_a_device_on_prints_does_not_wait():
+    reaches(printer("Till"))
+    assert enqueue().waits_for_device is False
+
+
+def test_a_job_waits_when_its_device_is_off_retired_or_reaches_another_printer():
+    till = printer("Till")
+    reaches(printer("Spare", address="10.0.0.9"), name="Spare tablet")
+    run("printing.settings.update", {"receipt_printer": "Till"})
+    reaches(till, name="Night till", seen=dt.timedelta(minutes=5))
+    reaches(till, name="Old till", retired=True)
+    out = enqueue()
+    assert (out.job.printer_name, out.waits_for_device) == ("Till", True)
+
+
+def test_a_job_a_device_has_or_printed_waits_for_nothing_and_neither_does_no_job():
+    printer("Till")
+    queued = enqueue(job_key="sale-1-receipt").job
+    assert enqueue(job_key="sale-1-receipt").waits_for_device is True
+    PrintJob.objects.filter(pk=queued.id).update(status=PrintJob.Status.DONE)
+    assert enqueue(job_key="sale-1-receipt").waits_for_device is False
+    run("printing.settings.update", {"print_receipt_on_sale": False})
+    assert enqueue(automatic=True).waits_for_device is False
+
+
 # ── PRINTING-F05 Test page ──────────────────────────────────────────────────────────────────────
+
+
+def test_a_test_page_says_whether_it_waits_for_a_device_as_any_job():
+    till = printer("Till")
+    assert run("printing.printer.test", {"printer": "Till"}).waits_for_device is True
+    reaches(till)
+    assert run("printing.printer.test", {"printer": "Till"}).waits_for_device is False
 
 
 def test_a_test_page_is_a_job_of_its_printer():

@@ -236,6 +236,13 @@ describe('RecordDetailPage', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Sent: 1 accepted, 0 rejected, 0 waiting.');
   });
 
+  it('in Spanish, «Send now» says each answer in the singular or the plural', async () => {
+    const s = await setup({}, { locale: 'es' });
+    s.answer(200, { chains: 1, sent: 3, accepted: 1, accepted_with_errors: 0, rejected: 2, waiting: 0, reason: '', message: '' });
+    await click(s.find('verifactu-record-transmit').element);
+    expect(toastSuccess).toHaveBeenCalledWith('Enviado: 1 aceptado, 2 rechazados, 0 en espera.');
+  });
+
   it('a «Send now» that did not reach the AEAT is a warning in the server’s words, never a success', async () => {
     const s = await setup();
     s.answer(200, { chains: 0, sent: 0, accepted: 0, accepted_with_errors: 0, rejected: 0, waiting: 1, reason: 'unreachable', message: 'the gateway or the AEAT could not be reached (timeout)' });

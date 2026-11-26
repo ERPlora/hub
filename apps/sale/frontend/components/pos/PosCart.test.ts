@@ -231,6 +231,8 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
     expect(m.find('pos-cart-tab-round-badge').text()).toBe('2');
     expect(m.find('pos-cart-tab-check').attributes('aria-selected')).toBe('true');
     expect(m.wrapper.findComponent(CartLines).props('lines')).toHaveLength(3);
+    const one = await setup({ kitchen: true, order: order({ lines: [line({ id: 'l1' }), SENT] }) }, 'es');
+    expect(one.find('pos-cart-tab-round').attributes('aria-label')).toBe('Comanda actual, 1 artículo por enviar');
   });
 
   it('«Current order» shows only what is pending, with the send bar; a send goes up with its rush', async () => {
