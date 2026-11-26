@@ -28,9 +28,80 @@ export interface TableCodePage {
   offset: number;
 }
 
+/** The table's page names its table by the code its QR carries. */
+export interface PublicCodeIn {
+  code: string;
+}
+
+export interface PublicOptionsIn extends PublicCodeIn {
+  product_id: string;
+}
+
+/** A dish of the menu, a product of Inventory; prices in the currency's minor unit. */
+export interface MenuItemOut {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  /** Where its photo is served; empty: it has none. */
+  image_url: string;
+  allergens: string[];
+}
+
+export interface MenuGroupOut {
+  /** The category's name; empty for the dishes in none. */
+  name: string;
+  items: MenuItemOut[];
+}
+
+/** One of the things a customer picks: an option of a dish or a dish of a set menu's course. */
+export interface ChoiceOut {
+  name: string;
+  price_delta: number;
+  allergens: string[];
+}
+
+export interface MenuCourseOut {
+  name: string;
+  min_choices: number;
+  max_choices: number;
+  choices: ChoiceOut[];
+}
+
+export interface MenuComboOut {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string;
+  courses: MenuCourseOut[];
+}
+
+export interface PublicMenuOut {
+  business_name: string;
+  table_number: string;
+  zone_name: string | null;
+  groups: MenuGroupOut[];
+  combos: MenuComboOut[];
+}
+
+export interface OptionGroupOut {
+  name: string;
+  min_choices: number;
+  /** 0 = no ceiling. */
+  max_choices: number;
+  options: ChoiceOut[];
+}
+
+export interface PublicOptionsOut {
+  product_id: string;
+  groups: OptionGroupOut[];
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'online_order.qr_code.list': { input: TableCodeListIn; output: TableCodePage };
     'online_order.qr_code.regenerate': { input: TableRefIn; output: TableCodeOut };
+    'online_order.public.menu': { input: PublicCodeIn; output: PublicMenuOut };
+    'online_order.public.options': { input: PublicOptionsIn; output: PublicOptionsOut };
   }
 }
