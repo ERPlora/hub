@@ -32,7 +32,7 @@ from apps.appointment.schemas.booking import AppointmentCreateIn
 from apps.appointment.schemas.series import RecurringCreateIn
 from apps.appointment.tests.conftest import MONDAY, at, make_appointment, make_customer, make_series, make_service
 from apps.service import queries as service_queries
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import ANA, Recoveries, fresh, run, run_in
