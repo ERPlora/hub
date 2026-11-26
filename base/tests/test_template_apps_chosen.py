@@ -5,7 +5,7 @@ it turns on needs it still goes off with that app, and what was on before the lo
 import pytest
 from live.operations import get
 
-from base import activation
+from base import activation, services
 from base.catalog.verticals import template_apps
 from base.models.activation import AppActivation
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
@@ -76,3 +76,15 @@ def test_a_spanish_restaurant_on_the_free_plan_loads_its_template_and_still_turn
     assert loaded.status == "complete"
     assert "verifactu" in modules_on()
     assert AppActivation.objects.get(host=A.key, app="tax").chosen is False
+
+
+def test_the_plans_limit_never_keeps_a_business_of_spain_from_verifactu(born):
+    with_max_apps(A.key, 1)
+    call(born, "base.app.enable", app="website")
+
+    with pytest.raises(services.apps.AppLimitReached):
+        call(born, "base.app.enable", app="task")
+    call(born, "base.app.enable", app="verifactu")
+
+    assert {"website", "verifactu"} <= modules_on()
+    assert "task" not in modules_on()
