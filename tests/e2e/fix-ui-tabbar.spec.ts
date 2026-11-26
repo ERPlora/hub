@@ -2,10 +2,11 @@
 // app with four or five tabs shows EVERY tab whole, as a bottom navigation bar does (iOS tab bar,
 // Material's navigation bar: three to five destinations, all on screen, labels never cut): no tab past
 // the edge of the screen, no strip hiding tabs behind a sideways scroll, no tab spilling into the next,
-// and no label cut, neither by its own box nor by its tab. Customers has four tabs, Sales five; both in
-// Spanish and in English, the source, with screenshots of Customers at 375, 390, 834 and 1440. More tabs
-// than fit (six, or a word wider than a fifth of the strip) keep scrolling with the next tab peeking
-// (`tabbar-peek.ts`), as the owner's six tabs of Staff do (STAFF-F21's «Commissions»).
+// and no label cut, neither by its own box nor by its tab. Customers has four tabs, Sales and Inventory
+// five; all in Spanish and in English, the source, with screenshots of Customers at 375, 390, 834 and 1440.
+// Inventory's «Movimientos» / «Movements» is a word wider than a fifth of the strip: its tab takes the
+// room it needs and the others share the rest. Only more tabs than fit (the owner's six tabs of Staff,
+// STAFF-F21's «Commissions») keep scrolling with the next tab peeking (`tabbar-peek.ts`).
 // flow: none — Sales' tabbar at 375 px: Sales & POS has five tabs whose fourth label is one word wider
 // than a fifth of a phone's strip, with its screenshots at 375, 390, 834 and 1440.
 import { type Browser, type BrowserContext, type Page, expect, test } from '@playwright/test';
@@ -22,6 +23,7 @@ const PHONES = [
 const PAGES = [
   { app: 'customer', path: '/customer/customers', tabs: 4 },
   { app: 'sale', path: '/sale/sales', tabs: 5 },
+  { app: 'inventory', path: '/inventory/dashboard', tabs: 5 },
 ];
 
 const LOCALES = ['es', 'en'] as const;
