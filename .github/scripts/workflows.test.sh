@@ -126,7 +126,7 @@ check("test.yml has the jobs python, frontend, scripts, smoke and test", {*TEST_
 check("python, frontend, scripts and smoke wait for nothing", all(not needs(tjobs.get(name, {})) for name in TEST_JOBS))
 check("test (the required check) needs python, frontend, scripts and smoke",
       set(needs(tjobs.get("test", {}))) == set(TEST_JOBS))
-check("test reports even when a job fails or is cancelled", str(tjobs.get("test", {}).get("if", "")) == "always()")
+check("test reports a red or skipped job, not a cancelled run", str(tjobs.get("test", {}).get("if", "")) == "${{ !cancelled() }}")
 # A red shard of python's matrix (or a red job) only turns "test / test" red if test reads every job's result and
 # nothing turns a failure into a pass on the way: no continue-on-error, on a job or on a step (hub#1185).
 test_results = "\n".join(str((step.get("env") or {}).get("RESULTS", "")) for step in steps(tjobs.get("test", {})))
