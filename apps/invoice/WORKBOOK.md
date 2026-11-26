@@ -847,9 +847,10 @@ avisa `invoice.issuer.updated`. Con «Inscrito en el ROI» encendido, la factura
 y la cuenta imprimen el NIF con el prefijo del país del emisor («NIF: ESB12345674»), también en las ventas
 nacionales; apagado, el NIF tal cual. Un documento ya emitido se reimprime como salió. El registro de VeriFactu y
 el QR siguen siempre con el NIF sin prefijo.
-Si falla: sin razón social, NIF o domicilio, bajo su campo; un NIF español que no es válido, «Ese NIF no
-es válido.». El motivo de un campo se quita en cuanto se corrige ese campo y vuelve si el siguiente intento
-también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente intento.
+Si falla: sin razón social, NIF o domicilio, «Este campo es obligatorio.» bajo su campo; un NIF español que no
+es válido, «Ese NIF no es válido.». El motivo de un campo se quita en cuanto se corrige ese campo y vuelve si el
+siguiente intento también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente
+intento.
 Implicados: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
