@@ -95,8 +95,8 @@ verla: en **Lista**, **Por profesional** (una fila por profesional, por día o p
 **Periódicas**. Con **Añadir cita** eliges la clienta, los servicios, el profesional y una de las horas libres; en
 la rejilla, tocar un hueco reserva a esa hora con ese profesional. Toca una cita para ver su ficha y, desde su
 fila, confírmala, empiézala, complétala, cóbrala en el TPV, muévela o cancélala; también puedes arrastrarla a otra
-hora o a otro profesional. El aviso **N por confirmar** te lleva a las citas que han reservado las clientas y
-esperan tu confirmación.
+hora o a otro profesional. El aviso **N por confirmar** te enseña todas las citas que han reservado las clientas y
+esperan tu confirmación, sean del día que sean.
 
 #### Detalle
 Una barra con el día (‹ fecha › y **Hoy**, y el botón del calendario para saltar a una fecha),
@@ -122,6 +122,12 @@ profesional**, además, **Día · Semana**.
   citas de cada día en orden. Tocar una cita abre su ficha; arrastrarla a otro día u otra fila la
   mueve conservando la hora.
 - **Periódicas**: ver la pantalla [Periódicas](#periódicas).
+- **Por confirmar**: al pulsar **N por confirmar** (o «Confirmar las citas» en la campana), la lista enseña, en vez
+  del día, todas las citas pendientes que aún no han empezado, sean del día que sean, la más próxima primero y cada
+  una con su día y su hora, bajo el aviso «Estas son las citas que esperan tu confirmación, sean del día que sean.»
+  con **Volver a la agenda**. Son las mismas que cuenta el aviso. El día, el filtro de estado y las vistas no
+  aplican y se ocultan; volver a pulsar **N por confirmar** o **Volver a la agenda** devuelve el día. Sin ninguna:
+  «No quedan citas por confirmar.».
 - Botón **Añadir cita** → **Nueva cita**: Cliente (buscador «Buscar por nombre, teléfono, email…»; si no está,
   **+ Nuevo cliente** la crea con nombre y teléfono sin salir), Servicios (uno o varios, en orden),
   Profesional (solo los que hacen todos esos servicios), Día, Hora (con las **Horas libres** como
@@ -294,13 +300,13 @@ Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
-1. Entra desde el aviso **N por confirmar** (lo pulsas y la lista filtra las pendientes), desde la campana
-   de la barra de arriba (su aviso «N citas por confirmar», «Tus clientes esperan a que les confirmes las citas antes
-   de que empiecen.», abre la Agenda con «Confirmar las citas», y su plazo es el comienzo de la más próxima) o busca
-   la cita **Pendiente**.
+1. Entra desde el aviso **N por confirmar** (lo pulsas y ves todas las citas por confirmar, sean del día que sean,
+   cada una con su día: las mismas que cuenta el aviso), desde la campana de la barra de arriba (su aviso «N citas por
+   confirmar», «Tus clientes esperan a que les confirmes las citas antes de que empiecen.», abre esa misma lista con
+   «Confirmar las citas», y su plazo es el comienzo de la más próxima) o busca la cita **Pendiente**.
 2. Pulsa **Confirmar** en su fila.
-3. La cita pasa a **Confirmada**, el historial dice «Confirmada» y el aviso **N por confirmar** baja; la
-   campana también, al momento, y deja de contarla.
+3. La cita pasa a **Confirmada**, sale de la lista de las por confirmar, el historial dice «Confirmada» y el aviso
+   **N por confirmar** baja; la campana también, al momento, y deja de contarla.
 Entra: una cita pendiente (la que reservó la clienta con la confirmación automática apagada).
 Sale: la cita confirmada, su línea de historial y el aviso `appointment.appointment.confirmed`.
 Si falla: «Esta cita ya no se puede confirmar: ya no está pendiente.»; no se escribe nada.

@@ -88,17 +88,17 @@ Besides, Appointments puts the **Visit history** block at the end of a customer'
 10 appointments, the most recent first, with services, professional, state and notes (the internal one first).
 
 ### Agenda
-<!-- from WORKBOOK.md sha256:9436bad1c4b3 -->
+<!-- from WORKBOOK.md sha256:0e6b68ff1df2 -->
 Here is the business's agenda, always on its clock. Change the day with the arrows or with **Today** and choose how
 to see it: as a **List**, **By professional** (one row per professional, by day or by week) or the **Repeating**
 appointments. With **Add appointment** you pick the customer, the services, the professional and one of the free
 times; on the grid, tapping a slot books at that time with that professional. Tap an appointment to see its card
 and, from its row, confirm it, start it, complete it, charge it at the till, move it or cancel it; you can also drag
-it to another time or another professional. The **N to confirm** notice takes you to the appointments customers have
-booked that are waiting for your confirmation.
+it to another time or another professional. The **N to confirm** notice shows you every appointment customers have
+booked that is waiting for your confirmation, whatever its day.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:e9ea0160aecc -->
+<!-- from WORKBOOK.md sha256:26078a961e03 -->
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -122,6 +122,12 @@ professional**, also **Day · Week**.
   appointments in order. Tapping an appointment opens its card; dragging it to another day or another row
   moves it keeping the time.
 - **Repeating**: see the [Repeating](#repeating) screen.
+- **To confirm**: when you tap **N to confirm** (or "Confirm the appointments" in the bell), the list shows, instead
+  of the day, every pending appointment that has not started yet, whatever its day, the soonest first and each with
+  its day and time, under the notice "These are the appointments waiting for your confirmation, whatever their day."
+  with **Back to the agenda**. They are the same ones the notice counts. The day, the status filter and the views do
+  not apply and are hidden; tapping **N to confirm** again or **Back to the agenda** brings the day back. With none:
+  "No appointments left to confirm.".
 - **Add appointment** button → **New appointment**: Customer (search "Search by name, phone, email…"; if they
   are not there, **+ New customer** creates them with name and phone without leaving), Services (one or
   more, in order), Professional (only those who perform all those services), Day, Time (with the **Free
@@ -307,18 +313,19 @@ professional. You can still pick a time.".
 Involved: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirm a pending appointment
-<!-- from WORKBOOK.md sha256:25b3b1b7df07 -->
+<!-- from WORKBOOK.md sha256:1c01788bfc89 -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda
 Steps:
-1. Come in from the **N to confirm** notice (you tap it and the list filters the pending ones), from the
-   bell in the top bar (its notice "N appointments to confirm", "Customers are waiting for you to confirm their
-   bookings before they start.", opens the Agenda with "Confirm the appointments", and its deadline is the start of
-   the soonest one) or search for the **Pending** appointment.
+1. Come in from the **N to confirm** notice (you tap it and see every appointment to confirm, whatever its day,
+   each with its day: the same ones the notice counts), from the bell in the top bar (its notice "N appointments to
+   confirm", "Customers are waiting for you to confirm their bookings before they start.", opens that same list with
+   "Confirm the appointments", and its deadline is the start of the soonest one) or search for the **Pending**
+   appointment.
 2. Tap **Confirm** on its row.
-3. The appointment becomes **Confirmed**, the history says "Confirmed" and the **N to confirm** notice
-   goes down; the bell too, at once, and it stops counting it.
+3. The appointment becomes **Confirmed**, leaves the list of those to confirm, the history says "Confirmed" and the
+   **N to confirm** notice goes down; the bell too, at once, and it stops counting it.
 In: a pending appointment (the one the customer booked with automatic confirmation turned off).
 Out: the confirmed appointment, its history line and the `appointment.appointment.confirmed` event.
 If it fails: "This appointment can no longer be confirmed: it is not pending any more."; nothing is
