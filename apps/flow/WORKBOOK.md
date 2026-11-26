@@ -233,9 +233,11 @@ Actor: propietario, administrador, asistente
 Pantalla: Automatizaciones
 Pasos:
 1. En **Tus automatizaciones** cada fila dice el nombre, cuándo arranca en palabras, cuándo se ejecutó
-   por última vez y cómo acabó, y si está «Activa» o «En pausa». Un nombre que no cabe en su fila acaba
-   en puntos suspensivos, nunca partido a media palabra: se lee entero al dejar el puntero encima, en la
-   tarjeta del teléfono y al abrirla.
+   por última vez y cómo acabó, y si está «Activa» o «En pausa». Un nombre largo se lee entero, nunca
+   partido a media palabra: en la tableta y en el escritorio ocupa en su fila las líneas que necesita,
+   cortadas entre palabras, y sale también al dejar el puntero encima; en la tarjeta del teléfono, el
+   título acaba en puntos suspensivos pasadas dos líneas y el nombre se lee entero debajo, en «Nombre», y
+   al abrirla.
 2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o filtra por
    **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**.
 3. Sin resultados: «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas**.
