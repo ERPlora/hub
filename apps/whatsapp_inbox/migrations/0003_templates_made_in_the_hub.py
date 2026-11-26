@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 
 def hub_handles(category, header_format, header, body, buttons):
-    """Frozen copy of ``models.hub_handles`` as of this migration."""
+    """Frozen copy of ``models.templates.hub_handles`` as of this migration."""
     if category == "AUTHENTICATION" or header_format not in ("", "TEXT") or "{{" in (header or ""):
         return False
     if re.search(r"\{\{(?!\s*\d+\s*\}\})", body or ""):
