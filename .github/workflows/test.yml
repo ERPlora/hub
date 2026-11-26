@@ -253,10 +253,11 @@ jobs:
           retention-days: 14
 
   # The check main and pre require ("test / test"): green only when the four jobs are. It runs even
-  # when one fails or the run is cancelled, so the check never ends up skipped (which counts as passed).
+  # when one fails or is skipped, so the check never ends up skipped (which counts as passed). Not in a
+  # cancelled run (a newer push to the branch replaces it): it would wait for a runner and hold the new run.
   test:
     needs: [python, frontend, scripts, smoke]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
