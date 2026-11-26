@@ -312,6 +312,16 @@ describe('startWayIn — what the shell does with the session’s way in, once m
     stop();
   });
 
+  it('back to the minutes it had before «Until sign out», the open till locks again', () => {
+    const d = deps();
+    const stop = startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    d.stream.answer(null);
+    d.stream.answer(5);
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
   it('the same minutes answered again (the stream reconnecting) keep counting from the last touch', () => {
     const d = deps();
     const stop = startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
