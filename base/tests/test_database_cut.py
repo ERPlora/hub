@@ -616,7 +616,7 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
 NOT_UNDONE_BY_A_ROLLBACK = {
     "apps.appointment.services.writes._next_number": "numbers an appointment",
     "apps.cart_checkout.services._number": "numbers an order",
-    "apps.cash_register.services._number": "numbers a till session",
+    "apps.cash_register.services.sessions._number": "numbers a till session",
     "apps.invoice.services.numbering._take_number": "numbers an invoice",
     "apps.kitchen.services.writes.take_number": "numbers a kitchen ticket",
     "apps.payment.services.payments._number": "numbers a payment",
