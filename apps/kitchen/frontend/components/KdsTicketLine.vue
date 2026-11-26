@@ -7,7 +7,7 @@ import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { ITEM_STATUS_ICONS } from '../lib/card';
-import { formatQuantity } from '../lib/format';
+import { orderTicketQuantity } from '../lib/format';
 import type { ItemOut } from '../operations';
 import KitchenAllergyNotice from './KitchenAllergyNotice.vue';
 
@@ -50,7 +50,7 @@ function tap(): void {
       slot="start"
       class="ep-order-ticket__qty"
     >
-      {{ formatQuantity(line.quantity, locale) }}×
+      {{ orderTicketQuantity(line.quantity, line.unit, locale) }}
     </ion-text>
     <ion-label class="ep-order-ticket__dish-body">
       <span class="ep-order-ticket__name">{{ line.name }}</span>
