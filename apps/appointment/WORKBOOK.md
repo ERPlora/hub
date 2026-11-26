@@ -276,14 +276,18 @@ Pasos:
    (Horarios: el tramo de ese día o la madrugada del anterior), dentro del turno del profesional y fuera
    de sus ausencias (Personal), sin bloqueo y sin otra cita suya; con los solapes permitidos, una hora
    ocupada también sale. La cita puede terminar justo a la hora de cierre.
-3. Desde el mostrador salen también las horas dentro de la antelación mínima (marcadas), nunca las ya
+3. Con las horas llegan los **tramos del día** en que trabaja el profesional, en orden: el horario del negocio
+   cruzado con su turno y sin sus ausencias, dentro de la ventana del calendario (sin turno, el día menos sus
+   ausencias). Los bloqueos y las citas no los parten (eso ya lo dicen las horas libres) y dos tramos seguidos
+   son uno. Sin tramos, ese día no trabaja.
+4. Desde el mostrador salen también las horas dentro de la antelación mínima (marcadas), nunca las ya
    pasadas; a la clienta, solo las que respetan la antelación mínima.
-4. Sin profesional (el asistente: «¿qué horas hay mañana para corte?»), cada hora dice qué
-   profesionales la tienen libre.
-5. Al preguntar si una hora concreta se puede reservar, se contesta por qué no; con qué citas choca se
+5. Sin profesional (el asistente: «¿qué horas hay mañana para corte?»), cada hora dice qué
+   profesionales la tienen libre, y los tramos son los del horario del negocio: no hay un turno que enseñar.
+6. Al preguntar si una hora concreta se puede reservar, se contesta por qué no; con qué citas choca se
    dice solo a quien puede ver esa agenda (a un empleado, de un compañero, solo «ya tiene una cita»).
 Entra: el horario del negocio, el turno y las ausencias, los bloqueos, las citas y los ajustes.
-Sale: la lista de horas; no guarda nada.
+Sale: la lista de horas y los tramos del día en que trabaja el profesional; no guarda nada.
 Si falla: «No se han podido cargar las horas libres. Puedes elegir una hora igualmente.» con
 **Reintentar**; la hora elegida se juzga al guardar. Sin horas: «No quedan horas libres ese día para este
 profesional. Puedes elegir una hora igualmente.».
@@ -803,7 +807,7 @@ elija.
 | Cuántas reservas de clientas esperan confirmación | ver citas | F03, F18 | `appointment.appointment.count_to_confirm` |
 | Lo que la clienta reservó o canceló ella misma en las últimas 24 horas, lo más nuevo primero | ver citas (todas o las suyas) | F28 | `appointment.appointment.notices` |
 | Las filas de la agenda (profesionales reservables y los que conservan citas) | ver citas | F01, F04, F25, F27 | `appointment.agenda.lanes` |
-| Las horas libres de un día | ver disponibilidad | F02, F18 | `appointment.availability.slots` |
+| Las horas libres de un día y los tramos en que trabaja el profesional | ver disponibilidad | F02, F18 | `appointment.availability.slots` |
 | Si una hora concreta se puede reservar y por qué no | ver disponibilidad | F02 | `appointment.availability.check` |
 | Los bloqueos de un rango | ver disponibilidad | F16 | `appointment.blocked_time.list` |
 | Las series, con búsqueda y filtros | ver citas | F12–F15 | `appointment.recurring.list` |

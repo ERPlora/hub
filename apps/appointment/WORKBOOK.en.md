@@ -280,7 +280,7 @@ BASE-F114 (ERPlora's staff recovers from a separate copy the appointments the bu
 booking; a deleted one comes back the same, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 See which times are still free
-<!-- from WORKBOOK.md sha256:feb760542985 -->
+<!-- from WORKBOOK.md sha256:e24f7d2baae3 -->
 Status: done
 Actor: employee, assistant, customer
 Screen: Agenda (new appointment and editing)
@@ -291,16 +291,21 @@ Steps:
    opening hours (Schedules: that day's stretch or the small hours of the day before), inside the
    professional's shift and outside their time off (Staff), with no block and no other appointment of
    theirs; with overlaps allowed, a taken time also shows. The appointment can end exactly at closing time.
-3. From the front desk the times inside the minimum notice show too (marked), never those already past; to
+3. With the times come the **spans of the day** the professional works, in order: the business's opening
+   hours crossed with their shift and without their time off, inside the calendar window (without a shift,
+   the day minus their time off). Blocks and appointments do not split them (the free times already say
+   that) and two spans back to back are one. With no spans, they do not work that day.
+4. From the front desk the times inside the minimum notice show too (marked), never those already past; to
    the customer, only those that respect the minimum notice.
-4. Without a professional (the assistant: "what times are free tomorrow for a haircut?"), each time says
-   which professionals have it free.
-5. When asking whether a specific time can be booked, the answer says why not; which appointments it
+5. Without a professional (the assistant: "what times are free tomorrow for a haircut?"), each time says
+   which professionals have it free, and the spans are the business's opening hours: there is no shift to
+   show.
+6. When asking whether a specific time can be booked, the answer says why not; which appointments it
    clashes with is told only to whoever can see that agenda (to an employee, about a colleague, only
    "already has an appointment").
 In: the business's opening hours, the shift and the time off, the blocks, the appointments and the
 settings.
-Out: the list of times; it saves nothing.
+Out: the list of times and the spans of the day the professional works; it saves nothing.
 If it fails: "The free times could not be loaded. You can still pick a time." with
 **Retry**; the picked time is judged when saving. With no times: "No free times that day for this
 professional. You can still pick a time.".
@@ -846,7 +851,7 @@ name; a time, as the business's wall-clock date and time ("2026-10-15 10:00"). I
 which ones and asks to choose.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:856d9410d08b -->
+<!-- from WORKBOOK.md sha256:cba85d5c7532 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -858,7 +863,7 @@ which ones and asks to choose.
 | How many customers' bookings are waiting for confirmation | see appointments | F03, F18 | `appointment.appointment.count_to_confirm` |
 | What the customer booked or cancelled by themselves in the last 24 hours, the newest first | see appointments (all or their own) | F28 | `appointment.appointment.notices` |
 | The rows of the agenda (bookable professionals and those who keep appointments) | see appointments | F01, F04, F25, F27 | `appointment.agenda.lanes` |
-| The free times of a day | see availability | F02, F18 | `appointment.availability.slots` |
+| The free times of a day and the spans the professional works | see availability | F02, F18 | `appointment.availability.slots` |
 | Whether a specific time can be booked and why not | see availability | F02 | `appointment.availability.check` |
 | The blocks of a range | see availability | F16 | `appointment.blocked_time.list` |
 | The series, with search and filters | see appointments | F12–F15 | `appointment.recurring.list` |

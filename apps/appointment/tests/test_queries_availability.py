@@ -98,6 +98,35 @@ def test_free_times_without_a_professional_say_who_is_free_among_those_who_do_th
     ]
 
 
+def spans(out) -> list[tuple[str, str]]:
+    return [(f"{span.start:%H:%M}", f"{span.end:%H:%M}") for span in out.windows]
+
+
+def test_the_free_times_say_the_spans_the_professional_works_that_day(salon):
+    make_settings(slot_interval=60)
+    make_day(0, ("09:00", "21:00"))
+    make_shift(salon.ana, (0, "10:00", "20:00"), break_at=("14:00", "16:00"))
+    make_time_off(salon.ana, MONDAY, hours=("17:00", "18:00"))
+    make_block(at(MONDAY, "11:00"), at(MONDAY, "12:00"), member=salon.ana)
+    make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "12:00"))
+    out = run(
+        "appointment.availability.slots",
+        {"date": MONDAY, "services": ["Haircut"], "staff": "Ana"},
+    )
+    assert spans(out) == [("10:00", "14:00"), ("16:00", "17:00"), ("18:00", "20:00")]
+    assert {span.start.utcoffset() for span in out.windows} == {out.slots[0].start.utcoffset()}
+
+
+def test_a_day_the_professional_does_not_work_has_no_spans_and_without_one_they_are_the_opening_hours(salon):
+    make_day(0, ("09:00", "13:00"), ("16:00", "20:00"))
+    make_shift(salon.ana, (1, "10:00", "18:00"))
+    asked = {"date": MONDAY, "services": ["Haircut"]}
+    assert spans(run("appointment.availability.slots", {**asked, "staff": "Ana"})) == []
+    assert spans(run("appointment.availability.slots", asked)) == [("09:00", "13:00"), ("16:00", "20:00")]
+    make_time_off(salon.bea, MONDAY)
+    assert spans(run("appointment.availability.slots", {**asked, "staff_id": str(salon.bea.id)})) == []
+
+
 def test_a_service_nobody_is_assigned_to_is_offered_with_the_whole_bookable_team(salon):
     make_settings(slot_interval=60)
     make_day(0, ("09:00", "10:00"))
