@@ -115,6 +115,7 @@
       "thisPrints": "Este dispositivo imprime para: {printers}.",
       "thisNotSetUp": "Este dispositivo todavía no imprime: «Imprimir desde este dispositivo» lo da de alta con las impresoras a las que llega.",
       "thisAskSomeone": "Este dispositivo no imprime aquí: quien gestiona las impresoras lo da de alta desde él.",
+      "browser": "Un navegador no imprime: el papel lo saca la app de ERPlora. Instálala en el dispositivo que está junto a las impresoras y dalo de alta desde la app, en Impresión → Dispositivos.",
       "actions": {
         "edit": "Editar",
         "retire": "Retirar"
