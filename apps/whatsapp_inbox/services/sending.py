@@ -15,7 +15,9 @@ from live.outbox import record_event
 from apps.customer.models import Consent
 from apps.customer.phones import InvalidPhone
 from apps.whatsapp_inbox import clock, events, samples
-from apps.whatsapp_inbox.models import Channel, Conversation, Message, Template, TemplateSample
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
+from apps.whatsapp_inbox.models.templates import Template, TemplateSample
 from apps.whatsapp_inbox.notify_schemas import NotifyIn
 from apps.whatsapp_inbox.queries.channel import channel, send_blocked
 from apps.whatsapp_inbox.queries.conversations import find_conversation

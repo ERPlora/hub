@@ -10,7 +10,8 @@ from live.outbox import record_event
 
 from apps.schedule import assistant_cards, events
 from apps.schedule.models import Override, OverrideInterval
-from apps.schedule.queries import override_out, resolve_override
+from apps.schedule.queries.outputs import override_out
+from apps.schedule.queries.references import resolve_override
 from apps.schedule.schemas.fields import RANGE_BACKWARDS, DeletedOut
 from apps.schedule.schemas.overrides import OverrideIn, OverrideOut, OverridePatchIn, OverrideRefIn
 

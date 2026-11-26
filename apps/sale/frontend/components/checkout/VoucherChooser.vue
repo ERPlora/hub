@@ -41,7 +41,7 @@ const failure = shallowRef('');
 
 function counter(row: TenderOptionOut): string {
   if (row.is_unlimited || row.remaining_after === null) return t('sale.voucher.unlimited');
-  return t('sale.voucher.remainingAfter', { before: row.remaining_before, after: row.remaining_after });
+  return t('sale.voucher.remainingAfter', { count: row.remaining_before, after: row.remaining_after });
 }
 
 function reason(row: TenderOptionOut): string {
