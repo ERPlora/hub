@@ -59,6 +59,7 @@ def _sale_row(combo: Combo, targets: frozenset[str], urls: images.Urls) -> dict:
                 "product_name": option.product.name,
                 "sku": option.product.sku,
                 "price_delta": option.price_delta,
+                "allergens": option.product.allergens,
             }
             for option in group.options.all()
             if offer_status(option, targets) == "offered"
