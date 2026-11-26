@@ -375,9 +375,10 @@ function mediaFailed(): void {
 </template>
 
 <style scoped>
+/* Capped by the page, not by `vh`: in Chrome on a tablet or a phone, `vh` also counts the screen under the address bar. */
 .file-preview {
   --width: min(1100px, 94vw);
-  --height: min(860px, 92vh);
+  --height: min(860px, 92%);
 }
 
 .file-preview-head {
@@ -439,7 +440,7 @@ function mediaFailed(): void {
 
 .file-preview-video {
   max-width: 100%;
-  max-height: 75vh;
+  max-height: calc(100cqh - 32px);
 }
 
 .file-preview-pdf {
