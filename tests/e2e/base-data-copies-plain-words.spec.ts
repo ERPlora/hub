@@ -3,7 +3,7 @@
 // flow: BASE-F37
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, horizontalOverflow, hostPage, saveSessionForTheSweep, shot, signedInSpanish, testid } from './helpers';
+import { A, capture, horizontalOverflow, hostPage, saveSessionForTheSweep, signedInSpanish, testid } from './helpers';
 
 const SIZES = [
   { width: 375, height: 667 },
@@ -26,7 +26,7 @@ async function introFits(page: Page, kept: string, name: string): Promise<void> 
   expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
   await expect(testid(page, 'dumps-loading')).toHaveCount(0);
   await testid(page, 'dumps-card').scrollIntoViewIfNeeded();
-  await page.screenshot({ path: shot(name) });
+  await capture(page, name);
 }
 
 for (const viewport of SIZES) {
