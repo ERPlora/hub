@@ -1,5 +1,5 @@
 // The Hub's session doors, `/auth/pin`, `/auth/badge` and `/auth/logout`, and the sign-out that stays on the page.
-import { forgetAssistant } from '@erplora/ui/components';
+import { forgetAssistant, useAssistant } from '@erplora/ui/components';
 import { readCookie, readSpaConfig } from '@erplora/ui/sdk';
 import { stopNoticeListening } from '@erplora/ui/shell';
 
@@ -25,6 +25,14 @@ export type SessionEnd = 'closed' | 'gone' | 'failed';
 export async function beforeSignOut(): Promise<void> {
   forgetAssistant();
   await stopNoticeListening();
+}
+
+/** What the hub does once another person entered over this session («Switch user»), before the screen reloads for
+ *  them: they find the assistant closed and empty, as someone who just arrived. The device would otherwise keep the
+ *  panel open for them. */
+export function beforeSwitch(): void {
+  forgetAssistant();
+  useAssistant().setOpen(false);
 }
 
 /**

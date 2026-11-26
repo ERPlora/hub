@@ -13,6 +13,7 @@ import { useRouter } from 'vue-router';
 import PinDoor from '../components/PinDoor.vue';
 import { announceSwitch, createBadgeReader, enterWith, replaceWith, safeNext } from '../lib/access';
 import { useBaseI18n } from '../lib/i18n';
+import { beforeSwitch } from '../lib/sign-out';
 
 const { t } = useBaseI18n();
 const router = useRouter();
@@ -31,6 +32,7 @@ async function enter(path: '/auth/pin' | '/auth/badge', body: Record<string, str
   refusal.value = '';
   try {
     const next = await enterWith(path, { ...body, next: screenInUse() });
+    beforeSwitch();
     announceSwitch(name);
     replaceWith(next);
   } catch (error) {
