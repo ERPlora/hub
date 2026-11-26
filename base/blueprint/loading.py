@@ -78,7 +78,7 @@ def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None, refus
                 # Each operation it called rolled its own part back; what committed before stays, and undo has it.
                 logger.exception("blueprint: loading %s failed", dataset.key)
                 loaded.refuse("", str(SOMETHING_WENT_WRONG))
-            if loaded.created:
+            if loaded.created and dataset.removable:
                 created[dataset.key] = loaded.created
             loads[dataset.key] = _dataset_report(dataset, loaded, rows)
         app_reports = [
