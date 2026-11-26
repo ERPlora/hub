@@ -149,18 +149,47 @@ def test_a_run_kept_before_its_reason_had_a_name_still_says_something():
     assert rows["flow.not_allowed"].log[0]["error"] == failed
 
 
-@pytest.mark.parametrize(
-    ("name", "shown"),
-    [
-        ("task.task.create", "«Crear una tarea»"),
-        ("api.example.com", "«api.example.com»"),  # a call not allowed names its address
-        ("gone.thing.make", "«gone.thing.make»"),  # an action that no longer exists, as it was kept
-    ],
-)
-def test_what_it_was_not_allowed_is_named_as_the_permissions_name_it(name, shown):
+# Each reason the engine gives when it stops an action's step, with ``{}`` where it names the action.
+AT_AN_ACTION = {
+    "flow.not_allowed": {
+        "en": "It tried to do something you have not allowed it to do ({}), so it stopped.",
+        "es": "Ha intentado hacer algo que no le has permitido ({}), así que ha parado.",
+    },
+    "flow.action_unavailable": {
+        "en": "{} is not available in this business any more (its app is off), so it stopped.",
+        "es": "{} ya no está disponible en este negocio (su app está apagada), así que ha parado.",
+    },
+    "flow.invalid_params": {
+        "en": "{} did not accept the data it was given, so it stopped.",
+        "es": "{} no ha aceptado los datos que le ha dado, así que ha parado.",
+    },
+    "flow.step_crashed": {
+        "en": "Something went wrong while doing {}, so it stopped. Nothing of that step was kept.",
+        "es": "Algo ha fallado al hacer {}, así que ha parado. No se ha guardado nada de ese paso.",
+    },
+    "flow.high_risk": {
+        "en": "{} needs a person in front: an automation cannot do it.",
+        "es": "{} necesita a una persona delante: una automatización no puede hacerlo.",
+    },
+}
+CREATE_A_TASK = {"en": "«Create a task»", "es": "«Crear una tarea»"}
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+@pytest.mark.parametrize("key", sorted(AT_AN_ACTION))
+def test_a_stop_at_an_action_names_it_as_permissions_and_try_name_it(key, language):
+    with translation.override(language):
+        named = queries.reasons.say({"key": key, "values": {"name": "task.task.create"}})
+        gone = queries.reasons.say({"key": key, "values": {"name": "gone.thing.make"}})
+    assert named == AT_AN_ACTION[key][language].format(CREATE_A_TASK[language])
+    # An action that no longer exists is said as it was kept.
+    assert gone == AT_AN_ACTION[key][language].format("«gone.thing.make»")
+
+
+def test_a_call_it_was_not_allowed_to_make_names_its_address():
     with translation.override("es"):
-        said = queries.reasons.say({"key": "flow.not_allowed", "values": {"name": name}})
-    assert said == f"Ha intentado hacer algo que no le has permitido ({shown}), así que ha parado."
+        said = queries.reasons.say({"key": "flow.not_allowed", "values": {"name": "api.example.com"}})
+    assert said == "Ha intentado hacer algo que no le has permitido («api.example.com»), así que ha parado."
 
 
 def test_every_reason_of_the_engine_is_said_in_english_and_in_spanish():

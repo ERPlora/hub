@@ -76,12 +76,16 @@ ASSISTANT_GONE_UNNAMED = _("That action is no longer allowed or available, so th
 ASSISTANT_GONE_KEY = "flow.assistant_gone"
 #: The reasons that name an action, by the value that keeps its operation and the value its words go in (``say``):
 #: the assistant's change nobody said yes to («Cancel a reservation», not the title kept in the automation's
-#: language) and what it was not allowed to do («Create a task», as Permissions and Try name it). An action that no
+#: language) and every stop at an action's step («Create a task», as Permissions and Try name it). An action that no
 #: longer exists, or the address of a call, is said as it was kept.
 NAMED_BY_ITS_ACTION = {
     "flow.question_rejected": ("operation", "title"),
     "flow.question_expired": ("operation", "title"),
+    HIGH_RISK_CODE: ("name", "name"),
     "flow.not_allowed": ("name", "name"),
+    "flow.action_unavailable": ("name", "name"),
+    "flow.invalid_params": ("name", "name"),
+    "flow.step_crashed": ("name", "name"),
 }
 #: The engine's own reasons, by name (the code, but where one code says different things): a run and the entry of
 #: the step that failed keep the name and its values, and the reason is said when it is read, in the reader's
