@@ -3,7 +3,8 @@
 // «Search product…» and the live answer of Inventory for what is typed — by name or SKU, across the
 // whole catalogue (sold out too, SALE-F07), 20 at a time. A row shows the name, the SKU (or «Sold out», or
 // why it cannot be sold) and the price; a tap hands the product up, where the same rules as a tile apply. With the services of Services
-// (SALE-F38, `withServices`), the services it finds come after them (`pickService`). Mounted only while
+// (SALE-F38, `withServices`), the services it finds come after them (`pickService`), and it says that nothing matches
+// only once neither finds anything. Mounted only while
 // open. A row is an Ionic button whose native control announces unavailability without swallowing the
 // tap, so the catalogue can explain it.
 import { useLive } from '@erplora/ui/sdk';
@@ -20,7 +21,7 @@ import { useNativeAriaDisabled } from '../../lib/ariaDisabled';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 import ServiceSearchResults from './ServiceSearchResults.vue';
 
-withDefaults(defineProps<{ withServices?: boolean }>(), { withServices: false });
+const props = withDefaults(defineProps<{ withServices?: boolean }>(), { withServices: false });
 const emit = defineEmits<{ pick: [product: ProductOut]; pickService: [service: ServiceSaleOut]; close: [] }>();
 
 const t = useT();
@@ -38,6 +39,9 @@ const { data, status, error } = useLive('inventory.product.list', () => ({
 }));
 
 const rows = computed(() => data.value?.rows ?? []);
+/** The services found for what is typed; `undefined` until Services answers. */
+const servicesFound = shallowRef<number | undefined>(undefined);
+const nothingFound = computed(() => !rows.value.length && (!props.withServices || servicesFound.value === 0));
 const search = useTemplateRef<HTMLElement>('search');
 useNativeAriaDisabled(() => search.value);
 
@@ -100,14 +104,14 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
       {{ error.message }}
     </p>
     <p
-      v-else-if="!rows.length"
+      v-else-if="nothingFound"
       class="pos-search__state"
       data-testid="pos-search-empty"
     >
-      {{ $t('sale.pos.noProducts') }}
+      {{ withServices ? $t('sale.pos.searchFoundNothing') : $t('sale.pos.noProducts') }}
     </p>
     <ion-list
-      v-else
+      v-else-if="rows.length"
       class="pos-search__list"
     >
       <ion-item
@@ -137,6 +141,7 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
       v-if="withServices"
       :term="term"
       @pick="emit('pickService', $event)"
+      @found="servicesFound = $event"
     />
   </div>
 </template>

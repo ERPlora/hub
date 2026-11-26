@@ -61,4 +61,13 @@ describe('ServiceSearchResults', () => {
     await m.result(OP, page([]));
     expect(m.find('pos-search-services-title').exists()).toBe(false);
   });
+
+  it('says how many it found once Services answers', async () => {
+    const m = await setup();
+    expect(m.wrapper.emitted('found')).toBeUndefined();
+    await m.result(OP, page([service()]));
+    expect(m.wrapper.emitted('found')?.at(-1)).toEqual([1]);
+    await m.result(OP, page([]), {}, 2);
+    expect(m.wrapper.emitted('found')?.at(-1)).toEqual([0]);
+  });
 });
