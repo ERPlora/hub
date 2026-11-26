@@ -24,3 +24,4 @@ Para qué: la pasada por todas las pantallas de la plataforma, en el móvil, la 
 9. BASE-F72 — Archivos.
 10. BASE-F64 — Mi perfil.
 11. BASE-F92 — el asistente se abre y contesta.
+12. BASE-F132 — el código del menú lateral, en una tableta en horizontal y en el ordenador.
