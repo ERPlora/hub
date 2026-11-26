@@ -4888,7 +4888,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `card.actions`, `card.operations` y `screens`). Estado por pestaña en `state.ts` del paquete; la conversación, en
   `sessionStorage` (`erplora.assistant.history`, de una persona: otra empieza vacía) y el abierto o cerrado en
   `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida antes de
-  `logout` (también el bloqueo por inactividad). Comprobaciones de la respuesta en `grounding.ts`, formato en
+  `logout` (también el bloqueo por inactividad). «Cambiar de usuario» la olvida y cierra el panel antes de recargar la
+  pantalla para quien entra (`beforeSwitch()` de `lib/sign-out.ts`, con PIN y con placa): el abierto o cerrado es del
+  dispositivo y, sin eso, pasaría a la persona siguiente. Comprobaciones de la respuesta en `grounding.ts`, formato en
   `markdown.ts` (nunca `v-html`), adjuntos y voz en `input.ts` (`MediaRecorder`, dos minutos), el dictado en
   `dictation.ts` (`useDictation`: una grabación por pulsación, 2 MB, el texto al cuadro y el panel abierto; el mismo
   para el cuadro y para la app que abre el asistente dictando), fallos y cupo en `guide.ts`, todos en
