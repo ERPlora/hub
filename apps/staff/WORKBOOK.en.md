@@ -665,7 +665,7 @@ whose it is and what it is called ("Ana López · Regular schedule") and a time-
 its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the person asking cannot see is left out.
 
 ### What it offers: queries (they read and change nothing; all but the accounts and the session's record can be followed live)
-<!-- from WORKBOOK.md sha256:236bc2a4b817 -->
+<!-- from WORKBOOK.md sha256:6b4bba69cb5b -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -689,7 +689,7 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 | My time off, with its reason and its notes | see time off | F08 | `staff.time_off.mine` |
 | The settings | see | F22 | `staff.settings.get` |
 | The active accounts with access to the business, for "Hub user" and for the assistant (id and name, with search or by user: the account of a record that no longer has access does not show and the screen says "No access to this business") | see the team and add or edit | F03 | `staff.account.list` |
-| The account the assistant is about to link to a record, checked before its card as the record checks it when saved (not an assistant tool) | see the team and add or edit | F01, F03 | `staff.account.check` |
+| The account the assistant is about to link to a record, checked before its card as the record checks it when saved (not an assistant tool) | add or edit | F01, F03 | `staff.account.check` |
 
 ### What it offers: actions (they change data)
 <!-- from WORKBOOK.md sha256:d63e8740eb72 -->

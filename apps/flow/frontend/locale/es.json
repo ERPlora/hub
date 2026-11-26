@@ -1283,7 +1283,6 @@
       "service__session__get": "Leer una sesión de un bono",
       "service__settings__get": "Leer los ajustes de los servicios",
       "service__record__get": "Leer el nombre de un registro al que se refiere un bono",
-      "staff__account__check": "Comprobar la cuenta a la que se vincularía una ficha del equipo",
       "staff__account__list": "Buscar las cuentas a las que se puede vincular una ficha del equipo",
       "staff__availability__for_member": "Leer cuándo está disponible alguien",
       "staff__commission__summary": "Leer las comisiones",

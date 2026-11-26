@@ -448,6 +448,9 @@ def test_a_write_may_name_several_checks_and_the_first_that_refuses_is_its_outco
         failure, fields = assistant.cards.preview(ctx(), write, data)
         assert (failure.code, fields) == (code, None)
     assert assistant.cards.preview(ctx(), write, {"id": "7", "note": "x"}) == (None, None)
+    found: list = []
+    assert assistant.cards.checked(ctx(), write, {"id": "7", "note": "x"}, found=found) is None
+    assert len(found) == 2  # what each check found, for the card's fingerprint
 
 
 def check_errors() -> list:
@@ -469,6 +472,7 @@ class NoItemIn(Schema):
         (checking({"operation": "demo.item.settle_preview"}), "is not the name of a read"),
         (checking("demo.item.settle_preview", input=NoItemIn), "the write never takes id"),
         (checking(("demo.item.settle_preview", "demo.item.nothing")), "names no operation demo.item.nothing"),
+        (checking(("demo.item.nothing", "demo.item.settle_preview")), "names no operation demo.item.nothing"),
         (checking(()), "is not the name of a read"),
     ],
 )

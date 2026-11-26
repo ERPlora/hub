@@ -121,3 +121,19 @@ def test_a_change_that_links_no_account_still_gets_its_card():
     plan = turn_as(as_person(), call("staff.member.update", {"id": str(record.id), "phone": "600111222"}))
     assert plan["confirm"]["operation"] == "staff.member.update"
 
+
+@pytest.mark.parametrize(
+    ("permission", "write", "data"),
+    [
+        ("staff.change_member", "staff.member.update", {"phone": "600111222"}),
+        ("staff.add_member", "staff.member.create", {"first_name": "Bea", "last_name": "Ruiz"}),
+    ],
+)
+def test_the_account_s_check_asks_for_no_more_than_the_write_it_checks(permission, write, data):
+    """A role of the business's own may edit records without seeing the team: the check before the card asks for what
+    the write asks, so the card still comes."""
+    record = make_member("Ana", "Martín")
+    person = ctx_for(permissions={"base.view_home", permission}, actor="asker")
+    sent = {"id": str(record.id), **data} if write == "staff.member.update" else data
+    assert turn_as(person, call(write, sent))["confirm"]["operation"] == write
+

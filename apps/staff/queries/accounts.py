@@ -14,8 +14,8 @@ from base.models import HubUser, Membership
 
 from .reads import _page
 
-#: Who may read the accounts: whoever adds or edits a record (the «Hub user» selector of the form). The operations ask
-#: for the team's view to reach them, since an operation names one permission and an assistant tool needs one.
+#: Who may read the accounts: whoever adds or edits a record (the «Hub user» selector of the form). The list asks for
+#: the team's view to reach it, since an operation names one permission and an assistant tool needs one.
 ACCOUNT_PERMISSIONS = ("staff.add_member", "staff.change_member")
 
 USER_NOT_IN_BUSINESS = _("That Hub user has no access to this business.")
@@ -84,7 +84,7 @@ def list_accounts(ctx: OperationContext, params: AccountListIn) -> dict:
 @operation(
     "staff.account.check",
     kind="query",
-    permission="staff.view",  # and either of ACCOUNT_PERMISSIONS, checked below
+    permission=None,  # either of ACCOUNT_PERMISSIONS, checked below: no more than the writes it checks ask for
     input=AccountCheckIn,
     output=AccountCheckOut,
     ai=INTERNAL,

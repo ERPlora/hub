@@ -664,7 +664,7 @@ López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no p
 | Mis ausencias, con su motivo y sus notas | ver ausencias | F08 | `staff.time_off.mine` |
 | Los ajustes | ver | F22 | `staff.settings.get` |
 | Las cuentas activas con acceso al negocio, para «Usuario del Hub» y para el asistente (id y nombre, con búsqueda o por usuario: la cuenta de una ficha que ya no tiene acceso no sale y la pantalla dice «Sin acceso a este negocio») | ver el equipo y dar de alta o editar | F03 | `staff.account.list` |
-| La cuenta que el asistente va a vincular a una ficha, comprobada antes de su tarjeta como la comprueba la ficha al guardarse (no es herramienta del asistente) | ver el equipo y dar de alta o editar | F01, F03 | `staff.account.check` |
+| La cuenta que el asistente va a vincular a una ficha, comprobada antes de su tarjeta como la comprueba la ficha al guardarse (no es herramienta del asistente) | dar de alta o editar | F01, F03 | `staff.account.check` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
