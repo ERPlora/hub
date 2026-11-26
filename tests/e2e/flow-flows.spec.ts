@@ -280,7 +280,9 @@ for (const viewport of VIEWPORTS) {
       await expect(row).toContainText('Every Friday at 18:00');
       await expect(row).toContainText('Finished well');
       await choose(page, 'flow-list-sort', 'Name');
-      await choose(page, 'flow-list-state', 'Only the paused ones');
+      await shown(page).locator('[data-testid=flow-list-filters-toggle]').click();
+      await choose(page, 'flow-list-filter-state', 'Only the paused ones');
+      await shown(page).locator('[data-testid=flow-list-filters-apply]').click();
       await expect(shown(page).locator('[data-testid=flow-list-nomatch]')).toContainText('Nothing here matches that.');
       await shown(page).locator('[data-testid=flow-list-clear]').click();
       await expect(row).toBeVisible();
