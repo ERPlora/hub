@@ -82,7 +82,8 @@ def test_the_specs_are_split_over_a_matrix_of_shards_named_1_to_n(nightly):
     assert set(strategy["matrix"]) == {"shard"}
     assert len(shards) >= 2 and shards == list(range(1, len(shards) + 1))
     assert strategy["fail-fast"] is False
-    assert isinstance(strategy["max-parallel"], int) and 1 <= strategy["max-parallel"] <= len(shards)
+    # Fewer at once than there are shards: the rest of the account's runners stay free for the pushes of that hour.
+    assert isinstance(strategy["max-parallel"], int) and 1 <= strategy["max-parallel"] < len(shards)
 
 
 def test_each_shard_runs_its_share_on_the_commit_of_the_run_without_publishing(nightly):
