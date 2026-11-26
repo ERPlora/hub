@@ -106,6 +106,15 @@ def test_every_screen_of_an_app_is_either_open_in_the_menu_or_locked(make_user):
             assert role != "hub_employee" or config.label not in SETUP_APPS or not opened, config.label
 
 
+def test_the_accountancy_firm_opens_no_screen_of_verifactu(make_user):
+    user = make_user()
+    assert "verifactu" not in menu_of(user, "hub_accountant")
+    assert session_me(user, "hub_accountant")["locked"]["verifactu"] == [
+        "/verifactu/records", "/verifactu/contingency", "/verifactu/events", "/verifactu/recovery",
+        "/verifactu/config", "/verifactu/settings",
+    ]
+
+
 def test_nothing_is_locked_to_the_owner_or_the_admin(make_user):
     assert session_me(make_user("olga"), "hub_owner")["locked"] == {}
     assert session_me(make_user("adrian"), "hub_admin")["locked"] == {}
