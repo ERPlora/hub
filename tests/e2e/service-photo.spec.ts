@@ -142,7 +142,10 @@ test('SERVICE-F34: the library names its images in the language the person reads
     const form = await editFormIn(page, colour, language);
     await form.locator('[data-testid=service-form-image-library]').click();
     const library = dialog(page, 'service-form-image-library-modal');
-    await library.locator('[data-testid=service-form-image-library-modal-search] input').fill('Mechas');
+    const search = library.locator('[data-testid=service-form-image-library-modal-search] input');
+    const hint = language === 'es' ? 'Buscar imagen…' : 'Search image…';
+    await expect(search, 'a screen reader announces the search box by its hint, never «search text»').toHaveAccessibleName(hint);
+    await search.fill('Mechas');
     const choice = library.locator('[data-testid=service-form-image-library-modal-image-beauty_hair-mechas]');
     await expect(choice).toHaveText(title);
     await expect(choice.locator('img')).toHaveAttribute('alt', title);
