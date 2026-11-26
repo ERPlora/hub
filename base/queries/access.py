@@ -145,11 +145,12 @@ def has_pin(user) -> bool:
     output=AccessSettingsOut,
     ai=AI(
         description=(
-            "Reads how the business asks who is at the till, as the «PIN pad» card of Settings › General names it: "
-            "«Show PIN pad» is off when pin_policy is never; «Ask again after inactivity» is pin_inactivity_minutes "
-            "min when pin_policy is always, and «Until signing out» when it is per_shift (its minutes then do not "
-            "count); and how many digits a PIN has. With the PIN pad on, each person enters with their own PIN and "
-            "every sale carries their name. Say it to the person by those names."
+            "Reads how the business asks who is at the till, as the PIN pad card of Settings › General shows it: "
+            "showing the PIN pad is off when pin_policy is never; asking again after inactivity is "
+            "pin_inactivity_minutes min when pin_policy is always, and until signing out when it is per_shift (its "
+            "minutes then do not count); and how many digits a PIN has. With the PIN pad on, each person enters with "
+            "their own PIN and every sale carries their name. Say it to the person as that card does, in their "
+            "language."
         ),
         asks={
             "en": (
