@@ -6,7 +6,7 @@ from operator import or_
 from django.db.models import Count, Q, QuerySet, Value
 from django.db.models.functions import Concat
 from live.context import OperationContext
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.staff.models import Member, TimeOff
 from apps.staff.schemas.fields import MemberRefIn
@@ -158,6 +158,7 @@ def my_record(ctx: OperationContext, data: MineIn) -> dict:
     return {"member": own_member(ctx)}
 
 
+# Not an assistant tool: the till's own record (the assistant reads it with staff.member.mine).
 @operation(
     "staff.member.current",
     kind="query",
@@ -166,10 +167,7 @@ def my_record(ctx: OperationContext, data: MineIn) -> dict:
     permission=None,
     input=CurrentMemberIn,
     output=CurrentMemberOut,
-    ai={
-        "description": "Returns the id and name of the current user's own staff record: who a sale is "
-        "attributed to when nobody else is named. Empty when the user has no record."
-    },
+    ai=INTERNAL,
 )
 def current_record(ctx: OperationContext, data: CurrentMemberIn) -> dict:
     return {"member": own_member(ctx)}

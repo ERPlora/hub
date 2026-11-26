@@ -422,6 +422,34 @@ def test_a_dangerous_write_is_checked_before_its_preview_is_read(monkeypatch):
     assert (failure, shown(fields), read) == (None, [("name", "text", "Item 7")], ["7"])
 
 
+class NoteOnlyIn(Schema):
+    note: str = ""
+
+
+def no_empty_note(ctx, data):
+    if data.note == "":
+        raise OperationError("Say what to note.", code="invalid_payload", status=422)
+    return {"name": data.note, "total_cents": 0, "expected_balance": None, "asked_by": ctx.actor, "note": data.note}
+
+
+NOTE_CHECK = Operation(**{**vars(SETTLE_PREVIEW), "name": "demo.item.note_check", "input": NoteOnlyIn, "fn": no_empty_note})
+
+
+@HUB_DB
+def test_a_write_may_name_several_checks_and_the_first_that_refuses_is_its_outcome(monkeypatch):
+    """Each datum by the read that knows it (a new staff record's role and its account): in the order named, each with
+    the data its own input takes; the card comes only when all of them take the data."""
+    monkeypatch.setitem(registry, SETTLE_PREVIEW.name, SETTLE_PREVIEW)
+    monkeypatch.setitem(registry, NOTE_CHECK.name, NOTE_CHECK)
+    write = checking((SETTLE_PREVIEW.name, NOTE_CHECK.name))
+    monkeypatch.setitem(registry, write.name, write)
+    assert check_errors() == []
+    for data, code in (({"id": "gone", "note": ""}, "demo.item_not_found"), ({"id": "7", "note": ""}, "invalid_payload")):
+        failure, fields = assistant.cards.preview(ctx(), write, data)
+        assert (failure.code, fields) == (code, None)
+    assert assistant.cards.preview(ctx(), write, {"id": "7", "note": "x"}) == (None, None)
+
+
 def check_errors() -> list:
     from django.core import checks
 
@@ -440,6 +468,8 @@ class NoItemIn(Schema):
         (checking("demo.item.create"), "not a read"),
         (checking({"operation": "demo.item.settle_preview"}), "is not the name of a read"),
         (checking("demo.item.settle_preview", input=NoItemIn), "the write never takes id"),
+        (checking(("demo.item.settle_preview", "demo.item.nothing")), "names no operation demo.item.nothing"),
+        (checking(()), "is not the name of a read"),
     ],
 )
 def test_a_check_is_checked_at_start(monkeypatch, write, why):
