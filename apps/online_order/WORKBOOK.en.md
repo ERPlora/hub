@@ -40,19 +40,24 @@ acceptance of Lightspeed and Toast). Nobody rotates the printed QR over time or 
 for permission and fails indoors; generating a table's QR again is the way out when one should no longer work.
 
 ## Before you start
-<!-- from WORKBOOK.md sha256:7c0a118bc9b7 -->
+<!-- from WORKBOOK.md sha256:d5b3a5c83295 -->
 
-1. Online orders turns on **Tables** with it (and, through Tables, **Sales** and **Customers**), and Tables cannot be
-   turned off while it is on.
+1. Online orders turns on **Tables** with it (and, through Tables, **Sales** and **Customers**) and **Inventory**, and
+   they cannot be turned off while it is on. With **Modifiers** and **Menus** on, the menu also shows each dish's
+   modifiers and the set menus.
 2. In **Tables**, add the zones and the tables of the premises: each table has its QR.
 3. Each table gets its code the first time its QR is generated; from then on the same code works until it is
    regenerated.
+4. In **Inventory**, the table's menu shows the products on sale that have "Show on the menu" on, like the Website's
+   menu, with their photo, description, allergens and category.
 
 ## Screens
-<!-- from WORKBOOK.md sha256:f8e76bf31d0d -->
+<!-- from WORKBOOK.md sha256:cc240824c00d -->
 
 The **Online orders** menu has one tab: **QR codes**. Only those who can see the tables' QR codes see it (the
 owner, the administrator and the manager); the buttons to generate and regenerate, only those who can regenerate them.
+The **Table page** is not in the menu: it is the one each table's QR opens on the customer's phone, with no account or
+session.
 
 ### QR codes
 <!-- from WORKBOOK.md sha256:7e72bfa0c2af -->
@@ -70,23 +75,40 @@ and **Regenerate QR**, which asks for confirmation ("Regenerate the QR of table 
 table that has none yet. If some tables have no QR, a notice says how many are not on the sheet, with **Generate the
 missing QR codes**. The QR is drawn on the device itself: the sheet asks nothing of the internet.
 
+### Table page
+<!-- from WORKBOOK.md sha256:0d21163a0d62 -->
+The one the customer sees on their phone when they scan their table's QR: the business's menu, with the table they are
+at above it. It is only to look at; ordering from here comes with ONLINE_ORDER-F04.
+
+#### Details
+<!-- from WORKBOOK.md sha256:0a83b1d81501 -->
+Address `/p/<business>/order/<code>`, with no session, in the phone's language (Spanish or English). At the top, the
+business's name and "Table 4 · Terrace" (without a zone, just "Table 4"). Below, **Menus** first, with each set menu's
+closed price and its courses ("Starters · Mains · Drink"), and then each Inventory category in its order, with its
+dishes sorted by name: the photo (if it has one), the name, the description, "Allergens: Gluten, Milk" and the price.
+Dishes without a category go last, under "More dishes". Tapping a dish opens its card with the photo in large, the same
+as its row, and each modifier group with how many are chosen ("Optional · up to 2", "Choose 1") and each option with
+its allergens and what it adds ("+€0.50"); tapping a set menu opens its dishes, course by course, in the same way.
+**Close** closes it.
+
 ## States of each screen
-<!-- from WORKBOOK.md sha256:99e230118c05 -->
+<!-- from WORKBOOK.md sha256:cf56646b5824 -->
 
 | Screen | Loading | Empty | Error |
 |---|---|---|---|
 | QR codes | The list loading; **Print sheet**, off until all the tables are in | "No tables yet", with **Go to Tables** for whoever can add them | The list's, with "Retry"; that of generating or regenerating, in a passing notice with its reason; "The sheet could not be printed." |
+| Table page | "Loading the menu…"; on a dish's card, "Loading its options…" | "No dishes on the menu yet", with "Ask the staff what you can order." | "The menu could not be loaded." with "Retry"; on the card, "Its options could not be loaded." with "Retry"; a QR that no longer works, "This QR is no longer active" with "Ask the staff for help.", with nothing of the business |
 
 "Reconnecting…" while the live connection recovers (what is painted stays).
 
 ## Flows
-<!-- from WORKBOOK.md sha256:a4befbc441e7 -->
+<!-- from WORKBOOK.md sha256:d564c702c5cb -->
 
 | ID | Flow | Status |
 |---|---|---|
 | ONLINE_ORDER-F01 | Generate or regenerate a table's QR | done |
 | ONLINE_ORDER-F02 | See and print the tables' QR sheet | done |
-| ONLINE_ORDER-F03 | The customer opens the menu from their table's QR | not done |
+| ONLINE_ORDER-F03 | The customer opens the menu from their table's QR | done |
 | ONLINE_ORDER-F04 | The customer orders from their table | not done |
 | ONLINE_ORDER-F05 | Accept or reject a table's first order | not done |
 | ONLINE_ORDER-F06 | The customer sees whether their order was accepted | not done |
@@ -135,23 +157,27 @@ API).
 Involved: TABLE-F02, WEBSITE-F09
 
 ### ONLINE_ORDER-F03 The customer opens the menu from their table's QR
-<!-- from WORKBOOK.md sha256:e0c1cc2783a4 -->
-Status: not done — the table's public page is missing
+<!-- from WORKBOOK.md sha256:3121c94b9e9a -->
+Status: done
 Actor: customer (no session)
 Screen: Table page
 Steps:
-1. Scans their table's QR with the phone's camera and the table's page opens, with the business's name and the
-   table's number.
-2. Sees the whole menu: the products on sale that are shown on the menu, with their photo, description, allergens and
-   price, the modifiers of each and the menus. What is sold out does not show.
-In: the menu (Inventory, Modifiers, Menus) and the business's opening hours (Schedule).
-Out: nothing; it only reads.
-If it fails: a QR that no longer works (regenerated) shows «This QR is no longer active; please ask the staff for
-help.»; with the business closed, the menu shows but says no orders are taken right now.
-Involved: ONLINE_ORDER-F01, INVENTORY-F36, SCHEDULE-F02
+1. Scans their table's QR with the phone's camera and the table's page opens, with the business's name and their table
+   with its zone ("Table 4 · Terrace").
+2. Sees the whole menu: the set menus and the products on sale that are shown on the menu, by category, with their
+   photo, description, allergens and price. What is sold out does not show, nor what the business does not show on its
+   menu.
+3. Taps a dish and sees its modifiers, how many are chosen from each group and what each one adds; taps a set menu and
+   sees its dishes, course by course, with their allergens.
+In: the menu (Inventory and, if they are on, Modifiers and Menus) and the table (Tables).
+Out: nothing; it only reads. The page shows no costs, stock, taxes or anything about the staff.
+If it fails: a QR that no longer works (regenerated, or of a deleted table) shows "This QR is no longer active" with
+"Ask the staff for help.", and nothing of the business; with no dishes on sale, "No dishes on the menu yet"; if the
+menu does not load, "The menu could not be loaded." with "Retry".
+Involved: ONLINE_ORDER-F01, INVENTORY-F36, COMBO-F14
 
 ### ONLINE_ORDER-F04 The customer orders from their table
-<!-- from WORKBOOK.md sha256:ab06dc81f225 -->
+<!-- from WORKBOOK.md sha256:79a4da862d5b -->
 Status: not done — the order is missing
 Actor: customer (no session)
 Screen: Table page
@@ -161,9 +187,10 @@ Steps:
 3. If the table has an open check, the order goes into it and is sent to the kitchen with everything the check had
    not sent yet, also what the waiter had entered at the POS. If not, the order waits until an employee accepts it
    (ONLINE_ORDER-F05).
-In: the menu, the table's check (Tables and Sales) and the business's opening hours.
+In: the menu, the table's check (Tables and Sales) and the business's opening hours (Schedule).
 Out: the lines on the table's check and the ticket in the kitchen, or the pending order with its notice.
-If it fails: nothing is written. The business is closed; a product sold out while ordering; too many orders in a row
+If it fails: nothing is written. The business is closed (the menu still shows, but says no orders are taken right
+now); a product sold out while ordering; too many orders in a row
 from the same phone or in the business («Try again in a few minutes or ask the staff for help.»); a QR that no longer
 works.
 Involved: ONLINE_ORDER-F05, SALE-F20, KITCHEN-F05
@@ -231,11 +258,16 @@ whoever speaks), with the same rules and permissions. A table is named by its id
 and, if it repeats, its zone.
 
 ### What it offers: queries
-<!-- from WORKBOOK.md sha256:3310f0dd2146 -->
+<!-- from WORKBOOK.md sha256:b83fefa46990 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The tables in the floor plan's order, each with its zone and, if it already has one, its code, the address of its page and when it was generated, in pages (up to 100) | see the tables' QR codes (+ see tables) | F02 | `online_order.qr_code.list` |
+| The menu of a code's table: the business's name, the table's number and zone, the dishes on sale shown on the menu by category and the set menus with their dishes | anyone with the table's QR, without a session | F03 | `online_order.public.menu` |
+| The modifier groups of a dish of that menu, with their options | anyone with the table's QR, without a session | F03 | `online_order.public.options` |
+
+The two of the menu belong to the table's page: its phone calls them through the Hub's public door, with the code in
+the call's body, and they are not tools of the assistant.
 
 ### What it offers: actions
 <!-- from WORKBOOK.md sha256:6fd3529a003d -->
@@ -260,12 +292,14 @@ asks for confirmation before doing it.
 No notice of another app.
 
 ### Who can do what
-<!-- from WORKBOOK.md sha256:72def8cbadcc -->
+<!-- from WORKBOOK.md sha256:6a67cc4d4780 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
 | See the tables' QR codes | yes | yes | yes | no | `online_order.view_qr_code` |
 | Regenerate the tables' QR codes | yes | yes | yes | no | `online_order.change_qr_code` |
+| Open a table's ordering page | yes | yes | no | no | `online_order.public` |
 
 Tables are read by Tables with the permission of whoever asks: this app's permission **and** the one to see tables
-are needed.
+are needed. The customer who opens their table's page has no account: the public door serves the page with
+`online_order.public` and nothing more.
