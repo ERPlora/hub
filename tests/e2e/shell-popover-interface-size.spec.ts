@@ -3,13 +3,13 @@
 // what opens it, as at 100 %: the person's menu under its card (Ionic places it) and the list of a field under the
 // field (the shared Combo places it, here the country of a customer card). Its gap and its offset grow with the
 // interface, and nothing else moves it. Measured as boxes, at four window sizes, in English and Spanish.
-import { type BrowserContext, type Page, expect, test } from '@playwright/test';
+import { type Browser, type BrowserContext, type Page, expect, test } from '@playwright/test';
 
 import {
   A,
   api,
   capture,
-  login,
+  hostPage,
   record,
   saveSessionForTheSweep,
   shown,
@@ -32,13 +32,24 @@ const SIZES: Size[] = [
 
 const SCALES = [80, 100, 110, 120] as const;
 
-/** Sub-pixel rounding of two boxes read in the same space; the zoom counted twice moves the menu tens of pixels. */
+/** Sub-pixel rounding of two boxes read in the same space; the zoom counted twice moves a window tens of pixels. */
 const TOLERANCE = 2;
 
 const KEY = 'FIX-UI-POPOVER-INTERFACE-SIZE';
 
+/** A window against what opens it, as the person sees both: the space between them, how far its start is from the
+ *  start of what opens it, and how much wider it is. */
+interface Placed {
+  gap: number;
+  offset: number;
+  width: number;
+}
+
 const card = (page: Page) => page.locator('ion-menu.dash-menu [data-testid=user-menu-trigger]');
 const userMenu = (page: Page) => page.locator('ion-popover.sidebar-user-popover');
+const customerForm = (page: Page) => page.locator('ion-modal[data-testid=customer-create]');
+const countryField = (page: Page) => customerForm(page).locator('ion-input[data-testid=customer-form-country]');
+const countryList = (page: Page) => page.locator('ion-popover.combo__popover');
 
 interface Appearance {
   theme_mode: string;
@@ -59,8 +70,8 @@ async function atScale(context: BrowserContext, page: Page, scale: number): Prom
   await expect(page.locator('html')).toHaveCSS('zoom', String(scale / 100));
 }
 
-/** The menu open from its card: where its box starts against the card's, as the person sees both. */
-async function menuAgainstItsCard(page: Page, size: Size): Promise<{ gap: number; offset: number }> {
+/** The menu open from its card. */
+async function menuAgainstItsCard(page: Page, size: Size): Promise<Placed> {
   if (size.width < 992) await shown(page).locator('ion-header.app-topbar ion-menu-button').click();
   await expect(card(page)).toBeVisible();
   await card(page).click();
@@ -68,16 +79,12 @@ async function menuAgainstItsCard(page: Page, size: Size): Promise<{ gap: number
   return userMenu(page).evaluate((popover) => {
     const trigger = document.querySelector('ion-menu.dash-menu [data-testid=user-menu-trigger]')!.getBoundingClientRect();
     const content = popover.shadowRoot!.querySelector('.popover-content')!.getBoundingClientRect();
-    return { gap: content.top - trigger.bottom, offset: content.left - trigger.left };
+    return { gap: content.top - trigger.bottom, offset: content.left - trigger.left, width: content.width - trigger.width };
   });
 }
 
-const customerForm = (page: Page) => page.locator('ion-modal[data-testid=customer-create]');
-const countryField = (page: Page) => customerForm(page).locator('ion-input[data-testid=customer-form-country]');
-const countryList = (page: Page) => page.locator('ion-popover.combo__popover');
-
-/** The country list open under its field in a new customer card: its box against the field's, on its side of it. */
-async function listAgainstItsField(page: Page): Promise<{ gap: number; offset: number; width: number }> {
+/** The country list open beside its field in a new customer card, on whichever side of it the list goes. */
+async function listAgainstItsField(page: Page): Promise<Placed> {
   await shown(page).locator('[data-testid=customer-list-add]').click();
   await expect(customerForm(page)).toBeVisible();
   await customerForm(page).locator('[data-testid=customer-form-more] > summary').click();
@@ -96,114 +103,86 @@ async function listAgainstItsField(page: Page): Promise<{ gap: number; offset: n
   });
 }
 
+/** The owner on `next` at `size` opens the window (`open`) at every interface size, and once more at 120 % in
+ *  Spanish; each 120 % is captured. The person's own appearance is put back after. */
+async function atEveryScale(
+  browser: Browser,
+  size: Size,
+  next: string,
+  name: string,
+  open: (page: Page) => Promise<Placed>,
+): Promise<{ at: Record<number, Placed>; spanish: Placed }> {
+  const { context, page } = await hostPage(browser, A, { next, viewport: size });
+  await saveSessionForTheSweep(context);
+  const before = await appearance(context);
+  try {
+    const at: Record<number, Placed> = {};
+    for (const scale of SCALES) {
+      await atScale(context, page, scale);
+      at[scale] = await open(page);
+      if (scale === 120) await capture(page, `${name}-120-EN`);
+    }
+    record(name, at);
+    await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+    await atScale(context, page, 120);
+    await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+    const spanish = await open(page);
+    await capture(page, `${name}-120-ES`);
+    return { at, spanish };
+  } finally {
+    expect((await api(context, A, 'POST', '/me/preferences', before)).status).toBe(200);
+    await context.close();
+  }
+}
+
+/** Beside what opens it at 100 % (no further than `most`), and at every size what `keys` name grows with the
+ *  interface and nothing else: as at 100 %, times the zoom. */
+function expectBesideItsOpener(
+  { at, spanish }: { at: Record<number, Placed>; spanish: Placed },
+  most: number,
+  keys: (keyof Placed)[],
+): void {
+  const base = at[100];
+  expect(base.gap, 'at 100 % it starts just beside what opens it').toBeGreaterThanOrEqual(0);
+  expect(base.gap).toBeLessThanOrEqual(most);
+  for (const scale of SCALES) {
+    for (const key of keys) {
+      expect(Math.abs(at[scale][key] - (base[key] * scale) / 100), `${key} at ${scale} %`).toBeLessThanOrEqual(TOLERANCE);
+    }
+  }
+  expect(Math.abs(spanish.gap - base.gap * 1.2), 'gap at 120 %, in Spanish').toBeLessThanOrEqual(TOLERANCE);
+}
+
 test.describe.configure({ mode: 'serial' });
 
 const turnedOn: string[] = [];
 
 test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/');
+  const { context } = await hostPage(browser, A, { next: '/' });
   await turnOnMissing(context, A, ['customer'], turnedOn);
   await context.close();
 });
 
 test.afterAll(async ({ browser }) => {
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/');
+  const { context } = await hostPage(browser, A, { next: '/' });
   await turnOffTurnedOn(context, A, turnedOn);
   await context.close();
 });
 
 for (const size of SIZES) {
-  test(`BASE-F64 — a field's list opens beside its field at every interface size (${size.label})`, async ({
-    browser,
-  }) => {
-    const context = await browser.newContext({ baseURL: A, viewport: size, locale: 'en-US' });
-    const page = await context.newPage();
-    await login(page, A, '/customer/customers');
-    const before = await appearance(context);
-    try {
-      const measured: Record<number, { gap: number; offset: number; width: number }> = {};
-      for (const scale of SCALES) {
-        await atScale(context, page, scale);
-        measured[scale] = await listAgainstItsField(page);
-        if (scale === 120) await capture(page, `${KEY}-LIST-${size.label}-120-EN`);
-      }
-      record(`${KEY}-LIST-${size.label}`, measured);
-
-      const base = measured[100];
-      expect(base.gap, 'at 100 % the list starts just beside the field').toBeGreaterThanOrEqual(0);
-      expect(base.gap).toBeLessThanOrEqual(16);
-      for (const scale of SCALES) {
-        const zoom = scale / 100;
-        const { gap, offset, width } = measured[scale];
-        expect(Math.abs(gap - base.gap * zoom), `gap beside the field at ${scale} %`).toBeLessThanOrEqual(TOLERANCE);
-        expect(Math.abs(offset), `the list starts at the field's edge at ${scale} %`).toBeLessThanOrEqual(TOLERANCE);
-        expect(Math.abs(width - base.width), `the list as wide as the field at ${scale} %`).toBeLessThanOrEqual(
-          TOLERANCE,
-        );
-      }
-
-      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-      await atScale(context, page, 120);
-      await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-      const spanish = await listAgainstItsField(page);
-      expect(Math.abs(spanish.gap - base.gap * 1.2), 'gap beside the field at 120 %, in Spanish').toBeLessThanOrEqual(
-        TOLERANCE,
-      );
-      await capture(page, `${KEY}-LIST-${size.label}-120-ES`);
-    } finally {
-      expect((await api(context, A, 'POST', '/me/preferences', before)).status).toBe(200);
-      await context.close();
-    }
-  });
-}
-
-for (const size of SIZES) {
   test(`BASE-F64 — the person's menu opens under its card at every interface size (${size.label})`, async ({
     browser,
   }) => {
-    const context = await browser.newContext({ baseURL: A, viewport: size, locale: 'en-US' });
-    const page = await context.newPage();
-    await login(page, A, '/');
-    await saveSessionForTheSweep(context);
-    const before = await appearance(context);
-    try {
-      const measured: Record<number, { gap: number; offset: number }> = {};
-      for (const scale of SCALES) {
-        await atScale(context, page, scale);
-        measured[scale] = await menuAgainstItsCard(page, size);
-        if (scale === 120) await capture(page, `${KEY}-${size.label}-120-EN`);
-      }
-      record(`${KEY}-${size.label}`, measured);
+    const measured = await atEveryScale(browser, size, '/', `${KEY}-${size.label}`, (page) =>
+      menuAgainstItsCard(page, size),
+    );
+    expectBesideItsOpener(measured, 24, ['gap', 'offset']);
+  });
 
-      const base = measured[100];
-      expect(base.gap, 'at 100 % the menu starts just under the card').toBeGreaterThanOrEqual(0);
-      expect(base.gap).toBeLessThanOrEqual(24);
-      for (const scale of SCALES) {
-        const zoom = scale / 100;
-        expect(Math.abs(measured[scale].gap - base.gap * zoom), `gap under the card at ${scale} %`).toBeLessThanOrEqual(
-          TOLERANCE,
-        );
-        expect(
-          Math.abs(measured[scale].offset - base.offset * zoom),
-          `offset from the card's edge at ${scale} %`,
-        ).toBeLessThanOrEqual(TOLERANCE);
-      }
-
-      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-      await atScale(context, page, 120);
-      await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-      const spanish = await menuAgainstItsCard(page, size);
-      expect(Math.abs(spanish.gap - base.gap * 1.2), 'gap under the card at 120 %, in Spanish').toBeLessThanOrEqual(
-        TOLERANCE,
-      );
-      await capture(page, `${KEY}-${size.label}-120-ES`);
-    } finally {
-      expect((await api(context, A, 'POST', '/me/preferences', before)).status).toBe(200);
-      await context.close();
-    }
+  test(`BASE-F64 — a field's list opens beside its field at every interface size (${size.label})`, async ({
+    browser,
+  }) => {
+    const measured = await atEveryScale(browser, size, '/customer/customers', `${KEY}-LIST-${size.label}`, listAgainstItsField);
+    expectBesideItsOpener(measured, 16, ['gap', 'offset', 'width']);
   });
 }
