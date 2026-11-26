@@ -2,7 +2,8 @@
 
 from django.utils.translation import gettext_lazy as _
 
-from apps.whatsapp_inbox.models import Message, Template
+from apps.whatsapp_inbox.models.conversations import Message
+from apps.whatsapp_inbox.models.templates import Template
 
 # Why a hand-over to erplora.com did not end well. A row keeps only the Hub's code (and, for a refusal of Meta's the
 # Hub has no name for, Meta's words as they came): the text is said when the row is read, in the reader's language,

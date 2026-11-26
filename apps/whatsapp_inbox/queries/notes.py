@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import INTERNAL, operation
 
-from apps.whatsapp_inbox.models import Note
+from apps.whatsapp_inbox.models.conversations import Note
 from apps.whatsapp_inbox.queries.conversations import find_conversation
 from apps.whatsapp_inbox.queries.reads import actor_id, page
 from apps.whatsapp_inbox.schemas.notes import NoteListIn, NoteOut, NotePage, NoteRefIn

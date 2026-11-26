@@ -13,7 +13,7 @@ from django.utils import timezone
 from live.context import Scope
 
 from apps.verifactu.models import Config
-from apps.whatsapp_inbox.models import Channel
+from apps.whatsapp_inbox.models.channel import Channel
 from base import registry
 from base.models import Hub, HubUser, Membership
 from base.permissions import permissions_of_role
