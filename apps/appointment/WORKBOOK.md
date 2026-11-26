@@ -589,7 +589,9 @@ Pasos:
    en el TPV, **Cobrar** abre una nueva. Con la cuenta abierta, la cita no se cancela, ni se marca como
    no presentada, ni se borra: primero se cobra o se anula la cuenta.
 5. Al cobrarla, la cita queda **cobrada** y, si no lo estaba, **Completada**; **Cobrar** sale en gris.
-   Si la venta se anula, la cita deja de estar cobrada y **Cobrar** vuelve a estar activo.
+   Si la venta se anula, la cita deja de estar cobrada y **Cobrar** vuelve a estar activo. En su historial,
+   «Cobrada», la «Completada» que trae el cobro y «Venta anulada» dicen quién cobró o anuló la venta en
+   el TPV, como el resto de cambios.
 Entra: una cita pendiente, confirmada, en curso o completada que no esté cobrada.
 Sale: la cuenta abierta en Venta (`sale.order.opened`) y aquí `appointment.appointment.check_opened`; al
 cobrar, el aviso de Venta `sale.sale.created_from_appointment` y aquí `appointment.appointment.charged`;
