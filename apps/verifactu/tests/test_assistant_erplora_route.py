@@ -7,8 +7,11 @@ that tool and the Home's checklist (``base.setup.status``) but not ``verifactu.c
 Nothing here runs an operation: the tests read what the model is told of each tool.
 """
 
+from django.utils import translation
 from live.assistant import tool_spec
 from live.operations import registry
+
+from apps.verifactu import erplora_route
 
 MODEL = "verifactu.representation.model"
 
@@ -21,11 +24,14 @@ def test_the_authorisation_is_offered_only_where_erplora_files_for_businesses():
     """Where the route is closed the model gets the answer the screen and the tool give, in its own words (the person
     reads them in their language), and the two signals a turn carries of it: the Home's step, which then asks only for
     the business certificate, and the configuration's ``erplora_route_available``."""
+    with translation.override("en"):
+        refused = str(erplora_route.UNAVAILABLE)
     told = told_of_model()
 
+    assert refused == "ERPlora does not file on behalf of businesses for now: file with your own certificate."
     assert "Only on a server where ERPlora files on behalf of businesses" in told
-    assert "ERPlora does not file on behalf of businesses for now: that is the answer" in told
-    assert "the business files with its own certificate" in told
+    assert f"{refused.partition(':')[0]}: that is the answer" in told
+    assert "the business files with its own certificate (VeriFactu › Configuration, in the tab of its own certificate)" in told
     assert "the authorisation is not offered" in told
     assert "the Home's step to set up VeriFactu (base.setup.status)" in told
     assert "erplora_route_available" in told
