@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, settled, shown, testid } from './helpers';
+import { dismissToasts } from './toast-helpers';
 
 /** The tablet's screen with Chrome's address bar shown: what the page has, and what `100vh` counts. */
 const CHROME_LANDSCAPE = { width: 1280, page: 665, withoutBar: 761 };
@@ -106,10 +107,10 @@ async function open(page: Page, name: string): Promise<Locator> {
   return preview;
 }
 
-/** The video's size is known once its metadata loaded: only then is its box the one it keeps. */
+/** The video with its first frame: its size is known and its box is the one it keeps. */
 async function videoReady(page: Page, preview: Locator): Promise<void> {
   const video = preview.locator('[data-testid="file-preview-video"]');
-  await expect.poll(() => video.evaluate((el) => (el as HTMLVideoElement).readyState)).toBeGreaterThanOrEqual(1);
+  await expect.poll(() => video.evaluate((el) => (el as HTMLVideoElement).readyState)).toBeGreaterThanOrEqual(2);
   await settled(page);
 }
 
@@ -129,6 +130,7 @@ for (const language of LANGUAGES) {
       await filesIn(page, context, language.lang);
       await upload(page, note, 'text/plain', Buffer.from(NOTE));
       await upload(page, video, 'video/webm', VIDEO);
+      await dismissToasts(page);
       // Chrome's address bar, as on the tablet: the page is 96 px shorter than what `100vh` counts.
       const bar = await page.addStyleTag({ content: `body { height: ${CHROME_LANDSCAPE.page}px !important; max-height: ${CHROME_LANDSCAPE.page}px !important; }` });
 
