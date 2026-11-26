@@ -139,14 +139,16 @@ function add(): void {
           +
         </ion-button>
       </ion-item>
-      <ion-input
-        :label="t('online_order.order.note')"
-        label-placement="stacked"
-        :maxlength="200"
-        :value="notes"
-        data-testid="oo-dish-note"
-        @ion-input="notes = String($event.detail.value ?? '')"
-      />
+      <ion-item lines="none">
+        <ion-input
+          :label="t('online_order.order.note')"
+          label-placement="stacked"
+          :maxlength="200"
+          :value="notes"
+          data-testid="oo-dish-note"
+          @ion-input="notes = String($event.detail.value ?? '')"
+        />
+      </ion-item>
     </div>
   </FormModal>
 </template>
