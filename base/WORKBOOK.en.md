@@ -4005,7 +4005,7 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:63af2ec5f10c -->
+<!-- from WORKBOOK.md sha256:a610db0844f3 -->
 Status: done
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
@@ -4018,8 +4018,8 @@ Steps:
      support can come in." or "Support access is off: ERPlora support can no longer come in.". It does not expire: it
      stays on until someone of the business turns it off, because getting started can take several days.
   3. Anyone of the business sees in the card whether it is on, who changed it last and when ("Last changed by Ana,
-     11/24/2026, 10:30 AM.") and, under "Latest support visits", the last 10 entries of support (who and when), the
-     most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
+     11/24/2026, 10:30 AM.") and, under "Latest support visits", the last 10 entries of support (who and when; a
+     support account without a name, by what goes before the @ of its email), the most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
      support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
      business can change it.".
   4. With the access on, a person of ERPlora's support comes into the business with "Enter as support", in erplora.com's
