@@ -88,10 +88,7 @@ async function retry(run: RunOut): Promise<void> {
   }
 }
 
-const attentionText = computed(() => {
-  const n = page.value?.failed ?? 0;
-  return phrasing.value.t(n === 1 ? 'flow.history.attentionOne' : 'flow.history.attentionMany', { n });
-});
+const attentionText = computed(() => phrasing.value.t('flow.history.stopped', { n: page.value?.failed ?? 0 }));
 </script>
 
 <template>
