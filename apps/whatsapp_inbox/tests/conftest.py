@@ -14,16 +14,16 @@ import httpx
 import pytest
 import respx
 from django.contrib.auth import get_user_model
-from django.db import connections
+from django.db import IntegrityError, connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
-from live.operations import get
+from live.operations import atomic, get
 from psycopg.conninfo import make_conninfo
 
 from apps.invoice.tests.conftest import catalog_of
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from base import catalog, hub_visits, worker
 from base.catalog.register_apps import RegisterResult
 from base.models import Membership
@@ -204,6 +204,12 @@ def delivered(django_capture_on_commit_callbacks):
 
 def stored(out) -> Message:
     return Message.objects.select_related("sent_by").get(pk=out.id)
+
+
+def violates(constraint, create):
+    with pytest.raises(IntegrityError) as excinfo, atomic():
+        create()
+    return constraint in str(excinfo.value)
 
 
 @pytest.fixture(autouse=True)

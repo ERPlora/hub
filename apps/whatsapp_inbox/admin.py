@@ -8,7 +8,9 @@ template's hand-over to Meta (its key, state and reason) is shown, never edited.
 
 from django.contrib import admin
 
-from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.conversations import Conversation, Message, Note
+from apps.whatsapp_inbox.models.templates import Template
 
 
 class MessageInline(admin.TabularInline):
