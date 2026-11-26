@@ -1928,8 +1928,9 @@ Pasos:
      negocio» deshace lo propio y devuelve el tamaño a 100%. El idioma pasa a toda la aplicación abierta, también a
      los textos que manda el servidor (el menú lateral, «Mis apps», el checklist, los paneles de Inicio y la campana),
      sin recargar ni volver a Inicio.
-  5. Si se lo pide al asistente («ponme el idioma en inglés»), la tarjeta dice solo lo que ha pedido («English»; lo que
-     vuelve a ser del negocio, por su nombre: «El idioma del negocio»). Al confirmarla cambia solo eso, y el tema, la
+  5. Si se lo pide al asistente («ponme el idioma en inglés»), la tarjeta dice solo lo que ha pedido, con el nombre de
+     su dato («Idioma: English», «Tamaño de la interfaz: 110%»; lo que vuelve a ser del negocio, por su nombre: «El
+     idioma del negocio»). Al confirmarla cambia solo eso, y el tema, la
      paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
      aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo.
 Entra: el perfil de quien tiene la sesión.

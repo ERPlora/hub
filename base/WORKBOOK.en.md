@@ -2007,7 +2007,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:f5fff0f123b1 -->
+<!-- from WORKBOOK.md sha256:d3f6f60ee728 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2024,8 +2024,9 @@ Steps:
      and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
      (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
      Home.
-  5. If they ask the assistant for it ("switch me to English"), the card says only what they asked for ("English";
-     what goes back to the business's, by its name: "The business's language"). On confirming it only that changes, and
+  5. If they ask the assistant for it ("switch me to English"), the card says only what they asked for, with the name
+     of its datum ("Language: English", "Interface scale: 110%"; what goes back to the business's, by its name: "The
+     business's language"). On confirming it only that changes, and
      the theme, the palette and the size they did not name stay as they were. The new language applies just as from the
      selector: the open application switches to it without reloading, and stays in it on reloading or opening it again
      on this device.
