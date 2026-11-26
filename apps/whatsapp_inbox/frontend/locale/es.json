@@ -271,7 +271,7 @@
       "reconnectHint": "WhatsApp retiró el permiso: vuelve a conectar el número. Hasta entonces no se puede enviar nada.",
       "month": "Este mes",
       "sent": "Mensajes enviados",
-      "usage": "{used} de {limit} mensajes enviados",
+      "usage": "{used} de {count} mensaje enviado | {used} de {count} mensajes enviados",
       "notIncluded": "Tu plan no incluye mensajes de WhatsApp.",
       "notReported": "erplora.com todavía no ha informado de los mensajes de este mes.",
       "capReached": "Has usado todos los mensajes de tu plan este mes.",

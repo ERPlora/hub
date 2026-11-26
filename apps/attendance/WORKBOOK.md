@@ -360,7 +360,7 @@ Actor: todos (el empleado, solo sus jornadas)
 Pantalla: Registros
 Pasos:
 1. En «Registros», elige el mes (y, si es responsable, la persona y el estado).
-2. Pulsa «Exportar CSV»; mientras tanto ve «Exportando…».
+2. Pulsa «Exportar CSV» (el icono de descarga de la barra); mientras tanto da vueltas y se llama «Exportando…».
 3. Se descarga «attendance-2026-10.csv» con una línea por jornada del filtro, todas, no solo las que
    caben en la pantalla: fecha, persona, entrada, salida, minutos de pausa, minutos trabajados, estado y
    si la entrada y la salida fueron dentro del radio.

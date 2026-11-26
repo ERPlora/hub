@@ -1,13 +1,25 @@
 // The business is emptied first through the apps' own operations, as `clearItems` does with the demo's. «Reset the
 // business» is never pressed, so the business stays for the other specs.
-// flow: BASE-F37
+// flow: BASE-F37, BASE-F32
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, ARTIFACTS, horizontalOverflow, hostPage, shot, shown, untilStill } from './helpers';
+import {
+  A,
+  api,
+  ARTIFACTS,
+  capture,
+  horizontalOverflow,
+  hostPage,
+  saveSessionForTheSweep,
+  shot,
+  shown,
+  signedInSpanish,
+  untilStill,
+} from './helpers';
 import { emptyOfTemplateData } from './business';
 
 // A control that never comes fails in half a minute and says which, instead of eating the whole test.
@@ -208,5 +220,76 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await snap(page, 'BASE-F37-copies', width);
 
     await context.close();
+  });
+}
+
+// BASE-F32 — each figure of a part in singular for one row and in plural for more, in words that fit any part (hub#2596).
+// The same file twice: the first time its good row is new, the second time it was already there; its broken row fails
+// both times. Both loads are undone at the end.
+const REPORT_SIZES = [
+  { label: '375x667', width: 375, height: 667 },
+  { label: '820x1180', width: 820, height: 1180 },
+  { label: '1280x720', width: 1280, height: 720 },
+] as const;
+
+const COUNTS = {
+  en: ['Products · 1 new row · 0 were already there · 1 failed', 'Products · 0 new rows · 1 was already there · 1 failed'],
+  es: ['Productos · 1 fila nueva · 0 ya estaban · 1 con error', 'Productos · 0 filas nuevas · 1 ya estaba · 1 con error'],
+} as const;
+
+/** Each part's line of figures on the report: its words, and whether it shows whole inside the report's card. */
+function countLines(page: Page) {
+  return testid(page, 'report').locator('.report-dataset .data-row-detail').evaluateAll((lines) =>
+    lines.map((line) => {
+      const card = line.closest('[data-testid="report"]')?.getBoundingClientRect();
+      const box = line.getBoundingClientRect();
+      return {
+        text: (line.textContent ?? '').replace(/\s+/g, ' ').trim(),
+        cut: line.scrollWidth > line.clientWidth || line.scrollHeight > line.clientHeight,
+        inside: !!card && box.left >= card.left && box.right <= card.right + 0.5,
+      };
+    }),
+  );
+}
+
+/** Import, with nothing left of an earlier report in the way: «See the templates» leads to the file input. */
+async function importFile(page: Page, file: string): Promise<void> {
+  await section(page, 'import');
+  await expect(testid(page, 'import-upload').or(testid(page, 'report'))).toBeVisible();
+  if (await testid(page, 'report').isVisible()) await testid(page, 'report-templates').click();
+  await testid(page, 'import-file').setInputFiles(file);
+  await testid(page, 'review-import').click();
+  await expect(testid(page, 'report')).toBeVisible();
+}
+
+for (const language of ['en', 'es'] as const) {
+  test(`the import report says each figure in singular or plural, in ${language}`, async ({ browser }) => {
+    const wide = REPORT_SIZES[2];
+    const { context, page } =
+      language === 'es'
+        ? await signedInSpanish(browser, wide, '/settings#data')
+        : await hostPage(browser, A, { next: '/settings#data', viewport: wide });
+    await saveSessionForTheSweep(context);
+    const stamp = `${language}-${Date.now().toString(36)}`;
+    const file = partialFile(stamp);
+    try {
+      for (const [time, words] of COUNTS[language].entries()) {
+        await page.setViewportSize(wide);
+        await importFile(page, file);
+        for (const size of REPORT_SIZES) {
+          await page.setViewportSize(size);
+          await testid(page, 'report').locator('.report-dataset').first().scrollIntoViewIfNeeded();
+          expect(await countLines(page), `${size.label}, import ${time + 1}`).toEqual([{ text: words, cut: false, inside: true }]);
+          expect(await horizontalOverflow(page), `${size.label}: no sideways scroll`).toBeLessThanOrEqual(0);
+          await capture(page, `BASE-F32-counts-${language}-${time + 1}-${size.label}`);
+        }
+      }
+    } finally {
+      const imports = await api<{ imports: { id: string; name: string; undone: boolean }[] }>(context, A, 'GET', '/settings/data/imports');
+      for (const load of imports.data.imports.filter((row) => row.name === `E2E partial ${stamp}` && !row.undone)) {
+        expect((await api(context, A, 'POST', '/settings/data/imports/undo', { id: load.id })).status, 'undo').toBeLessThan(300);
+      }
+      await context.close();
+    }
   });
 }

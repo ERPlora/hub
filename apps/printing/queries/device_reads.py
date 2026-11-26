@@ -35,6 +35,11 @@ def active_devices() -> QuerySet[PrintDevice]:
     return PrintDevice.objects.filter(retired_at__isnull=True)
 
 
+def devices_on(now: dt.datetime) -> QuerySet[PrintDevice]:
+    """The devices set up here that are there at ``now``: their last news is within :data:`SEEN_WITHIN`."""
+    return active_devices().filter(last_seen_at__gte=now - SEEN_WITHIN)
+
+
 def find_device(device_id: uuid.UUID, *, lock: bool = False) -> PrintDevice:
     devices = active_devices().select_for_update() if lock else active_devices()
     found = devices.filter(pk=device_id).first()
