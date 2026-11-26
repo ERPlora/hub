@@ -40,6 +40,15 @@ async function whoIsIn(page: Page): Promise<string | null> {
   return me.data.user?.label ?? null;
 }
 
+/** `person` picks their face on the PIN pad on screen and enters with their PIN: the till is theirs. */
+async function entersWithPin(page: Page, person: 'owner' | 'employee'): Promise<void> {
+  const [face, pin] = person === 'owner' ? ['e2e-switch-panel-owner', OWNER_PIN] : ['e2e-switch-panel-employee', EMPLOYEE_PIN];
+  await shown(page).getByTestId('pin-face').filter({ hasText: face }).click();
+  await pressPin(page, pin);
+  await expect(page).toHaveURL(`${origin}/`);
+  expect(await whoIsIn(page)).toMatch(new RegExp(face));
+}
+
 /** The panel open on the till with a question answered: the conversation of whoever is in. */
 async function conversationOpen(page: Page): Promise<void> {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -88,9 +97,7 @@ test.beforeAll(async ({ browser }) => {
   till = owner.page;
   await till.goto(`${origin}/`);
   await expect(till).toHaveURL(/\/login(\?|$)/);
-  await shown(till).getByTestId('pin-face').filter({ hasText: 'e2e-switch-panel-owner' }).click();
-  await pressPin(till, OWNER_PIN);
-  await expect(till).toHaveURL(`${origin}/`);
+  await entersWithPin(till, 'owner');
 });
 
 test.afterAll(async () => {
@@ -111,10 +118,7 @@ test('BASE-F102: whoever takes over with their PIN finds the panel closed and em
   await expect(panel(till)).toHaveAttribute('data-open', 'true');
   await userMenu(till, 'switch-user');
   await expect(till).toHaveURL(`${origin}/switch-user`);
-  await shown(till).getByTestId('pin-face').filter({ hasText: 'e2e-switch-panel-employee' }).click();
-  await pressPin(till, EMPLOYEE_PIN);
-  await expect(till).toHaveURL(`${origin}/`);
-  expect(await whoIsIn(till)).toMatch(/e2e-switch-panel-employee/);
+  await entersWithPin(till, 'employee');
   await closedAndEmpty(till, 'pin');
 });
 
@@ -134,10 +138,7 @@ test('BASE-F102: after signing out of the till, whoever enters next with their P
   await conversationOpen(till);
   await userMenu(till, 'logout');
   await expect(till).toHaveURL(/\/login(\?|$)/);
-  await shown(till).getByTestId('pin-face').filter({ hasText: 'e2e-switch-panel-employee' }).click();
-  await pressPin(till, EMPLOYEE_PIN);
-  await expect(till).toHaveURL(`${origin}/`);
-  expect(await whoIsIn(till)).toMatch(/e2e-switch-panel-employee/);
+  await entersWithPin(till, 'employee');
   await closedAndEmpty(till, 'sign-out');
 });
 
@@ -151,9 +152,6 @@ test('BASE-F102: after the till locked by itself, whoever enters next with their
   await expect(panel(till)).toHaveAttribute('data-open', 'true');
   await till.clock.fastForward('01:05');
   await expect(till).toHaveURL(/\/login(\?|$)/, { timeout: 60_000 });
-  await shown(till).getByTestId('pin-face').filter({ hasText: 'e2e-switch-panel-owner' }).click();
-  await pressPin(till, OWNER_PIN);
-  await expect(till).toHaveURL(`${origin}/`);
-  expect(await whoIsIn(till)).toMatch(/e2e-switch-panel-owner/);
+  await entersWithPin(till, 'owner');
   await closedAndEmpty(till, 'idle');
 });
