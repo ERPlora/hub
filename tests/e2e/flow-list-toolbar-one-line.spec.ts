@@ -8,7 +8,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cutLabels } from './field-labels';
-import { choose, deleteFlowsNamed, manualFlow, signedIn } from './flow-helpers';
+import { deleteFlowsNamed, filterList, manualFlow, signedIn } from './flow-helpers';
 import { capture, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 import { noHorizontalScroll } from './schedule-helpers';
 
@@ -92,8 +92,8 @@ async function expectFilters(page: Page, size: Size, name: string, words: (typeo
   await expect(panel.locator('[data-testid=flow-list-filter-trigger_kind]')).toBeVisible();
   expect(await cutLabels(panel), `${size.label}: the filters' labels`).toEqual([]);
   await capture(page, `hub-2542-flow-list-filters-${words === WORDS.es ? 'es' : 'en'}-${size.label}`);
-  await choose(page, 'flow-list-filter-state', words.paused);
-  await panel.locator('[data-testid=flow-list-filters-apply]').click();
+  await panel.locator('[data-testid=flow-list-filters-close]').click();
+  await filterList(page, 'flow-list', 'state', words.paused);
   await expect(list.locator('[data-testid=flow-list-nomatch]')).toContainText(words.noMatch);
   await list.locator('[data-testid=flow-list-clear]').click();
   await expect(list.locator('[data-testid=flow-list-row]', { hasText: name })).toBeVisible();
