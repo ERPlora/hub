@@ -154,7 +154,7 @@ def test_an_employee_reads_creates_services_and_vouchers_but_does_not_archive(
     created = post(
         employee_client,
         "/service/services",
-        {"name": "Cut", "tax_category_key": tax.key},
+        {"name": "Cut", "price": 1500, "tax_category_key": tax.key},
     )
     assert created.status_code == 201
     for response in (
@@ -191,7 +191,7 @@ def test_an_invalid_service_is_422_per_field(admin_client):
 
 @HUB_DB
 def test_a_service_without_a_tax_category_is_422_under_its_field(admin_client):
-    response = post(admin_client, "/service/services", {"name": "Cut"})
+    response = post(admin_client, "/service/services", {"name": "Cut", "price": 1500})
     assert response.status_code == 422
     assert response.json()["error"]["fields"] == {
         "tax_category_key": "Pick a tax category: without one the service cannot be charged."
@@ -237,7 +237,7 @@ def test_a_missing_service_is_404_and_one_not_named_is_422(admin_client):
 def test_the_messages_speak_spanish(admin_client):
     response = admin_client.post(
         "/api/service/services",
-        json.dumps({"name": "Corte"}),
+        json.dumps({"name": "Corte", "price": 1500}),
         content_type="application/json",
         HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",
@@ -309,7 +309,7 @@ def test_round_trip(admin_client, tax):
     bulk = post(
         admin_client,
         "/service/services/bulk_create",
-        {"services": [{"name": "Beard", "tax_category_key": tax.key}]},
+        {"services": [{"name": "Beard", "price": 1000, "tax_category_key": tax.key}]},
     )
     assert (bulk.status_code, bulk.json()["created"]) == (201, 1)
 

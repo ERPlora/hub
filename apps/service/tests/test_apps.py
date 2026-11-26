@@ -166,7 +166,9 @@ def test_every_operation_is_a_tool_of_the_assistant():
             expected |= {"asks"}
             said = {language: len(op.ai.get("asks", {}).get(language, ())) for language in ("en", "es")}
             assert min(said.values()) >= MIN_ASKS, (op.name, said)
-        if op.name == "service.grant.create":  # its card puts first the voucher, whose it is and its sale (hub#2347)
+        # Their cards put first what the person checks: the voucher, whose it is and its sale; a service's price and
+        # how long it lasts.
+        if op.name in ("service.grant.create", "service.service.create"):
             expected |= {"summary"}
         assert set(op.ai) == expected, op.name
         if op.kind == "command":

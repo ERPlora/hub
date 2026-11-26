@@ -9,7 +9,7 @@ from live.errors import InvalidPayload, NotFound
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.service import events
+from apps.service import events, service_card
 from apps.service.models.catalog import Category, Service
 from apps.service.models.settings import ServiceSettings
 from apps.service.queries.catalog import find_service, load_service
@@ -148,9 +148,10 @@ def _announce_created(ctx: OperationContext, service: Service) -> None:
     output=ServiceOut,
     expose_api=True,
     ai={
-        "description": "Create a service of the catalog with its price, duration and tax category (the settings' "
-        "default when not said); what it does not say takes the settings.",
+        "description": "Create a service of the catalog at its price; its duration, buffers, online booking and tax "
+        "category, when not said, are the settings'.",
         "risk": "normal",
+        "summary": service_card.summary,
         "asks": {
             "en": ("add a new service: men's haircut, 30 minutes, 15 euros", "create a keratin treatment at 90 euros"),
             "es": (

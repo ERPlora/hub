@@ -57,7 +57,7 @@ class ComboIn(In):
     kitchen_name: KitchenName = Field(
         "", description="Name on the kitchen ticket; empty uses the name."
     )
-    price: Cents = Field(0, description=D_PRICE)
+    price: Cents = Field(description=D_PRICE)
     supply_kind: SupplyKind = Field("service", description=D_SUPPLY)
     tax_category_key: TaxKey | None = Field(
         None, title=VAT_CATEGORY, description=D_TAX, json_schema_extra=A_TAX_CATEGORY

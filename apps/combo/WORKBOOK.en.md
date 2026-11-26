@@ -185,7 +185,7 @@ first one with the + button.".
 Involved: none
 
 ### COMBO-F02 Create a menu at a closed price
-<!-- from WORKBOOK.md sha256:f877af580080 -->
+<!-- from WORKBOOK.md sha256:de1267f330e5 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menus
@@ -193,7 +193,9 @@ Steps:
 1. In Menus, tap **+**.
 2. Type the Name; if the kitchen ticket must say something else, the "Kitchen name".
 3. Type the "Closed price" (in Spain, "Closed price (EUR)"): what the customer pays for the whole menu, in the business's
-   currency and with its decimals (the yen has none). Empty is 0.
+   currency and with its decimals (the yen has none). Empty is 0. Through the assistant, a menu asked for
+   without saying its price ("create the menu of the day") draws no card: it first asks how much it
+   costs, and it is free only if the person says so.
 4. Choose "How is it sold?": "Eaten in" bills ONE line at the menu's rate, the drink included (the
    menu of the day); "Sold as a product / to take away": if all the choices are taxed the same, ONE
    line at that rate; if not, ONE line per dish, each one at its rate, with the price shared out.
