@@ -19,7 +19,6 @@ const business = useBusinessMoney();
 const totalText = computed(() => (props.total === undefined ? '—' : formatMoney(props.total, locale.value, business.value)));
 const label = computed(() => {
   if (props.count === 0) return t('sale.pos.openCart');
-  if (props.count === 1) return t('sale.pos.openCartWithItemsOne', { total: totalText.value });
   return t('sale.pos.openCartWithItems', { count: props.count, total: totalText.value });
 });
 </script>
