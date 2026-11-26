@@ -37,6 +37,25 @@ async function arrive(answers: Parameters<Awaited<ReturnType<typeof setup>>['ans
   return s;
 }
 
+/** The till still says it is opening `o7` while its customer is read; once it is, it shows `o7` and the catalogue. */
+async function shownOnceItsCustomerIsRead(s: Awaited<ReturnType<typeof setup>>, customer: ReturnType<typeof held>) {
+  expect(shows(s)).toEqual({ opening: true, catalogue: false, check: null });
+  customer.release(NO_CUSTOMER);
+  await settle();
+  expect(shows(s)).toEqual({ opening: false, catalogue: true, check: 'o7' });
+}
+
+/** A check with lines on the till (`o1`), and then the address of `o7`. */
+async function addressWhileSelling() {
+  const s = await setup();
+  await s.addProduct();
+  s.answer(200, O7);
+  await s.router.push('/sale/pos?order=o7');
+  await settle();
+  await settle();
+  return s;
+}
+
 /** What the till shows: that it is opening a check, the catalogue, and the check on screen (`none`: an empty one). */
 function shows(s: Awaited<ReturnType<typeof setup>>) {
   const cart = s.wrapper.findComponent(PosCart);
@@ -56,10 +75,7 @@ describe('PosPage: a check opened by its address (/sale/pos?order=<id>, APPOINTM
     expect(shows(s)).toEqual({ opening: true, catalogue: false, check: null });
     detail.release(O7);
     await settle();
-    expect(shows(s)).toEqual({ opening: true, catalogue: false, check: null });
-    customer.release(NO_CUSTOMER);
-    await settle();
-    expect(shows(s)).toEqual({ opening: false, catalogue: true, check: 'o7' });
+    await shownOnceItsCustomerIsRead(s, customer);
     expect(s.find('pos-line-l7').exists()).toBe(true);
     expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos');
   });
@@ -80,10 +96,7 @@ describe('PosPage: a check opened by its address (/sale/pos?order=<id>, APPOINTM
     s.answerBy({ '/api/sale/orders/detail': [200, parked], '/api/customer/orders/customer': customer.route });
     await s.router.push('/sale/pos?order=o7');
     await settle();
-    expect(shows(s)).toEqual({ opening: true, catalogue: false, check: null });
-    customer.release(NO_CUSTOMER);
-    await settle();
-    expect(shows(s)).toEqual({ opening: false, catalogue: true, check: 'o7' });
+    await shownOnceItsCustomerIsRead(s, customer);
   });
 
   it('opens that check on the till and leaves the address clean', async () => {
@@ -145,30 +158,17 @@ describe('PosPage: a check opened by its address (/sale/pos?order=<id>, APPOINTM
   });
 
   it('the till entered without an address is not held back', async () => {
-    const s = await setup();
-    expect(s.find('pos-linked-loading').exists()).toBe(false);
-    expect(s.wrapper.findComponent(PosCatalog).exists()).toBe(true);
-    expect(s.wrapper.findComponent(PosCart).exists()).toBe(true);
+    expect(shows(await setup())).toEqual({ opening: false, catalogue: true, check: 'none' });
   });
 
   it('with another check with lines on screen, asks first, as resuming one does', async () => {
-    const s = await setup();
-    await s.addProduct();
-    s.answer(200, O7);
-    await s.router.push('/sale/pos?order=o7');
-    await settle();
-    await settle();
+    const s = await addressWhileSelling();
     expect(s.wrapper.findComponent(DirtyCheckDialog).props('open')).toBe(true);
     expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBe('o1');
   });
 
   it('«Cancel» on that question keeps the check on screen and opens nothing', async () => {
-    const s = await setup();
-    await s.addProduct();
-    s.answer(200, O7);
-    await s.router.push('/sale/pos?order=o7');
-    await settle();
-    await settle();
+    const s = await addressWhileSelling();
     s.wrapper.findComponent(DirtyCheckDialog).vm.$emit('update:open', false);
     await settle();
     expect(s.wrapper.findComponent(DirtyCheckDialog).props('open')).toBe(false);

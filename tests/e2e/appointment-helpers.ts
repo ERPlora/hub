@@ -2,6 +2,8 @@
 // goes on, the salon it is booked in and how a spec takes away what it made.
 import type { BrowserContext } from '@playwright/test';
 
+import { cardDeletes } from './customer-helpers';
+import { psql } from './helpers';
 import { post } from './service-helpers';
 
 /** A Monday five weeks ahead, and `weeks` more (inside the 90 days of advance and past any notice), as `YYYY-MM-DD`. */
@@ -64,4 +66,9 @@ export function salonCleanUp(tag: string): string[] {
     `delete from service_service where name like '${tag}%'`,
     `delete from staff_member where first_name like '${tag}%'`,
   ];
+}
+
+/** Deletes what a spec named with `tag` booked (`salonCleanUp`) and its customers' cards with what hangs from them. */
+export function cleanSalonAndCards(tag: string): void {
+  psql([...salonCleanUp(tag), ...cardDeletes(`select id from customer_customer where name like '${tag}%'`)].join('; '));
 }

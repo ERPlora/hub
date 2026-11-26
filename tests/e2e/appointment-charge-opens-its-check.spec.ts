@@ -5,28 +5,18 @@
 // is named «e2e Apt Opens <stamp>…» and deleted before and after it.
 import { type Page, expect, test } from '@playwright/test';
 
-import { aMonday, openForACut, salonCleanUp } from './appointment-helpers';
-import { cardDeletes, spanishMobile } from './customer-helpers';
+import { aMonday, cleanSalonAndCards, openForACut } from './appointment-helpers';
+import { spanishMobile } from './customer-helpers';
 import { pickDay } from './date-time-fields';
-import { A, capture, psql, shown } from './helpers';
-import { cleanSales, stamp } from './sale-helpers';
-import { ownerPage, post, rowAction } from './service-helpers';
+import { A, shown } from './helpers';
+import { stamp } from './sale-helpers';
+import { capturedAtSizes, FLOW_VIEWPORTS, ownerPage, post, rowAction } from './service-helpers';
 
 const TAG = `e2e Apt Opens ${stamp()}`;
 const DAY = aMonday();
-const SIZES = [
-  { label: '1440', width: 1440, height: 900 },
-  { label: '820', width: 820, height: 1180 },
-  { label: '375', width: 375, height: 667 },
-] as const;
 
-function cleanUp(): void {
-  cleanSales();
-  psql([...salonCleanUp(TAG), ...cardDeletes(`select id from customer_customer where name like '${TAG}%'`)].join('; '));
-}
-
-test.beforeAll(cleanUp);
-test.afterAll(cleanUp);
+test.beforeAll(() => cleanSalonAndCards(TAG));
+test.afterAll(() => cleanSalonAndCards(TAG));
 
 interface Paint {
   opening: boolean;
@@ -94,10 +84,9 @@ test('«Charge» says it is opening the appointment’s check and then shows tha
     }
     expect(paints.filter((paint) => paint.opening).every((paint) => !paint.catalogue), JSON.stringify(paints)).toBe(true);
     expect(paints[0], JSON.stringify(paints)).toMatchObject({ opening: true });
-    for (const size of SIZES) {
-      await page.setViewportSize(size);
-      await capture(page, `appointment-charge-opens-check-${size.label}`);
-    }
+    await capturedAtSizes(page, 'appointment-charge-opens-check', FLOW_VIEWPORTS, async () => {
+      await expect(shown(page).locator('[data-testid=pos-till]')).toBeVisible();
+    });
   } finally {
     await context.close();
   }
@@ -118,20 +107,14 @@ test('while the check is on its way the till says so; one that cannot be opened 
     await expect(opening).toHaveText('Opening the check…');
     await expect(shown(page).locator('.pos-catalog')).toHaveCount(0);
     await expect(shown(page).locator('[data-testid=pos-cart]')).toHaveCount(0);
-    for (const size of SIZES) {
-      await page.setViewportSize(size);
-      await capture(page, `appointment-charge-opening-${size.label}`);
-    }
+    await capturedAtSizes(page, 'appointment-charge-opening', FLOW_VIEWPORTS, () => expect(opening).toBeVisible());
 
     letGo();
     const failed = shown(page).locator('[data-testid=pos-linked-error]');
     await expect(failed).toContainText('That check is not open any more: it was charged, voided or does not exist.');
     await expect(shown(page).locator('.pos-catalog')).toHaveCount(0);
     await expect(shown(page).locator('[data-testid=pos-cart]')).toHaveCount(0);
-    for (const size of SIZES) {
-      await page.setViewportSize(size);
-      await capture(page, `appointment-charge-cannot-open-${size.label}`);
-    }
+    await capturedAtSizes(page, 'appointment-charge-cannot-open', FLOW_VIEWPORTS, () => expect(failed).toBeVisible());
 
     await shown(page).locator('[data-testid=pos-linked-action]').click();
     await expect(failed).toHaveCount(0);
