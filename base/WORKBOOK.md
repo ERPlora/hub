@@ -2866,7 +2866,11 @@ Pasos:
      y 17 más»); las filas de un fichero que se importa (productos, categorías o clientes), por el nombre de cada una,
      como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
      nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una, por su nombre y su tipo
-     de hoy («Categoría fiscal: Restauración — comida · 10 %»);
+     de hoy («Categoría fiscal: Restauración — comida · 10 %»); las filas de un alta de golpe que dicta la persona,
+     igual, por el nombre de cada una: cada persona de Personal por su nombre y apellidos («Crear en Personal:
+     Carla Ruiz, Diego Martín, Elena Sanz»; una sin nombre o sin apellidos cuenta entre los «más») y cada servicio por
+     su nombre («Servicios: Corte, Tinte»), con las categorías y las categorías fiscales que llevan aparte, una vez cada
+     una;
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
