@@ -176,7 +176,7 @@ describe('SpecialDaysList', () => {
     expect([dialog.props('open'), dialog.props('title'), dialog.props('message'), dialog.props('confirmLabel')]).toEqual([
       true,
       'Delete',
-      '«Christmas» will be deleted. This cannot be undone.',
+      '“Christmas” will be deleted. This cannot be undone.',
       'Delete',
     ]);
     dialog.vm.$emit('confirm');

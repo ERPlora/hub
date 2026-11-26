@@ -72,7 +72,7 @@
       "searchWithoutContact": "Search name, tax ID or company…",
       "loadError": "The customers could not be loaded",
       "empty": "No customers.",
-      "emptyMessage": "Add the first one with «Add» or bring yours with «Import CSV».",
+      "emptyMessage": "Add the first one with “Add” or bring yours with “Import CSV”.",
       "noResults": "No results",
       "noResultsMessage": "No customer matches your search or filters.",
       "columns": {
@@ -290,7 +290,7 @@
       "assign": "Assign customer",
       "choose": "Choose customer",
       "remove": "Remove customer",
-      "quickAdd": "+ New customer «{term}»",
+      "quickAdd": "+ New customer “{term}”",
       "quickName": "Name",
       "quickPhone": "Phone",
       "quickCreate": "Create and assign",

@@ -286,7 +286,7 @@ describe('CustomerListPage: the screen', () => {
     const empty = s.wrapper.findComponent(EmptyState);
     expect([empty.props('heading'), empty.props('message'), empty.props('icon')]).toEqual([
       'No customers.',
-      'Add the first one with «Add» or bring yours with «Import CSV».',
+      'Add the first one with “Add” or bring yours with “Import CSV”.',
       'people-outline',
     ]);
   });

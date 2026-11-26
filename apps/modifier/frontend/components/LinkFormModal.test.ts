@@ -30,7 +30,7 @@ async function setup(locale: 'en' | 'es' = 'en') {
 describe('LinkFormModal', () => {
   it('is named after the group and starts with a product', async () => {
     const s = await setup();
-    expect(s.inDoc('modifier-link-form')?.getAttribute('aria-label')).toBe('Apply «Sauces» to…');
+    expect(s.inDoc('modifier-link-form')?.getAttribute('aria-label')).toBe('Apply “Sauces” to…');
     expect(s.kind().value).toBe('product');
     expect(s.target().props('label')).toBe('Product (name or SKU)');
     expect(s.save().textContent).toContain('Apply');

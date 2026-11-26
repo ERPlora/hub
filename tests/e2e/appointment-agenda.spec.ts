@@ -289,7 +289,7 @@ test('CUSTOMER-F25: a new customer from «New appointment» without leaving the 
     await search.locator('[data-testid=customer-picker-search] input').fill(name);
     await expect(search.locator('[data-testid=customer-picker-empty]')).toBeVisible();
     const quickAdd = search.locator('[data-testid=customer-search-quick-add]');
-    await expect(quickAdd).toHaveText(`+ New customer «${name}»`);
+    await expect(quickAdd).toHaveText(`+ New customer “${name}”`);
     const sizes = [
       ['390', { width: 390, height: 844 }],
       ['834', { width: 834, height: 1112 }],

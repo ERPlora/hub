@@ -61,9 +61,9 @@ describe('ImportReportModal', () => {
   });
 
   it('a stopped import says the rest of the file was left untouched; notes are shown', async () => {
-    const s = await setup({ ...REPORT, cancelled: true, notes: ['Taxes could not save «IVA 7»: boom'] });
+    const s = await setup({ ...REPORT, cancelled: true, notes: ['Taxes could not save “IVA 7”: boom'] });
     expect(s.testid('inventory-import-report-cancelled')?.textContent).toContain('The import was stopped halfway.');
-    expect(s.testid('inventory-import-report-note')?.textContent).toContain('Taxes could not save «IVA 7»: boom');
+    expect(s.testid('inventory-import-report-note')?.textContent).toContain('Taxes could not save “IVA 7”: boom');
   });
 
   it('without failures there is nothing to copy', async () => {

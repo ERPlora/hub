@@ -138,7 +138,7 @@
     },
     "zones": {
       "search": "Search zone…",
-      "empty": "No zones. Tap «+» to create the first one (Dining room, Terrace, Bar…).",
+      "empty": "No zones. Tap “+” to create the first one (Dining room, Terrace, Bar…).",
       "new": "New zone",
       "entity": {
         "one": "zone",

@@ -395,7 +395,7 @@
         "undoTitle": "Undo an import",
         "undoHint": "Removes only what that import brought. What you created afterwards stays.",
         "undo": "Undo",
-        "undoConfirmTitle": "Undo «{name}»",
+        "undoConfirmTitle": "Undo “{name}”",
         "undoConfirmMessage": "The row this import brought will be removed. What you created afterwards stays. | The {n} rows this import brought will be removed. What you created afterwards stays.",
         "undone": "Import undone:",
         "removed": "{app} — {n} row removed | {app} — {n} rows removed",
@@ -411,10 +411,10 @@
         "confirmTitle": "This cannot be undone",
         "confirmMessage": "{n} row will be removed for good: | {n} rows will be removed for good:",
         "confirmLabel": "Remove for good",
-        "typeName": "Type «{name}» to confirm",
+        "typeName": "Type “{name}” to confirm",
         "done": "Business reset:",
         "busy": "A reset is under way: wait for it to finish.",
-        "keptCopy": "A full copy of the data from before is kept in «Copies».",
+        "keptCopy": "A full copy of the data from before is kept in “Copies”.",
         "progress": {
           "copying": "Copying the business's data before emptying…",
           "copyingHint": "Then {sections} will be emptied. You can leave this screen: it goes on by itself.",
@@ -428,11 +428,11 @@
           "hub_not_ready": "The business is closed, so nothing was emptied.",
           "retry": "Try again"
         },
-        "copyFirst": "Before emptying, a full copy of the business's data is made and kept for 90 days, in «Copies» below."
+        "copyFirst": "Before emptying, a full copy of the business's data is made and kept for 90 days, in “Copies” below."
       },
       "copies": {
         "title": "Copies of the data",
-        "intro": "Before each reset, ERPlora makes a full copy of the business's data and keeps it for 90 days. It brings the whole business back as it was (PostgreSQL's format, restored with pg_restore). To take your products, services or settings to another business, use «Export».",
+        "intro": "Before each reset, ERPlora makes a full copy of the business's data and keeps it for 90 days. It brings the whole business back as it was (PostgreSQL's format, restored with pg_restore). To take your products, services or settings to another business, use “Export”.",
         "loading": "Reading the copies…",
         "loadError": "The copies could not be read.",
         "empty": "No copies yet: one is made before each reset.",
@@ -450,7 +450,7 @@
       "use": "Use this one",
       "all": "See all templates",
       "later": "Not now",
-      "preparing": "Preparing «{name}»…",
+      "preparing": "Preparing “{name}”…",
       "loadError": "The templates to start with could not be loaded.",
       "readyTitle": "Your apps and your catalogue are ready",
       "readyHint": "What is left only you can answer: your business's details. They are in the list below.",
@@ -614,7 +614,7 @@
           "full": "Full"
         },
         "fellShort": "Fell short once this week | Fell short {count} times this week",
-        "topCapacity": "You already have the maximum capacity: tell us in «Report a problem».",
+        "topCapacity": "You already have the maximum capacity: tell us in “Report a problem”.",
         "notMeasured": "Not measured yet.",
         "notMeasuredToday": "Not measured today yet.",
         "notMeasuredYet": "Measured every night: the first figure comes tomorrow.",

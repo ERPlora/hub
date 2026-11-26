@@ -138,7 +138,7 @@ describe('CourseCard: its choices', () => {
     const s = await setup();
     await click(s.el('combo-choice-o2-delete'));
     const dialog = s.wrapper.findComponent(ConfirmDialog);
-    expect([dialog.props('title'), dialog.props('message')]).toEqual(['Remove this choice?', 'Remove «Chicken» from the course «Mains»?']);
+    expect([dialog.props('title'), dialog.props('message')]).toEqual(['Remove this choice?', 'Remove “Chicken” from the course “Mains”?']);
     s.answer(200, { id: 'o2' });
     dialog.vm.$emit('confirm');
     await settle();
@@ -193,7 +193,7 @@ describe('CourseCard: adding and editing a choice', () => {
   it('editing a choice keeps its place and sends only what changed', async () => {
     const s = await setup();
     await click(s.el('combo-choice-o1-edit'));
-    expect(s.el('combo-course-g1-editing').textContent).toContain('Editing «Hake». It keeps its position in the course.');
+    expect(s.el('combo-course-g1-editing').textContent).toContain('Editing “Hake”. It keeps its position in the course.');
     expect(s.picker().props('modelValue')).toEqual({ id: 'p1', label: 'Hake' });
     expect(s.el('combo-course-g1-delta').value).toBe('2.00');
     s.answer(200, option({}));

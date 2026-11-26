@@ -159,7 +159,7 @@ describe('RecoveryPage', () => {
   it('says there is no AEAT data yet, or no results with a search', async () => {
     const s = await setup();
     await s.result(AEAT_OP, { rows: [], total: 0, limit: 50, offset: 0 });
-    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No AEAT data. Press «Query AEAT».');
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No AEAT data. Press “Query AEAT”.');
     await s.emit('update:search', 'nope');
     await s.reopen();
     await s.result(AEAT_OP, { rows: [], total: 0, limit: 50, offset: 0 });

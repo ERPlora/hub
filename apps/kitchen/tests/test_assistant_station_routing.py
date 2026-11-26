@@ -34,7 +34,7 @@ def told_of(name: str) -> dict:
 
 
 def test_the_stations_screen_says_what_has_no_route_goes_to_no_station_in_english_and_spanish():
-    assert screen("en", "routing.empty") == "Nothing routed yet: everything goes to «No station»."
+    assert screen("en", "routing.empty") == "Nothing routed yet: everything goes to “No station”."
     assert screen("es", "routing.empty") == "Nada enrutado todavía: todo sale en «Sin estación»."
 
 

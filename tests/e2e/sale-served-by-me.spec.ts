@@ -20,7 +20,7 @@ const VIEWPORTS = [
   { label: '834', width: 834, height: 1112 },
   { label: '1440', width: 1440, height: 900 },
 ] as const;
-const UNLINKED = 'Your account has no record in Staff: left on «Me», this sale counts for nobody.';
+const UNLINKED = 'Your account has no record in Staff: left on “Me”, this sale counts for nobody.';
 
 let product: Product;
 /** The owner's person in the business's database (`base.HubUser`), as `/api/me` says it. */

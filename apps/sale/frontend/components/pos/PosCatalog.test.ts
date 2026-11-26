@@ -175,7 +175,7 @@ describe('PosCatalog: taps', () => {
     await click(s.find('pos-search-trigger').element);
     s.wrapper.findComponent(ProductSearch).vm.$emit('pick', product({ id: 'p7', name: 'Croquettes', is_sold_out: true }));
     await s.reopen();
-    expect(s.find('pos-tap-notice').text()).toBe('«Croquettes» is sold out.');
+    expect(s.find('pos-tap-notice').text()).toBe('“Croquettes” is sold out.');
     await s.result(GET, product({ id: 'p7', name: 'Croquettes', is_sold_out: false }));
     expect(s.find('pos-tap-notice').exists()).toBe(false);
   });
@@ -210,7 +210,7 @@ describe('PosCatalog: taps', () => {
     await click(s.find('pos-product-p2').element);
     await s.reopen();
     await s.result(GET, product({ id: 'p1', is_sold_out: false }), { id: 'p1' });
-    expect(s.find('pos-tap-notice').text()).toBe('«Tea» is sold out.');
+    expect(s.find('pos-tap-notice').text()).toBe('“Tea” is sold out.');
     await s.clock.advance(RELEASE_GRACE_MS);
     expect(s.params(GET)).toEqual([{ id: 'p2' }]);
     await s.result(GET, product({ id: 'p2', name: 'Tea', is_sold_out: false }), { id: 'p2' });
@@ -407,7 +407,7 @@ describe('PosCatalog: the services of Services (SALE-F38)', () => {
       await s.clock.advance(RELEASE_GRACE_MS);
       expect(s.params(SERVICE)).toEqual([]);
       expect(s.params(GET)).toEqual([{ id: 'p1' }]);
-      expect(s.find('pos-tap-notice').text()).toBe('«Tea» is sold out.');
+      expect(s.find('pos-tap-notice').text()).toBe('“Tea” is sold out.');
     });
 
     it('the next sellable tap clears the notice and lets the service go', async () => {

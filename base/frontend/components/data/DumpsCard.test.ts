@@ -45,7 +45,7 @@ describe('DumpsCard', () => {
     const intro = m.wrapper.get('[data-testid="dumps-intro"]').text();
     expect(intro).toContain('keeps it for 90 days');
     expect(intro).toContain('pg_restore');
-    expect(intro).toContain('«Export»');
+    expect(intro).toContain('“Export”');
   });
 
   it('asks for the link of a copy on each click and hands it to the browser', async () => {

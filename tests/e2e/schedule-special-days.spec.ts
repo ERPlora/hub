@@ -66,7 +66,7 @@ test('SCHEDULE-F04, F13, F06: a special day added, a taken date refused, correct
   const id = psql(`select id from schedule_specialday where name = '${name}'`);
   await rowAction(page, 'schedule-special-days', id, 'delete');
   const confirm = page.locator('ion-modal[data-testid=schedule-special-day-delete]');
-  await expect(confirm).toContainText(`«${name}» will be deleted. This cannot be undone.`);
+  await expect(confirm).toContainText(`“${name}” will be deleted. This cannot be undone.`);
   await page.locator('[data-testid=schedule-special-day-delete-submit]').click();
   await expect(confirm).toBeHidden();
   await expect(row).toHaveCount(0);

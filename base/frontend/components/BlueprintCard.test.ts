@@ -83,7 +83,7 @@ describe('BlueprintCard', () => {
     await m.wrapper.get('[data-testid="blueprint-card-use-restaurant.es"]').trigger('click');
     await settle();
     expect(m.bodies).toEqual([{ template: 'restaurant.es' }]);
-    expect(m.wrapper.get('[data-testid="blueprint-card-busy"]').text()).toBe('Preparing «Restaurant»…');
+    expect(m.wrapper.get('[data-testid="blueprint-card-busy"]').text()).toBe('Preparing “Restaurant”…');
     release(Response.json(load()));
     await settle();
     // The business is no longer empty: the card stays to tell how it went.

@@ -153,7 +153,7 @@
       "missingVariables": "Fill in every variable of the template.",
       "search": "Search template…",
       "empty": "No templates.",
-      "emptyHint": "Create one with «Add template»: Meta reviews it. The ones made in WhatsApp Manager appear here too.",
+      "emptyHint": "Create one with “Add template”: Meta reviews it. The ones made in WhatsApp Manager appear here too.",
       "loadError": "Could not load the templates.",
       "rejectedReason": "Meta's reason: {reason}",
       "entity": {
@@ -310,7 +310,7 @@
       "turnOn": "Turn on",
       "turnOff": "Turn off",
       "notNow": "Not now",
-      "exclusive": "Only one automatic answer can answer on your number: turning this one on turns «{other}» off.",
+      "exclusive": "Only one automatic answer can answer on your number: turning this one on turns “{other}” off.",
       "both": "“{other}” is on too: each message gets two automatic answers. Turn off the one you do not use.",
       "onlyOwner": "Only an owner or an admin can turn it on.",
       "needsApp": "“{name}” needs the app {apps}.",
