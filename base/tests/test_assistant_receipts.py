@@ -56,6 +56,17 @@ def test_only_the_write_the_person_confirmed_has_a_receipt_beside_a_slip_before_
     assert [(row["name"], row["outcome"]) for row in done["executed"]] == [("demo.item.create", "ok")]
 
 
+def test_a_slip_after_the_write_the_person_confirmed_leaves_no_receipt():
+    """The yes is for its own card: a slip the model made after it in the same message is still no receipt."""
+    good = call("demo.item.create", {"name": "Barra"}, call_id="c1")
+    slip = call("demo.item.create", {"name": "Mesa 4", "status": "abierto"}, call_id="c2")
+    drawn = turn(good, slip)
+    assert (drawn["confirm"]["operation"], drawn["executed"]) == ("demo.item.create", [])
+    done = turn(*drawn["pending"], decision={"call_id": "c1", "accepted": True}, messages=[ASK, asked(good, slip)])
+    assert [(row["call_id"], row["outcome"]) for row in done["executed"]] == [("c1", "ok")]
+    assert (done["confirm"], heard(done)) == (None, ["", "invalid_payload"])
+
+
 def test_a_confirmed_write_that_fails_keeps_its_receipt():
     item = run("demo.item.create", name="Mesa 4")
     run("demo.item.update", id=item["id"], status="done")
