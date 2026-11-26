@@ -442,13 +442,13 @@ already and is not filled: what the business took out of it since stays out; if 
 failed halfway, asking for it again from the same copy fills it with what the business keeps untouched)
 
 ### SERVICE-F09 Sell a service at the till
-<!-- from WORKBOOK.md sha256:6a4c836211cc -->
+<!-- from WORKBOOK.md sha256:61c94280c58e -->
 Status: done (Sales does it, SALE-F38)
 Actor: employee
 Screen: Sales: Sell
 Steps:
-1. In the till's strip of categories, **Services** shows each service on offer with its price and its
-   duration (they also show in the search).
+1. In the till's strip of categories, **All** and **Services** show each service on offer with its price
+   and its duration (they also show in the search).
 2. A **Not configured** service shows with the mark "VAT missing" and is not sold.
 3. A service that is not at a fixed price asks for the amount, with its price as a suggestion.
 In: the services on offer, their pricing and their tax category.

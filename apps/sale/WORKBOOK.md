@@ -1384,8 +1384,10 @@ Vertical: peluquería
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. Con Servicios activa y «Mostrar servicios en el TPV» encendido, toca «Servicios» en la tira de
-   categorías (o búscalo con la lupa).
+1. Con Servicios activa y «Mostrar servicios en el TPV» encendido, los servicios salen en «Todos», tras los
+   menús y delante de los artículos (su número cuenta los dos: «13 artículos»), y solos en «Servicios». Toca
+   el servicio en cualquiera de las dos, o búscalo por su nombre con la lupa; si la lupa no encuentra ni
+   artículos ni servicios, dice «Ningún producto ni servicio coincide con la búsqueda.».
 2. Toca el servicio: entra como línea con su precio. Si no es de precio fijo («Desde», «Por hora»,
    «Variable», «Gratis»), se abre «Importe de Mechas» con su precio como sugerencia: marca el
    importe y pulsa «Añadir 45,00 €».
@@ -1413,7 +1415,8 @@ la cuenta no se cobra: el pie dice el motivo, con el nombre de la categoría y d
 archivado, «Ese servicio ya no se ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese
 importe está fuera de lo que admite el servicio (30,00 € – 80,00 €).». Un precio reservado que no casa con
 la cita: «Ese no es el precio que reservó la cita para este servicio: está cancelada, es de otra clienta, no
-reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Servicios» no sale en la tira.
+reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Servicios» no sale en la tira y «Todos»
+enseña y cuenta solo los artículos de Inventario.
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)
