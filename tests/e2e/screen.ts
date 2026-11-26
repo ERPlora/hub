@@ -11,6 +11,33 @@ export const THREE_SIZES_TALL_TABLET = [
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
+/** Every `ion-icon` on screen: its name and whether its shadow root painted an `<svg>`. */
+export async function iconStates(page: Page): Promise<{ name: string; painted: boolean }[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll('ion-icon')]
+      .filter((el) => el.getBoundingClientRect().width > 0)
+      .map((el) => ({
+        name: el.getAttribute('name') ?? '(icon prop)',
+        painted: !!el.shadowRoot?.querySelector('svg'),
+      })),
+  );
+}
+
+/** The capture once the screen settled and nothing scrolls sideways. */
+export async function settledCapture(page: Page, name: string): Promise<void> {
+  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
+  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}
+
+/** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
+export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
+  await untilStill(page);
+  const overflow = await horizontalOverflow(page);
+  expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}
+
 /** Chrome on an Android tablet in landscape with its address bar shown: the page is 665 px tall while `100vh` still
  *  counts the 761 px the screen has without the bar. */
 export const CHROME_LANDSCAPE = { width: 1280, page: 665, withoutBar: 761 } as const;
@@ -39,31 +66,4 @@ export async function atEachFitSize(page: Page, check: (label: string, height: n
     await settled(page);
     await check(`${size.width}x${size.height}`, size.height);
   }
-}
-
-/** Every `ion-icon` on screen: its name and whether its shadow root painted an `<svg>`. */
-export async function iconStates(page: Page): Promise<{ name: string; painted: boolean }[]> {
-  return page.evaluate(() =>
-    [...document.querySelectorAll('ion-icon')]
-      .filter((el) => el.getBoundingClientRect().width > 0)
-      .map((el) => ({
-        name: el.getAttribute('name') ?? '(icon prop)',
-        painted: !!el.shadowRoot?.querySelector('svg'),
-      })),
-  );
-}
-
-/** The capture once the screen settled and nothing scrolls sideways. */
-export async function settledCapture(page: Page, name: string): Promise<void> {
-  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
-  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await capture(page, name);
-}
-
-/** The page still, with nothing past its right edge at the size `label`, then captured as `name`. */
-export async function capturedFitting(page: Page, name: string, label: string): Promise<void> {
-  await untilStill(page);
-  const overflow = await horizontalOverflow(page);
-  expect(overflow, `no sideways scroll at ${label}`).toBeLessThanOrEqual(0);
-  await capture(page, name);
 }
