@@ -70,12 +70,13 @@ class TestWhatItSays:
 
         assert role_on(page(client, "saas:7")) == (None, False, "base.role_of_accountant")
 
-    def test_whoever_does_not_manage_roles_is_told_no_reason(self, client, make_user, eva):
+    def test_whoever_does_not_manage_roles_is_told_no_reason(self, client, make_user, eva, olga):
         office = make_user("saas:8", host=A.key, role=Membership.Role.MANAGER, first_name="Otto")
         held_by(office, a_role("Office", base__view_home=ON, base__administer_hub=ON))
         client.force_login(office)
 
         assert role_on(page(client, "saas:3")) == (None, False, None)
+        assert role_on(page(client, "saas:1")) == (None, False, None)
 
 
 def test_what_it_says_is_what_giving_it_answers(client, adam, gema, cashier):
