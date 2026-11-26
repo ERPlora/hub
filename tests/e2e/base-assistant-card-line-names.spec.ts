@@ -1,12 +1,14 @@
-// flow: assistant-card (BASE-F97 SERVICE-F03 SALE-F35 INVENTORY-F01)
+// flow: assistant-card (BASE-F97 BASE-F64 SERVICE-F03 SALE-F35 INVENTORY-F01)
 // The one line of a normal write's card: what it touches by its value, every datum after it by the name its screen
 // gives it. A minimum price and a price, a duration or a position used to go bare («Mechas · 65,00 €» for both prices),
-// and who confirmed could not tell what would change. A tax category says the rate it charges today, as the Sections
-// screen does. Cancelled: nothing is changed or created.
+// and who confirmed could not tell what would change. A value of a closed list goes by its name even first: one
+// preference asked used to read «Cambiar en Mi perfil: 110%». A tax category says the rate it charges today, as the
+// Sections screen does. Cancelled: nothing is changed or created.
 import { expect, test } from '@playwright/test';
 
 import { VIEWPORTS } from './assistant-card-helpers';
 import { askForACard, cancel, cancelAtComputerSize, captureStill, card, leave, openPanelAtTheDesk, openPanelInSpanish, signedInWith } from './assistant-panel';
+import { horizontalOverflow } from './helpers';
 import { panelSpec } from './provider-helpers';
 import { post } from './service-helpers';
 
@@ -68,6 +70,29 @@ for (const language of ['es', 'en'] as const) {
       await page.setViewportSize({ width: 1440, height: 900 });
       await cancel(page);
     }
+    await leave(context, turnedOn);
+  });
+}
+
+const ONE_PREFERENCE = {
+  es: { open: openPanelInSpanish, line: 'Cambiar en Mi perfil: Tamaño de la interfaz: 110%' },
+  en: { open: openPanelAtTheDesk, line: 'Change in My profile: Interface scale: 110%' },
+};
+const SIZES = [...VIEWPORTS, { label: '1280x720', width: 1280, height: 720 }];
+for (const language of ['es', 'en'] as const) {
+  test(`BASE-F97 BASE-F64 — in ${language} the card of the one preference asked says which one it is`, async ({ browser }) => {
+    const KEY = `FIX-HUB-2336-CARD-ONE-CHOICE-${language}`;
+    const { context, page, turnedOn } = await signedInWith(browser, []);
+    await ONE_PREFERENCE[language].open(page);
+    await askForACard(page, `E2E-ASK base__profile__preferences_set ${JSON.stringify({ ui_scale: 110 })}`);
+    for (const vp of SIZES) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(card(page).getByText(ONE_PREFERENCE[language].line, { exact: true })).toBeVisible();
+      expect(await horizontalOverflow(page)).toBe(0);
+      await captureStill(page, `${KEY}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await cancel(page);
     await leave(context, turnedOn);
   });
 }
