@@ -7,7 +7,7 @@ from live.context import OperationContext, Scope
 from live.errors import NotFound
 from live.operations import INTERNAL, operation
 
-from apps.whatsapp_inbox.models import FILE_HEADERS, Template, TemplateSample, hub_writes
+from apps.whatsapp_inbox.models.templates import FILE_HEADERS, Template, TemplateSample, hub_writes
 from apps.whatsapp_inbox.queries.reads import page
 from apps.whatsapp_inbox.queries.reasons import template_reason
 from apps.whatsapp_inbox.queries.template_samples import sample_out

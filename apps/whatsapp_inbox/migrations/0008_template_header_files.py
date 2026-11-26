@@ -10,7 +10,7 @@ FILE_HEADERS = ("IMAGE", "VIDEO", "DOCUMENT")
 def fill_file_headers(apps, schema_editor):
     """The templates with a file header the Hub fills now (``models.hub_handles`` as of this migration): the rest of
     their content is what it already filled."""
-    from apps.whatsapp_inbox.models import hub_handles
+    from apps.whatsapp_inbox.models.templates import hub_handles
 
     Template = apps.get_model("whatsapp_inbox", "Template")
     rows = Template.objects.using(schema_editor.connection.alias).filter(header_format__in=FILE_HEADERS, supported=False)

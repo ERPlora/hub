@@ -246,7 +246,7 @@ def test_a_photo_applies_while_verifactu_is_off_and_its_block_waits_until_it_is_
 
 @HUB_DB
 def test_a_photo_applies_while_whatsapp_is_off_and_its_block_waits_until_it_is_on(client, registered_a):
-    from apps.whatsapp_inbox.models import Channel
+    from apps.whatsapp_inbox.models.channel import Channel
     from base.tests.test_internal_whatsapp import channel_state
 
     set_rows(staff="on*")
@@ -265,7 +265,7 @@ def test_a_photo_applies_while_whatsapp_is_off_and_its_block_waits_until_it_is_o
 def test_a_whatsapp_block_out_of_contract_while_it_is_off_never_stops_turning_it_on(client, registered_a, caplog):
     """Off, the photo's WhatsApp block is not read (as before the activation): the photo applies. Turned on, a block
     the sync refuses is logged and waits for the next photo; the app turns on all the same."""
-    from apps.whatsapp_inbox.models import Channel
+    from apps.whatsapp_inbox.models.channel import Channel
 
     set_rows(staff="on*")
 

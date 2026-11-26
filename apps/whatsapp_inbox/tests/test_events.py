@@ -9,7 +9,7 @@ may deliver twice.
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox import events
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, A, card, receive, run, system
 
 pytestmark = HUB_DB
