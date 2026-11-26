@@ -85,6 +85,10 @@ def test_navigation_is_the_old_modules_two_entries_with_registered_icons():
     ]
 
 
+def test_its_help_window_has_no_tour_yet():
+    assert online_booking().help.videos == {}
+
+
 #: The short video of each task, with the flows it shows: its Spanish and its English one.
 TASK_VIDEOS = [
     (("ONLINE_BOOKING-F07",), "zY4sujWM2k8", "f_w8NuRupjw"),

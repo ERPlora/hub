@@ -285,6 +285,10 @@ def test_the_store_card_says_what_it_does_today():
         assert assistant in description, description
 
 
+def test_its_help_window_has_no_tour_yet():
+    assert flow_app().help.videos == {}
+
+
 #: The short video of each task, with the flows it shows: its Spanish and its English one.
 TASK_VIDEOS = [
     (("FLOW-F11", "FLOW-F25"), "nsf883pzXH8", "69FcCkAcanY"),

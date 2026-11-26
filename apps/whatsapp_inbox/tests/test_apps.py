@@ -269,6 +269,10 @@ def test_the_inbox_has_no_setup_steps_nor_panels():
     assert (inbox().setup, inbox().widgets) == ([], [])
 
 
+def test_its_help_window_has_no_tour_yet():
+    assert inbox().help.videos == {}
+
+
 #: The short video of each task, with the flows it shows: its Spanish and its English one.
 TASK_VIDEOS = [
     (("WHATSAPP_INBOX-F16",), "bdZh9fc-kM8", "mEqjI-FsgX8"),
