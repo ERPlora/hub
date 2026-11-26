@@ -20,7 +20,7 @@ let ticketNumber: string;
 function receiptCode(saleId: string): string {
   const source = [
     'import os',
-    'from apps.sale.models import Sale',
+    'from apps.sale.models.sales import Sale',
     'from apps.sale.queries.receipt_codes import receipt_code',
     "print(receipt_code(Sale.objects.get(id=os.environ['RECEIPT_SALE_ID'])))",
   ].join('; ');

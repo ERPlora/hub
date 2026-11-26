@@ -16,7 +16,7 @@ from live.operations import get
 
 from apps.flow import services
 from apps.flow.models import FlowRun
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from base.sensitive import DATA_PERMISSIONS
 
 from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run

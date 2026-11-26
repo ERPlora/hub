@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from apps.sale.queries.business import business_currency, missing_tax, money_text
 from apps.sale.queries.line_parts import GRID_FALLBACK, check_grid
 from apps.sale.queries.order_lines import OPEN_PRICE_PERMISSION, new_line

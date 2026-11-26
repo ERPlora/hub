@@ -14,7 +14,8 @@ from apps.cash_register.models import Movement, Session
 from live.errors import Conflict
 
 from apps.cash_register.tests.conftest import HUB_DB, charge, drawer_lock_off, open_session, refund, run, void
-from apps.sale.models import PaymentMethod, Sale
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.sales import Sale
 
 pytestmark = HUB_DB
 

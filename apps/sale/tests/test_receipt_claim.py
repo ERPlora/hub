@@ -10,7 +10,7 @@ from django.test import RequestFactory
 from live.operations import registry
 
 from apps.printing.models import PrintJob
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.queries.receipt_codes import receipt_code, receipt_url
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from apps.sale.tests.test_integration_invoice import ISSUER, RECIPIENT

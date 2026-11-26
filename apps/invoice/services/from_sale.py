@@ -23,7 +23,9 @@ from apps.invoice.services.numbering import series_of_year
 from apps.invoice.services.recipient import _recipient
 from apps.invoice.services.writes import _result, _today
 from apps.sale import pricing
-from apps.sale.models import OrderLine, Sale, Settings
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.sales import Sale
+from apps.sale.models.settings import Settings
 from apps.sale.queries.sales import find_sale
 from apps.tax.models import TaxRule
 from apps.tax.queries.calculation import round_half_up

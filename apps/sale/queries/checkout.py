@@ -11,7 +11,8 @@ from live.errors import Conflict
 from live.operations import AI, operation
 
 from apps.sale import pricing
-from apps.sale.models import Order, OrderLine, Sale
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.sales import Sale
 from apps.sale.queries.business import CASH_LIMIT, LIMITS_CURRENCY, TICKET_LIMIT, business_country
 from apps.sale.queries.departments import hold_departments
 from apps.sale.queries.line_parts import charge_parts, combo_name, dish_name, dishes_of, folded_names, is_child, ratio_of

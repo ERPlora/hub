@@ -10,7 +10,7 @@ from importlib import import_module
 from django.apps import apps as global_apps
 from django.db import connections
 
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 from apps.sale.tests.conftest import HUB_DB
 from base.tenancy.context import current_alias
 

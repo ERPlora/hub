@@ -8,7 +8,7 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import AI, operation
 
-from apps.sale.models import Order, OrderLine
+from apps.sale.models.orders import Order, OrderLine
 from apps.sale.schemas.orders import OrderListIn, OrderOut, OrderPage, OrderRefIn
 from base.allergens import found_in
 from base.text_search import contains_text

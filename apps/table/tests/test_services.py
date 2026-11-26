@@ -270,7 +270,7 @@ def test_a_deleted_table_leaves_the_plan_frees_its_number_and_keeps_its_history(
     order = open_check("Table 4")
     session = make_session(table, order_id=order.id)
     # Its check was charged in Sales, with nothing relayed yet: the table is free, so it may go.
-    from apps.sale.models import Order
+    from apps.sale.models.orders import Order
 
     Order.objects.filter(pk=order.id).update(
         status="completed", closed_at=timezone.now()

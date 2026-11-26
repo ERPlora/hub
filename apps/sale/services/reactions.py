@@ -7,7 +7,8 @@ from live.outbox import record_event
 
 from apps.customer.services.writes import lock_customers
 from apps.sale import events
-from apps.sale.models import FiscalStatus, Refund, Sale
+from apps.sale.models.refunds import Refund
+from apps.sale.models.sales import FiscalStatus, Sale
 from apps.sale.schemas.reactions import CustomerMergedIn, CustomerReassignOut, InvoiceIssuedIn, InvoiceRecordedOut
 
 

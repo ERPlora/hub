@@ -7,7 +7,7 @@ import json
 
 from live.operations import get
 
-from apps.sale.models import SaleLine
+from apps.sale.models.sales import SaleLine
 from base import assistant
 from base.tests.test_assistant_card_values_references import AN_ID
 

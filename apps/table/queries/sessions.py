@@ -23,7 +23,8 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import operation
 
-from apps.sale.models import Order, OrderLine, Sale
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.sales import Sale
 from apps.table.models import TableSession
 from .floor import ENDED, _customers, table_label
 from .lookups import find_session

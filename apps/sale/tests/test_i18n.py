@@ -35,14 +35,14 @@ def visible_texts() -> set[str]:
         *(sentence for sentences in getattr(config, "approval_figures", {}).values() for sentence in sentences),
     ]
     lazies += module_texts(queries, services, pricing, schemas, models)
-    lazies += list(models.FACTORY_METHOD_NAMES.values())
+    lazies += list(models.payment_methods.FACTORY_METHOD_NAMES.values())
     lazies += [text for text in model_texts(apps.get_app_config("sale").get_models()) if isinstance(text, Promise)]
     lazies += [
-        *models.PaymentMethod.Type.labels,
-        *models.Settings.DocumentType.labels,
-        *models.Order.Status.labels,
-        *models.Order.Source.labels,
-        *models.Sale.Status.labels,
+        *models.payment_methods.PaymentMethod.Type.labels,
+        *models.settings.Settings.DocumentType.labels,
+        *models.orders.Order.Status.labels,
+        *models.orders.Order.Source.labels,
+        *models.sales.Sale.Status.labels,
     ]
     with translation.override("en"):
         return {catalogue_key(text) for text in lazies} | operation_titles("sale")
@@ -65,8 +65,8 @@ def test_the_compiled_catalog_is_current():
 def test_spanish_texts():
     with translation.override("es"):
         assert str(apps.get_app_config("sale").verbose_name) == "Ventas / TPV"
-        assert str(models.FACTORY_METHOD_NAMES["Cash"]) == "Efectivo"
-        assert str(models.FACTORY_METHOD_NAMES["Card"]) == "Tarjeta"
+        assert str(models.payment_methods.FACTORY_METHOD_NAMES["Cash"]) == "Efectivo"
+        assert str(models.payment_methods.FACTORY_METHOD_NAMES["Card"]) == "Tarjeta"
         assert (
             str(services.checkout.CUSTOMER_REQUIRED)
             == "Este negocio exige un cliente en cada venta."
@@ -99,10 +99,10 @@ def test_spanish_says_ventas_own_words_not_an_earlier_apps():
     carries of Modifiers is its «suplementos» (SALE-F11, and «suplementos en línea propia» beside it), not Clientes'
     «opciones»; a sale is «anulada el» like it is «anulada por», not Clientes' «anulado el»."""
     labels = {
-        "Order.status=open": models.Order.Status.OPEN.label,
-        "OrderLine.modifiers": models.OrderLine._meta.get_field("modifiers").verbose_name,
-        "SaleLine.modifiers": models.SaleLine._meta.get_field("modifiers").verbose_name,
-        "Sale.voided_at": models.Sale._meta.get_field("voided_at").verbose_name,
+        "Order.status=open": models.orders.Order.Status.OPEN.label,
+        "OrderLine.modifiers": models.orders.OrderLine._meta.get_field("modifiers").verbose_name,
+        "SaleLine.modifiers": models.sales.SaleLine._meta.get_field("modifiers").verbose_name,
+        "Sale.voided_at": models.sales.Sale._meta.get_field("voided_at").verbose_name,
     }
     with translation.override("es"):
         assert {name: str(label) for name, label in labels.items()} == {
@@ -127,7 +127,7 @@ def test_a_line_names_the_product_data_it_freezes_as_inventory_names_them():
     assert {msgid: own.get(msgid) for msgid in said} == said
     fields = {"category_id": "product category", "price_quantity": "price quantity", "pricing_unit": "pricing unit"}
     with translation.override("es"):
-        for model in (models.OrderLine, models.SaleLine):
+        for model in (models.orders.OrderLine, models.sales.SaleLine):
             shown = {name: str(model._meta.get_field(name).verbose_name) for name in fields}
             assert shown == {name: said[msgid] for name, msgid in fields.items()}, model.__name__
 

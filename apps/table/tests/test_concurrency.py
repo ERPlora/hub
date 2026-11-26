@@ -22,7 +22,7 @@ from live.operations import atomic
 
 from apps.customer.models import Customer, OrderLink
 from apps.customer.tests.conftest import writes
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.table.models import Table, TableSession, Zone
 from base.tenancy.context import current_alias
 from base.tenancy.tests.concurrency import HOW, at_once, in_a_thread, meanwhile

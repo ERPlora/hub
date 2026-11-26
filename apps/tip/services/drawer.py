@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict
 
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 from apps.tip.models import Tip
 from base.operations import call
 

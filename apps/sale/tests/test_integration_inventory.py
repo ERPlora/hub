@@ -14,7 +14,8 @@ from live.models import OutboxEvent
 
 from apps.inventory import events as inventory_events
 from apps.inventory.models import Product, StockMovement
-from apps.sale.models import Order, OrderLine, Sale
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
 pytestmark = HUB_DB

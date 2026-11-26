@@ -8,7 +8,8 @@ from uuid import UUID
 from django.db.models import Q
 
 from apps.cash_register.models import Movement, Session
-from apps.sale.models import RefundPayment, Sale
+from apps.sale.models.refunds import RefundPayment
+from apps.sale.models.sales import Sale
 
 CASH = "cash"
 

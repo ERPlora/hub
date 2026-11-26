@@ -8,7 +8,7 @@ import pytest
 from live.context import system_context
 from live.errors import PermissionDenied
 
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
 pytestmark = HUB_DB

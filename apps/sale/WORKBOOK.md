@@ -1795,7 +1795,7 @@ es una línea.
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0002` siembra Efectivo y Tarjeta, con
+- Anatomía completa: `apps.py`, `models/`, `migrations/` (`0002` siembra Efectivo y Tarjeta, con
   reverso), `schemas/`, `pricing.py` (la valoración, sin ORM), `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_*.py` con Impuestos, Clientes, Inventario, Servicios,

@@ -17,15 +17,16 @@ from decimal import Decimal
 import pytest
 from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
-from django.db import connections
+from django.db import IntegrityError, connections
 from django.test import Client
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import CheckoutStep, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
-from live.operations import get, registry
+from live.operations import atomic, get, registry
 from psycopg.conninfo import make_conninfo
 
+from apps.sale.models.sales import Sale
 from base import activation, assistant
 from base.models import Membership
 from base.services.sessions import ensure_hub_user
@@ -444,3 +445,21 @@ def redeem(grant, *, member=None, service=None, ctx=None):
         },
         ctx,
     )
+
+
+def refused(make):
+    with pytest.raises(IntegrityError), atomic():
+        make()
+
+
+def a_sale(**more) -> Sale:
+    values = {
+        "number": "20261014-0001",
+        "business_day": dt.date(2026, 10, 14),
+        "sequence": 1,
+        "idempotency_key": "key-0001",
+        "total": 100,
+        "subtotal": 91,
+        "tax_total": 9,
+    }
+    return Sale.objects.create(**(values | more))

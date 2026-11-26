@@ -28,7 +28,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 
 ACTOR_MAX_LENGTH = 128
 NUMBER_WIDTH = 4

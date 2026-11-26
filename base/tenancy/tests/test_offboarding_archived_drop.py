@@ -96,7 +96,7 @@ def test_a_business_with_fiscal_documents_goes_once_they_are_archived_after_its_
 def test_a_document_written_while_the_final_copy_is_made_goes_to_the_archive_too(
     business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
 ):
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     hub = business(left_days_ago=91)
     with use_hub(hub):

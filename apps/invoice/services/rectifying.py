@@ -26,7 +26,8 @@ from apps.invoice.services.numbering import series_of_year
 from apps.invoice.services.recipient import _recipient_of
 from apps.invoice.services.writes import _now, _result, _today
 from apps.invoice.withholding import columns
-from apps.sale.models import Refund, Sale
+from apps.sale.models.refunds import Refund
+from apps.sale.models.sales import Sale
 from apps.sale.queries.sales import find_sale
 from apps.tax.models import TaxRule
 from apps.tax.queries.calculation import round_half_up

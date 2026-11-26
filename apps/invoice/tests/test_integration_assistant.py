@@ -519,7 +519,7 @@ def a_business(scope: Scope) -> dict:
     """What the Facturas screens of a salon show: its issuer, the customer card «Talleres Pérez SL», a sale of the
     shampoo charged by card with 5,00 € of it given back, and the manual invoice of that customer, this year's first of
     the series FACT. Made with each app's own operations."""
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     admin, system = ctx_for(scope=scope), system_context(scope)
     run("invoice.issuer.update", ISSUER, admin)

@@ -13,7 +13,9 @@ from django.utils import translation
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.sale.models import PaymentMethod, Refund, Sale
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.refunds import Refund
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
 pytestmark = HUB_DB

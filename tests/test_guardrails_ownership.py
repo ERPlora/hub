@@ -320,7 +320,7 @@ def test_every_reason_is_one_of_the_kinds_and_says_why():
 
 # ── A planted read is caught ─────────────────────────────────────────────────────────────────────────────────────────
 
-DECLARED = "from apps.sale.models import Sale\nfrom base.queries.ownership import Owned\n\nSALES = Owned(Sale)\n"
+DECLARED = "from apps.sale.models.sales import Sale\nfrom base.queries.ownership import Owned\n\nSALES = Owned(Sale)\n"
 
 
 def tree_with(tmp_path: Path, files: dict[str, str]) -> Path:
@@ -331,14 +331,14 @@ def tree_with(tmp_path: Path, files: dict[str, str]) -> Path:
 
 
 def test_a_planted_read_in_a_queries_module_is_caught(tmp_path):
-    peek = "from apps.sale.models import Sale\n\n\ndef peek():\n    return Sale.objects.all()\n"
+    peek = "from apps.sale.models.sales import Sale\n\n\ndef peek():\n    return Sale.objects.all()\n"
     root = tree_with(tmp_path, {"apps/sale/queries/peek.py": peek})
     assert unscoped_reads(root) == {("apps/sale/queries/peek.py", "peek")}
 
 
 def test_a_read_under_another_name_in_another_apps_queries_file_is_caught(tmp_path):
-    peek = "from apps.sale.models import Sale as Charged\n\n\ndef peek():\n    return Charged.objects.first()\n"
-    relative = "from ..models import Sale\n\n\ndef peek():\n    return Sale._default_manager.all()\n"
+    peek = "from apps.sale.models.sales import Sale as Charged\n\n\ndef peek():\n    return Charged.objects.first()\n"
+    relative = "from ..models.sales import Sale\n\n\ndef peek():\n    return Sale._default_manager.all()\n"
     root = tree_with(tmp_path, {"apps/shop/queries.py": peek, "apps/sale/queries/other.py": relative})
     assert unscoped_reads(root) == {("apps/shop/queries.py", "peek"), ("apps/sale/queries/other.py", "peek")}
 
@@ -368,7 +368,7 @@ def test_the_declaration_a_services_door_and_another_model_called_alike_are_not_
     root = tree_with(
         tmp_path,
         {
-            "apps/sale/services/peek.py": "from apps.sale.models import Sale\n\n\ndef peek():\n    return Sale.objects.all()\n",
+            "apps/sale/services/peek.py": "from apps.sale.models.sales import Sale\n\n\ndef peek():\n    return Sale.objects.all()\n",
             "apps/shop/queries.py": "from apps.shop.models import Sale\n\n\ndef peek():\n    return Sale.objects.all()\n",
         },
     )

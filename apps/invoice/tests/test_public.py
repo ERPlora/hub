@@ -11,7 +11,7 @@ from live.context import system_context
 
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.tests.conftest import HUB_DB, ISSUER, run
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.queries.receipt_codes import CODE_LIFETIME, receipt_code
 from apps.verifactu.chain import QR_HOSTS, TESTING
 from apps.verifactu.models import Config, Record

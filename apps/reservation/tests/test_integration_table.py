@@ -9,7 +9,7 @@ import pytest
 
 from apps.customer.models import OrderLink
 from apps.reservation.models import Reservation
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.table.models import Hold, TableSession
 
 from .conftest import (
