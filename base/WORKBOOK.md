@@ -1750,7 +1750,9 @@ Pantalla: Acceso
 Pasos:
   1. En un dispositivo compartido de un negocio que pide PIN, **Acceso** abre en la pestaña «PIN»: «Introduce tu
      PIN», «…o pasa tu placa: no hace falta elegir tu nombre antes.» y «Elige tu usuario» con una cara por
-     persona (iniciales y nombre; nunca su correo). Con una sola persona, ya sale elegida.
+     persona (iniciales y nombre; nunca su correo). El nombre es el de su perfil en este negocio; sin él, el de su
+     ficha de Personal vinculada (STAFF-F03), y si tampoco la tiene, el de su cuenta. Con una sola persona, ya sale
+     elegida.
   2. Toca tu nombre: sale «PIN de {name}» y el teclado con tantos círculos como dígitos tenga el PIN del negocio.
      La flecha («Cambiar usuario») vuelve a las caras. El teclado se ve entero, hasta el 0 y el de borrar, sin
      desplazar la pantalla: en una tablet en horizontal (también dentro de su navegador), un portátil o un móvil
@@ -1768,7 +1770,7 @@ Un dispositivo en el que nunca se entró con una cuenta, o que un administrador 
 todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.». Sin
 conexión, «No se pudo entrar. Comprueba la conexión e inténtalo de nuevo.»; si no se puede leer quién trabaja
 aquí, «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.».
-Implicados: BASE-F54, BASE-F67
+Implicados: BASE-F54, BASE-F67, STAFF-F03
 
 ### BASE-F56 Entrar pasando la placa
 Estado: hecho
@@ -1937,7 +1939,8 @@ Pasos:
      paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
      aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo.
 Entra: el perfil de quien tiene la sesión.
-Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
+Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»; sin él, el menú
+lateral y las caras dicen el de su ficha de Personal vinculada, STAFF-F03), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
 su placa o su cuenta. Con «Usar el idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su
 cuenta de erplora.com (BASE-F51). El correo es solo de contacto: no cambia la cuenta de erplora.com.

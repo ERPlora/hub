@@ -29,7 +29,9 @@ SKU_NOT_BARCODE = _(
     expose_api=True,
     ai={
         "description": "Print the barcode label of a product (its name, its SKU as the code and its price) on the "
-        "printer of the label function, named by its id, SKU or name; each call prints one label.",
+        "printer of the label function, named by its id, SKU or name; each call prints one label. When the answer "
+        "says no device that prints that printer is on, say it stays in the queue until a device set up in Printing › "
+        "Devices prints it, never that it was printed.",
         "risk": "normal",
         "check": "inventory.product.get",
         "asks": {
@@ -72,4 +74,4 @@ def print_label(ctx: OperationContext, data: ProductRefIn) -> dict:
         )
     except (UnknownOperation, AppInactive, PermissionDenied):
         raise Conflict(str(LABEL_QUEUE_UNAVAILABLE), code="inventory.label_queue_unavailable") from None
-    return {"job_id": queued.job.id, "printer_name": queued.job.printer_name}
+    return {"job_id": queued.job.id, "printer_name": queued.job.printer_name, "waits_for_device": queued.waits_for_device}
