@@ -38,7 +38,7 @@ from base.tenancy.connections import control_name
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests.business import HUB_DB, A
 from base.tests.test_auth_views import demo
-from control.models import HubDue
+from control.models.hubs import HubDue
 from base.queries.demos import demo_get
 from base.schemas.demos import DemoCodeIn, DemoCreateIn, DemoSlugIn
 from base.services.demos import (

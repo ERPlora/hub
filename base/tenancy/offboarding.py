@@ -45,7 +45,8 @@ from base.schemas.hub_registry import HubGetIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, fiscal_archive, names, ops, provision
 from base.tenancy.context import AppNotCreated, use_hub
-from control.models import Hub, HubDump
+from control.models.dumps import HubDump
+from control.models.hubs import Hub
 
 logger = logging.getLogger(__name__)
 

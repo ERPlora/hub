@@ -18,7 +18,7 @@ from base.tenancy import connections as tenancy_connections, migrator, names, pr
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.test_provision import control_hears, fresh, nothing_checked_yet
-from control.models import Hub, HubDue
+from control.models.hubs import Hub, HubDue
 
 #: The provisioning tests' own autouse fixture.
 __all__ = ["nothing_checked_yet"]

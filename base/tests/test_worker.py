@@ -515,7 +515,7 @@ def test_it_names_each_ready_business_without_its_own_database_as_an_error_and_g
     it comes back."""
     from types import SimpleNamespace
 
-    from control.models import Hub
+    from control.models.hubs import Hub
 
     nobody_without_a_database.append(SimpleNamespace(slug="elpa", status=Hub.Status(status)))
     stop = threading.Event()

@@ -14,7 +14,7 @@ from django.utils.text import capfirst
 
 from control import admin as control_admin
 from control import admin_recoveries
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 from control.tests import test_admin_move
 from control.tests.conftest import events
 from control.tests.test_admin import (
@@ -193,13 +193,13 @@ class TestRestoreToASeparateCopy:
     @staticmethod
     def a_copy(hub: Hub, **fields):
         """A separate copy of ``hub`` of the moment, as ``control.hub.restore_aside`` asks it."""
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         values = {"restore_point": AT_MOMENT, "db_name": f"hub_copy_{uuid.uuid7().hex}", "asked_by": "root"}
         return RestoredCopy.objects.create(hub=hub, **(values | fields))
 
     def test_asks_for_a_temporary_cluster_and_the_moment_first_and_changes_nothing(self, client, root):
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         hub = self.a_hub("acme")
         temporary = self.a_temporary_cluster()
@@ -211,7 +211,7 @@ class TestRestoreToASeparateCopy:
         assert not RestoredCopy.objects.exists()
 
     def test_confirmed_each_hub_gets_its_copy_asked_and_stays_as_it_is(self, client, root):
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         first, second = self.a_hub("acme"), self.a_hub("bistro", is_demo=True)
         temporary = self.a_temporary_cluster()
@@ -227,7 +227,7 @@ class TestRestoreToASeparateCopy:
         assert "←" not in cluster_cell(row_of(page(client, HUBS), ">acme<"))
 
     def test_support_neither_sees_it_nor_runs_it_but_reads_the_copies(self, client, support):
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         hub = self.a_hub("acme")
         temporary = self.a_temporary_cluster()
@@ -242,7 +242,7 @@ class TestRestoreToASeparateCopy:
         assert "addlink" not in listed
 
     def test_the_copies_are_listed_read_only_with_until_when_they_are_kept(self, client, root):
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         hub = self.a_hub("acme")
         made = AT_MOMENT + dt.timedelta(hours=1)
@@ -261,7 +261,7 @@ class TestRestoreToASeparateCopy:
     def test_each_copy_says_its_business_and_moment_on_two_lines_as_recoveries_do(self, client, root):
         """Five columns in one line each do not fit a phone (375 px), even with the last error broken: its business and
         moment share the first cell, the one Recoveries shows for the same copy, and the last error keeps the room."""
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         copy = self.a_copy(self.a_hub("acme"), status=RestoredCopy.Status.MADE, made_at=AT_MOMENT)
 
@@ -287,7 +287,7 @@ class TestRestoreToASeparateCopy:
         from django.contrib.staticfiles import finders
         from django.templatetags.static import static
 
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         copy = self.a_copy(self.a_hub("acme"), status=RestoredCopy.Status.FAILED)
         copy.last_error = f"restore_aside_restore_failed: pg_restore into {copy.db_name} failed (exit 1)"
@@ -310,7 +310,7 @@ class TestRecoverIntoTheBusiness:
     a_hub = staticmethod(test_admin_move.TestMoveToCluster.a_hub)
 
     def made(self, slug: str = "acme", **fields):
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         made_at = AT_MOMENT + dt.timedelta(hours=1)
         values = {"status": RestoredCopy.Status.MADE, "made_at": made_at} | fields
@@ -329,12 +329,12 @@ class TestRecoverIntoTheBusiness:
 
     @staticmethod
     def a_recovery(copy, **fields):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         return CopyRecovery.objects.create(copy=copy, **({"apps": ["customer"], "asked_by": "root"} | fields))
 
     def test_asks_what_to_bring_back_first_and_changes_nothing(self, client, root):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         copy = self.made()
 
@@ -355,7 +355,7 @@ class TestRecoverIntoTheBusiness:
         assert not CopyRecovery.objects.exists()
 
     def test_confirmed_each_copy_is_asked_and_recoveries_says_how_it_goes(self, client, root):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         copy = self.made("acme")
         not_made = TestRestoreToASeparateCopy.a_copy(self.a_hub("bistro"))
@@ -372,7 +372,7 @@ class TestRecoverIntoTheBusiness:
         assert "Asked" in row and "Customers" in row
 
     def test_with_nothing_ticked_it_asks_again(self, client, root):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         copy = self.made()
 
@@ -555,7 +555,7 @@ class TestRecoverIntoTheBusiness:
         assert read_only_values(plain_page, "notes") == read_only_values(plain_page, "why_not")
 
     def test_support_neither_sees_it_nor_runs_it_but_reads_the_recoveries(self, client, support):
-        from control.models import CopyRecovery
+        from control.models.copies import CopyRecovery
 
         copy = self.made()
 

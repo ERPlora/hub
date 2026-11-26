@@ -13,7 +13,7 @@ from base.tenancy import connections as tenancy_connections, migrator, names
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from base.tenancy.tests.test_provision import databases, fresh, nothing_checked_yet
-from control.models import Hub
+from control.models.hubs import Hub
 
 #: The provisioning tests' own autouse fixture.
 __all__ = ["nothing_checked_yet"]

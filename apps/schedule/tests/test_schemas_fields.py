@@ -3,7 +3,7 @@ of what they refuse (``errors``, which the tests of every schema module read). H
 
 import pydantic
 import pytest
-from live.ninja import _field_message
+from live.ninja import field_message
 
 from apps.schedule.schemas.fields import PageIn
 from apps.schedule.schemas.overrides import OverrideListIn
@@ -15,7 +15,7 @@ def errors(schema, **data) -> dict[str, str]:
     with pytest.raises(pydantic.ValidationError) as refused:
         schema.model_validate(data)
     return {
-        ".".join(str(part) for part in error["loc"]): _field_message(error)
+        ".".join(str(part) for part in error["loc"]): field_message(error)
         for error in refused.value.errors()
     }
 

@@ -47,7 +47,7 @@ from base.models.identity import HubIdentity
 from base.schemas.hub_registry import HubCutFinishIn
 from base.tenancy import connections as tenancy_connections, identity, inventory, migrator, names, ops, provision
 from base.tenancy.context import HUB_SCOPE_KIND, use_control, use_hub
-from control.models import Hub
+from control.models.hubs import Hub
 
 logger = logging.getLogger(__name__)
 

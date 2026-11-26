@@ -12,7 +12,7 @@ const HUBS = `http://hubs.localhost:${STACK.hubPort}/admin/control/hub/`;
 const ROOT = 'e2e-restore-closure-root';
 const CLUSTER = 'e2e-restore';
 const CLEAN = [
-  'from control.models import Cluster',
+  'from control.models.hubs import Cluster',
   `Cluster.objects.filter(name="${CLUSTER}", hubs__isnull=True).delete()`,
 ];
 

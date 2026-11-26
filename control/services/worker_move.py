@@ -10,7 +10,8 @@ from live.errors import Conflict
 from live.operations import atomic
 
 from base.business import zone_of
-from control.models import Hub, HubDue, LeftoverDatabase, MovedCopy
+from control.models.copies import LeftoverDatabase, MovedCopy
+from control.models.hubs import Hub, HubDue
 from control.services.clusters import _locked
 from control.services.move import _movable, night_start
 

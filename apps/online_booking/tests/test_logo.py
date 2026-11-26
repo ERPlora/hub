@@ -19,7 +19,7 @@ from base.storage import hub_prefix
 from base.tenancy.context import use_hub
 from base.tests.test_images import hub_files as hub_files
 from base.tests.test_public_door import B_HOST, door
-from control.models import Hub
+from control.models.hubs import Hub
 
 from .conftest import HOST, HUB_DB, A, B, make_page, public, run
 from .test_api import admin_client as admin_client

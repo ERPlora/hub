@@ -46,7 +46,7 @@ from base.services.provisioning import holds_hub_lease, offboarding_due
 from base.services.sessions import _apply_members, _sync_hub_users, _wake_open_apps
 from base.tenancy import names as database_names
 from base.tenancy.connections import control_name
-from control.models import HubDue
+from control.models.hubs import HubDue
 
 
 # ── The registry of hubs: what the SaaS's /internal/hubs/{id} runs ──────────────────────────────────────────────

@@ -13,7 +13,8 @@ from live.outbox import record_event
 
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from control import events
-from control.models import Cluster, Hub, LeftoverDatabase, MovedCopy, RestoredCopy
+from control.models.copies import LeftoverDatabase, MovedCopy, RestoredCopy
+from control.models.hubs import Cluster, Hub
 from control.schemas import ClusterDeletedOut, ClusterIdIn, ClusterIn, ClusterOut, ClusterUpdateIn
 from control.services.actor import platform_admin_only
 

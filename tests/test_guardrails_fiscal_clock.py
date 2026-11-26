@@ -21,7 +21,7 @@ from apps.tax.tests.conftest import turn_the_rate_at_midnight
 from apps.verifactu.models import Record
 from apps.verifactu.tests.conftest import HUB_DB, run
 from base.tenancy.context import use_hub
-from control.models import Hub
+from control.models.hubs import Hub
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("nothing_leaves")]
 

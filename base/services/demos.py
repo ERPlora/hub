@@ -36,7 +36,7 @@ from base.services.provisioning import _control_transaction
 from base.services.sessions import InactiveUser, MODEL_BACKEND, ensure_hub_user
 from base.tenancy import names as database_names
 from base.tenancy.connections import control_name
-from control.models import HubDue
+from control.models.hubs import HubDue
 
 logger = logging.getLogger(__name__)
 

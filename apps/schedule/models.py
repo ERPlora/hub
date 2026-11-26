@@ -130,7 +130,7 @@ class SpecialDayInterval(IntervalBase):
 
 class Override(UUIDModel):
     """A temporary change: every day from ``start_date`` to ``end_date`` (both included) closed or with
-    the same hours. Two of them never cover the same day (services.py)."""
+    the same hours. Two of them never cover the same day (services/overrides.py)."""
 
     start_date = models.DateField(_("from"))
     end_date = models.DateField(_("to"))

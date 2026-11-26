@@ -19,7 +19,7 @@ from base.services import hub_registry, provisioning
 from base.tenancy import cut, dumps
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
-from control.models import Hub
+from control.models.hubs import Hub
 
 
 class Command(BaseCommand):

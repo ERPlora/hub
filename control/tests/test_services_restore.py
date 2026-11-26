@@ -9,7 +9,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 
 from base.tenancy.tests.hubs import HUB_DATABASES
 from control import services
-from control.models import Cluster, Hub
+from control.models.hubs import Cluster, Hub
 from control.schemas import ClusterIdIn
 from control.tests.conftest import SERVICES_MARKS, a_cluster, a_ready_hub, as_actor, events, person
 
@@ -219,7 +219,7 @@ class TestRestoreAside(AskedFromATemporaryCluster):
     operation = staticmethod(services.restore.hub_restore_aside)
 
     def nothing_asked(self, hub: Hub) -> bool:
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         return not RestoredCopy.objects.filter(hub=hub).exists()
 
@@ -227,7 +227,7 @@ class TestRestoreAside(AskedFromATemporaryCluster):
         from base import registry
         from base.tenancy import names
         from base.tenancy.connections import control_name
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         own, source = a_cluster(), self.temporary()
         hub = self.a_hub(cluster=own, last_error="move_cancelled: an old one")
@@ -274,7 +274,7 @@ class TestRestoreAside(AskedFromATemporaryCluster):
         ]
 
     def test_two_copies_of_one_hub_have_two_names(self, admin_ctx, small):
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         hub, source = self.a_hub(), self.temporary()
 
@@ -286,7 +286,7 @@ class TestRestoreAside(AskedFromATemporaryCluster):
     def test_the_temporary_cluster_is_kept_while_its_copy_is_made_and_the_hubs_while_the_copy_is_on_it(
         self, admin_ctx, small
     ):
-        from control.models import RestoredCopy
+        from control.models.copies import RestoredCopy
 
         own, source = a_cluster(), self.temporary()
         hub = self.a_hub(cluster=own)

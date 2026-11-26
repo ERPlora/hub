@@ -7,7 +7,7 @@ from live.operations import INTERNAL, operation
 from live.outbox import record_event
 
 from control import events
-from control.models import CopyRecovery, RestoredCopy
+from control.models.copies import CopyRecovery, RestoredCopy
 from control.schemas import CopyRecoverIn, CopyRecoveryOut
 from control.services.actor import _who, platform_admin_only
 

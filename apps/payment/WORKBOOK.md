@@ -424,7 +424,7 @@ pago» y ata Pagos a Ventas sin motivo.
 ### Cómo está hecho
 
 - Anatomía completa (copia de `apps/service`): `apps.py`, `models.py`, `migrations/`, `schemas.py`,
-  `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/`
+  `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/`
   y un `tests/test_<fichero>.py` por fichero, más `test_integration_sale.py` (con Ventas real),
   `test_concurrency.py` (hilos) y `test_relay.py` (el aviso por el relay real del worker hasta una
   automatización real de Automatizaciones, PAYMENT-F07).
@@ -434,7 +434,7 @@ pago» y ata Pagos a Ventas sin motivo.
   quién lo creó y quién lo cambió por última vez) y `PaymentCounter` (último número por día). UUIDv7,
   sin `hub_id`.
 - **Quién actúa** (`created_by`, `updated_by`, `approved_by` y `cancelled_by`) se guarda como lo lee un compañero:
-  `_actor` (`services.py`) nombra con `actor_name` de `base.queries.people`, la misma pieza que Caja, Mesas y Cocina:
+  `_actor` (`services/actor.py`) nombra con `actor_name` de `base.queries.people`, la misma pieza que Caja, Mesas y Cocina:
   el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega
   a quien ve el contacto del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
   `0005_actors_without_address`, en la base de datos de cada negocio.

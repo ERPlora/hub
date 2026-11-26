@@ -18,7 +18,7 @@ from live.live_registry import live_registry
 from base import hub_visits
 from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
-from control.models import Hub
+from control.models.hubs import Hub
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
