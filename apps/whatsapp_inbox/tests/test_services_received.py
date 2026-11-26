@@ -11,7 +11,7 @@ import pydantic
 import pytest
 from live.errors import InvalidPayload, PermissionDenied
 
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, card, conv, ctx_for, events, receive, run, system
 
 pytestmark = HUB_DB

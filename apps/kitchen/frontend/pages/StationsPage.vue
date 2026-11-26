@@ -118,7 +118,7 @@ const routeColumns = computed<DataTableColumn<RouteOut>[]>(() => [
   { key: 'station_name', label: t('kitchen.routing.columns.station') },
 ]);
 const routeActions = computed<DataTableAction<RouteOut>[]>(() =>
-  canManage.value ? [{ id: 'remove', label: t('kitchen.routing.remove'), icon: 'close-circle-outline', color: 'danger', showLabel: true }] : [],
+  canManage.value ? [{ id: 'remove', label: t('kitchen.routing.remove'), icon: 'close-circle-outline', color: 'danger' }] : [],
 );
 const clear = useCommand('kitchen.routing.clear');
 const routeError = ref<ApiError | null>(null);

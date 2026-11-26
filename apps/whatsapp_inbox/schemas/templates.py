@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
-from apps.whatsapp_inbox.models import NAMED_VARIABLE
+from apps.whatsapp_inbox.models.templates import NAMED_VARIABLE
 from apps.whatsapp_inbox.schemas.fields import A_SAMPLE, A_TEMPLATE, TEMPLATE, Page, PageIn, _text
 from apps.whatsapp_inbox.schemas.template_samples import TemplateSampleOut
 
