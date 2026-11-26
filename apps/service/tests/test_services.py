@@ -139,8 +139,7 @@ def test_what_a_new_service_does_not_say_comes_from_the_settings(tax):
     plain = run(
         "service.service.create",
         {
-            "name": "Shave",
-            "price": 1000,
+            "name": "Shave", "price": 1000,
             "duration_minutes": 20,
             "buffer_before": 0,
             "allow_online_booking": True,
