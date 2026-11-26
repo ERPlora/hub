@@ -1,7 +1,7 @@
 # Workbook — Pedidos online (app)
 Prefijo: ONLINE_ORDER
 Alcance MVP: restaurante (no viene en ninguna plantilla; entra en la tienda cuando el cliente pueda pedir)
-Estado de la app: en construcción — hoy, el código de cada mesa, su regeneración y la hoja de QR; falta la página de la mesa en la que pide el cliente
+Estado de la app: en construcción — hoy, el código de cada mesa, su regeneración, la hoja de QR y la carta que abre el QR de cada mesa; falta que el cliente pida desde ella
 
 > Manual de usuario y especificación de la app `online_order`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor y
@@ -45,17 +45,21 @@ interiores; volver a generar el QR de una mesa es la salida cuando uno ya no se 
 
 ## Antes de empezar
 
-1. Pedidos online enciende con ella **Mesas** (y, por Mesas, **Ventas** y **Clientes**), y no se puede apagar Mesas
-   mientras esté encendida.
+1. Pedidos online enciende con ella **Mesas** (y, por Mesas, **Ventas** y **Clientes**) e **Inventario**, y no se
+   pueden apagar mientras esté encendida. Con **Suplementos** y **Menús** encendidas, la carta enseña también los
+   suplementos de cada plato y los menús.
 2. En **Mesas**, da de alta las zonas y las mesas del local: cada mesa tiene su QR.
 3. Cada mesa recibe su código la primera vez que se genera su QR; desde entonces el mismo código vale hasta que se
    regenera.
+4. En **Inventario**, la carta de la mesa enseña los productos a la venta que tienen encendido «Mostrar en la carta»,
+   como la carta de la Página web, con su foto, su descripción, sus alérgenos y su categoría.
 
 ## Pantallas
 
 El menú **Pedidos online** tiene una pestaña: **Códigos QR**. Solo la ven quienes pueden ver los QR de las mesas
 (el propietario, el administrador y el responsable); los botones para generar y regenerar, solo quienes pueden
-regenerarlos.
+regenerarlos. La **Página de la mesa** no está en el menú: es la que abre el QR de cada mesa en el móvil del cliente,
+sin cuenta ni sesión.
 
 ### Códigos QR
 Aquí tienes todas las mesas del local, en el orden del plano de sala, cada una con la dirección que abre su QR y
@@ -71,11 +75,25 @@ QR** (solo esa mesa) y **Regenerar QR**, que pide confirmación («¿Regenerar e
 **Generar QR** en una mesa que aún no tiene. Si hay mesas sin QR, un aviso dice cuántas no salen en la hoja, con
 **Generar los QR que faltan**. El QR se dibuja en el propio aparato: la hoja no pide nada a internet.
 
+### Página de la mesa
+La que ve el cliente en su móvil al escanear el QR de su mesa: la carta del negocio, con la mesa en la que está
+arriba. Solo se mira; pedir desde aquí llega con ONLINE_ORDER-F04.
+
+#### Detalle
+Dirección `/p/<negocio>/order/<código>`, sin sesión, en el idioma del móvil (español o inglés). Arriba, el nombre del
+negocio y «Mesa 4 · Terraza» (sin zona, solo «Mesa 4»). Debajo, **Menús** primero, con el precio cerrado de cada menú y
+sus platos («Primeros · Segundos · Bebida»), y después cada categoría de Inventario en su orden, con sus platos
+ordenados por nombre: la foto (si la tiene), el nombre, la descripción, «Alérgenos: Gluten, Leche» y el precio. Los
+platos sin categoría van al final, en «Otros platos». Tocar un plato abre su ficha con la foto en grande, lo mismo de la
+fila y cada grupo de suplementos con cuántos se eligen («Opcional · hasta 2», «Elige 1») y cada opción con sus
+alérgenos y lo que suma («+0,50 €»); tocar un menú abre sus platos, curso a curso, del mismo modo. **Cerrar** la cierra.
+
 ## Estados de cada pantalla
 
 | Pantalla | Cargando | Vacío | Error |
 |---|---|---|---|
 | Códigos QR | La lista en carga; **Imprimir hoja**, apagado hasta tener todas las mesas | «Aún no hay mesas», con **Ir a Mesas** a quien puede añadirlas | El de la lista con «Reintentar»; el de generar o regenerar, en un aviso efímero con su motivo; «No se ha podido imprimir la hoja.» |
+| Página de la mesa | «Cargando la carta…»; en la ficha de un plato, «Cargando sus suplementos…» | «Aún no hay platos en la carta», con «Pregunta al personal qué puedes pedir.» | «No se ha podido cargar la carta.» con «Reintentar»; en la ficha, «No se han podido cargar sus suplementos.» con «Reintentar»; un QR que ya no vale, «Este QR ya no está activo» con «Pide ayuda al personal.», sin nada del negocio |
 
 «Reconectando…» mientras se recupera la conexión en vivo (lo pintado se queda).
 
@@ -85,7 +103,7 @@ QR** (solo esa mesa) y **Regenerar QR**, que pide confirmación («¿Regenerar e
 |---|---|---|
 | ONLINE_ORDER-F01 | Generar o regenerar el QR de una mesa | hecho |
 | ONLINE_ORDER-F02 | Ver e imprimir la hoja de QR de las mesas | hecho |
-| ONLINE_ORDER-F03 | El cliente abre la carta desde el QR de su mesa | no hecho |
+| ONLINE_ORDER-F03 | El cliente abre la carta desde el QR de su mesa | hecho |
 | ONLINE_ORDER-F04 | El cliente pide desde su mesa | no hecho |
 | ONLINE_ORDER-F05 | Aceptar o rechazar el primer pedido de una mesa | no hecho |
 | ONLINE_ORDER-F06 | El cliente ve si su pedido se ha aceptado | no hecho |
@@ -130,19 +148,22 @@ imprimir la hoja.»; quien no puede ver los QR de las mesas no ve la pestaña (�
 Implicados: TABLE-F02, WEBSITE-F09
 
 ### ONLINE_ORDER-F03 El cliente abre la carta desde el QR de su mesa
-Estado: no hecho — falta la página pública de la mesa
+Estado: hecho
 Actor: cliente (sin sesión)
 Pantalla: Página de la mesa
 Pasos:
-1. Escanea el QR de su mesa con la cámara del móvil y se abre la página de la mesa, con el nombre del negocio y el
-   número de la mesa.
-2. Ve la carta completa: los productos a la venta que se muestran en la carta, con su foto, su descripción, sus
-   alérgenos y su precio, los suplementos de cada uno y los menús. Lo agotado no sale.
-Entra: la carta (Inventario, Suplementos, Menús) y el horario del negocio (Horarios).
-Sale: nada; solo se lee.
-Si falla: un QR que ya no vale (regenerado) enseña «Este QR ya no está activo; pide ayuda al personal.»; con el
-negocio cerrado, la carta se ve pero dice que ahora no se aceptan pedidos.
-Implicados: ONLINE_ORDER-F01, INVENTORY-F36, SCHEDULE-F02
+1. Escanea el QR de su mesa con la cámara del móvil y se abre la página de la mesa, con el nombre del negocio y su
+   mesa con la zona («Mesa 4 · Terraza»).
+2. Ve la carta completa: los menús y los productos a la venta que se muestran en la carta, por categoría, con su foto,
+   su descripción, sus alérgenos y su precio. Lo agotado no sale, ni lo que el negocio no muestra en la carta.
+3. Toca un plato y ve sus suplementos, cuántos se eligen de cada grupo y lo que suma cada uno; toca un menú y ve sus
+   platos, curso a curso, con sus alérgenos.
+Entra: la carta (Inventario y, si están encendidas, Suplementos y Menús) y la mesa (Mesas).
+Sale: nada; solo se lee. La página no enseña costes, existencias, impuestos ni nada del personal.
+Si falla: un QR que ya no vale (regenerado, o de una mesa borrada) enseña «Este QR ya no está activo» con «Pide ayuda
+al personal.», y nada del negocio; sin platos a la venta, «Aún no hay platos en la carta»; si la carta no carga, «No se
+ha podido cargar la carta.» con «Reintentar».
+Implicados: ONLINE_ORDER-F01, INVENTORY-F36, COMBO-F14
 
 ### ONLINE_ORDER-F04 El cliente pide desde su mesa
 Estado: no hecho — falta el pedido
@@ -154,9 +175,10 @@ Pasos:
 3. Si la mesa tiene la cuenta abierta, el pedido entra en ella y se manda a cocina con todo lo que la cuenta tenía
    sin mandar, también lo que el camarero había apuntado en el TPV. Si no la tiene, el pedido queda pendiente hasta
    que un empleado lo acepte (ONLINE_ORDER-F05).
-Entra: la carta, la cuenta de la mesa (Mesas y Ventas) y el horario del negocio.
+Entra: la carta, la cuenta de la mesa (Mesas y Ventas) y el horario del negocio (Horarios).
 Sale: las líneas en la cuenta de la mesa y la comanda en cocina, o el pedido pendiente con su aviso.
-Si falla: no se escribe nada. El negocio cerrado; un producto que se ha agotado mientras pedía; demasiados pedidos
+Si falla: no se escribe nada. El negocio cerrado (la carta se sigue viendo, pero dice que ahora no se aceptan
+pedidos); un producto que se ha agotado mientras pedía; demasiados pedidos
 seguidos desde el mismo móvil o en el negocio («Inténtalo dentro de unos minutos o pide ayuda al personal.»); un QR
 que ya no vale.
 Implicados: ONLINE_ORDER-F05, SALE-F20, KITCHEN-F05
@@ -223,6 +245,11 @@ zona.
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las mesas en el orden del plano de sala, cada una con su zona y, si ya lo tiene, su código, la dirección de su página y cuándo se generó, en páginas (hasta 100) | ver los QR de las mesas (+ ver mesas) | F02 | `online_order.qr_code.list` |
+| La carta de la mesa de un código: el nombre del negocio, el número y la zona de la mesa, los platos a la venta que se muestran en la carta por categoría y los menús con sus platos | cualquiera con el QR de la mesa, sin sesión | F03 | `online_order.public.menu` |
+| Los grupos de suplementos de un plato de esa carta, con sus opciones | cualquiera con el QR de la mesa, sin sesión | F03 | `online_order.public.options` |
+
+Las dos de la carta son de la página de la mesa: las llama su móvil por la puerta pública del Hub, con el código en el
+cuerpo de la llamada, y no son herramientas del asistente.
 
 ### Lo que ofrece: acciones
 
@@ -249,21 +276,42 @@ A ningún aviso de otra app.
 |---|---|---|---|---|---|
 | Ver los QR de las mesas | sí | sí | sí | no | `online_order.view_qr_code` |
 | Regenerar los QR de las mesas | sí | sí | sí | no | `online_order.change_qr_code` |
+| Abrir la página de pedidos de una mesa | sí | sí | no | no | `online_order.public` |
 
-Las mesas las lee Mesas con el permiso de quien pregunta: hace falta el de esta app **y** el de ver mesas.
+Las mesas las lee Mesas con el permiso de quien pregunta: hace falta el de esta app **y** el de ver mesas. El cliente
+que abre la página de su mesa no tiene cuenta: la página la sirve la puerta pública con `online_order.public` y nada
+más.
 
 ## Para quien lo mantiene
 
-- **`requires = ["table"]`**: lo único que llama hoy son las lecturas de Mesas, `table.table.list` y
-  `table.table.get`, por su nombre (`base.operations.call`), con el permiso de quien pregunta. Las apps que necesitarán
-  el pedido (Ventas, Inventario, Clientes y Horarios) entran en `requires` en el mismo cambio que empiece a llamarlas.
+- **`requires = ["table", "inventory"]`**: llama a las lecturas de Mesas (`table.table.list` y `table.table.get`) y a
+  las de la carta de Inventario (`inventory.product.list_for_sale`, `inventory.category.list` e
+  `inventory.product_category.list`) por su nombre. Suplementos (`modifier.group.for_target`) y Menús
+  (`combo.combo.for_sale`) se leen solo si están encendidas en el negocio (`base.apps_on.active_apps`): sin ellas, la
+  carta va sin suplementos ni menús. Las apps que necesitará el pedido (Ventas, Clientes y Horarios) entran en
+  `requires` en el mismo cambio que empiece a llamarlas.
 - Modelo (UUIDv7, sin `hub_id`): `TableCode`, una fila por mesa con código: el id de la mesa de Mesas (`table_id`,
   único, sin clave ajena, como `order_id` de Mesas hacia Ventas), el código (`secrets.token_urlsafe(16)`, guardado tal
   cual porque la hoja se vuelve a imprimir, único) y cuándo se generó. Regenerar escribe con un solo `INSERT … ON
   CONFLICT (table_id) DO UPDATE`: dos regeneraciones a la vez de una mesa sin código no chocan, gana la última.
 - La dirección de la página de una mesa es `/p/<negocio>/order/<código>` sobre la dirección pública del negocio
-  (`base.qr.public_url`, la misma que usa Página web para su QR). La página la servirá la puerta pública de `base`
-  cuando la app declare `public_pages = {"order": "online_order.public"}`, con ONLINE_ORDER-F03.
+  (`base.qr.public_url`, la misma que usa Página web para su QR). La sirve la puerta pública de `base`
+  (`base/public_door.py`), porque la app declara `public_pages = {"order": "online_order.public"}`: el HTML es el mismo
+  valga o no el código, y sus llamadas van por `POST /p/<negocio>/api/<operación>` con el código en el cuerpo, nunca en
+  la dirección. La puerta solo corre las dos operaciones cuyo permiso es `online_order.public`.
+- Las dos lecturas de la carta leen las otras apps con `menu_reader(ctx)` (`queries.py`): el contexto del visitante más
+  `MENU_READS`, los permisos de ver mesas, productos, categorías, suplementos y menús, y ninguno que escriba. Su salida
+  es propia (`schemas.py`): nunca el coste, el SKU, la categoría de impuesto, las existencias ni el nombre de cocina que
+  dan las lecturas del TPV. Un código que no es de ninguna mesa, el viejo de una regenerada o el de una mesa borrada
+  dan el mismo 404 `online_order.qr_not_active`, sin nada del negocio.
+- La carta se agrupa por categoría con la misma pieza que la carta de Página web, `base/catalog_groups.py` (cada fila de
+  una lista de otra app, página a página, y los productos bajo sus categorías en su orden). Los platos se leen ya
+  filtrados por «Mostrar en la carta» (`show_on_website=True`), como en Página web, con el mismo tope de 200: los que
+  el negocio no muestra no ocupan sitio. Los alérgenos de los platos de un menú los da `combo.combo.for_sale` con cada
+  elección, también los de un plato que no se muestra suelto en la carta. Los suplementos de un plato se leen al
+  abrirlo, como hace el TPV, y solo de un plato de la carta (`online_order.not_on_menu` si no lo es).
+- Las fotos de los productos y las de los menús se sirven sin sesión (`public_media` de Inventario y de Menús), porque
+  las enseña esta página.
 - Las mesas borradas en Mesas no salen en la lista; su fila de `TableCode` se queda y no abre nada, porque la página
   de la mesa comprobará que la mesa sigue existiendo.
 - El aviso `online_order.qr_code.regenerated` no lleva el código: los avisos llegan a Automatizaciones y al

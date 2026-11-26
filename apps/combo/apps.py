@@ -28,8 +28,9 @@ class ComboConfig(LiveAppConfig):
     verticals = ["restaurant"]
     # A choice is a product of Inventory; a menu eaten in has a tax category of Taxes.
     requires = ["inventory", "tax"]
-    # The menus' own photos (COMBO-F14, base.images): served by /p/media/ to the hub's sessions only.
-    members_media = ["combo/combos/"]
+    # The menus' own photos (COMBO-F14, base.images): served by /p/media/ to anyone, as a table's menu shows them to
+    # the customer who scans its QR.
+    public_media = ["combo/combos/"]
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). An «opción» or an «elección» of a course
     # is a choice (combo.option), as of a modifier group (modifier.option). live still reads «ordena» and «orden» as
