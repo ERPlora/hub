@@ -82,9 +82,8 @@ def _queued_job(ctx: OperationContext, request: dict):
         "description": "Print an invoice's A4 page (by its id or number) on the system printer, in the reader's "
         "language and with its VeriFactu QR; duplicate marks it as a copy. Each call prints one. With no system "
         "printer for it (or its VeriFactu record unreadable) it fails and says why: nothing was printed. When the answer "
-        "says no device that prints that printer is on now, nothing has come out yet: say it stays in that printer's "
-        "queue and prints once a device set up in Printing › Devices prints it, never that it was printed. It issues "
-        "nothing.",
+        "says no device that prints that printer is on, say it stays in that printer's queue until a device set up in "
+        "Printing › Devices prints it, never that it was printed. It issues nothing.",
         "risk": "normal",
     },
 )
