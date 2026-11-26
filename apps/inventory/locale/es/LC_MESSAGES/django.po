@@ -215,7 +215,7 @@ msgid "Count"
 msgstr "Recuento"
 
 msgid "Write-off"
-msgstr "Descuento"
+msgstr "Baja"
 
 msgid "quantity"
 msgstr "cantidad"
