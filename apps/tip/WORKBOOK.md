@@ -1,10 +1,10 @@
 # Workbook — Propinas (app)
 Prefijo: TIP
 Alcance MVP: etapa TPV (restaurante y peluquería)
-Estado de la app: parcial, fuera de la tienda — la hoja Cobro propone la propina y la anota con su venta en un cobro de una
-sola forma de pago; una propina se anota, se ajusta y se anula por la API y el asistente, y sale aparte en la caja; faltan sus
-pantallas, el informe y «Mis propinas» (hub#1498), la propina de cada cobro al repartir y «Quédese el cambio» (hub#1500) y el
-reparto (hub#1501)
+Estado de la app: parcial — la hoja Cobro propone la propina y la anota con su venta en un cobro de una sola forma de pago;
+en la pantalla Propinas se anota, se ajusta, se anula y se echa al bote, y sale aparte en la caja; Ajustes guarda las
+sugerencias de cada forma de pago; faltan el informe y «Mis propinas» (hub#1498), la propina de cada cobro al repartir y
+«Quédese el cambio» (hub#1500) y el reparto (hub#1501)
 
 > Manual de usuario y especificación de la app `tip`. Se escribe **antes** que el código: no se programa
 > nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde (servidor y
@@ -143,12 +143,12 @@ importe), cuál sale marcada, «Permitir otra cantidad» y «Guardar».
 
 | ID | Flujo | Vertical | Estado |
 |---|---|---|---|
-| TIP-F01 | Configurar las propinas | común | parcial — falta la pantalla Ajustes |
+| TIP-F01 | Configurar las propinas | común | hecho |
 | TIP-F02 | Proponer la propina al cobrar | común | parcial — faltan «Para <nombre>» y la propina de cada cobro al repartir |
-| TIP-F03 | Anotar una propina con tarjeta | común | parcial — falta la pantalla Propinas |
-| TIP-F04 | Anotar una propina en efectivo | común | parcial — faltan «Quédese el cambio» en el Cobro y la pantalla Propinas |
-| TIP-F05 | Echar al bote una propina sin tique | restaurante | parcial — falta la pantalla Propinas |
-| TIP-F06 | Ajustar o anular una propina | común | parcial — falta la pantalla Propinas |
+| TIP-F03 | Anotar una propina con tarjeta | común | hecho |
+| TIP-F04 | Anotar una propina en efectivo | común | parcial — falta «Quédese el cambio» en el Cobro |
+| TIP-F05 | Echar al bote una propina sin tique | restaurante | hecho |
+| TIP-F06 | Ajustar o anular una propina | común | hecho |
 | TIP-F07 | Declarar las propinas en efectivo al cerrar el turno | restaurante | no hecho |
 | TIP-F08 | Definir el reparto | restaurante | no hecho |
 | TIP-F09 | Repartir a otro puesto (tip-out) | restaurante | no hecho |
@@ -159,7 +159,7 @@ importe), cuál sale marcada, «Permitir otra cantidad» y «Guardar».
 | TIP-F14 | Ver mis propinas | común | no hecho |
 
 ### TIP-F01 Configurar las propinas
-Estado: parcial — los ajustes se leen y se guardan por la API y el asistente; falta la pantalla Ajustes (hub#1498)
+Estado: hecho
 Vertical: común
 Actor: propietario, administrador, asistente
 Pantalla: Ajustes
@@ -203,8 +203,7 @@ al ajustarla (TIP-F06).
 Implicados: SALE-F39, SALE-F16, CASH_REGISTER-F18
 
 ### TIP-F03 Anotar una propina con tarjeta
-Estado: parcial — la propina con tarjeta se anota en el Cobro y, sobre su venta, por la API y el asistente, y sale aparte
-en la caja; falta anotarla en la pantalla Propinas (hub#1498)
+Estado: hecho
 Vertical: común
 Actor: empleado, responsable, asistente
 Pantalla: Cobro, Propinas
@@ -216,14 +215,13 @@ Pasos:
 Entra: la venta y lo que el datáfono cobró de más (ERPlora no habla con el datáfono).
 Sale: la propina con tarjeta. En la caja abierta sale como «Propinas con tarjeta», sin tocar el efectivo esperado
 (CASH_REGISTER-F18).
-Si falla: anotarla sobre una venta anulada o devuelta entera, «Esa venta está anulada: no admite propina.»; sobre
-una venta de un día ya repartido, «Ese día ya está repartido: reábrelo para añadir propinas.» (TIP-F11).
+Si falla: anotarla sobre una venta anulada o devuelta entera, «Esa venta está anulada: no admite propina.».
 Implicados: CASH_REGISTER-F18
 
 ### TIP-F04 Anotar una propina en efectivo
 Estado: parcial — la propina en efectivo se anota en el Cobro (lo entregado cubre la cuenta y la propina, y el cambio
-descuenta las dos) y, sobre su venta, por la API y el asistente, y entra en el cajón; faltan en el Cobro «Quédese el cambio» y
-el aviso propio cuando lo entregado no cubre el total y la propina (hub#1500), y la pantalla Propinas (hub#1498)
+descuenta las dos) y, sobre su venta, en la pantalla Propinas, y entra en el cajón; faltan en el Cobro «Quédese el cambio» y
+el aviso propio cuando lo entregado no cubre el total y la propina (hub#1500)
 Vertical: común
 Actor: empleado, responsable, asistente
 Pantalla: Cobro, Propinas
@@ -242,7 +240,7 @@ total y la propina».
 Implicados: SALE-F01, CASH_REGISTER-F18
 
 ### TIP-F05 Echar al bote una propina sin tique
-Estado: parcial — el bote se anota por la API y el asistente y entra en el cajón; falta la pantalla Propinas (hub#1498)
+Estado: hecho
 Vertical: restaurante
 Actor: responsable
 Pantalla: Propinas
@@ -253,12 +251,12 @@ Pasos:
 Entra: el importe en efectivo.
 Sale: una propina sin venta ni persona, del turno abierto, que entra en el cajón (CASH_REGISTER-F18) y se reparte
 con las reglas del día (TIP-F08); sin reglas, queda «Sin asignar» hasta que se asigna (TIP-F06).
-Si falla: la caja cerrada, el mismo aviso que TIP-F04.
+Si falla: con «Activar caja» encendido y la caja cerrada, «La caja está cerrada: abre una sesión de caja para anotar una
+propina en efectivo.».
 Implicados: TIP-F08, CASH_REGISTER-F18
 
 ### TIP-F06 Ajustar o anular una propina
-Estado: parcial — ajustar y anular van por la API y el asistente, y anular o devolver entera la venta anula su
-propina sola; falta la pantalla Propinas (hub#1498)
+Estado: hecho
 Vertical: común
 Actor: responsable, asistente
 Pantalla: Propinas
@@ -271,8 +269,7 @@ Entra: la propina, el importe o la persona nuevos y el motivo; las anulaciones y
 Sale: la propina ajustada o anulada, con quién, cuándo y por qué (avisa: `tip.tip.adjusted`, `tip.tip.voided`).
 En la caja abierta, la diferencia entra o sale en su forma de pago (CASH_REGISTER-F18): nunca se toca la sesión
 ya cerrada.
-Si falla: sin motivo, «Escribe el motivo.»; con el día ya repartido, «Ese día ya está repartido: reábrelo para
-cambiar sus propinas.».
+Si falla: sin motivo, «Escribe el motivo.»; una propina ya anulada no cambia: «Esa propina está anulada: ya no cambia.».
 Implicados: SALE-F30, SALE-F31, CASH_REGISTER-F18
 
 ### TIP-F07 Declarar las propinas en efectivo al cerrar el turno
@@ -348,7 +345,9 @@ Pasos:
 2. Para corregir algo de un día aprobado, pulsa «Reabrir», corrige y vuelve a aprobar.
 Entra: las propinas, declaraciones, ventas y fichajes del día y las reglas vigentes ese día.
 Sale: lo de cada persona, fijado (avisa: `tip.pool.settled`, `tip.pool.reopened`). Sin reglas, cada propina ya es
-de quien atendió y no hay nada que aprobar.
+de quien atendió y no hay nada que aprobar. Mientras el día está aprobado, sus propinas no se anotan, ni se ajustan ni
+se anulan: «Ese día ya está repartido: reábrelo para añadir propinas.» y «Ese día ya está repartido: reábrelo para
+cambiar sus propinas.».
 Si falla: con un fichaje de ese día abierto o por revisar, «Hay jornadas de ese día sin cerrar o por revisar:
 corrígelas en Control horario antes de aprobar.» (ATTENDANCE-F05, ATTENDANCE-F08); un día con propinas ya
 pagadas no se reabre: «Ese día ya tiene propinas pagadas.».
