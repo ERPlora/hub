@@ -507,8 +507,7 @@ const label = (row: AppointmentRow): string =>
 }
 .day-grid__slot {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset-block: 0;
   border: 0;
   padding: 0;
   background: transparent;
@@ -521,15 +520,13 @@ const label = (row: AppointmentRow): string =>
 }
 .day-grid__closed {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset-block: 0;
   pointer-events: none;
   background: color-mix(in srgb, var(--ion-color-medium, #9ca3af) 14%, transparent);
 }
 .day-grid__blocked {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset-block: 0;
   pointer-events: none;
   overflow: hidden;
   padding: 2px 4px;
@@ -560,7 +557,6 @@ const label = (row: AppointmentRow): string =>
   cursor: pointer;
   touch-action: pan-x pan-y;
 }
-/* One line each for the name and the services; what does not fit ends in «…», and the title says it all. */
 .day-grid__appointment > * {
   overflow: hidden;
   text-overflow: ellipsis;
