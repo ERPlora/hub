@@ -1,16 +1,17 @@
 // Printing → Devices in Chrome (PRINTING-F18; apps/printing/WORKBOOK.md): an employee's session never takes the jobs
-// of a printer just by naming it. The owner sets up the browser's device from Devices («Print from this device», with
-// its printer), the list marks it as this device and the note says what it prints; the employee's session takes the
-// jobs only from that device (by the API, the device's side of /ws/print), never from another, and once the owner
-// retires it, not from it either, nor does its hello on /ws/print get in with the owner's session. The employee reads
-// the page without setting anything up. Screenshots of the flow in the three viewports. What is made here is deleted
-// after it.
+// of a printer just by naming it. Inside the installed app, the owner sets up its device from Devices («Print from this
+// device», with its printer), the list marks it as this device and the note says what it prints; the employee's
+// session takes the jobs only from that device (by the API, the device's side of /ws/print), never from another, and
+// once the owner retires it, not from it either, nor does its hello on /ws/print get in with the owner's session. In a
+// browser, which reaches no printer, Devices sets nothing up: it says why and where to get the app, and the queue keeps
+// saying nobody prints it. The employee reads the page without setting anything up. Screenshots of the flow in the
+// three viewports. What is made here is deleted after it.
 // flow: PRINTING-F18
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown, testid } from './helpers';
 import { dialog, fill } from './inventory-helpers';
-import { FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
+import { asTheApp, FLOW_VIEWPORTS, flowShots, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
 import { rowAction } from './service-helpers';
 import { dismissToasts } from './toast-helpers';
@@ -41,8 +42,8 @@ async function devicesReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=printing-devices-this]').waitFor({ state: 'visible' });
 }
 
-/** The id the SPA names this browser's device with (`X-Device-Id`): what the app of the device would say. */
-async function browserDevice(page: Page): Promise<string> {
+/** The id the SPA names this device with (`X-Device-Id`): what the app of the device says. */
+async function ownDevice(page: Page): Promise<string> {
   const id = await page.evaluate(() => window.localStorage.getItem('erplora.device_id'));
   expect(id, 'the SPA keeps its device id').toMatch(/^[0-9a-f-]{36}$/);
   return id!;
@@ -53,6 +54,7 @@ async function claimAs(context: BrowserContext, printer: string, device: string)
 }
 
 test('PRINTING-F18: only the device the owner set up takes the queue, with anybody’s session', async ({ page, context, browser }) => {
+  await asTheApp(context);
   await login(page, A, '/printing/devices');
   const created = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
     name: PRINTER,
@@ -62,7 +64,7 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   });
   expect(created.status, JSON.stringify(created.data)).toBe(201);
   const printer = created.data.id;
-  const mine = await browserDevice(page);
+  const mine = await ownDevice(page);
 
   // The employee's session, on a device nobody set up: refused, and the job stays waiting (the bug).
   const employee = await hostPage(browser, A, { next: '/printing/devices', credentials: EMPLOYEE });
@@ -71,7 +73,7 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   const refused = await claimAs(employee.context, printer, mine);
   expect([refused.status, refused.data.error?.code]).toEqual([403, 'printing.device_not_registered']);
 
-  // The owner sets this browser's device up from Devices.
+  // The owner sets this device up from Devices, in the app.
   await devicesReady(page);
   await expect(shown(page).locator('[data-testid=printing-devices-this]')).toContainText(/does not print yet|todavía no imprime/);
   await shown(page).locator('[data-testid=printing-devices-add]').click();
@@ -136,8 +138,10 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
     expect([after.status, after.data.error?.code]).toEqual([403, 'printing.device_not_registered']);
   }
   // Nor is it let in by its hello on /ws/print, with the owner's session that pairs a device new here: refused at
-  // once instead of a ready and a refusal at every claim, and not set up again.
-  const hello = await page.evaluate(
+  // once instead of a ready and a refusal at every claim, and not set up again. Said from a browser's page: the app's
+  // own channel is shut in this spec.
+  const owner = await hostPage(browser, A, { next: '/printing/devices' });
+  const hello = await owner.page.evaluate(
     ({ printerId, deviceId }) =>
       new Promise<{ frames: { type: string; code?: string }[]; close: number }>((resolve, reject) => {
         const socket = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/print`);
@@ -156,6 +160,7 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   );
   expect(hello.frames.map((frame) => [frame.type, frame.code])).toEqual([['error', 'print.host_not_registered']]);
   expect(hello.close).toBe(4403);
+  await owner.context.close();
   const still = await api<{ rows: Device[] }>(context, A, 'GET', '/printing/devices');
   expect(still.data.rows.map((device) => device.name)).not.toContain(DEVICE_NAME);
   await dismissToasts(page);
@@ -169,6 +174,29 @@ test('PRINTING-F18: only the device the owner set up takes the queue, with anybo
   }
   await page.setViewportSize({ width: 1280, height: 860 });
   await employee.context.close();
+});
+
+test('PRINTING-F18: in a browser, Devices sets nothing up to print: it says why and where to get the app', async ({ page, context }) => {
+  await login(page, A, '/printing/devices');
+  const created = await api<{ id: string }>(context, A, 'POST', '/printing/printers', {
+    name: `${PRINTER} browser`,
+    kind: 'network',
+    address: '10.0.0.89',
+    usage: 'receipt',
+  });
+  expect(created.status, JSON.stringify(created.data)).toBe(201);
+  await api(context, A, 'POST', '/printing/printers/test', { printer_id: created.data.id });
+  await page.reload();
+  await flowShots(page, 'PRINTING-F18-BROWSER', async () => {
+    await devicesReady(page);
+    await expect(shown(page).locator('[data-testid=printing-devices-this]')).toContainText(/A browser cannot print|Un navegador no imprime/);
+    await expect(shown(page).locator('[data-testid=printing-devices-add]')).toHaveCount(0);
+  });
+  const listed = await api<{ rows: Device[] }>(context, A, 'GET', '/printing/devices');
+  expect(listed.data.rows.filter((device) => device.this_device)).toEqual([]);
+  // Nobody prints the test page, as the queue's card says (PRINTING-F01: «No device»).
+  const summary = await api<{ usages: { usage: string; unattended: number }[] }>(context, A, 'GET', '/printing/jobs/summary');
+  expect(summary.data.usages.find((row) => row.usage === 'receipt')?.unattended).toBeGreaterThanOrEqual(1);
 });
 
 test('PRINTING-F18: the employee does not open the devices and sets none up: «No access» by their address', async ({ page }) => {
