@@ -215,6 +215,8 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | PRICING-F13 | Consultar el precio de una línea | hecho |
 | PRICING-F14 | Cuando se borra o vuelve un producto, se borra una categoría o un grupo, o cambia un servicio | hecho |
 | PRICING-F15 | Recuperar los precios de tarifa desde una copia aparte | hecho |
+| PRICING-F16 | Borrar una tarifa | no hecho |
+| PRICING-F17 | Borrar una regla de descuento | no hecho |
 
 ### PRICING-F01 Ver las tarifas
 Estado: hecho (servidor y pantalla)
@@ -520,6 +522,38 @@ pide Tarifas sin Servicios, o antes, y el servicio aún no ha vuelto: pedirlo ot
 recuperó una recuperación anterior a esta regla no lo guarda, y sus precios tampoco vuelven.
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14, SERVICE-F01
 
+### PRICING-F16 Borrar una tarifa
+Estado: no hecho — faltan la acción de borrar, su ruta, su frase del asistente y **Borrar** en la pantalla
+Actor: propietario, administrador, responsable, asistente
+Pantalla: Tarifas, Tarifa (detalle)
+Pasos:
+1. **Borrar** en el menú «⋮» de la fila de la tarifa o en la barra de su detalle, en una activa o en una
+   desactivada. En la tarifa general no se ofrece.
+2. Confirma «Socios VIP desaparece con todos sus precios. Las ventas ya hechas no cambian.».
+3. Desde el detalle, al borrarla se vuelve a **Tarifas**.
+Entra: la tarifa, por su id, su código o su nombre.
+Sale: la tarifa borrada con todos sus precios, en una sola operación, y `pricing.price_list.deleted` (con `id` y
+`code`). Su código queda libre para una tarifa nueva. Las ventas ya hechas no cambian: Ventas guarda el precio en su
+línea y ninguna otra app apunta a una tarifa. Para dejar de aplicarla y guardarla, se desactiva (PRICING-F05).
+Si falla: «Esta es la tarifa general: elige otra como general o quítale la marca antes de borrarla.» (también por el
+asistente y por la API); una que ya no está, porque otra persona la borró antes, «Esta tarifa no existe.». El rechazo
+sale dentro de la confirmación.
+Implicados: ninguno
+
+### PRICING-F17 Borrar una regla de descuento
+Estado: no hecho — faltan la acción de borrar, su ruta, su frase del asistente y **Borrar** en la pantalla
+Actor: propietario, administrador, responsable, asistente
+Pantalla: Tarifas
+Pasos:
+1. **Borrar** en la fila de la regla, activa o desactivada.
+2. Confirma «Happy hour desaparece y deja de aplicarse a las ventas nuevas. Las ventas ya hechas no cambian.».
+Entra: la regla, por su id, su código o su nombre.
+Sale: la regla borrada y `pricing.rule.deleted` (con `id` y `code`). Su código queda libre para una regla nueva. Las
+ventas ya hechas no cambian: el descuento se guarda en su línea. Para pararla un tiempo, se desactiva (PRICING-F12).
+Si falla: una que ya no está, porque otra persona la borró antes, «Esta regla de descuento no existe.». El rechazo
+sale dentro de la confirmación.
+Implicados: ninguno
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien habla)
@@ -788,4 +822,3 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 - **No hace horarios** (happy hour por días u horas): solo fechas.
 - **No convierte divisas ni bases fiscales**: lo dice en la respuesta y decide quien vende.
 - **No tiene reglas por categoría de servicio**: por servicio, por todos los servicios o por todo.
-- **No borra tarifas ni reglas**: se desactivan y se reactivan (los precios sí se quitan).

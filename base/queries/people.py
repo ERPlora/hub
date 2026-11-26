@@ -1,13 +1,16 @@
 """The business's people (``base.person.*``, ``base.hub_user.get``) and how a person is named in this hub."""
 
+import sys
+from collections.abc import Iterable
 from typing import Any
 
 from django.utils.translation import gettext
-from live.context import OperationContext
-from live.errors import NotFound
+from live.context import OperationContext, Scope, system_context
+from live.errors import AppInactive, NotFound
 from live.operations import AI, INTERNAL, operation
 
 from base import access, people as people_rules
+from base.catalog_groups import every_row
 from base.models.access import Credential
 from base.models import Hub, HubUser, Membership
 from base.models.profile import Profile
@@ -214,17 +217,52 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     return person_detail_out(ctx, person_of(ctx, data.person))
 
 
-def person_label(user) -> str:
-    """How ``user`` is named in this hub: its «My profile» name, else its erplora.com account's, else its username."""
+def person_label(user, staff_name: str = "") -> str:
+    """How ``user`` is named in this hub: its «My profile» name, else the name of its Staff record (``staff_name``),
+    else its erplora.com account's, else its username. erplora.com names an account without a name by its address, and
+    «My profile» starts from the account's name: an address names them only when nothing else does."""
     profile = Profile.objects.filter(username=user.get_username()).only("first_name", "last_name").first()
-    if profile is not None and (name := f"{profile.first_name} {profile.last_name}".strip()):
-        return name
-    return user.get_full_name() or user.get_username()
+    own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
+    named = [name for name in (own, staff_name, user.get_full_name()) if name]
+    return next((name for name in named if "@" not in name), named[0] if named else user.get_username())
 
 
-def face_name(user) -> str:
+def face_name(user, staff_name: str = "") -> str:
     """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email."""
-    return without_address(person_label(user))
+    return without_address(person_label(user, staff_name))
+
+
+def faces_of(scope: Scope, people: Iterable[tuple[Any, Any]]) -> list[dict[str, str]]:
+    """The faces of ``people`` (each, their way in and their user) on a grid of the till: id, name and initials,
+    sorted by name."""
+    people = list(people)
+    names = staff_names(scope, (user.get_username() for _, user in people))
+    found = []
+    for credential, user in people:
+        name = face_name(user, names.get(user.get_username(), ""))
+        found.append({"id": str(credential.pk), "name": name, "initials": access.initials(name)})
+    return sorted(found, key=lambda face: face["name"].casefold())
+
+
+#: Staff's directory: the business's records of its team, each with the business user it hangs from (STAFF-F03).
+STAFF_DIRECTORY = "staff.member.list"
+
+
+def staff_names(scope: Scope, usernames: Iterable[str]) -> dict[str, str]:
+    """The name of the Staff record each of ``usernames`` is linked to, for those that have one: the name the business
+    knows its team member by. Read from Staff's directory as the platform; none while Staff is off or absent."""
+    linked = dict(HubUser.objects.filter(username__in=set(usernames)).values_list("pk", "username"))
+    if not linked:
+        return {}
+    records = every_row(system_context(scope), STAFF_DIRECTORY, limit=sys.maxsize)
+    try:
+        return {
+            linked[row.user_id]: row.full_name.strip()
+            for row in records
+            if row.user_id in linked and row.full_name.strip()
+        }
+    except AppInactive:
+        return {}
 
 
 def actor_name(who) -> str:
