@@ -11,8 +11,11 @@ from live.operations import Operation, get
 from base import assistant
 from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.card_values import ctx, writes
+from base.tests.test_assistant_card_preferences import SET, owner
+from base.tests.test_assistant_yes_for_its_card import turn_as
+from base.tests.test_services_assistant import call
 
-__all__ = ["in_business_a"]
+__all__ = ["in_business_a", "owner"]
 
 pytestmark = HUB_DB
 
@@ -70,3 +73,8 @@ def test_what_the_write_is_about_is_no_choice():
     """A name and a figure keep their own words: only a closed list's value is marked."""
     assert drawn(get("service.service.create"), "name", "Corte").get(CHOICE) is None
     assert drawn(get("service.service.create"), "duration_minutes", 30).get(CHOICE) is None
+
+
+def test_the_card_a_turn_sends_to_the_screen_keeps_the_mark(owner):
+    [shown] = turn_as(owner, call(SET, {"ui_scale": 110}))["confirm"]["fields"]
+    assert (shown["name"], shown["value"], shown.get(CHOICE)) == ("ui_scale", "110%", True)
