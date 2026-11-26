@@ -5,18 +5,19 @@ Every test with the database runs as production does: inside business A's own da
 ``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
 of B asks for ``hub_b`` and enters it.
 
-The builders import the models lazily, so that the tests of apps.py still collect while models.py
-does not exist.
+The builders import the models lazily, so that the tests of apps.py still collect while the models
+do not exist.
 """
 
 import datetime as dt
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import connections
+from django.db import IntegrityError, connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from live.operations import atomic
 from psycopg.conninfo import make_conninfo
 
 from apps.flow.tests.test_relay import worker_loop
@@ -98,13 +99,13 @@ def make_tax(key: str = "test.service", name: str = "Service — test", **fields
 
 
 def make_category(name: str = "Hair", **fields):
-    from apps.service.models import Category
+    from apps.service.models.catalog import Category
 
     return Category.objects.create(name=name, **fields)
 
 
 def make_service(name: str = "Haircut", *, tax=None, price: int = 2000, **fields):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     return Service.objects.create(name=name, tax_category=tax, price=price, **fields)
 
@@ -122,7 +123,7 @@ def make_customer(name: str = "Lucía Pérez", **fields):
 
 
 def make_package(name: str = "Bono 5 cortes", services=(), sessions: int = 1, **fields):
-    from apps.service.models import Package, PackageItem
+    from apps.service.models.packages import Package, PackageItem
 
     package = Package.objects.create(name=name, **fields)
     for position, service in enumerate(services):
@@ -134,7 +135,7 @@ def make_package(name: str = "Bono 5 cortes", services=(), sessions: int = 1, **
 
 def make_grant(package, customer, *, days_ago: int = 0, **fields):
     """A voucher sold ``days_ago`` days ago, with the package's terms frozen unless given."""
-    from apps.service.models import Grant
+    from apps.service.models.grants import Grant
 
     fields.setdefault("max_uses", package.max_uses)
     fields.setdefault("validity_days", package.validity_days)
@@ -145,6 +146,17 @@ def make_grant(package, customer, *, days_ago: int = 0, **fields):
 
 
 def make_redemption(grant, service=None, **fields):
-    from apps.service.models import Redemption
+    from apps.service.models.grants import Redemption
 
     return Redemption.objects.create(grant=grant, service=service, **fields)
+
+
+def refused(**create) -> bool:
+    """Whether creating ``model(**fields)`` breaks a constraint (inside its own savepoint)."""
+    model, fields = create.pop("model"), create
+    try:
+        with atomic():
+            model.objects.create(**fields)
+    except IntegrityError:
+        return True
+    return False

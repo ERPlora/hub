@@ -9,7 +9,7 @@ from live.operations import INTERNAL, operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import Category, Service, parent_problem
+from apps.service.models.catalog import Category, Service, parent_problem
 from apps.service.queries.catalog import find_service, load_service
 from apps.service.queries.categories import find_category, load_category
 from apps.service.queries.reads import SYSTEM

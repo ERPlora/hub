@@ -10,7 +10,8 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import Category, Service, ServiceSettings
+from apps.service.models.catalog import Category, Service
+from apps.service.models.settings import ServiceSettings
 from apps.service.queries.catalog import find_service, load_service
 from apps.service.queries.categories import find_category
 from apps.service.queries.reads import held_rows
