@@ -30,16 +30,10 @@ from live.errors import OperationError
 from live.operations import atomic, get
 
 from apps.customer.models import Customer
-from apps.service.models import (
-    Assignment,
-    Category,
-    Grant,
-    Package,
-    PackageItem,
-    Redemption,
-    Service,
-    ServiceSettings,
-)
+from apps.service.models.catalog import Assignment, Category, Service
+from apps.service.models.grants import Grant, Redemption
+from apps.service.models.packages import Package, PackageItem
+from apps.service.models.settings import ServiceSettings
 from apps.staff.models import Member
 from apps.tax.models import TaxCategory
 from base.recovery import actor_of

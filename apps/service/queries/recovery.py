@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.operations import INTERNAL, operation
 from psycopg import sql
 
-from apps.service.models import Assignment, Category, Service, parent_problem
+from apps.service.models.catalog import Assignment, Category, Service, parent_problem
 from apps.service.queries.reads import SYSTEM
 from apps.service.schemas.recovery import StandingForIn, StandingForOut
 from apps.tax.models import TaxCategory

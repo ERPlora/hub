@@ -10,7 +10,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import CATEGORY_CYCLE, CATEGORY_LOOP, Category, Service, parent_problem
+from apps.service.models.catalog import CATEGORY_CYCLE, CATEGORY_LOOP, Category, Service, parent_problem
 from apps.service.queries.categories import find_category, load_category
 from apps.service.schemas.categories import CategoryIn, CategoryOut, CategoryPatchIn
 from apps.service.schemas.fields import CategoryRefIn, DeletedOut
