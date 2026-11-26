@@ -127,7 +127,7 @@ class AppointmentConfig(LiveAppConfig):
         BellCounter(
             key="to_confirm",
             operation="appointment.appointment.count_to_confirm",
-            route="/appointment/agenda",
+            route="/appointment/agenda?to_confirm=1",
             label=_("Appointments to confirm"),
             icon="ion:calendar-outline",
             permission="appointment.view_own_appointment",

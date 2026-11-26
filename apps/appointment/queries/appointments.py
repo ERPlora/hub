@@ -2,7 +2,7 @@
 
 from django.db.models import Exists, OuterRef, Q
 from live.context import OperationContext
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.appointment.models import Appointment, AppointmentService, History
 from apps.appointment.schemas.agenda import AppointmentListIn, AppointmentPage
@@ -16,7 +16,7 @@ from apps.appointment.schemas.appointments import (
     HistoryPage,
     VisitPage,
 )
-from apps.appointment.schemas.fields import NoIn
+from apps.appointment.schemas.fields import NoIn, PageIn
 from apps.customer.queries.reads import find_customer
 from apps.service.queries import catalog
 from apps.staff.queries.reads import resolve_member
@@ -252,9 +252,27 @@ def count_active_for_service(ctx: OperationContext, data: CountForServiceIn) -> 
     },
 )
 def count_to_confirm(ctx: OperationContext, data: NoIn) -> dict:
-    rows = appointments(ctx).filter(status=S.PENDING, start__gte=now())
-    first = rows.order_by("start", "id").first()
+    rows = _to_confirm(ctx)
+    first = rows.first()
     return {
         "count": rows.count(),
         "earliest": first.start.astimezone(business_zone()) if first else None,
     }
+
+
+@operation(
+    "appointment.appointment.list_to_confirm",
+    kind="query",
+    permission=VIEW_OWN,
+    input=PageIn,
+    output=AppointmentPage,
+    ai=INTERNAL,
+)
+def list_to_confirm(ctx: OperationContext, params: PageIn) -> dict:
+    page = _page(_to_confirm(ctx), params.limit, params.offset, row)
+    return {**page, "timezone": zone_name()}
+
+
+def _to_confirm(ctx: OperationContext):
+    """The bookings still waiting for confirmation, of any day, soonest first: what «N to confirm» counts and lists."""
+    return appointments(ctx).filter(status=S.PENDING, start__gte=now()).order_by("start", "id")
