@@ -6,7 +6,7 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { findingsByApp, hubFrontends, linesWhere } from './__tests__/frontend-sources';
+import { findingsByApp, hubFrontends, linesWhere, templateLinesWhere } from './__tests__/frontend-sources';
 import { NO_CLOCK } from '../../vitest.load';
 
 const NAME_IT =
@@ -20,16 +20,8 @@ const namesASearchbar = (node: ts.Node): boolean =>
 
 /** The lines of a component's template with a searchbar, when its script names fewer searchbars than that. */
 export function unnamedSearchbars(text: string, name: string): number[] {
-  if (!name.endsWith('.vue')) return [];
-  const start = text.indexOf('<template>');
-  const end = text.lastIndexOf('</template>');
-  if (start === -1 || end === -1) return [];
-  const before = text.slice(0, start).split('\n').length;
-  const bars = text
-    .slice(start, end)
-    .split('\n')
-    .flatMap((line, index) => (SEARCHBAR.test(line) ? [before + index] : []));
-  return linesWhere(text, name, namesASearchbar).length >= bars.length ? [] : bars;
+  const bars = templateLinesWhere(text, name, (line) => SEARCHBAR.test(line));
+  return bars.length === 0 || linesWhere(text, name, namesASearchbar).length >= bars.length ? [] : bars;
 }
 
 describe('guardrail: every search box of the Hub and of @erplora/ui is named for a screen reader', () => {
