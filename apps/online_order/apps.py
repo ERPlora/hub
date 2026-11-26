@@ -25,13 +25,18 @@ class OnlineOrderConfig(LiveAppConfig):
     verticals = []
     # Out of the store until the customer can order: a printed QR must not open a page that does not exist yet.
     listed = False
-    # The tables (and, through them, Sales and Customers): it reads them by Tables' operations.
-    requires = ["table"]
+    # The tables (and, through them, Sales and Customers) and the menu, read by Tables' and Inventory's operations.
+    # Modifiers and Menus and combos add to the menu when they are on.
+    requires = ["table", "inventory"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = {
         "online_order.view_qr_code": _("See the tables' QR codes"),
         "online_order.change_qr_code": _("Regenerate the tables' QR codes"),
+        "online_order.public": _("Open a table's ordering page"),
     }
+    # The page base's public door serves without a session at /p/<slug>/order/<code>: whoever opens it holds
+    # ``online_order.public`` and nothing else.
+    public_pages = {"order": "online_order.public"}
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).
     role_permissions = {
         "hub_owner": ["online_order.*"],

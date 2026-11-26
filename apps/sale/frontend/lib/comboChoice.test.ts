@@ -12,7 +12,7 @@ const course = (id: string, min: number, max: number, ids: string[], more: Parti
   min_choices: min,
   max_choices: max,
   allow_repeat: false,
-  options: ids.map((optionId) => ({ id: optionId, product_id: `p-${optionId}`, product_name: optionId, sku: '', price_delta: optionId === 'steak' ? 200 : 0 })),
+  options: ids.map((optionId) => ({ id: optionId, product_id: `p-${optionId}`, product_name: optionId, sku: '', price_delta: optionId === 'steak' ? 200 : 0, allergens: [] })),
   ...more,
 });
 
