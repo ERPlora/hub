@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 def fill_contact_search(apps, schema_editor):
     """The searchable WhatsApp name of the conversations that came before the column (expand)."""
-    from apps.whatsapp_inbox.models import name_key
+    from apps.whatsapp_inbox.models.conversations import name_key
 
     Conversation = apps.get_model("whatsapp_inbox", "Conversation")
     rows = Conversation.objects.using(schema_editor.connection.alias).exclude(contact_name="")

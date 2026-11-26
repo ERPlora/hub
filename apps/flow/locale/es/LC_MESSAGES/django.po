@@ -321,8 +321,8 @@ msgstr "Solo puede decir que sí a «%(name)s» quien también puede hacerlo."
 msgid "That draft does not exist in this business."
 msgstr "Ese borrador no existe en este negocio."
 
-msgid "It tried to do something you have not allowed it to do («%(name)s»), so it stopped. Open Permissions and allow what it needs."
-msgstr "Ha intentado hacer algo que no le has permitido («%(name)s»), así que ha parado. Abre Permisos y concédele lo que necesita."
+msgid "It tried to do something you have not allowed it to do («%(name)s»), so it stopped."
+msgstr "Ha intentado hacer algo que no le has permitido («%(name)s»), así que ha parado."
 
 msgid "«%(name)s» is not available in this business any more (its app is off), so it stopped."
 msgstr "«%(name)s» ya no está disponible en este negocio (su app está apagada), así que ha parado."

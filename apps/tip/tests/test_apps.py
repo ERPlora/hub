@@ -34,14 +34,23 @@ def test_it_is_a_free_module_of_the_people_group_with_a_registered_icon():
     assert f"'{config().icon.removeprefix('ion:')}'" in shell_icon_registry()
 
 
-def test_it_stays_out_of_the_store_and_of_every_template_until_it_has_its_screens():
+def test_it_is_in_the_store_and_in_the_restaurant_and_hair_salon_templates():
     assert str(config().verbose_name) == "Tips"
     assert 0 < len(str(config().summary)) <= 120
     assert str(config().description)
-    # A business that turned it on, or a new restaurant or hair salon born with it, would find no screen of it: only
-    # the API and the assistant would reach it.
-    assert config().listed is False
-    assert config().verticals == []
+    assert config().listed is True
+    assert sorted(config().verticals) == ["hair_salon", "restaurant"]
+
+
+def test_its_menu_opens_the_tips_and_the_settings_to_whoever_manages_them():
+    # Whoever only records tips sees neither: their own tips come with «My tips».
+    assert [(nav.id, nav.path, nav.permission) for nav in config().navigation] == [
+        ("tips", "/tip/tips", "tip.manage"),
+        ("settings", "/tip/settings", "tip.manage"),
+    ]
+    assert [str(nav.label) for nav in config().navigation] == ["Tips", "Settings"]
+    for nav in config().navigation:
+        assert f"'{nav.icon.removeprefix('ion:')}'" in shell_icon_registry(), nav.id
 
 
 def test_permissions():
