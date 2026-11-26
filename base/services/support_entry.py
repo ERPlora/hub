@@ -41,7 +41,7 @@ def open_support_session(request: HttpRequest, redeemed: RedeemedUser, slug: str
     """Log the person of support in on the business ``slug`` (a new session key) when it lets support in; else
     ``SupportAccessOff``, with nothing saved."""
     user = _local_copy(redeemed, username=support_username_for(redeemed.user_id), is_staff=False, is_superuser=False)
-    entry = SupportEnterIn(username=user.get_username(), name=redeemed.name[:150], email=redeemed.email)
+    entry = SupportEnterIn(username=user.get_username(), name=user.first_name, email=redeemed.email)
     if not support_access_enter(system_context(Scope("host", slug)), entry).entered:
         raise SupportAccessOff(slug)
     Membership.objects.update_or_create(user=user, host=slug, defaults={"role": Membership.SUPPORT})

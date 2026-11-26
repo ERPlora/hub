@@ -1,8 +1,8 @@
 # erplora.com names an account without a name by its address, and the Hub kept it as the person's name: on control's
-# copy of the account, on the business's person and on «My profile», which copies it when it is first saved. A
-# colleague's address only reaches whoever sees the team's contact details, so each keeps what goes before the «@», as
-# an account is named from now on when it enters. Only a bare address is cut: a person's name keeps theirs. Backwards,
-# nothing changes: the address is kept nowhere to give it back.
+# copy of the account, on the business's person, on «My profile», which copies it when it is first saved, and on a visit
+# of ERPlora's support. An address only reaches whoever sees the team's contact details, so each keeps what goes before
+# the «@», as an account is named from now on when it enters. Only a bare address is cut: a person's name keeps theirs.
+# Backwards, nothing changes: the address is kept nowhere to give it back.
 
 from django.db import migrations
 from django.db.models import F, Func, Value
@@ -23,6 +23,7 @@ def accounts_without_address(apps, schema_editor):
 def people_without_address(apps, schema_editor):
     _cut(schema_editor, apps.get_model("base", "HubUser"), "name")
     _cut(schema_editor, apps.get_model("base", "Profile"), "first_name")
+    _cut(schema_editor, apps.get_model("base", "SupportVisit"), "name")
 
 
 class Migration(migrations.Migration):
