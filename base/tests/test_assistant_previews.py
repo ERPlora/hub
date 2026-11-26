@@ -291,6 +291,20 @@ def test_a_read_the_assistant_reads_on_by_its_offset_is_still_a_preview(monkeypa
     assert preview_errors() == []
 
 
+class OffsetNeededPreviewIn(SettlePreviewIn):
+    offset: int
+
+
+def test_a_read_that_cannot_be_read_without_its_offset_is_no_preview(monkeypatch):
+    """A preview never sends an ``offset`` the write does not take: a read that needs one would fail on every card."""
+    needy = dataclasses.replace(SETTLE_PREVIEW, input=OffsetNeededPreviewIn)
+    monkeypatch.setitem(registry, needy.name, needy)
+    monkeypatch.setitem(registry, SETTLE.name, SETTLE)
+
+    [error] = preview_errors()
+    assert "the write never takes offset" in error.msg
+
+
 class SignedNameOut(Schema):
     name: str = Field(title="Owner", json_schema_extra={"signed": True})
     total_cents: int = Field(json_schema_extra={"signed": True, "money": True})

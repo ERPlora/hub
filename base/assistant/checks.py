@@ -20,7 +20,7 @@ _resolved = shared.resolved
 _schema = shared.input_schema
 
 #: Where a read goes on from when its answer is too long to be told at once (``live.assistant``): never a write's data,
-#: so a preview or a check reads it from its start.
+#: so a preview or a check reads it from its start, which it can only do when the read does not need one.
 READ_ON = "offset"
 
 
@@ -81,8 +81,8 @@ def _read_problems(op: Operation, read: Operation) -> list[str]:
         problems.append(f"names {read.name}, not a read")
     problems += [
         f"reads {name}, but the write never takes {name}"
-        for name in read.input.model_fields
-        if name not in op.input.model_fields and name != READ_ON
+        for name, field in read.input.model_fields.items()
+        if name not in op.input.model_fields and (name != READ_ON or field.is_required())
     ]
     return problems
 
