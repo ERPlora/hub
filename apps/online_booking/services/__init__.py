@@ -56,6 +56,7 @@ from apps.online_booking.schemas import (
 from apps.service.models.catalog import Service
 from apps.staff.models import Member
 from base.business import business_zone
+from base.queries.people import actor_name
 
 from .logo import check_logo
 
@@ -103,13 +104,7 @@ DEFAULT_PENDING = _(
 
 
 def _actor(ctx: OperationContext) -> str:
-    """Who acted, as a person reads it: an account's full name, else its email, else its username."""
-    actor = ctx.actor
-    if actor is None:
-        return ""
-    if hasattr(actor, "get_username"):
-        return (actor.get_full_name() or actor.email or actor.get_username())[:128]
-    return str(actor)[:128]
+    return actor_name(ctx.actor)[:128]
 
 
 def _diary(ctx: OperationContext, name: str, appointment: Appointment, **extra):
