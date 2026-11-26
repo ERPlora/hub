@@ -12,7 +12,8 @@ from live.outbox import record_event
 from apps.customer.queries.reads import find_customer
 from apps.service import grant_card
 from apps.service import events
-from apps.service.models import Assignment, Grant, GrantAdjustment, Redemption, Service
+from apps.service.models.catalog import Assignment, Service
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
 from apps.service.queries.catalog import find_service
 from apps.service.queries.grant_checks import redeem_refusal, void_refusal
 from apps.service.queries.grants import balance, find_grant, load_grant, lock_grant, session_value

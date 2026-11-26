@@ -11,7 +11,8 @@ from django.utils import timezone
 from live.operations import NAME_RE
 
 from apps.service import events
-from apps.service.models import Assignment, Grant, GrantAdjustment, Redemption
+from apps.service.models.catalog import Assignment
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
 from apps.service.tests.conftest import (
     HUB_DB, A, make_customer, make_grant, make_member, make_package, make_redemption, make_service,
 )

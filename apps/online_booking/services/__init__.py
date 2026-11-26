@@ -53,7 +53,7 @@ from apps.online_booking.schemas import (
     SettingsIn,
     SettingsOut,
 )
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.staff.models import Member
 from base.business import business_zone
 
