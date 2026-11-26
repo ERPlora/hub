@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// A button that downloads a file the server writes (the rows a list shows, an invoice's PDF): `load` asks for it, the
-// Hub's `saveFile` hands it over, and a refusal is told with its reason.
+// A button that downloads a file the server writes (the rows a list shows, an invoice's PDF): the download icon alone,
+// its label as its name and tooltip. `load` asks for it, the Hub's `saveFile` hands it over, and a refusal is told with
+// its reason.
 import { HubIcon, toastError } from '@erplora/ui/shell';
-import { IonButton } from '@ionic/vue';
-import { ref } from 'vue';
+import { IonButton, IonSpinner } from '@ionic/vue';
+import { computed, ref } from 'vue';
 
 import { saveFile } from '../lib/download';
 import { useBaseI18n } from '../lib/i18n';
@@ -22,6 +23,7 @@ const props = defineProps<{
 
 const { t } = useBaseI18n();
 const pending = ref(false);
+const name = computed(() => (pending.value ? props.pendingLabel : props.label));
 
 async function exportFile(): Promise<void> {
   if (props.disabled || pending.value) return;
@@ -44,12 +46,19 @@ async function exportFile(): Promise<void> {
     fill="outline"
     :data-testid="testid"
     :disabled="disabled || pending"
+    :aria-label="name"
+    :title="name"
     @click="exportFile"
   >
+    <ion-spinner
+      v-if="pending"
+      slot="icon-only"
+      name="crescent"
+    />
     <HubIcon
-      slot="start"
+      v-else
+      slot="icon-only"
       name="ion:download-outline"
     />
-    {{ pending ? pendingLabel : label }}
   </ion-button>
 </template>

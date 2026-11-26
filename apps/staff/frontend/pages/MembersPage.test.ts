@@ -35,7 +35,7 @@ import MyRecordModal from '../components/MyRecordModal.vue';
 import TerminateDialog from '../components/TerminateDialog.vue';
 import MembersPage from './MembersPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
-import { rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
+import { accessibleName, rowButtonNames } from '../../../../base/frontend/__tests__/mount-base';
 
 const OP = 'staff.member.list';
 
@@ -415,6 +415,9 @@ describe('MembersPage: my record (STAFF-F08)', () => {
     expect(s.find('staff-members-mine').exists()).toBe(false);
     await s.result('staff.member.mine', MINE);
     await s.show(page(ROWS));
+    const mine = s.find('staff-members-mine');
+    // The person icon alone: «My record» is its name and its tooltip.
+    expect([mine.text(), accessibleName(mine.element), mine.attributes('title')]).toEqual(['', 'My record', 'My record']);
     await click(s.find('staff-members-mine').element);
     const modal = s.wrapper.findComponent(MyRecordModal);
     expect([modal.props('open'), modal.props('record')]).toEqual([true, MINE.member]);
