@@ -293,7 +293,7 @@ quién se la aprobó, o que la hizo por su cuenta alguien a quien su rol se lo p
 
 ### Ficha de una persona
 Desde una fila de **Empleados › Personal**, para quien administra, con el botón de volver: «Sus datos» (con «Abrir
-en erplora.com»), «PIN» y «Placa».
+en erplora.com»), «Rol en este negocio», «PIN» y «Placa».
 
 ### Hace falta una aprobación
 Sobre la pantalla en la que se intentó la acción: qué se aprueba, «¿Quién lo aprueba?» con las caras y el teclado
@@ -488,7 +488,7 @@ En la pantalla Archivos:
 | BASE-F127 | Crear un rol propio a partir de otro | hecho |
 | BASE-F128 | Ajustar lo que permite un rol propio | hecho |
 | BASE-F129 | Borrar un rol propio | hecho |
-| BASE-F130 | Dar un rol propio a una persona | parcial |
+| BASE-F130 | Dar un rol propio a una persona | hecho |
 | BASE-F131 | Ver en la campana los roles por revisar | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
@@ -2318,7 +2318,8 @@ Pasos:
   3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
      totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
      registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
-     facturas y no cambia ningún ajuste, y no ocupa plaza del plan.
+     facturas y no cambia ningún ajuste, y no ocupa plaza del plan. Por eso no se le da un rol propio: con él, una
+     plaza gratis podría hacer más que leer.
   4. Al tocar un rol se abre «Qué permite», con el nombre del rol arriba, «Lo que este rol deja hacer en este negocio,
      app por app. Se da en erplora.com y aquí no se cambia.» y «Personas con este rol: 2». Debajo, un panel por app: «El
      negocio» primero, después cada app encendida por su nombre y «Datos sensibles» al final. En cada panel, la frase de
@@ -2326,7 +2327,8 @@ Pasos:
      momento) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con aprobación». Una app
      apagada no sale. Es solo lectura: aquí no se cambia nada. En un rol propio pone «Lo que este rol deja hacer en este
      negocio, app por app.» y sale lo que el negocio guardó; lo que no se puede dar en un rol propio, ser el propietario
-     del negocio, no sale. Quien gestiona los roles lo ajusta ahí mismo.
+     del negocio, no sale. Quien gestiona los roles lo ajusta ahí mismo, salvo el rol que tiene él, que ve igual,
+     de solo lectura, con «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.».
   5. Quien gestiona los roles (el propietario y el administrador, o quien lo tenga en su rol propio) crea uno con
      «Nuevo rol» o «Duplicar» y, en «⋮», edita o borra los propios.
   6. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
@@ -2364,8 +2366,8 @@ Pasos:
      mismo que ese rol. Después ajustas lo que permite.».
   3. «Crear rol»: el rol queda creado con lo mismo que permite el otro, app por app, menos ser el propietario del
      negocio, que ningún rol propio da. Sale «Rol Cajero creado» y se abre para ajustarlo.
-  4. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él; se da a una persona pidiéndoselo al asistente.
-     Desde entonces no cambia con el rol del que salió.
+  4. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él; se da a una persona en su ficha, en «Rol en
+     este negocio», o pidiéndoselo al asistente. Desde entonces no cambia con el rol del que salió.
   5. También se pide al asistente: «crea el rol Cajero a partir de Empleado», con una descripción si se quiere. La
      tarjeta dice «A partir de: Empleado» y «Nombre: Cajero», y al aceptarla queda creado igual.
 Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la descripción.
@@ -2383,8 +2385,9 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Roles · Qué permite; Asistente
 Pasos:
-  1. En **Empleados › Roles**, toca un rol propio, o «Editar» en su «⋮». Arriba, «Lo que este rol deja hacer en este
-     negocio, app por app. Al guardar, quien lo tiene lo nota al momento.», cuántas personas lo tienen y su «Nombre» y
+  1. En **Empleados › Roles**, toca un rol propio, o «Editar» en su «⋮» (el rol que tiene uno mismo no tiene «Editar»).
+     Arriba, «Lo que este rol deja hacer en este negocio, app por app. Al guardar, quien lo tiene lo nota al momento.»,
+     cuántas personas lo tienen y su «Nombre» y
      «Descripción», que se cambian ahí. Debajo, los mismos paneles de «Qué permite»: cada permiso con su frase
      y un interruptor o, en lo que un responsable puede aprobar con su PIN, «Permitido», «Con aprobación» o «No».
   2. Cambia lo que quiera y pulsa «Guardar» al final: «Rol guardado.». Sin nada cambiado, «Guardar» no se puede pulsar.
@@ -2407,8 +2410,11 @@ tú.»; y ser el propietario no se da a nadie: «Eso es solo del propietario del
 no es de una app encendida, «Ese permiso no es de ninguna app encendida de este negocio.»; «Con aprobación» en algo que
 un responsable no puede aprobar con su PIN, «Eso no se puede aprobar con un PIN: elige permitido o no.». El nombre, como
 al crearlo. Lo que se rechaza en la pantalla se dice junto a «Guardar», con «No se pudo guardar el rol», o bajo el
-nombre, y lo que se estaba cambiando sigue puesto. Quien no gestiona los roles lo ve de solo lectura.
-Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
+nombre, y lo que se estaba cambiando sigue puesto. Quien no gestiona los roles lo ve de solo lectura. Nadie cambia el
+rol que tiene él, ni para quitarle algo: lo ve de solo lectura, con «Nadie se cambia su propio rol: pídeselo a alguien
+por encima de ti.», y el asistente y la API contestan lo mismo y no cambian nada; se lo cambia otra persona que gestione
+los roles.
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F130, BASE-F131
 
 ### BASE-F129 Borrar un rol propio
 Estado: hecho
@@ -2428,30 +2434,41 @@ es de erplora.com. Duplícalo y cambia la copia.».
 Implicados: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
 
 ### BASE-F130 Dar un rol propio a una persona
-Estado: parcial — se da pidiéndoselo al asistente o por la API del Hub; falta su sitio en la ficha de la persona
+Estado: hecho
 Actor: propietario, administrador
-Pantalla: Asistente
+Pantalla: Ficha de una persona; Asistente
 Pasos:
-  1. Pide al asistente «dale a Luis el rol Cajero» o «quítale a Luis el rol Cajero».
-  2. La tarjeta dice la persona y el rol por sus nombres y, bajo «Lo que va a pasar», cuántas personas tienen ese rol.
-     Pide escribir CONFIRMAR (BASE-F98).
-  3. Al aceptarla, la persona queda con ese rol, que manda sobre el de su invitación: lo que ve y lo que puede hacer
-     cambian al momento en sus dispositivos, sin cerrar su sesión (BASE-F13), y quien ahora puede hacer algo con ese rol
-     lo aprueba también con su PIN (BASE-F84). Cada persona tiene un solo rol.
-  4. Para devolverla al de su invitación se le pide ese rol («Empleado»): es el que tiene desde entonces.
-  5. El asistente de esa persona sabe con qué rol habla: el propio, por el nombre que le puso el negocio (BASE-F100).
+  1. En **Empleados › Personal**, toca a una persona. En su ficha, bajo «Sus datos», está «Rol en este negocio»: «Manda
+     sobre el rol de su invitación: lo que ve y puede hacer aquí cambia al momento, sin volver a entrar.».
+  2. En «Rol» sale el que tiene: uno propio del negocio, por su nombre, o «El de la invitación (Empleado)». Elige otro de
+     los propios, o «El de la invitación (Empleado)» para devolverla al de su invitación, y se da al elegirlo: «Eva Gil
+     tiene ahora el rol Cajero.».
+  3. Desde ese momento ese rol manda sobre el de su invitación: lo que ve y lo que puede hacer cambian en sus
+     dispositivos sin cerrar su sesión, y lo que ese rol le deja hacer también lo aprueba con su PIN cuando otro lo pide.
+     Cada persona tiene un solo rol.
+  4. Si el negocio aún no tiene roles propios, la ficha dice «Este negocio aún no tiene roles propios: se crean en
+     Empleados › Roles, a partir de cualquier rol.», y «Crear un rol» lleva a **Empleados › Roles**.
+  5. Si a esa persona no se le puede dar un rol, su ficha enseña el que tiene y por qué, sin nada que elegir. Quien no
+     gestiona los roles solo ve el que tiene.
+  6. También se pide al asistente: «dale a Luis el rol Cajero» o «quítale a Luis el rol Cajero». La tarjeta dice la
+     persona y el rol por sus nombres y, bajo «Lo que va a pasar», cuántas personas tienen ese rol, y pide escribir
+     CONFIRMAR.
+  7. El asistente de esa persona sabe con qué rol habla: el propio, por el nombre que le puso el negocio.
 Entra: la persona y el rol, uno propio del negocio o el de su invitación.
 Sale: la persona con ese rol. Evento `base.role.assigned`. erplora.com no lo sabe: allí sigue con el de su invitación.
-Si falla: al propietario nadie le da otro rol, «El propietario siempre es el propietario: nadie le da otro rol.»; nadie
-se lo cambia a sí mismo, «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.»; ni a quien no está por
-debajo en su invitación, «Solo puedes dar un rol a quien está por debajo de ti en el negocio.». Nadie da un rol que
+Si falla: al propietario nadie le da otro rol, «El propietario siempre es el propietario: nadie le da otro rol.»; a la
+gestoría tampoco, porque solo lee y no ocupa plaza del plan, «La gestoría solo lee y no ocupa plaza del plan: se queda
+con el rol de su invitación.», y un rol propio que le dieran antes de pasar a gestoría en erplora.com deja de mandar;
+nadie se lo cambia a sí mismo, «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.»; ni a quien no está
+por debajo en su invitación, «Solo puedes dar un rol a quien está por debajo de ti en el negocio.». Nadie da un rol que
 permite más de lo que puede hacer él, tampoco el de la invitación al devolverla, ni lo que daría una app apagada, ni
 «Con aprobación» lo que su propio rol le niega: «Un rol no puede permitir más de lo que puedes hacer tú.». Otro rol
 básico, «Ese rol se da en erplora.com. Aquí se da uno propio del negocio.»; un rol que no está, «Este rol no existe en
 este negocio.»; una persona que no es del negocio, «Esa persona no está en este negocio.». Si alguien borra el rol a la
 vez, o se borra o se da, nunca las dos cosas: se oye el «Este rol no existe en este negocio.» o el «2 personas tienen
-este rol. Dales otro antes de borrarlo.».
-Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
+este rol. Dales otro antes de borrarlo.». En la ficha, lo que se rechaza al elegir se dice bajo «Rol», que vuelve al
+rol que tenía; si no se pueden cargar los roles, «No se pudieron cargar los roles.» con «Reintentar».
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F128, BASE-F129
 
 ### BASE-F131 Ver en la campana los roles por revisar
 Estado: hecho
