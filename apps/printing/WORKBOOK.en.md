@@ -380,7 +380,7 @@ off: "The printer does not answer. Check that it is on and connected.") and, aft
 Involved: PRINTING-F18
 
 ### PRINTING-F06 Choose how the business prints
-<!-- from WORKBOOK.md sha256:fe9be6185920 -->
+<!-- from WORKBOOK.md sha256:7dae70702fa0 -->
 Status: done
 Actor: administrator, manager
 Screen: Settings
@@ -395,7 +395,8 @@ In: the business's decisions.
 Out: the print settings, a single row (announces: `printing.settings.updated`). Without saving,
 the factory ones always hold: receipt on checkout on, drawer off, one copy, no printer chosen.
 If it fails: "Could not save the settings." with the reason; if it names a role's printer (deactivated,
-deleted or moved to another role while it was being chosen), the reason also shows below that role. As
+deleted or moved to another role while it was being chosen), the reason shows only below that role, once:
+the notice above does not repeat it. As
 in the form windows, the notice goes as soon as something is changed and a role's reason as soon as
 another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
 field stays until the next try. If the read fails, the screen does not

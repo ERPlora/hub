@@ -464,8 +464,8 @@ online y la categoría fiscal por defecto los toma todo servicio nuevo que no lo
 asistente, API y alta de golpe); el formulario trae elegida la categoría fiscal por defecto.
 «Mostrar precios» y «Mostrar duración» los usa la página de Reservas online: sin ellos no enseña el
 precio o la duración de cada servicio.
-Si falla: «No se pudieron guardar los ajustes.» y el motivo debajo del campo (una duración de 0, una
-categoría fiscal que no existe). Como en las ventanas de formulario, el aviso se quita en cuanto se cambia
+Si falla: el motivo debajo del campo, una sola vez (una duración de 0, una categoría fiscal que no
+existe): el aviso «No se pudieron guardar los ajustes.» de arriba no lo repite. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia
 algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el siguiente intento
 también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
 Implicados: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
