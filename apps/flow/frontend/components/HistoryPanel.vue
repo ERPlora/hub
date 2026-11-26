@@ -14,6 +14,7 @@ import { computed, ref } from 'vue';
 
 import { useLiveList } from '../composables/useLiveList';
 import { usePhrasing } from '../composables/usePhrasing';
+import { advice } from '../lib/advice';
 import { wording } from '../lib/refusal';
 import { describeLog, runStatusPill } from '../lib/phrasing';
 import type { CatalogOut, RunOut, RunPageOut, Step } from '../operations';
@@ -60,11 +61,6 @@ async function copy(id: string): Promise<void> {
 
 function when(run: RunOut): string {
   return new Intl.DateTimeFormat(phrasing.value.locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(run.started_at));
-}
-
-function advice(code: string): string {
-  const key = `flow.history.advice.${code.replaceAll('.', '__')}`;
-  return phrasing.value.te(key) ? phrasing.value.t(key) : '';
 }
 
 function technical(run: RunOut): string {
@@ -170,9 +166,9 @@ const attentionText = computed(() => {
       >
         <span class="flow-history__why">{{ run.error_message }}</span>
         <span
-          v-if="advice(run.error_code)"
+          v-if="advice(run.error_code, phrasing)"
           class="flow-history__do"
-        >{{ advice(run.error_code) }}</span>
+        >{{ advice(run.error_code, phrasing) }}</span>
         <details v-if="technical(run)">
           <summary>{{ $t('flow.history.technical') }}</summary>
           <code>{{ technical(run) }}</code>
