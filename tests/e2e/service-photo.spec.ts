@@ -11,7 +11,7 @@
 // the cash register goes back as it was.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, shown } from './helpers';
+import { A, api, capture, login, painted, shown } from './helpers';
 import { dialog, PHOTO_PNG, photoLoaded, VIEWPORTS } from './inventory-helpers';
 import { drawerOff, restoreDrawer, tilePhotoLoaded } from './sale-helpers';
 import { cleanUp, named, post, rowAction } from './service-helpers';
@@ -59,6 +59,20 @@ async function editForm(page: Page, service: Service): Promise<Locator> {
   const form = dialog(page, 'service-form');
   await expect(form).toBeVisible();
   return form;
+}
+
+/** The names under the library's images that do not show whole: cut with «…», short of lines, or past their tile. */
+async function cutNames(library: Locator): Promise<string[]> {
+  return library.locator('[data-testid^=service-form-image-library-modal-image-] span').evaluateAll((names) =>
+    names
+      .filter((name) => {
+        const tile = name.closest('button')!.getBoundingClientRect();
+        const box = name.getBoundingClientRect();
+        const cut = name.scrollWidth > name.clientWidth + 1 || name.scrollHeight > name.clientHeight + 1;
+        return cut || box.left < tile.left - 1 || box.right > tile.right + 1;
+      })
+      .map((name) => name.textContent!.trim()),
+  );
 }
 
 async function detail(page: Page, id: string): Promise<Service> {
@@ -125,6 +139,37 @@ test('SERVICE-F34: the library names its images in the language the person reads
       await capture(page, `APP-SERVICE-F34-ES-${viewport.label}`);
     }
     await page.setViewportSize({ width: 1280, height: 860 });
+  }
+});
+
+test('SERVICE-F34: every image of the library shows its whole name under it, on a phone, a tablet and a desktop', async ({ page }) => {
+  // The longest Spanish names of the hair sector, and the longest single word of the library.
+  const searches = [
+    ['Mechas', 'mechas_papel'],
+    ['Corte', 'corte_caballero'],
+    ['Microdermoabrasión', 'microdermoabrasion'],
+  ] as const;
+  const sizes = [
+    { width: 375, height: 667 },
+    { width: 820, height: 1180 },
+    { width: 1180, height: 820 },
+    { width: 1440, height: 900 },
+  ];
+  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize(sizes[3]);
+  const form = await editForm(page, colour);
+  await form.locator('[data-testid=service-form-image-library]').click();
+  const library = dialog(page, 'service-form-image-library-modal');
+  for (const [query, longest] of searches) {
+    await library.locator('[data-testid=service-form-image-library-modal-search] input').fill(query);
+    await expect(library.locator(`[data-testid$=-image-beauty_hair-${longest}], [data-testid$=-image-beauty_body-${longest}]`)).toBeVisible();
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      await painted(page);
+      expect(await cutNames(library), `«${query}» at ${size.width}x${size.height}`).toEqual([]);
+      if (query !== 'Microdermoabrasión') await capture(page, `APP-SERVICE-F34-NAMES-${query}-${size.width}x${size.height}`);
+    }
+    await page.setViewportSize(sizes[3]);
   }
 });
 
