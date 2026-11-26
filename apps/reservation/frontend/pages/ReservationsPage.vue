@@ -147,10 +147,10 @@ const columns = computed<DataTableColumn<ReservationOut>[]>(() => [
   { key: 'source', label: t('reservation.list.columns.source'), hidden: true, format: (_, row) => t(`reservation.source.${row.source}`) },
 ]);
 
-const ACTIONS: ReadonlyArray<{ id: RowAction; key: string; icon: string; color?: string; showLabel?: boolean }> = [
-  { id: 'confirm', key: 'confirm', icon: 'checkmark-outline', color: 'primary', showLabel: true },
-  { id: 'seat', key: 'seat', icon: 'people-outline', color: 'success', showLabel: true },
-  { id: 'complete', key: 'complete', icon: 'checkmark-circle-outline', color: 'medium', showLabel: true },
+const ACTIONS: ReadonlyArray<{ id: RowAction; key: string; icon: string; color?: string }> = [
+  { id: 'confirm', key: 'confirm', icon: 'checkmark-outline', color: 'primary' },
+  { id: 'seat', key: 'seat', icon: 'people-outline', color: 'success' },
+  { id: 'complete', key: 'complete', icon: 'checkmark-circle-outline', color: 'medium' },
   { id: 'cancel', key: 'cancel', icon: 'close-outline', color: 'danger' },
   { id: 'no_show', key: 'noShow', icon: 'ban-outline', color: 'danger' },
   { id: 'edit', key: 'edit', icon: 'create-outline' },
@@ -163,7 +163,6 @@ const actions = computed<DataTableAction<ReservationOut>[]>(() =>
     label: t(`reservation.actions.${action.key}`),
     icon: action.icon,
     color: action.color,
-    showLabel: action.showLabel,
     hidden: (row: ReservationOut) => !allows(action.id, row.status),
   })),
 );

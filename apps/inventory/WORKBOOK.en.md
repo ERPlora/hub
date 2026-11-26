@@ -966,7 +966,7 @@ refund's notice does not bring them; if they go back to the shelf, they are coun
 Involved: SALE-F31
 
 ### INVENTORY-F25 Print the barcode label
-<!-- from WORKBOOK.md sha256:69d5dc301c13 -->
+<!-- from WORKBOOK.md sha256:bb06275d5ffe -->
 Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Product card
@@ -981,7 +981,9 @@ Steps:
    label is waiting in the print queue: no printer has the «Label» function. Give it to one in
    Printing.".
 In: the product's SKU, name and price; the printer with the "Label" function, from Printing. It can also
-be asked for through the assistant ("print the shampoo's label") or through the API.
+be asked for through the assistant ("print the shampoo's label") or through the API. If no device that is on prints
+that queue, the assistant says the label waits in the queue and will come out when a device set up to print it does,
+never that it has printed it.
 Out: a label job in Printing's queue, with the price in the business's currency.
 If it fails: whoever does not reach the print queue (Printing is not active, or they cannot print) sees
 the device's print dialog with the code, the SKU and the name, without a price: the browser's or, in the

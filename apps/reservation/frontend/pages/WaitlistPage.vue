@@ -127,7 +127,6 @@ const actions = computed<DataTableAction<WaitlistOut>[]>(() =>
           label: t('reservation.waitlist.actions.convert'),
           icon: 'checkmark-circle-outline',
           color: 'success',
-          showLabel: true,
           hidden: (row) => row.is_converted,
         },
         { id: 'remove', label: t('reservation.waitlist.actions.remove'), icon: 'trash-outline', color: 'danger' },
