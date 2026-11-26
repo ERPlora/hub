@@ -5,10 +5,10 @@
 // What a run creates — the products `E2E-KWD-<run>-…` and the check «e2e kwd <run>» — is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { capture, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { cleanSales, stamp } from './sale-helpers';
-import { ownerPage } from './service-helpers';
+import { ownerPage, post } from './service-helpers';
 
 const RUN = stamp();
 const CHECK = `e2e kwd ${RUN}`;
@@ -36,12 +36,6 @@ function cleanUp(): void {
   );
   cleanSales();
   cleanInventory();
-}
-
-async function post<T>(context: BrowserContext, path: string, body: unknown, status: number): Promise<T> {
-  const res = await api<T>(context, A, 'POST', path, body);
-  expect(res.status, `${path} ${JSON.stringify(res.data)}`).toBe(status);
-  return res.data;
 }
 
 /** A check with 0.350 kg of prawns and two croquettes, sent to the kitchen from the till: its ticket's id. */
