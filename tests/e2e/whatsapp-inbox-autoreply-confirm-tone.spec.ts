@@ -5,13 +5,12 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { signedIn } from './flow-helpers';
-import { A, capture, login, psql, shown, THREE_SIZES, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { capture, psql, shown, THREE_SIZES } from './helpers';
 import { noHorizontalScroll } from './schedule-helpers';
 
 const TASK = 'WHATSAPP-INBOX-AUTOREPLY-CONFIRM-TONE';
 const ANSWER = 'whatsapp_inbox/appointment_from_whatsapp';
 const FLOWS = "select id from flow_flow where recipe like 'whatsapp_inbox/%'";
-const turnedOn: string[] = [];
 
 /** Each size starts with nothing of the inbox's automatic answers built. */
 function cleanUp(): void {
@@ -24,24 +23,8 @@ function cleanUp(): void {
   );
 }
 
-test.beforeAll(async ({ browser }) => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await turnOnMissing(context, A, ['flow', 'customer', 'appointment', 'whatsapp_inbox'], turnedOn);
-  await context.close();
-});
-
 test.beforeEach(cleanUp);
-
-test.afterAll(async ({ browser }) => {
-  cleanUp();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await turnOffTurnedOn(context, A, turnedOn);
-  await context.close();
-});
+test.afterAll(cleanUp);
 
 /** The open question titled `title`, and its button that says yes. */
 function question(page: Page, title: string): { dialog: Locator; yes: Locator } {
