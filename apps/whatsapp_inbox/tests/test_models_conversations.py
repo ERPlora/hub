@@ -1,15 +1,10 @@
-"""Models of the WhatsApp inbox: keys, defaults and the database guards (one row per message, one live
-conversation per number, one channel row, one template per name and language)."""
+"""The models of a WhatsApp conversation, its messages and its notes: keys, defaults, the database guards (one row
+per message, one live conversation per number), Meta's 24-hour window and the searchable contact name."""
 
 import datetime as dt
-import uuid
 
-import pytest
-from django.db import IntegrityError
-from live.operations import atomic
-
-from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
-from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW
+from apps.whatsapp_inbox.models.conversations import Conversation, Message, Note
+from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, violates
 
 pytestmark = HUB_DB
 
@@ -24,19 +19,11 @@ def message(conv, wa_id="wamid.1", **fields):
     )
 
 
-def violates(constraint, create):
-    with pytest.raises(IntegrityError) as excinfo, atomic():
-        create()
-    return constraint in str(excinfo.value)
-
-
 def test_keys_are_uuid7():
     conv = conversation()
     msg = message(conv)
     note = Note.objects.create(conversation=conv, text="Llamar mañana")
-    tpl = Template.objects.create(name="recordatorio", language="es")
-    channel = Channel.objects.create()
-    assert {obj.pk.version for obj in (conv, msg, note, tpl, channel)} == {7}
+    assert {obj.pk.version for obj in (conv, msg, note)} == {7}
 
 
 def test_defaults():
@@ -63,20 +50,6 @@ def test_defaults():
         "received",
     )
     assert msg.payload == {}
-    channel = Channel.objects.create()
-    assert (
-        channel.status,
-        channel.monthly_limit,
-        channel.monthly_usage,
-        channel.version,
-    ) == (
-        "not_connected",
-        0,
-        0,
-        0,
-    )
-    tpl = Template.objects.create(name="recordatorio", language="es")
-    assert (tpl.category, tpl.status, tpl.variables) == ("UTILITY", "APPROVED", 0)
 
 
 def test_one_row_per_whatsapp_message():
@@ -113,55 +86,6 @@ def test_a_client_message_id_is_used_once():
     message(conv, "wamid.4")
 
 
-def test_one_channel_row_per_database():
-    Channel.objects.create()
-    assert violates("whatsapp_inbox_channel_one_per_host", Channel.objects.create)
-
-
-def test_one_template_per_name_and_language():
-    Template.objects.create(name="recordatorio", language="es")
-    Template.objects.create(name="recordatorio", language="en")
-    assert violates(
-        "whatsapp_inbox_template_live_host_name_language_unique",
-        lambda: Template.objects.create(name="recordatorio", language="es"),
-    )
-
-
-def test_a_template_deleted_here_frees_its_name_and_language():
-    Template.objects.create(name="recordatorio", language="es", deleted_at=NOW, delete_state="done")
-    Template.objects.create(name="recordatorio", language="es")
-    assert Template.objects.filter(name="recordatorio", language="es").count() == 2
-
-
-def test_one_save_of_a_template_per_key():
-    key = uuid.uuid7()
-    Template.objects.create(name="uno", language="es", submit_key=key)
-    assert violates(
-        "whatsapp_inbox_template_submit_key_unique",
-        lambda: Template.objects.create(name="dos", language="es", submit_key=key),
-    )
-
-
-@pytest.mark.parametrize(
-    ("fields", "handled"),
-    [
-        ({}, True),
-        ({"header_format": "TEXT", "header": "Tu cita"}, True),
-        ({"header_format": "TEXT", "header": "Hola {{1}}"}, False),
-        ({"header_format": "IMAGE"}, True),  # sent with the file chosen (F33)
-        ({"header_format": "LOCATION"}, False),
-        ({"category": "AUTHENTICATION"}, False),
-        ({"buttons": [{"type": "QUICK_REPLY", "text": "Sí"}, {"type": "URL", "text": "Web", "url": "https://p.test"}]}, True),
-        ({"buttons": [{"type": "URL", "text": "Web", "url": "https://p.test/{{1}}"}]}, False),
-        ({"buttons": [{"type": "COPY_CODE", "text": "Copiar"}]}, False),
-    ],
-)
-def test_the_hub_handles_templates_it_can_write_and_fill(fields, handled):
-    row = Template.objects.create(name="t", language="es", **fields)
-    assert row.supported is handled
-    assert Template.objects.get(pk=row.pk).supported is handled
-
-
 def test_the_window_is_24_hours_from_the_customer_s_last_message():
     conv = conversation()
     assert conv.window_open(NOW) is False  # she never wrote
@@ -170,22 +94,6 @@ def test_the_window_is_24_hours_from_the_customer_s_last_message():
     assert conv.window_expires_at() == NOW + dt.timedelta(minutes=1)
     conv.last_inbound_at = NOW - dt.timedelta(hours=24)
     assert conv.window_open(NOW) is False
-
-
-def test_the_cap_is_the_platform_s_figure_of_this_month():
-    channel = Channel(monthly_limit=150, monthly_usage=150, usage_month="2026-10", synced_at=NOW)
-    assert channel.cap_reached("2026-10") is True
-    # Another month's figure counts as nothing spent: November starts again even before the SaaS speaks.
-    assert channel.cap_reached("2026-11") is False
-    channel.monthly_usage = 149
-    assert channel.cap_reached("2026-10") is False
-    # 0 = the plan includes none, never «no cap»: tests/test_plan_cap.py.
-    assert (
-        Channel(monthly_limit=0, monthly_usage=0, usage_month="2026-10", synced_at=NOW).cap_reached(
-            "2026-10"
-        )
-        is True
-    )
 
 
 def test_deleting_a_conversation_takes_its_messages_and_notes():
@@ -199,7 +107,6 @@ def test_deleting_a_conversation_takes_its_messages_and_notes():
 def test_str():
     conv = conversation(contact_name="Ana")
     assert str(conv) == "Ana (+34600111222)"
-    assert str(Template(name="recordatorio", language="es")) == "recordatorio (es)"
 
 
 def test_a_message_queued_by_the_hub_has_no_whatsapp_id_until_it_leaves():

@@ -1243,7 +1243,7 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   código de verificación, ni cabecera con ubicación o con variable, ni variables con nombre, solo respuestas
   rápidas, enlaces fijos y llamadas; una cabecera con archivo se envía con el archivo elegido, F33). La
   migración 0008 marca `supported` las de cabecera con archivo que ya cumplían el resto. El Hub escribe
-  (`models.hub_writes`) las `supported`, y las de cabecera con archivo solo con su archivo elegido aquí: las
+  (`models.templates.hub_writes`) las `supported`, y las de cabecera con archivo solo con su archivo elegido aquí: las
   de WhatsApp Manager se editan allí. En la lista, `sendable` es «se envía tal cual», sin elegir
   nada (la de cabecera con archivo, solo con el suyo), y `fillable` «la bandeja la envía» (pidiendo el archivo si no
   tiene); el paso «Enviar un mensaje» de una automatización (FLOW-F31, F32) ofrece las `fillable`, no solo las
