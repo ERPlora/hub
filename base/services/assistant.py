@@ -176,7 +176,8 @@ def _assistant_write(ctx, op, call, decision, files: dict[str, str]):
     nothing to change (``assistant.edits``), once its check has found the record. The yes is for the card it
     answers (hub#1208): drawn again, a card that no longer shows what ``call.shown`` says — a record found by its name is
     another, a name or what it will do changed — runs nothing and is shown anew; a «no» or a word typed wrong never
-    needs it. The card shows the model's data, a file by the name it was attached with; the write runs with the file."""
+    needs it. The card shows the model's data, a file by the name it was attached with; the write runs with the file.
+    Once answered, the model hears how the data an edit sent stood and stand (``assistant.edits.heard``)."""
     arguments = json.loads(call.arguments or "{}")
     given, refused = _assistant_given(ctx, op, arguments, files)
     if refused is not None:
@@ -186,9 +187,10 @@ def _assistant_write(ctx, op, call, decision, files: dict[str, str]):
     answered = decision is not None and decision.call_id == call.call_id
     if card["blocked"] and not answered:
         return None, card, ""
+    before = assistant.edits.as_it_stands(ctx, op, arguments) if answered else None
     declined = shared.declined(card, decision) if answered else None
     if declined is not None:
-        return declined, None, ""
+        return assistant.edits.heard(op, arguments, before, declined), None, ""
     failure, preview = assistant.cards.preview(ctx, op, given, found=found)
     failure = failure or assistant.edits.unchanged(op, arguments)
     if failure is not None:
@@ -197,7 +199,8 @@ def _assistant_write(ctx, op, call, decision, files: dict[str, str]):
     shown = assistant.cards.fingerprint(drawn, found)
     if not answered or call.shown != shown:
         return None, drawn, shown
-    return assistant.tools.run(_assistant_approved(ctx, op, call.arguments), op, json.dumps(given)), None, ""
+    ran = assistant.tools.run(_assistant_approved(ctx, op, call.arguments), op, json.dumps(given))
+    return assistant.edits.heard(op, arguments, before, ran), None, ""
 
 
 def _assistant_approved(ctx: OperationContext, op, arguments: str) -> OperationContext:
