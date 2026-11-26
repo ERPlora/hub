@@ -6,11 +6,12 @@
 // title is read whole (its `.toolbar-title` not cut with «…»), the help and the bell are on the bar, and «Nueva
 // automatización» opens the new automation from the bar, by its icon and its words from a tablet on and as a row of
 // «⋮» on a phone. No sideways scroll. Each width leaves its capture. Nothing is created.
-import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 import { actionBell } from './action-center';
-import { A, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { saveSessionForTheSweep, shown, signedInSpanish, untilStill } from './helpers';
 import { parkIssuer, unparkIssuer } from './invoice-helpers';
+import { capturedFitting } from './screen';
 import { topbar, topbarMore, topbarMoreMenu } from './topbar';
 
 const KEY = 'FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE';
@@ -26,19 +27,6 @@ const SIZES = [
 test.beforeAll(() => parkIssuer(PARKED));
 test.afterAll(() => unparkIssuer(PARKED));
 
-/** The owner on `a` in Spanish at `viewport`, on «Automatizaciones». */
-async function spanishOwner(browser: Browser, viewport: { width: number; height: number }): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  await login(page, A, '/flow/automations');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/flow/automations`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page };
-}
-
 /** Presses «Nueva automatización» where the bar puts it: on the bar from a tablet on, in «⋮» on a phone. */
 async function pressNewAutomation(page: Page, phone: boolean): Promise<void> {
   if (!phone) {
@@ -53,7 +41,8 @@ async function pressNewAutomation(page: Page, phone: boolean): Promise<void> {
 
 for (const size of SIZES) {
   test(`flow-automations-list at ${size.label}: «Automatizaciones» read whole beside the help and the bell`, async ({ browser }) => {
-    const { context, page } = await spanishOwner(browser, { width: size.width, height: size.height });
+    const { context, page } = await signedInSpanish(browser, { width: size.width, height: size.height }, '/flow/automations');
+    await saveSessionForTheSweep(context);
     try {
       // The list as the owner reads it: its gallery painted, nothing still loading, the bell with its notice.
       await expect(shown(page).locator('[data-testid^=flow-card-open-]').first()).toBeVisible();
@@ -71,9 +60,7 @@ for (const size of SIZES) {
       await expect(topbar(page).getByRole('button', { name: 'Ayuda', exact: true })).toBeVisible();
       await expect(actionBell(page)).toBeVisible();
 
-      const overflow = await horizontalOverflow(page);
-      expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
+      await capturedFitting(page, `${KEY}-${size.label}`, size.label);
 
       await pressNewAutomation(page, size.phone);
       await page.waitForURL(/\/flow\/automations\/new$/);
