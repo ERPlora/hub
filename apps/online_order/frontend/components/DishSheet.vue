@@ -77,13 +77,20 @@ function add(): void {
         :src="photo"
         :alt="t('online_order.menu.photo', { name: dish.name })"
       />
-      <p v-if="dish.description">
-        {{ dish.description }}
-      </p>
-      <AllergenRow :codes="dish.allergens" />
-      <p>
-        <strong>{{ formatMoney(dish.price, locale, money) }}</strong>
-      </p>
+      <!-- The sheet opens here, on what the dish is: a field focused on opening would raise a phone's keyboard. -->
+      <div
+        data-autofocus
+        tabindex="-1"
+        data-testid="oo-dish-about"
+      >
+        <p v-if="dish.description">
+          {{ dish.description }}
+        </p>
+        <AllergenRow :codes="dish.allergens" />
+        <p>
+          <strong>{{ formatMoney(dish.price, locale, money) }}</strong>
+        </p>
+      </div>
       <p
         v-if="loading"
         role="status"

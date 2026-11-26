@@ -46,9 +46,13 @@ function picked(line: BasketLine): string {
       :message="t('online_order.order.emptyMessage')"
       data-testid="oo-order-empty"
     />
+    <!-- The order opens on its lines, not in a quantity field that would raise a phone's keyboard. -->
     <ion-list
       v-else
       lines="inset"
+      data-autofocus
+      tabindex="-1"
+      data-testid="oo-order-lines"
     >
       <ion-item
         v-for="line in lines"

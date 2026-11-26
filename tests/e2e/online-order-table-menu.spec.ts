@@ -133,12 +133,16 @@ test('ONLINE_ORDER-F04: the customer sends their order from the table; a QR rege
   await page.setViewportSize(SIZES[0]);
   await page.goto(`${A}/p/a/order/${code}`);
   const view = shown(page);
+  const focused = () => page.evaluate(() => document.activeElement?.getAttribute('data-testid'));
   await view.locator(`[data-testid=oo-menu-dish-${productId}]`).click();
+  // Opened on what the dish is, not in a field: a phone does not raise its keyboard.
+  await expect.poll(focused).toBe('oo-dish-about');
   await page.locator('[data-testid=oo-dish-qty-plus]').last().click();
   await page.locator('[data-testid=oo-menu-sheet-submit]').last().click();
   const bar = page.locator('[data-testid=oo-order-view]');
   await expect(bar).toHaveText('View order (2) · €15.00');
   await bar.click();
+  await expect.poll(focused).toBe('oo-order-lines');
   const order = page.locator('[data-testid=oo-order-sheet]').last();
   await expect(order).toContainText(DISH);
   await expect(order.locator('[data-testid=oo-order-total]')).toContainText('€15.00');
