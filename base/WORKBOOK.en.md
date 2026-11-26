@@ -2923,7 +2923,7 @@ If it fails: a badly written answer reads as text: it is never lost nor breaks t
 Involved: BASE-F96
 
 ### BASE-F96 Go to a screen from an answer
-<!-- from WORKBOOK.md sha256:dad0c85c76a7 -->
+<!-- from WORKBOOK.md sha256:0c53c566bb03 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2931,9 +2931,11 @@ Steps:
   1. If the answer names a screen of this business, "Go to …" with its name shows under the bubble (up to four,
      without repeating) and the mention itself can be tapped.
   2. It can lead to Home, Employees, Apps, Settings, My profile, Files (for whoever sees them), System (for whoever
-     runs the business) and the screens in the menu of each app that is on.
+     runs the business), each tab of those screens the person may open (Employees › Roles, Settings › Business…) and
+     the screens in the menu of each app that is on. The roles of the business lead to Employees › Roles, not to the
+     job titles of the Staff app.
   3. The button uses the name the person sees in the menu ("Go to Settings", "Go to Home" and, for an app, its name
-     and the screen's), never the address.
+     and the screen's), never the address; a tab's says its screen ("Go to Employees") and opens it on that tab.
   4. Tapping it opens that screen and the panel closes so it can be seen.
 In: the screens the answer names; those of this business and of its apps that are on.
 Out: the screen opened; nothing is asked for.

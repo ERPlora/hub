@@ -2806,9 +2806,12 @@ Pasos:
   1. Si la respuesta nombra una pantalla de este negocio, bajo la burbuja sale «Ir a …» con su nombre (hasta cuatro,
      sin repetir) y la propia mención se puede pulsar.
   2. Puede llevar al Inicio, a Empleados, a Apps, a Ajustes, a Mi perfil, a Archivos (a quien los ve), a Sistema (a
-     quien administra) y a las pantallas del menú de cada app encendida.
+     quien administra), a cada pestaña de esas pantallas que la persona puede abrir (Empleados › Roles, Ajustes ›
+     Negocio…) y a las pantallas del menú de cada app encendida. Los roles del negocio los manda a Empleados › Roles,
+     no a los puestos de la app Personal.
   3. El botón usa el nombre que la persona ve en el menú («Ir a Ajustes», «Ir a Inicio» y, para una app, su nombre y
-     el de la pantalla), nunca la dirección.
+     el de la pantalla), nunca la dirección; el de una pestaña dice su pantalla («Ir a Empleados») y la abre en esa
+     pestaña.
   4. Al pulsarlo se abre esa pantalla y el panel se cierra para que se vea.
 Entra: las pantallas que nombra la respuesta; las de este negocio y las de sus apps encendidas.
 Sale: la pantalla abierta; no se pide nada.
@@ -4769,7 +4772,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`; si su rol propio
   dice «No», la herramienta no está en su catálogo y no corre ni con pase), y arma las
-  instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
+  instrucciones con las pantallas que puede enlazar (las de la plataforma, cada pestaña que la persona puede abrir con
+  el nombre que le da `base/platform_screens.py`, y las del menú de cada app encendida;
+  `base/tests/test_assistant_screen_links.py`), lo que sabe del negocio (`base/assistant/business_facts.py`: país,
   zona y hora de allí, el idioma del negocio y el de «Mi perfil» de la persona (`base.profile.get`), sector, apps
   encendidas, con `base.administer_hub` el plan de la foto con las apps que cuenta, `activation.chosen_on` contra
   `plan.max_apps`, y los ajustes de cada app encendida que los declara en `assistant_settings` de su `LiveAppConfig`
