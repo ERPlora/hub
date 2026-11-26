@@ -1,8 +1,8 @@
 // flow: BASE-F64 (the language asked of the assistant)
 // The language the person asks the assistant for applies as «My profile»'s selector does: once its card is confirmed,
 // the open app speaks it, «My apps» included, without reloading, and it still does after reloading. In both
-// directions. The card says the language alone, and the appearance the person has stays theirs. At the end the owner
-// of `a` gets back the preferences they had, since other specs sign in as them.
+// directions. The card says the language alone, by its name, and the appearance the person has stays theirs. At the
+// end the owner of `a` gets back the preferences they had, since other specs sign in as them.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { askForACard, card, decide, openPanelAtTheDesk, shots } from './assistant-panel';
@@ -19,8 +19,8 @@ const APPEARANCE = { theme_mode: 'dark', palette: 'forest', ui_scale: 90 };
 const KEY = 'FIX-HUB-BASE-ASSISTANT-LANGUAGE-APPLIES';
 
 const WORDS = {
-  en: { run: 'Run this action?', asked: 'Change in My profile: Español', myApps: 'My apps', verifactu: 'Set up VeriFactu' },
-  es: { run: '¿Ejecutar esta acción?', asked: 'Cambiar en Mi perfil: English', myApps: 'Mis apps', verifactu: 'Configura VeriFactu' },
+  en: { run: 'Run this action?', asked: 'Change in My profile: Language: Español', myApps: 'My apps', verifactu: 'Set up VeriFactu' },
+  es: { run: '¿Ejecutar esta acción?', asked: 'Cambiar en Mi perfil: Idioma: English', myApps: 'Mis apps', verifactu: 'Configura VeriFactu' },
 } as const;
 
 async function speaking(context: BrowserContext, language: 'en' | 'es'): Promise<void> {
