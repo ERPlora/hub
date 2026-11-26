@@ -1267,7 +1267,8 @@ Pasos:
      día.
 Entra: la importación elegida.
 Sale: borradas exactamente las filas que trajo, también lo que entró después porque esperaba a una app, y lo que aún
-esperaba ya no entra; lo creado después se queda (`base.import.undone`).
+esperaba ya no entra; lo creado después se queda (`base.import.undone`). Las categorías fiscales propias y sus tipos
+que trajo se quedan, como el resto de los ajustes del negocio: no cuentan entre las filas que se van a borrar.
 Si falla: el motivo sale en la propia ventana, que no se cierra; una
 importación ya deshecha, «Esta importación ya se deshizo.».
 Implicados: BASE-F32
@@ -1293,8 +1294,9 @@ Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus fi
 productos, y de Servicios, las categorías y los servicios, con sus fotos propias dentro (INVENTORY-F33); de Mesas, las
 zonas y las mesas; de Suplementos, los grupos, cada uno con sus opciones y con los productos (por su código) y las
 categorías a los que se aplica; de Menús y combos, los menús, cada uno con su precio cerrado, sus platos, los productos
-a elegir en cada plato (por su código) con su suplemento, y su foto propia dentro; y, solo en una copia de seguridad,
-los clientes. Nunca las ventas, las personas, los PIN
+a elegir en cada plato (por su código) con su suplemento, y su foto propia dentro; de Impuestos, las categorías fiscales
+propias del negocio, cada una con sus tipos y sus recargos, nunca las de fábrica, que ya trae todo negocio y que un
+archivo no toca; y, solo en una copia de seguridad, los clientes. Nunca las ventas, las personas, los PIN
 ni los datos fiscales. Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
 negocio no se guarda nada.
 Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un nombre para el archivo.» y no se puede
@@ -1335,7 +1337,8 @@ Pasos:
      los registros fiscales, las personas y sus accesos, los archivos y los ajustes del negocio se quedan
      siempre.», y «Antes de vaciar se hace una copia completa de los datos del negocio y se guarda 90 días, en
      «Copias», aquí debajo.».
-  3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total.
+  3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total. Impuestos
+     no sale como sección: sus categorías fiscales y sus tipos son ajustes del negocio.
   4. Marca las secciones y pulsa «Restablecer el negocio»: «Esto no se puede deshacer», con «Se borrarán
      definitivamente 120 filas:» y el desglose. Escribe el nombre del negocio («Escribe «Casa Ramón» para confirmar») y
      pulsa «Borrar definitivamente» (o «Cancelar»).
