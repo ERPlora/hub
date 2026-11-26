@@ -18,7 +18,9 @@ from base import activation, approvals, entitlement
 from base.business import DEFAULT_CURRENCY, business_zone, currency_decimals
 from base.operations import business_currency
 from base.permissions import refused_outright
+from base.queries.ownership import hearing_only_theirs
 
+from . import only_theirs
 from .relevance import FIND_TOOLS
 
 #: Never from the chat (the old hub's «destructive actions of the hub itself»): emptying the business; a file.
@@ -55,12 +57,16 @@ def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = No
 def run(ctx: OperationContext, op: Operation, arguments: str) -> shared.ToolOutcome:
     """``op`` run for ``ctx`` with the model's ``arguments`` (``live.assistant.run_tool``), its result told as the screens
     write it: its hours on the business's clock and each amount in the currency of the record that names one, else in
-    the business's, with its decimals."""
+    the business's, with its decimals. A read the person's role kept to their own says so (``only_theirs``)."""
     try:
         business = business_currency(ctx.scope)
     except NotFound:
         business = DEFAULT_CURRENCY
-    return shared.run_tool(ctx, op, arguments, zone=business_zone(), money=lambda named: _with_decimals(named or business))
+    with hearing_only_theirs() as heard:
+        outcome = shared.run_tool(
+            ctx, op, arguments, zone=business_zone(), money=lambda named: _with_decimals(named or business)
+        )
+    return only_theirs.told(outcome) if heard and op.kind == "query" else outcome
 
 
 def _with_decimals(currency: str) -> tuple[str, int]:

@@ -16,6 +16,7 @@ from apps.tip.models import Settings, Tip
 from apps.tip.schemas import SettingsOut, SuggestionIn, SuggestionOut, TipListIn, TipOut, TipPage, TipRefIn
 from base.business import business_zone
 from base.operations import call
+from base.queries.ownership import only_theirs
 
 
 TIP_NOT_FOUND = _("That tip no longer exists.")
@@ -223,6 +224,7 @@ def _filtered(params: TipListIn) -> QuerySet[Tip]:
 def list_tips(ctx: OperationContext, params: TipListIn) -> dict:
     rows = _filtered(params)
     if not ctx.has("tip.manage"):
+        only_theirs()
         own = own_member_id(ctx)
         rows = rows.filter(member_id=own) if own is not None else rows.none()
     rows = rows.order_by("-created_at", "id")

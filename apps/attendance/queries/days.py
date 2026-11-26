@@ -25,6 +25,7 @@ from live.context import OperationContext
 from live.errors import NotFound, PermissionDenied
 
 from apps.attendance.models import Break, Correction, Record
+from base.queries.ownership import only_theirs
 from apps.attendance.schemas import RecordListIn
 from base.ordering import list_order_for
 
@@ -154,6 +155,17 @@ def visible_record(ctx: OperationContext, record_id: UUID) -> Record:
     return record
 
 
+def _kept_to_own(ctx: OperationContext, records: QuerySet, own: Q | None, *, mine: bool) -> QuerySet:
+    """``records`` as the caller reads them: all with «View the whole team's shifts» unless they ask for their own
+    (``mine``); else their own, and the assistant hears the role keeps them to it (``only_theirs``)."""
+    whole = ctx.has(VIEW_ALL)
+    if whole and not mine:
+        return records
+    if not whole:
+        only_theirs()
+    return records.filter(own) if own is not None else records.none()
+
+
 def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.datetime, hours: int) -> QuerySet:
     """The days of the list and the CSV: the caller's own unless they see the team, then the filters.
 
@@ -169,8 +181,7 @@ def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.dateti
         ):
             raise PermissionDenied(str(OWN_DAYS_ONLY))
         records = records.filter(member=member)
-    if params.mine or not ctx.has(VIEW_ALL):
-        records = records.filter(own) if own is not None else records.none()
+    records = _kept_to_own(ctx, records, own, mine=params.mine)
     if params.status:
         limit = as_of - dt.timedelta(hours=hours)
         if params.status == Record.Status.OPEN:

@@ -3,7 +3,9 @@ rows belong to someone (``Owned``), which give a person only theirs unless they 
 own / view all»: Square, Toast, Odoo). An app declares its own in ``apps/<app>/queries/ownership.py``, and
 ``tests/test_guardrails_ownership.py`` keeps its reads going through that declaration."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -19,6 +21,8 @@ from base.sensitive import VIEW_BUSINESS_TOTALS
 
 #: Every «see everyone's» permission an ``Owned`` names: of them, an API key holds those its maker holds (BASE-F125).
 _SEE_ALL: set[str] = set()
+#: Whether the read running answered only the caller's own, while someone listens (``hearing_only_theirs``).
+_ONLY_THEIRS: ContextVar[list[bool] | None] = ContextVar("only_theirs", default=None)
 
 
 @dataclass(frozen=True)
@@ -61,6 +65,25 @@ def _reads_as(ctx: OperationContext) -> str | None:
     return None
 
 
+def only_theirs() -> None:
+    """Says that the read running answers only the caller's own, as their role lets them see no one else's: the
+    assistant tells the model so, which otherwise takes the rows it does not get for none (hub#2688)."""
+    heard = _ONLY_THEIRS.get()
+    if heard is not None:
+        heard.append(True)
+
+
+@contextmanager
+def hearing_only_theirs() -> Iterator[list[bool]]:
+    """What runs inside answered only the caller's own when the list it gives is not empty (``only_theirs``)."""
+    heard: list[bool] = []
+    token = _ONLY_THEIRS.set(heard)
+    try:
+        yield heard
+    finally:
+        _ONLY_THEIRS.reset(token)
+
+
 def see_all_permissions() -> frozenset[str]:
     """The «see everyone's» permissions of every declaration (``Owned.all_permission``)."""
     return frozenset(_SEE_ALL)
@@ -85,6 +108,7 @@ class Owned:
     def visible(self, ctx: OperationContext) -> QuerySet:
         if self.sees_all(ctx):
             return self.model.objects.all()
+        only_theirs()
         return self.theirs(_person(ctx, _reads_as(ctx)))
 
     def theirs(self, person: Me) -> QuerySet:
@@ -99,4 +123,5 @@ class Owned:
         whose = _reads_as(ctx)
         if ctx.has(VIEW_BUSINESS_TOTALS) or whose is None:
             return self.visible(ctx)
+        only_theirs()
         return self.theirs(_person(ctx, whose))
