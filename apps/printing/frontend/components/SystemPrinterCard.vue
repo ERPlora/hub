@@ -2,15 +2,13 @@
 // «Your printer», Printing's card in System › «Usage and plan» (hub#683),
 // which base mounts while Printing is on, for everybody with Printing (`system_cards` in apps.py). It says
 // who prints — the ERPlora app on the device next to the printer, PRINTING-F18 — and leads to Printing with «Set up
-// printing». In a browser it says where to get that app: erplora.com's door of each system it publishes (base's
-// `useAppDownloads`), Windows first, each opening outside the hub (`openExternalLink`); inside the installed app there
-// is no download, which would be the app offering itself. It says whether the receipt printer answers right now with
+// printing». In a browser it says where to get that app (`AppDownloadButtons`); inside the installed app there is no
+// download, which would be the app offering itself. It says whether the receipt printer answers right now with
 // Printing's own reading (`printing.device.health`), the one the Home's health row reads too, in its colours (base's
 // `HEALTH_PILLS`); a reading that fails says it could not check, never ready. It wears Settings' cards
 // (`base/frontend/settings.css`).
 import { StatusPill } from '@erplora/ui/components';
 import { useLiveClient } from '@erplora/ui/sdk';
-import { openExternalLink } from '@erplora/ui/shell';
 import { IonButton, IonSkeletonText } from '@ionic/vue';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -20,11 +18,12 @@ import { HEALTH_PILLS } from '../../../../base/frontend/lib/home-health';
 import '../../../../base/frontend/settings.css';
 import { useT } from '../composables/useT';
 import type { StationState } from '../operations/health';
+import AppDownloadButtons from './AppDownloadButtons.vue';
 
 const t = useT();
 const router = useRouter();
 const client = useLiveClient();
-const { downloads, offered } = useAppDownloads();
+const { offered } = useAppDownloads();
 
 const health = ref<StationState | 'unknown'>();
 client.api.call('printing.device.health', { usage: 'receipt' }).then(
@@ -99,25 +98,7 @@ client.api.call('printing.device.health', { usage: 'receipt' }).then(
       >
         {{ t('printing.systemCard.downloadIntro') }}
       </p>
-      <div
-        class="settings-card__actions"
-        role="group"
-        :aria-label="t('printing.systemCard.downloadTitle')"
-      >
-        <IonButton
-          v-for="(download, index) in downloads"
-          :key="download.platform"
-          :fill="index === 0 ? 'solid' : 'outline'"
-          :href="download.url"
-          target="_blank"
-          rel="noopener"
-          :aria-label="t('printing.systemCard.downloadLabel', { platform: t(`printing.systemCard.platform.${download.platform}`) })"
-          :data-testid="`printing-system-card-download-${download.platform}`"
-          @click="openExternalLink(download.url, $event)"
-        >
-          {{ t(`printing.systemCard.platform.${download.platform}`) }}
-        </IonButton>
-      </div>
+      <AppDownloadButtons testid="printing-system-card-download" />
     </template>
   </section>
 </template>

@@ -1,7 +1,8 @@
 // Helpers of the printing specs (apps/printing/WORKBOOK.md): the screenshots of a flow in the three sizes the
 // migration asks for (`APP-PRINTING-<KEY>-390`, `-834`, `-1440` in `.artifacts/`), the device's side of the
-// queue by the API (claim, then confirm or fail: what `/ws/print` will do for the app of the device) and letting
-// go of the devices a spec printed from (PRINTING-F18: the owner's claim sets the device up).
+// queue by the API (claim, then confirm or fail: what `/ws/print` will do for the app of the device), the hub's pages
+// as the installed app (only there does Devices set a device up) and letting go of the devices a spec printed from
+// (PRINTING-F18: the owner's claim sets the device up).
 import { type BrowserContext, expect, type Page } from '@playwright/test';
 
 import { A, api, capture, painted, psql, settled } from './helpers';
@@ -58,6 +59,18 @@ export async function claim(context: BrowserContext, printerId: string, device =
 export async function fail(context: BrowserContext, job: { id: string; attempts: number }, error: string, device = 'e2e device'): Promise<void> {
   const res = await api(context, A, 'POST', '/printing/jobs/fail', { job_id: job.id, error, device, attempt: job.attempts });
   expect(res.status, JSON.stringify(res.data)).toBe(200);
+}
+
+/**
+ * The context's hub pages as the installed ERPlora app (PRINTING-F18): Tauri's bridge, the only door to a printer, so
+ * Printing → Devices offers «Print from this device». The SaaS's login stays a browser's. Its print channel
+ * (`/ws/print`) is shut: the spec, not the page, takes the jobs, and its bridge prints nothing. Before the first page.
+ */
+export async function asTheApp(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    if (window.location.hostname.startsWith('a.')) Object.assign(window, { __TAURI__: { core: { invoke: async () => null } } });
+  });
+  await context.routeWebSocket(/\/ws\/print$/, (socket) => socket.close());
 }
 
 /**
