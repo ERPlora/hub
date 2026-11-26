@@ -13,7 +13,7 @@ from live.errors import Conflict
 from live.operations import operation
 from live.operations import get as get_operation
 
-from apps.invoice import fiscal
+from apps.invoice import events, fiscal
 from apps.invoice.models import Invoice
 from apps.invoice.queries.series import FULL, TICKET
 from apps.invoice.schemas.invoices import FromSaleIn, IssueOut
@@ -28,6 +28,7 @@ from apps.sale.queries.sales import find_sale
 from apps.tax.models import TaxRule
 from apps.tax.queries.calculation import round_half_up
 from apps.tax.queries.jurisdiction import business_tax_kind, tax_kind_of
+from base.services.failed_events import resend_done
 
 #: VeriFactu's DescripcionOperacion of a document born of a sale, in the tax agency's language.
 SALE_OPERATION = _("Sale %(number)s")
@@ -238,9 +239,20 @@ def _tell_sales(ctx: OperationContext, invoice: Invoice, written: str) -> None:
     sale and its document agree when the issue commits. ``written`` is the fiscal status Sales keeps for that
     document: blank while Sales' own write is still running (the charge, the void or the refund writes the
     answer itself). Sales changes nothing for a document it already has, nor when the relay hands it the
-    notice afterwards."""
+    notice afterwards. The write's event for Invoicing, if the relay gave it up, is resent: it finds it done."""
     if not written:
         return
     record = get_operation(SALE_RECORD_INVOICE)
     as_platform = replace(ctx, permissions=ctx.permissions | {record.permission})
     record(as_platform, record.input.model_validate(_issued_notice(invoice)))
+    event, match = _write_event(invoice)
+    resend_done(ctx, app_label=Invoice._meta.app_label, event=event, match=match)
+
+
+def _write_event(invoice: Invoice) -> tuple[str, dict]:
+    """The Sales event that asked Invoicing for ``invoice`` and what its payload names: the refund, or the sale."""
+    if invoice.source_type == Invoice.Source.REFUND:
+        return events.SALE_REFUNDED, {"refund_id": str(invoice.source_refund_id)}
+    if invoice.source_type == Invoice.Source.VOID:
+        return events.SALE_VOIDED, {"sale_id": str(invoice.source_sale_id)}
+    return events.SALE_COMPLETED, {"sale_id": str(invoice.source_sale_id)}
