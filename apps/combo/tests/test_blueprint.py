@@ -90,7 +90,7 @@ def test_the_file_carries_each_course_with_its_products_by_their_code(ctx):
     assert (offer["name"], offer["is_active"], offer["courses"]) == ("Sandwich and drink", False, [])
 
 
-def test_the_menu_s_own_photo_travels_inside_the_file_and_comes_back(ctx, hub_files):  # noqa: F811
+def test_the_menu_s_own_photo_travels_inside_the_file_and_comes_back(ctx, hub_files):
     menu = a_menu(ctx)
     call(ctx, "combo.combo.upload_image", id=menu.id, data_base64=base64.b64encode(webp()).decode("ascii"))
     file = exported(ctx, APPS)
