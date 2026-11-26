@@ -17,6 +17,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { appRowsCopy, bounceTasks } from './app-rows-helpers';
+import { flipApp } from './apps-switch-helpers';
 import { A, api, horizontalOverflow, hostPage, psql, registerBusinessIn, registrationOf, shot, shown, untilStill } from './helpers';
 import { emptyOfTemplateData } from './business';
 
@@ -137,6 +138,20 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, 'apps-search').locator('input').fill('Inventory');
       await expect(appRow(page, 'inventory').locator('[data-testid="apps-state"]')).toContainText('Active');
       await snap(page, 'mine-after', width);
+
+      // What the template turned on is the business's: turning Reservations off asks about it alone, and Tables and
+      // Hours stay on.
+      await testid(page, 'apps-search').locator('input').fill('Reservations');
+      await flipApp(page, 'reservation');
+      const askOff = page.locator('.ep-confirm-dialog').last();
+      await expect(askOff).toContainText('Turn off Reservations?');
+      await expect(askOff).not.toContainText('turn off with it');
+      await snap(page, 'reservations-off-asks', width);
+      await askOff.getByRole('button', { name: 'Turn off' }).click();
+      await expect(appRow(page, 'reservation')).toHaveCount(0);
+      const left = await api<{ apps: App[] }>(context, A, 'GET', '/apps');
+      const kept = left.data.apps.filter((app) => app.id === 'table' || app.id === 'schedule').map((app) => app.state);
+      expect(kept).toEqual(['on', 'on']);
     } finally {
       if (loadId) {
         const undone = await api(context, A, 'POST', '/settings/data/imports/undo', { id: loadId });
