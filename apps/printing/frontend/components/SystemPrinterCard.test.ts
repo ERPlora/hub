@@ -8,18 +8,10 @@ import { StatusPill } from '@erplora/ui/components';
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { embedHubHome, forgetHubHome } from '../../../../base/frontend/__tests__/hub-home';
+import { forgetHubHome } from '../../../../base/frontend/__tests__/hub-home';
+import { DOWNLOADS, embedDownloads as embed } from '../__tests__/app-downloads';
 import { type Answers, flush, mountPrinting } from '../__tests__/mount-printing';
 import SystemPrinterCard from './SystemPrinterCard.vue';
-
-const SAAS = 'http://localhost:8001';
-const DOWNLOADS = {
-  windows: `${SAAS}/app/download/windows/`,
-  linux: `${SAAS}/app/download/linux/`,
-  android: `${SAAS}/app/download/android/`,
-};
-
-const embed = (downloads: Record<string, string> | null) => embedHubHome(downloads && { name: 'Bar', app_downloads: downloads });
 
 const HEALTH = '/api/printing/devices/health';
 
