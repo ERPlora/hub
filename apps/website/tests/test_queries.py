@@ -45,7 +45,7 @@ def visitor(**request):
 
 @pytest.fixture
 def services_catalog(db):
-    from apps.service.models import Category, Service
+    from apps.service.models.catalog import Category, Service
 
     hair, nails = Category.objects.create(name="Hair", sort_order=2), Category.objects.create(name="Nails", sort_order=1)
     Service.objects.create(name="Cut", price=1500, duration_minutes=30, category=hair)
@@ -284,7 +284,7 @@ def test_the_public_catalog_is_read_live_priced_for_the_visitor_and_cached_a_min
     business_in("ES")
     save()
     run("website.site.publish")
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     Service.objects.create(name="Beard", price=900, duration_minutes=20, category=services_catalog["hair"])
     out = run("website.public.catalog", ctx=with_language(visitor(), "es"))
