@@ -17,7 +17,7 @@ from live.models import OutboxEvent
 from live.operations import get
 from live.outbox import channel_for
 
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.service.tests.conftest import HUB_DB, HUB_DB_COMMITTED, A, B, make_service, make_tax
 from base.schemas.home import SetupStatusIn
 from base.tenancy.context import use_hub
