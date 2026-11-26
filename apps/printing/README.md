@@ -56,7 +56,7 @@ WORKBOOK; las de la migración, en la ronda de CLOSE-PRINTING de `PLAN-HUB.md` (
 ```bash
 cd hub   # o tu worktree
 TEST_DB_NAME=test_hub_<tema> uv run pytest -q apps/printing apps/sale/tests/test_integration_printing.py \
-  apps/cash_register/tests/test_integration_printing.py apps/inventory/tests/test_integration_printing.py
+  apps/cash_register/tests/test_services_reports.py apps/inventory/tests/test_integration_printing.py
 pnpm test apps/printing
 pnpm e2e tests/e2e/printing-printers.spec.ts tests/e2e/printing-devices.spec.ts tests/e2e/printing-queue.spec.ts \
   tests/e2e/printing-sale.spec.ts tests/e2e/printing-kitchen.spec.ts tests/e2e/printing-assistant.spec.ts \

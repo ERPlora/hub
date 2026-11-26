@@ -38,7 +38,7 @@ async def settings_get(request):
 
 @bind(router, "cash_register.settings.update", "/cash_register/settings")
 async def settings_update(request, data: SettingsPatchIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
 
 
 # Drawers
@@ -56,12 +56,12 @@ async def register_get(request, params: Query[RegisterGetIn]):
 
 @bind(router, "cash_register.register.create", "/cash_register/registers", status=201)
 async def register_create(request, data: RegisterIn):
-    return await run_operation(request, services.create_register, data)
+    return await run_operation(request, services.registers.create_register, data)
 
 
 @bind(router, "cash_register.register.update", "/cash_register/registers/update")
 async def register_update(request, data: RegisterUpdateIn):
-    return await run_operation(request, services.update_register, data)
+    return await run_operation(request, services.registers.update_register, data)
 
 
 # Sessions
@@ -89,22 +89,22 @@ async def session_closing_summary(request, params: Query[ClosingSummaryIn]):
 
 @bind(router, "cash_register.session.open", "/cash_register/sessions/open", status=201)
 async def session_open(request, data: SessionOpenIn):
-    return await run_operation(request, services.open_session, data)
+    return await run_operation(request, services.sessions.open_session, data)
 
 
 @bind(router, "cash_register.session.close", "/cash_register/sessions/close")
 async def session_close(request, data: SessionCloseIn):
-    return await run_operation(request, services.close_session, data)
+    return await run_operation(request, services.sessions.close_session, data)
 
 
 @bind(router, "cash_register.session.auto_close", "/cash_register/sessions/auto_close")
 async def session_auto_close(request):
-    return await run_operation(request, services.auto_close)
+    return await run_operation(request, services.sessions.auto_close)
 
 
 @bind(router, "cash_register.session.print", "/cash_register/sessions/print")
 async def session_print(request, data: SessionGetIn):
-    return await run_operation(request, services.print_session, data)
+    return await run_operation(request, services.reports.print_session, data)
 
 
 # Movements and counts
@@ -117,7 +117,7 @@ async def movement_list(request, params: Query[MovementListIn]):
 
 @bind(router, "cash_register.movement.add", "/cash_register/movements", status=201)
 async def movement_add(request, data: MovementAddIn):
-    return await run_operation(request, services.add_movement, data)
+    return await run_operation(request, services.movements.add_movement, data)
 
 
 @bind(router, "cash_register.count.list", "/cash_register/counts")
@@ -127,7 +127,7 @@ async def count_list(request, params: Query[CountListIn]):
 
 @bind(router, "cash_register.count.add", "/cash_register/counts", status=201)
 async def count_add(request, data: CountAddIn):
-    return await run_operation(request, services.add_count, data)
+    return await run_operation(request, services.counts.add_count, data)
 
 
 # Currency
