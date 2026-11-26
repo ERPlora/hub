@@ -36,8 +36,12 @@ class AttendanceConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms): «mi salida» or «mi entrada»
     # is clocking (attendance.record.clock_*). Only after «mi»: «la salida de» or «su entrada» also says the drawer's
-    # money, goods received or a place in the waiting list.
-    assistant_synonyms = (("clock", "mi salida", "mi entrada", "my departure", "my exit", "my arrival"),)
+    # money, goods received or a place in the waiting list. «Pausa» is a break («pon a Javi en pausa»); «descanso» is
+    # left out, as it is also a day off.
+    assistant_synonyms = (
+        ("clock", "mi salida", "mi entrada", "my departure", "my exit", "my arrival"),
+        ("break", "pausa"),
+    )
     # Clocking someone else in or out (ATTENDANCE-F12) is a permission of its own.
     permissions = {
         "attendance.clock": _("Clock in and out, and see and export their own history"),
