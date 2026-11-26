@@ -156,6 +156,11 @@ class JobCreateOut(Schema):
     skipped: Literal["print_on_sale_off"] | None = Field(
         description="Why the receipt was not queued: the business does not print it at checkout."
     )
+    waits_for_device: bool = Field(
+        description="True: nothing has printed it yet, as no device that prints its printer is on now (none is set up "
+        "in Printing › Devices, or the ones there gave no news in the last 90 s): it waits in the queue and prints once "
+        "one is. Say so, never that it printed."
+    )
 
 
 class JobListIn(PageIn):

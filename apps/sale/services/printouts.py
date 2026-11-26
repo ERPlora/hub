@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 PRINT_JOB = "printing.job.create"
 FISCAL_RECORD = "verifactu.record.by_invoice"
-NOT_QUEUED = {"queued": False, "job_id": None, "printer": None}
+NOT_QUEUED = {"queued": False, "job_id": None, "printer": None, "waits_for_device": False}
 
 NO_PRINTER_FOR_THE_SALE = _("No receipt printer takes this sale's paper: open the sale to print it on this device.")
 NO_PRINTER_FOR_THE_BILL = _("No receipt printer takes this bill: open it in Sales to print it on this device.")
@@ -72,7 +72,8 @@ def _queue_paper(ctx: OperationContext, request: dict) -> dict:
         return dict(NOT_QUEUED)
     try:
         with atomic():
-            job = op(ctx, op.input.model_validate(request)).job
+            answer = op(ctx, op.input.model_validate(request))
+            job = answer.job
             if job is not None and job.printer_id is None:
                 raise _NoPrinter
     except (_NoPrinter, AppInactive):
@@ -82,7 +83,7 @@ def _queue_paper(ctx: OperationContext, request: dict) -> dict:
         return dict(NOT_QUEUED)
     if job is None:
         return dict(NOT_QUEUED)
-    return {"queued": True, "job_id": job.id, "printer": job.printer_name}
+    return {"queued": True, "job_id": job.id, "printer": job.printer_name, "waits_for_device": answer.waits_for_device}
 
 
 def _fiscal_record(ctx: OperationContext, sale: SaleOut) -> dict | None:
@@ -169,7 +170,9 @@ def _note_bill_requested(ctx: OperationContext, order: Order) -> None:
     ai=AI(
         description="Print a sale's receipt (or its full invoice) again on the receipt printer, marked «DUPLICATE», by "
         "the sale's id or number. With no receipt printer for it, its fiscal document still pending or its VeriFactu "
-        "record unreadable, it fails and says why: nothing was printed. It creates no sale nor fiscal document.",
+        "record unreadable, it fails and says why: nothing was printed. Queued with waits_for_device, nothing has "
+        "come out yet: say it waits in that printer's queue and prints once a device set up in Printing › Devices "
+        "prints it, never that it was printed. It creates no sale nor fiscal document.",
         risk="normal",
         asks={
             "en": (
@@ -207,7 +210,9 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
     ai=AI(
         description="Print the bill of an open check for the table (not an invoice: no number, no payment) on the "
         "receipt printer. Each call prints one. With no receipt printer for it, it fails and says why: nothing was "
-        "printed. Once printed, its table shows «Bill requested» on the floor plan until the check is charged in full.",
+        "printed. Queued with waits_for_device, nothing has come out yet: say it waits in that printer's queue and "
+        "prints once a device set up in Printing › Devices prints it, never that it was printed. Once queued, its table "
+        "shows «Bill requested» on the floor plan until the check is charged in full.",
         risk="normal",
         asks={
             "en": (

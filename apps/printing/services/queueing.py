@@ -20,6 +20,7 @@ from apps.printing.queries.job_printer import job_printer
 from apps.printing.queries.jobs import actor, job_row
 from apps.printing.queries.printers import find_printer
 from apps.printing.queries.settings import current_settings
+from apps.printing.queries.waiting import waits_for_device
 from apps.printing.schemas.jobs import JobCreateIn, JobCreateOut, JobOut
 from apps.printing.schemas.printers import PrinterRefIn
 from base import operations as platform
@@ -117,7 +118,23 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
     job_key = data.job_key or f"job-{uuid.uuid7()}"
     existing = PrintJob.objects.select_related("printer").filter(job_key=job_key).first()
     if existing is not None:
-        return {"job": job_row(existing), "duplicate": True, "skipped": None}
+        return _answer(existing, duplicate=True)
+    job, skipped = _queue_job(ctx, data, job_key)
+    if job is None:
+        return {"job": None, "duplicate": False, "skipped": skipped, "waits_for_device": False}
+    if getattr(job, "duplicate", False):
+        return _answer(job, duplicate=True)
+    _queued(ctx, job)
+    return _answer(job, duplicate=False, skipped=skipped)
+
+
+def _answer(job: PrintJob, *, duplicate: bool, skipped: str | None = None) -> dict:
+    return {"job": job_row(job), "duplicate": duplicate, "skipped": skipped, "waits_for_device": waits_for_device(job)}
+
+
+def _queue_job(ctx: OperationContext, data: JobCreateIn, job_key: str) -> tuple[PrintJob | None, str | None]:
+    """The job ``data`` asks for, written under ``job_key``, and why its receipt was left out, if it was: at checkout
+    with the receipt off, only the drawer's kick travels, and nothing at all without cash to open it for."""
     settings = current_settings()
     usage = data.usage or documents.default_usage(data.document_type)
     if data.printer is not None:
@@ -133,36 +150,32 @@ def create_job(ctx: OperationContext, data: JobCreateIn) -> dict:
         "reference": reference,
         "source_app": data.source_app or "",
     }
-    skipped = None
     # The drawer opens at checkout when the settings say so and the till took cash.
     drawer = data.automatic and data.open_drawer and settings.open_drawer_on_sale
     if data.automatic and not settings.print_receipt_on_sale:
-        skipped = "print_on_sale_off"
         if not drawer:
-            return {"job": None, "duplicate": False, "skipped": skipped}
+            return None, "print_on_sale_off"
         # The receipt stays in the drawer's printer's tray: only the kick travels.
-        job = _new_job(ctx, kind=PrintJob.Kind.DRAWER, open_drawer=True, **common)
-    else:
-        # An A4 page prints once (a copy would be a second original); a receipt takes the settings' copies.
-        if data.format == PrintJob.Format.A4:
-            copies = 1
-        else:
-            copies = data.copies or (settings.receipt_copies if data.document_type == "receipt" else 1)
-        job = _new_job(
-            ctx,
-            kind=PrintJob.Kind.DOCUMENT,
-            document_type=data.document_type,
-            document=document,
-            html=data.html or "",
-            format=data.format,
-            copies=copies,
-            open_drawer=drawer,
-            **common,
-        )
-    if getattr(job, "duplicate", False):
-        return {"job": job_row(job), "duplicate": True, "skipped": None}
-    _queued(ctx, job)
-    return {"job": job_row(job), "duplicate": False, "skipped": skipped}
+        return _new_job(ctx, kind=PrintJob.Kind.DRAWER, open_drawer=True, **common), "print_on_sale_off"
+    job = _new_job(
+        ctx,
+        kind=PrintJob.Kind.DOCUMENT,
+        document_type=data.document_type,
+        document=document,
+        html=data.html or "",
+        format=data.format,
+        copies=_copies(data, settings),
+        open_drawer=drawer,
+        **common,
+    )
+    return job, None
+
+
+def _copies(data: JobCreateIn, settings) -> int:
+    """An A4 page prints once (a copy would be a second original); a receipt takes the settings' copies."""
+    if data.format == PrintJob.Format.A4:
+        return 1
+    return data.copies or (settings.receipt_copies if data.document_type == "receipt" else 1)
 
 
 @operation(
