@@ -393,8 +393,8 @@ Pasos:
    - **Pasa algo**: en «Elige qué pasa», los avisos de las apps activas del negocio, dichos en palabras
      («se cobra una venta», «se crea una ficha de cliente», «una cita se marca como no vino»…), con la
      palabra de la app que los tiene («se crea un cambio temporal», como en Horarios), con el nombre de
-     esa app debajo de cada uno y nunca su código, y con buscador. Debajo, **Solo cuando…**: condiciones sobre los datos del aviso («el total es mayor que
-     10000»); sin ellas arranca sola con cada aviso.
+     esa app debajo de cada uno y nunca su código, y con buscador. Debajo, **Solo cuando…**: condiciones
+     sobre los datos del aviso («el total es mayor que 10000»); sin ellas arranca sola con cada aviso.
    - **Según un horario**: «Cada cuánto» (todos los días, todas las semanas, todos los meses), el día de
      la semana o del mes si toca, y la hora, en la hora del negocio. Un día del mes que no existe (el 31
      en abril) se salta ese mes.
@@ -422,8 +422,8 @@ Pasos:
 2. Rellena su formulario:
    - **Hacer algo**: «Qué hacer» (una acción de las apps activas, elegida de una lista con buscador:
      «Crear una tarea», «Apuntar una nota en un cliente»…, con el nombre de su app debajo de cada una y
-     nunca su código) y «Con esta información»: un campo por cada
-     dato que la acción pide (los obligatorios marcados) y **Añadir información** para los opcionales.
+     nunca su código) y «Con esta información»: un campo por cada dato que la acción pide (los
+     obligatorios marcados) y **Añadir información** para los opcionales.
    - **Consultar algo**: «Qué consultar» (una consulta de las apps activas, elegida igual: «Buscar
      conversaciones de WhatsApp», con «Bandeja de WhatsApp» debajo), sus datos y «Qué guardar»
      («La primera fila que encuentre, campo a campo» o «Solo cuántas hay»). Si no encuentra nada, la
