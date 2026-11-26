@@ -22,9 +22,9 @@ describe('catalogOptions', () => {
       [
         { name: 'payment.payment.list', app_name: 'Pagos' },
         { name: 'whatsapp_inbox.conversation.list', app_name: 'Bandeja de WhatsApp' },
-        { name: 'customer.customer.list', app_name: 'Clientes' },
-        { name: 'order.order.list', app_name: 'Órdenes' },
         { name: 'customer.customer.detail', app_name: 'Clientes' },
+        { name: 'order.order.list', app_name: 'Órdenes' },
+        { name: 'customer.customer.list', app_name: 'Clientes' },
       ],
       label,
       'es',
