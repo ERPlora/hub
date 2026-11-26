@@ -6,6 +6,7 @@ from django.db.models.functions import Coalesce
 from live.context import OperationContext
 from live.operations import AI, operation
 
+from apps.customer import consent_notice
 from apps.customer.models import Consent, Customer, CustomField, CustomFieldValue
 from apps.customer.phones import candidates
 from apps.customer.queries.reads import _ordered, business_country, find_customer, page
@@ -75,6 +76,7 @@ def load_detail(customer: Customer) -> dict:
         "consent": consent,
         "marketing_consent": bool(granted),
         "consent_date": max(granted) if granted else None,
+        "consent_notice": str(consent_notice.WORDS),
     }
 
 

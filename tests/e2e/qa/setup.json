@@ -536,8 +536,6 @@
       "arguments": {
         "customer": "Ana QA",
         "channel": "email",
-        "notice_text": "Acepto recibir ofertas por correo QA",
-        "notice_version": "1",
         "source": "counter"
       },
       "provides": []
