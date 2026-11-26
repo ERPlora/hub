@@ -4,22 +4,20 @@ code (its name without one) and a category by its name, never by an id of the bu
 
 from collections import defaultdict
 
-import pydantic
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import OperationError
 
 from base.blueprint.calls import (
-    ROW_REFUSED,
     Dataset,
     Loaded,
-    call,
+    attempt,
     count_of,
     create_each,
+    given,
     ids_of,
+    listed,
     natural_key,
     pages,
-    reason,
     remover,
     text_of,
 )
@@ -49,39 +47,22 @@ def _group_rows(ctx: OperationContext) -> list[dict]:
     ]
 
 
-def _listed(row: dict, key: str, kind: type) -> list:
-    value = row.get(key)
-    return [item for item in value if isinstance(item, kind)] if isinstance(value, list) else []
-
-
-def _given(row: dict, fields: tuple[str, ...]) -> dict:
-    return {name: row[name] for name in fields if row.get(name) not in (None, "")}
-
-
-def _try(ctx: OperationContext, loaded: Loaded, label: str, operation: str, **data) -> None:
-    """``operation`` on a part of a group just made; one it refuses leaves the group without it, and is told."""
-    try:
-        call(ctx, operation, **data)
-    except (OperationError, pydantic.ValidationError) as exc:
-        loaded.warn(str(ROW_REFUSED) % {"row": label, "reason": reason(exc)})
-
-
 def _fill(ctx: OperationContext, loaded: Loaded, row: dict, pk: str) -> None:
     group = text_of(row, "name")
-    for option in _listed(row, "options", dict):
-        _try(ctx, loaded, f"{group} · {text_of(option, 'name')}", "modifier.option.create", group_id=pk,
-             **_given(option, OPTION_FIELDS))
-    for product in _listed(row, "products", str):
-        _try(ctx, loaded, f"{group} · {product}", "modifier.link.attach", group_id=pk, product=product)
-    for category in _listed(row, "categories", str):
-        _try(ctx, loaded, f"{group} · {category}", "modifier.link.attach", group_id=pk, category=category)
+    for option in listed(row, "options", dict):
+        attempt(ctx, loaded, f"{group} · {text_of(option, 'name')}", "modifier.option.create", group_id=pk,
+                **given(option, OPTION_FIELDS))
+    for product in listed(row, "products", str):
+        attempt(ctx, loaded, f"{group} · {product}", "modifier.link.attach", group_id=pk, product=product)
+    for category in listed(row, "categories", str):
+        attempt(ctx, loaded, f"{group} · {category}", "modifier.link.attach", group_id=pk, category=category)
 
 
 def _group_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
     """Each group the business does not have, by its name, made with its options and hung where it was."""
     existing = {natural_key(group.name) for group in pages(ctx, "modifier.group.list")}
     create_each(ctx, rows, loaded, name="modifier.group.create", key=lambda row: natural_key(text_of(row, "name")),
-                existing=existing, build=lambda row: _given(row, GROUP_FIELDS), label=lambda row: text_of(row, "name"),
+                existing=existing, build=lambda row: given(row, GROUP_FIELDS), label=lambda row: text_of(row, "name"),
                 after=lambda row, pk: _fill(ctx, loaded, row, pk))
 
 
