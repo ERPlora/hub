@@ -9,7 +9,7 @@ the conversation follows the card. erplora.com's erasure door is the only thing 
 import httpx
 import respx
 
-from apps.whatsapp_inbox.models import Conversation
+from apps.whatsapp_inbox.models.conversations import Conversation
 from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, ctx_for, receive, run, system
 from base.models.relay import EventDelivery
 

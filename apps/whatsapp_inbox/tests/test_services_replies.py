@@ -16,7 +16,7 @@ import pytest
 import respx
 from live.models import OutboxEvent
 
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models.conversations import Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, connect, receive, run, template
 from base.tenancy.context import current_alias
 
