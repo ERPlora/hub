@@ -35,6 +35,6 @@ export interface AppHelp {
 
 declare module '@erplora/ui/sdk' {
   interface Operations {
-    'base.help.get': { input: { app: string }; output: AppHelp };
+    'base.help.get': { input: { app: string; offset?: number }; output: AppHelp };
   }
 }

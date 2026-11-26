@@ -1267,7 +1267,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26, F27 | `flow.secret.list` |
 | Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente su acción y sus datos en palabras, leídos como esa persona y en su idioma (en vivo) | contestar | F01, F29, F38 | `flow.question.list` |
 | Una pregunta que espera respuesta, como sale en «Esperan tu respuesta», solo para quien puede contestarla | contestar (su rol) | F29 | `flow.question.get` |
-| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F01, F33–F36 | `flow.recipe.list` |
+| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo; el asistente sigue leyendo con `offset` donde se cortó una respuesta que no le cabía de una vez) | ver | F01, F33–F36 | `flow.recipe.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
