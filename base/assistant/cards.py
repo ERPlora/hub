@@ -29,6 +29,8 @@ from live.operations import Operation, registry
 
 from base.business import babel_locale, business_zone, currency_decimals
 
+from . import card_marks
+
 # The card's helpers by the names this module reads them by (``live.assistant``'s).
 _LEFT_OUT = LEFT_OUT
 _resolved = shared.resolved
@@ -219,8 +221,11 @@ def card(
     names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``).
     With ``ctx`` and a callable ``ai["summary"]``, its fields are exactly what that callable returns; it receives
     ``(ctx, arguments, fields) -> list[dict]``, with the detailed fields already in ``language``, and runs in it too.
-    ``found`` gathers the ids of the records it read to name them (``fingerprint``)."""
-    shown = _card_details(op, arguments, language, ctx, found)
+    ``found`` gathers the ids of the records it read to name them (``fingerprint``). Each datum is said as the write
+    takes it, and as its screen says it (``card_marks``)."""
+    taken = card_marks.as_taken(op, arguments)
+    shown = _card_details(op, taken, language, ctx, found)
+    shown["fields"] = card_marks.marked(op, shown["fields"], taken, language)
     summary = op.ai.get("summary") if isinstance(op.ai, dict) else None
     if ctx is None or not callable(summary):
         return shown

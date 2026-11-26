@@ -23,6 +23,7 @@ from apps.sale.schemas.fields import (
     _text,
 )
 from apps.tax.schemas.references import A_TAX_CATEGORY
+from base.schemas.assistant import no_limit
 
 
 # ── Settings ──────────────────────────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ class SettingsFields(Schema):
         ge=0,
         le=100,
         description="The biggest discount (each one, in %) given without a manager; 100 = no cap.",
+        json_schema_extra=no_limit(100),
     )
     enable_parked_tickets: bool = Field(
         description="Checks may be parked and picked up again."
@@ -109,6 +111,7 @@ class SettingsPatchIn(Closed):
         ge=0,
         le=100,
         description="The biggest discount (each one, in %) given without a manager; 100 = no cap.",
+        json_schema_extra=no_limit(100),
     )
     enable_parked_tickets: bool | None = Field(
         None, description="Checks may be parked and picked up again."

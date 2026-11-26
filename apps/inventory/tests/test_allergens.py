@@ -150,7 +150,7 @@ def test_the_assistant_hears_the_refusal_before_any_card_is_drawn():
 def test_the_assistants_card_says_the_allergens_by_their_names_in_spanish():
     burger = Product.objects.create(name="Hamburguesa", sku="HAM", price=900)
     fields = fields_of("inventory.product.update", {"id": str(burger.id), "allergens": ["milk", "gluten"]}, "es")
-    assert (fields["allergens"]["label"], fields["allergens"]["value"]) == ("Alérgenos", ["Leche", "Gluten"])
+    assert (fields["allergens"]["label"], fields["allergens"]["value"]) == ("Alérgenos", ["Gluten", "Leche"])
 
 
 # The catalogs the till and Kitchen read (INVENTORY-F27)

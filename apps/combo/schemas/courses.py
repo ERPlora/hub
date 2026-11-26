@@ -9,12 +9,13 @@ from pydantic import ValidationInfo, field_validator, model_validator
 from apps.combo.schemas.choices import OptionOut
 from apps.combo.schemas.fields import D_MAX, D_MIN, D_REPEAT, SAY_WHICH_MENU, GroupIds, Name, Picks, _ceiling, _named
 from apps.combo.schemas.references import ComboRefIn, GroupRefIn, _ComboOfIn
+from base.schemas.assistant import no_limit
 
 
 class GroupIn(_ComboOfIn):
     name: Name = Field(description="The course's name («Starters», «Mains», «Drink»).")
     min_choices: Picks = Field(1, description=D_MIN)
-    max_choices: Picks = Field(1, description=D_MAX)
+    max_choices: Picks = Field(1, description=D_MAX, json_schema_extra=no_limit())
     allow_repeat: bool = Field(False, description=D_REPEAT)
 
     @field_validator("max_choices")
@@ -40,7 +41,7 @@ class GroupPatchIn(GroupRefIn):
 
     name: Name | None = Field(None, description="New name.")
     min_choices: Picks | None = Field(None, description=D_MIN)
-    max_choices: Picks | None = Field(None, description=D_MAX)
+    max_choices: Picks | None = Field(None, description=D_MAX, json_schema_extra=no_limit())
     allow_repeat: bool | None = Field(None, description=D_REPEAT)
 
     @field_validator("max_choices")

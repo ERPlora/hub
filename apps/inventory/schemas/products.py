@@ -30,6 +30,7 @@ from apps.inventory.schemas.fields import (
 from apps.tax.schemas.references import A_TAX_CATEGORY
 from base.allergens import AllergensIn, AllergensOut, AllergensPatchIn
 from base.recovery import ImageInCopyIn
+from base.schemas.assistant import per_unit
 from base.sensitive import COSTS
 
 ProductType = Literal["physical", "service"]
@@ -54,6 +55,9 @@ ProductCost = Annotated[
 ]
 SHOW_ON_WEBSITE = gettext_noop("Show on website")
 SHOWN_ON_WEBSITE = "Whether the website's catalog shows it; off, the till still sells it."
+#: A price is for its quantity of its pricing unit, else of the product's unit; a cost, for the product's unit.
+PRICE_PER_UNIT = per_unit("pricing_unit", "unit", quantity="price_quantity", each="ud")
+COST_PER_UNIT = {**COSTS, **per_unit("unit", each="ud")}
 Name = _text(200, 1)
 Sku = _text(64, 1)
 Ean13 = _text(13)
@@ -141,14 +145,16 @@ class ProductIn(AllergensIn):
         description="The product's code; its identity, never edited afterwards."
     )
     price: Cents = Field(
-        description="Sale price in cents, per price_quantity of pricing_unit."
+        description="Sale price in cents, per price_quantity of pricing_unit.", json_schema_extra=PRICE_PER_UNIT
     )
     tax_category_key: TaxKey = Field(
         title=TAX_CATEGORY,
         description="Key of the tax category (Taxes app) that says how it is taxed.",
         json_schema_extra=A_TAX_CATEGORY,
     )
-    cost: Cents = Field(0, description="Cost in cents; only whoever sees the costs sends one.", json_schema_extra=COSTS)
+    cost: Cents = Field(
+        0, description="Cost in cents; only whoever sees the costs sends one.", json_schema_extra=COST_PER_UNIT
+    )
     initial_stock: Quantity = Field(
         Decimal("0"),
         ge=0,
@@ -206,9 +212,9 @@ class ProductPatchIn(ProductRefIn, AllergensPatchIn):
     model_config = ConfigDict(extra="forbid")
 
     name: Name | None = Field(None, description="New name.")
-    price: Cents | None = Field(None, description="New price in cents.")
+    price: Cents | None = Field(None, description="New price in cents.", json_schema_extra=PRICE_PER_UNIT)
     cost: Cents | None = Field(
-        None, description="New cost in cents; only whoever sees the costs sends one.", json_schema_extra=COSTS
+        None, description="New cost in cents; only whoever sees the costs sends one.", json_schema_extra=COST_PER_UNIT
     )
     low_stock_threshold: Quantity | None = Field(
         None, ge=0, description="New low-stock threshold."

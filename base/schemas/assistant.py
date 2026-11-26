@@ -1,6 +1,6 @@
 """Schemas of the assistant (``base.assistant.*``, ``base.docs.search``), and the marks an app's
-schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``) or says as written
-(``IN_OWN_WORDS``), a file the person attaches in the chat (``AN_ATTACHED_FILE``), a file a read hands the person
+schemas give the data its card names (``names``, ``unless_given``, ``in_currency_of``) or says as its screen does
+(``no_limit``, ``per_unit``) or as written (``IN_OWN_WORDS``), a file the person attaches in the chat (``AN_ATTACHED_FILE``), a file a read hands the person
 (``A_HANDED_FILE``) and the names it reads (``exactly_one``, ``RecordNameOut``)."""
 
 from typing import Annotated, Any, Literal
@@ -61,6 +61,19 @@ def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:
     """The mark of a datum that names a record in a currency of its own, a cart or a price list (base/assistant/cards.py
     ``CURRENCY``): the assistant's card says the amounts beside it in the currency ``read`` answers (its ``code``)."""
     return {"currency": {"read": read, "by": by, "code": code}}
+
+
+def no_limit(value: int = 0) -> dict:
+    """The mark of a whole number whose ``value`` means there is no limit (base/assistant/card_marks.py ``NO_LIMIT``):
+    the card says «No limit» for it, never the figure."""
+    return {"no_limit": value}
+
+
+def per_unit(*units: str, quantity: str = "", each: str = "") -> dict:
+    """The mark of an amount that is a price for a unit (base/assistant/card_marks.py ``PER_UNIT``): ``units``, the data
+    beside it that name the unit, the first one sent; ``quantity``, the one that says how many of it; ``each``, the unit
+    that is just each one. The card names it «Price per kg», as the till writes «45,00 € / kg»."""
+    return {"per_unit": {"units": list(units), "quantity": quantity, "each": each}}
 
 
 def exactly_one(data: Any, message: Any) -> Any:
