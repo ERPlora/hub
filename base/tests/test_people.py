@@ -172,13 +172,17 @@ class TestWhoIsInTheBusiness:
         client.force_login(olga)
         assert row(people(client), "saas:3")["name"] == "Eva María Ruiz"
 
-    def test_a_name_of_my_profile_holding_an_address_reaches_an_employee_without_it(self, client, olga, eva):
+    def test_a_name_of_my_profile_holding_an_address_never_reaches_an_employee(self, client, olga, eva, make_user):
         from base.models.profile import Profile
 
+        nora = "nora.ruiz+bar@example.com"
+        make_user("saas:6", host=A.key, role=Membership.Role.MANAGER, first_name=nora, email=nora)
         Profile.objects.create(username="saas:1", first_name="olga.ruiz+bar@example.com")
+        Profile.objects.create(username="saas:6", first_name=nora)
         client.force_login(eva)
         answer = people(client)
-        assert row(answer, "saas:1")["name"] == "olga.ruiz+bar"
+        # An address names a person only when nothing else does, and then by what goes before its «@».
+        assert (row(answer, "saas:1")["name"], row(answer, "saas:6")["name"]) == ("Olga", "nora.ruiz+bar")
         assert "@" not in json.dumps(answer)
 
     def test_nobody_without_a_session(self, client, olga):
