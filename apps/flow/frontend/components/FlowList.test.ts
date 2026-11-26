@@ -143,8 +143,10 @@ describe('FlowList', () => {
     const s = await setup();
     const order = s.find('flow-list-sort');
     expect(order.attributes('aria-label')).toBe('Order');
-    expect(order.attributes('label-placement')).toBeUndefined();
-    expect(order.attributes('fill')).toBeUndefined();
+    // Ionic Vue hands these to the element as properties, never as attributes.
+    const select = order.element as HTMLElement & { label?: string; fill?: string };
+    expect(select.label).toBeUndefined();
+    expect(select.fill).toBeUndefined();
   });
 
   it('the filters and «Order» query the server again', async () => {
