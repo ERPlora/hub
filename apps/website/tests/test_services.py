@@ -18,7 +18,7 @@ from live.operations import atomic, get
 from PIL import Image as PILImage
 
 from apps.website.models import Image, Site
-from apps.website.queries import catalog_cache_key, page_cache_key
+from apps.website.queries.public import catalog_cache_key, page_cache_key
 from apps.website import reviews, services
 from apps.website.tests.conftest import (
     HUB_DB,
@@ -214,8 +214,9 @@ def test_publish_with_the_catalogs_app_off_leaves_an_empty_catalog_not_an_error(
     # flow: WEBSITE-F05 — Services has offered services, but it is off in the hub: none of them is copied.
     from apps.website import queries
 
-    real = queries.active_apps
-    monkeypatch.setattr(queries, "active_apps", lambda scope: real(scope) - {"service"})
+    real = queries.catalog.active_apps
+    monkeypatch.setattr(queries.catalog, "active_apps", lambda scope: real(scope) - {"service"})
+    monkeypatch.setattr(queries.public, "active_apps", lambda scope: real(scope) - {"service"})
     save()
     run("website.site.publish")
     assert Site.objects.get().published_content["catalog"] == {"source": "service", "show_prices": True, "groups": []}

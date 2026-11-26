@@ -14,7 +14,7 @@ from django.core.cache import cache
 
 from apps.website import public_home, queries
 from apps.website.models import Site
-from apps.website.queries import CATALOG_TTL, PAGE_TTL, page_cache_key
+from apps.website.queries.public import CATALOG_TTL, PAGE_TTL, page_cache_key
 from apps.website.render import local_day
 from apps.website.tests.conftest import HOST, HUB_DB, A, B, ctx_for, full_content
 from apps.website.tests.test_public_home import A_HOST, B_HOST, publish, run
@@ -95,7 +95,8 @@ def test_without_a_website_to_show_the_domain_serves_nothing(client, connected, 
         run("website.site.unpublish")
     elif state == "app_off":
         publish()
-        monkeypatch.setattr(queries, "active_apps", lambda scope: frozenset())
+        monkeypatch.setattr(queries.public, "active_apps", lambda scope: frozenset())
+        monkeypatch.setattr(queries.catalog, "active_apps", lambda scope: frozenset())
     response = visit(client)
     assert response.status_code == 404
     assert "auth/login" not in response.content.decode()
@@ -103,7 +104,7 @@ def test_without_a_website_to_show_the_domain_serves_nothing(client, connected, 
 
 def test_a_site_that_went_offline_between_the_check_and_the_page_is_not_found(client, connected, monkeypatch):
     publish()
-    monkeypatch.setattr(queries, "published_page", lambda scope: None)
+    monkeypatch.setattr(queries.public, "published_page", lambda scope: None)
     assert visit(client).status_code == 404
     # On its own address it still sends to the team's sign-in.
     assert visit(client, host=SLUG_HOST)["Location"] == public_home.OFFLINE_FALLBACK
@@ -256,7 +257,7 @@ def test_a_publication_forgets_the_page_of_the_domain_too(client, connected):
     visit(client)
     key = page_cache_key(A.key, 1, "en", today, "EUR", own_domain=True)
     assert cache.get(key) is not None
-    queries.forget_cached(A.key, 1, "EUR")
+    queries.public.forget_cached(A.key, 1, "EUR")
     assert cache.get(key) is None
 
 
@@ -280,8 +281,8 @@ def test_a_hidden_catalog_is_not_even_read(db):
     from apps.service.models import Service
 
     Service.objects.create(name="Live haircut", price=1250, duration_minutes=30)
-    assert queries.live_catalog(A, full_content(catalog={"source": "service", "hidden": False}))["groups"]
-    assert queries.live_catalog(A, full_content(catalog={"source": "service", "hidden": True}))["groups"] == []
+    assert queries.public.live_catalog(A, full_content(catalog={"source": "service", "hidden": False}))["groups"]
+    assert queries.public.live_catalog(A, full_content(catalog={"source": "service", "hidden": True}))["groups"] == []
 
 
 # The main address: what the page tells search engines
