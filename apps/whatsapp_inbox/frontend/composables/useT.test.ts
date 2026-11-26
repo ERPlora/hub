@@ -17,7 +17,7 @@ describe('useT', () => {
       defineComponent({
         setup() {
           const t = useT();
-          const text = computed(() => `${t('whatsapp_inbox.title')} · ${t('whatsapp_inbox.settings.usage', { used: 2, limit: 30 })}`);
+          const text = computed(() => `${t('whatsapp_inbox.title')} · ${t('whatsapp_inbox.settings.usage', { used: 2, count: 30 })}`);
           return () => h('p', text.value);
         },
       }),

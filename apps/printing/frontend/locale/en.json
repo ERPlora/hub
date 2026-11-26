@@ -199,8 +199,7 @@
       "nothing": "Nothing waiting",
       "failed": "Failed: {n}",
       "printsOn": "Prints on: {name}.",
-      "alert": "{n} print jobs for {usage} have been waiting {age}.",
-      "alertOne": "1 print job for {usage} has been waiting {age}.",
+      "alert": "{n} print job for {usage} has been waiting {age}. | {n} print jobs for {usage} have been waiting {age}.",
       "alertCause": "No active printer has this role: add one below or give this role to one of them."
     },
     "jobs": {
