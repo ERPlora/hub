@@ -20,9 +20,10 @@ permissions:
   contents: read
 
 jobs:
-  # Which tests python runs and in how many shards: the whole suite, or for a branch whose changes all sit inside
-  # apps/<id>/, the tests of those apps and of the apps that depend on them, in as few shards as they need. Anything it
-  # cannot work out runs the whole suite, with a warning in the log.
+  # Which tests python runs and in how many shards: the whole suite, or for a branch whose changes stay inside the apps'
+  # folders, its own test modules and the few files only some tests read (the size allow list, the e2e specs, the
+  # WORKBOOKs), the tests of those apps and of the apps that depend on them, those test modules and the tests that read
+  # those files, in as few shards as they need. Anything it cannot work out runs the whole suite, with a warning in the log.
   select:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
