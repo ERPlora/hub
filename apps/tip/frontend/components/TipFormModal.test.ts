@@ -96,6 +96,19 @@ describe('TipFormModal', () => {
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 
+  it('opened again, it starts empty: the tip just recorded is not left written to be saved twice', async () => {
+    const s = await setup();
+    s.answer(201, { id: 't1' });
+    await s.type('sale', '20261125-0007');
+    await s.pick('method', 'm-card');
+    await s.type('amount', '2,50');
+    await s.submit();
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ open: true });
+    await flush();
+    expect([s.field('sale').value, s.field('method').value, s.field('amount').value]).toEqual(['', '', '']);
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup('es');
     expect(s.inDoc('tip-form')?.getAttribute('aria-label')).toBe('Anotar propina');

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { errorFrame, flush, words } from '../../../../base/frontend/__tests__/mount-in-shell';
-import { MANAGER, mountTip } from '../__tests__/mount-tip';
+import { EMPLOYEE, MANAGER, mountTip } from '../__tests__/mount-tip';
 import TipAdjustModal from '../components/TipAdjustModal.vue';
 import TipFormModal from '../components/TipFormModal.vue';
 import TipVoidModal from '../components/TipVoidModal.vue';
@@ -160,6 +160,17 @@ describe('TipsPage: what can be done', () => {
     await pressRowAction(s.wrapper, 't2', 'void');
     await flush();
     expect(s.wrapper.findComponent(TipVoidModal).props()).toMatchObject({ open: true, tip: ROWS[1] });
+  });
+
+  it('whoever only records tips is offered neither «Adjust» nor «Void»; whoever only reads them, no «Record tip» either', async () => {
+    const records = await setup('en', EMPLOYEE);
+    await records.show(PAGE);
+    expect(records.prop('addable')).toBe(true);
+    expect(offeredRowActions(records.wrapper, 't1')).toEqual([]);
+    const reads = await setup('en', { ...EMPLOYEE, permissions: EMPLOYEE.permissions.filter((held) => held !== 'tip.add_tip') });
+    await reads.show(PAGE);
+    expect(reads.prop('addable')).toBe(false);
+    expect(offeredRowActions(reads.wrapper, 't1')).toEqual([]);
   });
 
   it('speaks Spanish', async () => {

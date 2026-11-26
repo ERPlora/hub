@@ -114,7 +114,9 @@ describe('SettingsPage: who and when', () => {
     const s = await setup('en', MANAGER);
     await s.result(OP, SETTINGS);
     expect(s.find('tip-settings-read-only').text()).toContain('You do not have permission to change these settings.');
-    expect([s.field('tip-settings-enabled').disabled, s.field('tip-settings-m-cash-0-value').disabled]).toEqual([true, true]);
+    expect(
+      ['enabled', 'allow_custom', 'preselected', 'm-cash-0-kind', 'm-cash-0-value'].map((name) => s.field(`tip-settings-${name}`).disabled),
+    ).toEqual([true, true, true, true, true]);
     expect(s.inDoc('tip-settings-save')).toBeNull();
   });
 
