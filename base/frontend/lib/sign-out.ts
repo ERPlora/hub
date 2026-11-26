@@ -20,19 +20,18 @@ export const SIGN_OUT_WAIT_MS = 10_000;
 /** How a sign-out ended: the session closed, the hub is gone (no session is left to close), or it did not happen. */
 export type SessionEnd = 'closed' | 'gone' | 'failed';
 
-/** What the hub does before its session ends: the tab's conversation with the assistant is forgotten and the
- *  installed app stops listening with the screen off (HUB_APP-F26), waited for. */
-export async function beforeSignOut(): Promise<void> {
-  forgetAssistant();
-  await stopNoticeListening();
-}
-
-/** What the hub does once another person entered over this session («Switch user»), before the screen reloads for
- *  them: they find the assistant closed and empty, as someone who just arrived. The device would otherwise keep the
- *  panel open for them. */
-export function beforeSwitch(): void {
+/** When a person leaves the till (signing out, the idle lock, «Switch user»): whoever enters next finds the assistant
+ *  closed and empty, as someone who just arrived. The device would otherwise keep the panel open for them. */
+export function handOverAssistant(): void {
   forgetAssistant();
   useAssistant().setOpen(false);
+}
+
+/** What the hub does before its session ends: the assistant handed over and the installed app stops listening with
+ *  the screen off (HUB_APP-F26), waited for. */
+export async function beforeSignOut(): Promise<void> {
+  handOverAssistant();
+  await stopNoticeListening();
 }
 
 /**
