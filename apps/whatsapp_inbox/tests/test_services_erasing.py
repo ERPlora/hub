@@ -11,7 +11,7 @@ import respx
 from live.errors import NotFound, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.whatsapp_inbox.models import Conversation, Message, Note
+from apps.whatsapp_inbox.models.conversations import Conversation, Message, Note
 from apps.whatsapp_inbox.tests.conftest import (
     HUB_DB,
     NOW,
