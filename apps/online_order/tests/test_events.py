@@ -8,4 +8,7 @@ def declared():
 
 
 def test_the_events():
-    assert declared() == {"QR_CODE_REGENERATED": "online_order.qr_code.regenerated"}
+    assert declared() == {
+        "QR_CODE_REGENERATED": "online_order.qr_code.regenerated",
+        "ORDER_SENT": "online_order.order.sent",
+    }

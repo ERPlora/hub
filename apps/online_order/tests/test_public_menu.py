@@ -20,22 +20,12 @@ from apps.online_order import queries
 from base.tenancy.context import use_hub
 from base.tests.test_public_door import B_HOST, door, turn_off
 
-from .conftest import HOST, HUB_DB, A, B, ctx_for, make_table, make_zone, run
+from .conftest import HOST, HUB_DB, PUBLIC, A, B, make_table, make_zone, regenerate, run, visitor
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("spa_manifest", "hub_a", "hub_b")]
 
-PUBLIC = "online_order.public"
 #: All a dish of the menu tells the customer.
 ITEM_FIELDS = {"id", "name", "description", "price", "image_url", "allergens"}
-
-
-def visitor():
-    """Nobody signed in, holding the page's permission and nothing more, as the door runs it."""
-    return ctx_for(None, permissions={PUBLIC})
-
-
-def regenerate(table, scope=A) -> str:
-    return run("online_order.qr_code.regenerate", {"id": str(table.id)}, ctx_for(scope=scope)).code
 
 
 def menu(code: str):
@@ -44,30 +34,6 @@ def menu(code: str):
 
 def options(code: str, product) -> list:
     return run("online_order.public.options", {"code": code, "product_id": str(product.id)}, visitor()).groups
-
-
-@pytest.fixture
-def table_code() -> str:
-    return regenerate(make_table("4", make_zone("Terrace")))
-
-
-@pytest.fixture
-def dishes():
-    from apps.inventory.models import Category, ProductCategory
-
-    starters = Category.objects.create(name="Starters", slug="starters", order=0)
-    drinks = Category.objects.create(name="Drinks", slug="drinks", order=1)
-    croquettes = make_product(
-        "Croquettes", price=750, sku="CRO", cost=200, description="Six, of ham", allergens=["gluten", "milk"]
-    )
-    cola = make_product("Cola", price=250, sku="COLA", cost=90)
-    staff_meal = make_product("Staff meal", price=500, sku="STAFF", show_on_website=False)
-    gone = make_product("Gone", price=100, sku="GONE", is_sold_out=True)
-    ProductCategory.objects.create(product=croquettes, category=starters)
-    ProductCategory.objects.create(product=cola, category=drinks)
-    ProductCategory.objects.create(product=staff_meal, category=starters)
-    ProductCategory.objects.create(product=gone, category=starters)
-    return {"croquettes": croquettes, "cola": cola, "staff_meal": staff_meal, "gone": gone}
 
 
 def test_a_table_s_code_opens_the_menu_by_category_with_the_table_and_its_zone(table_code, dishes):
@@ -268,6 +234,9 @@ def test_a_code_of_another_business_reads_nothing_of_either(client, hub_b, dishe
         "combo.combo.for_sale",
         "table.table.get",
         "sale.order.open",
+        "sale.order.add_line",
+        "modifier.selection.resolve",
+        "combo.combo.resolve",
     ],
 )
 def test_the_door_runs_only_the_menu_s_own_reads(client, make_user, table_code, operation):
@@ -278,10 +247,12 @@ def test_the_door_runs_only_the_menu_s_own_reads(client, make_user, table_code, 
 
 
 def test_the_page_reads_its_table_and_the_menu_and_nothing_else(monkeypatch, table_code, dishes):
-    # The door runs only this app's two reads; they read the other apps with the menu's permissions, and only these.
+    # The door runs only this app's two reads and the order (test_public_send.py); the reads read the other apps with
+    # the menu's permissions, and only these.
     assert sorted(op.name for op in registry.values() if op.permission == PUBLIC) == [
         "online_order.public.menu",
         "online_order.public.options",
+        "online_order.public.send",
     ]
     assert queries.MENU_READS == {
         "table.view_table",

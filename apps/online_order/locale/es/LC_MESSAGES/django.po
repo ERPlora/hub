@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hub-next online_order\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-25 18:42+0100\n"
+"POT-Creation-Date: 2026-11-26 02:50+0100\n"
 "PO-Revision-Date: 2026-11-25 08:56+0100\n"
 "Last-Translator: ERPlora\n"
 "Language-Team: Spanish\n"
@@ -57,7 +57,7 @@ msgstr "Abrir la página de pedidos de una mesa"
 msgid "QR codes"
 msgstr "Códigos QR"
 
-#: models.py:11
+#: models.py:11 models.py:34
 msgid "table"
 msgstr "mesa"
 
@@ -77,10 +77,95 @@ msgstr "código de mesa"
 msgid "table codes"
 msgstr "códigos de mesa"
 
-#: queries.py:40
+#: models.py:29
+msgid "Pending"
+msgstr "Pendiente"
+
+#: models.py:30
+msgid "Accepted"
+msgstr "Aceptado"
+
+#: models.py:31
+msgid "Rejected"
+msgstr "Rechazado"
+
+#: models.py:35
+msgid "status"
+msgstr "estado"
+
+#: models.py:37
+msgid "total"
+msgstr "total"
+
+#: models.py:38
+msgid "sent at"
+msgstr "enviado el"
+
+#: models.py:41 models.py:49
+msgid "online order"
+msgstr "pedido online"
+
+#: models.py:42
+msgid "online orders"
+msgstr "pedidos online"
+
+#: models.py:50
+msgid "position"
+msgstr "posición"
+
+#: models.py:52
+msgid "dish"
+msgstr "plato"
+
+#: models.py:53
+msgid "set menu"
+msgstr "menú"
+
+#: models.py:54
+msgid "name"
+msgstr "nombre"
+
+#: models.py:55
+msgid "quantity"
+msgstr "cantidad"
+
+#: models.py:56
+msgid "unit price"
+msgstr "precio unitario"
+
+#: models.py:57
+msgid "notes"
+msgstr "notas"
+
+#: models.py:59
+msgid "choices"
+msgstr "elecciones"
+
+#: models.py:62
+msgid "online order line"
+msgstr "línea de pedido online"
+
+#: models.py:63
+msgid "online order lines"
+msgstr "líneas de pedido online"
+
+#: queries.py:41
 msgid "This QR is no longer active; ask the staff for help."
 msgstr "Este QR ya no está activo; pide ayuda al personal."
 
-#: queries.py:42
+#: queries.py:43
 msgid "This dish is not on the menu."
 msgstr "Este plato no está en la carta."
+
+#: services.py:77
+msgid ""
+"Too many orders in a row. Try again in a few minutes or ask the staff for "
+"help."
+msgstr ""
+"Demasiados pedidos seguidos. Inténtalo dentro de unos minutos o pide ayuda "
+"al personal."
+
+#: services.py:78
+msgid ""
+"This is no longer on the menu: take it out of your order and send it again."
+msgstr "Esto ya no está en la carta: quítalo de tu pedido y vuelve a enviarlo."

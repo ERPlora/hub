@@ -1105,6 +1105,7 @@
       "online_booking__settings__upload_logo": "Upload the booking page's logo",
       "online_order__public__menu": "Read a table's menu",
       "online_order__public__options": "Read the options of a dish of a table's menu",
+      "online_order__public__send": "Send the order of a table",
       "online_order__qr_code__list": "Look for the tables' QR codes",
       "payment__method__activate": "Turn on a payment method",
       "payment__method__create": "Create a payment method",
