@@ -254,18 +254,17 @@ def _load_what_waited(ctx: OperationContext, on: Iterable[str]) -> None:
 
 def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[str]) -> dict[str, str]:
     """Before a blueprint loads, turn on the apps its manifest lists (only those ``selected``, when the person chose
-    some) that are off here, each through ``base.app.enable``: its plan's limit, its rights, what it needs along and
-    its event, as if the person turned it on in Apps. Their roots first, chosen, so what they need comes along and
-    does not count against the limit (as a vertical's template, ``base.activation.template``); then any listed app
-    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load, or wait
-    for their tables (``creating``: ``_being_set_up``)."""
+    some) that are off here, each through ``base.app.enable``, as if the person turned it on in Apps: chosen, within
+    its plan's limit and its rights, with its event. What an app needs goes first, so each one is turned on by itself
+    and none of them is left as merely brought along by another, which would go off with it. What the load does not
+    turn on (on already, or left unselected) stays as it was. An app refused stays off and its reason is returned, by
+    app: the rest are turned on and load, or wait for their tables (``creating``: ``_being_set_up``)."""
     graph = activation.module_graph()
     wanted = _wanted(listed, selected, graph)
-    roots = activation.roots(set(wanted) | activation.needs(wanted, graph), graph)
     enable = get_operation("base.app.enable")
     blocked = entitlement.blocked_apps(ctx.scope)
     refused: dict[str, str] = {}
-    for app in [app for app in wanted if app in roots] + [app for app in wanted if app not in roots]:
+    for app in activation.in_requires_order(wanted, graph):
         if app not in blocked and activation.states_of(ctx.scope)[app].on:
             continue
         try:

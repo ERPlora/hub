@@ -470,14 +470,13 @@ def with_max_apps(slug, max_apps):
 def test_a_template_turns_on_its_apps_and_then_loads_them(born, load):
     assert modules_on() == set()
     apps = template_apps("restaurant")
-    roots = activation.roots(apps, activation.module_graph())
 
     loaded = load(born, template="restaurant.es")
 
     assert modules_on() == set(apps)
-    # Only its roots are chosen (what the plan's limit counts); what they need came along, as base.app.enable does.
-    assert chosen() == roots and len(roots) == 13
-    assert enabled_events() == sorted(roots)
+    # Each one is turned on as in Apps: chosen, with its own event.
+    assert chosen() == set(apps)
+    assert enabled_events() == sorted(apps)
     assert (loaded.status, loaded.rows) == ("complete", 34)
     assert total(born, "inventory.product.list") == 16
     assert total(born, "table.table.list") == 10
