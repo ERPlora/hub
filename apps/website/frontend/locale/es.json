@@ -153,11 +153,11 @@
     },
     "gallery": {
       "label": "Fotos de la galería",
-      "count": "{n} de {max} fotos",
+      "count": "{shown} de {count} foto | {shown} de {count} fotos",
       "empty": "Aún no hay fotos: añade la primera. Se muestran en este orden.",
       "photo": "Foto {n}",
       "add": "Añadir una foto",
-      "full": "La galería está completa ({max} fotos): quita una para añadir otra.",
+      "full": "La galería está completa ({count} foto): quita una para añadir otra. | La galería está completa ({count} fotos): quita una para añadir otra.",
       "up": "Subir",
       "down": "Bajar"
     },
