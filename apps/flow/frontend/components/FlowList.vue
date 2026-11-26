@@ -1,14 +1,16 @@
 <script setup lang="ts">
 // «Your automations» (WORKBOOK FLOW-F02, F03, F06, F07; `flow.flow.list`, live): the business's
 // automations in the Hub's server-side DataTable. Each row says its name and when it starts in words,
-// how its last run ended, and Active/Paused with its switch (saved at once). Search, «Showing»,
-// «Starts with» and «Order» (the old screen's three) query the server again, with the count «Showing
-// N of M». Several chosen are turned on or paused, one after another. A row is copied (paused, with no
-// permission) or deleted (asked first); tapping it opens the editor. A refusal is said above the list.
+// how its last run ended, and Active/Paused with its switch (saved at once). Search, «Order», and
+// «Showing» and «Starts with» behind the table's filters button query the server again, with the count
+// «Showing N of M». Several chosen are turned on or paused, one after another. A row is copied (paused,
+// with no permission) or deleted (asked first); tapping it opens the editor. A refusal is said above the list.
 import {
   DataTable,
   type DataTableAction,
   type DataTableColumn,
+  type DataTableFilterField,
+  type DataTableFilters,
   EmptyState,
   InlineFeedback,
   StatusPill,
@@ -32,20 +34,44 @@ const emit = defineEmits<{ open: [flow: FlowOut]; ready: [] }>();
 const phrasing = usePhrasing();
 const { confirm } = useConfirm();
 
-type StateFilter = '' | 'active' | 'paused';
 type Order = 'updated' | 'name';
 const table = useServerTable({ sort: '-updated_at' });
-const state = ref<StateFilter>('');
-const startsWith = ref<'' | TriggerKind>('');
+const filters = ref<DataTableFilters>({});
 const order = ref<Order>('updated');
-watch([state, startsWith], () => table.restart({ narrowed: !!state.value || !!startsWith.value }));
 watch(order, (now) => table.setSort(now === 'name' ? { sort: 'name', dir: 'asc' } : { sort: 'updated_at', dir: 'desc' }));
+
+function onFilters(now: DataTableFilters): void {
+  filters.value = now;
+  table.restart({ narrowed: Object.keys(now).length > 0 });
+}
+
+const TRIGGER_KINDS = { event: 'triggerEvent', schedule: 'triggerSchedule', at: 'triggerAt', manual: 'triggerManual' } as const;
+const filterFields = computed<DataTableFilterField[]>(() => {
+  const t = phrasing.value.t;
+  return [
+    {
+      key: 'state',
+      label: t('flow.list.filterState'),
+      type: 'select',
+      options: [
+        { value: 'active', label: t('flow.list.stateActive') },
+        { value: 'paused', label: t('flow.list.statePaused') },
+      ],
+    },
+    {
+      key: 'trigger_kind',
+      label: t('flow.list.filterTrigger'),
+      type: 'select',
+      options: Object.entries(TRIGGER_KINDS).map(([value, key]) => ({ value, label: t(`flow.list.${key}`) })),
+    },
+  ];
+});
 
 const query = computed<Omit<FlowListIn, 'limit' | 'offset'>>(() => ({
   ...table.query.value,
   sort: table.query.value.sort as FlowListIn['sort'],
-  ...(state.value ? { enabled: state.value === 'active' } : {}),
-  ...(startsWith.value ? { trigger_kind: startsWith.value } : {}),
+  ...(filters.value.state ? { enabled: filters.value.state === 'active' } : {}),
+  ...(filters.value.trigger_kind ? { trigger_kind: filters.value.trigger_kind as TriggerKind } : {}),
 }));
 const { data: result, status, error: listError, refresh } = useLiveList('flow.flow.list', () => query.value, () => table.windows.value);
 table.followResult(result);
@@ -109,8 +135,7 @@ async function onAction({ actionId, row }: { actionId: string; row: FlowOut }): 
 }
 
 function clearFilters(): void {
-  state.value = '';
-  startsWith.value = '';
+  onFilters({});
   table.search.value = '';
 }
 
@@ -140,6 +165,10 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
     <h2 class="flow-section">
       {{ $t('flow.list.heading') }}
     </h2>
+    <span
+      class="flow-list__count"
+      data-testid="flow-list-count"
+    >{{ $t('flow.list.count', { shown: result?.total ?? 0, total: allTotal }) }}</span>
     <InlineFeedback
       v-if="error"
       tone="danger"
@@ -153,9 +182,13 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
       testid="flow-list"
       server-side
       searchable
+      filterable
       selectable
       row-clickable
       row-key="id"
+      :column-picker="false"
+      :filters="filters"
+      :filter-fields="filterFields"
       :rows="result?.rows ?? []"
       :total="result?.total ?? 0"
       :page="table.page.value"
@@ -175,77 +208,23 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
       @row-click="emit('open', $event)"
       @action="onAction"
       @retry="refresh()"
+      @filters-change="onFilters"
     >
       <template #filters>
-        <div class="flow-list__filters">
-          <IonSelect
-            data-testid="flow-list-state"
-            :value="state"
-            :label="$t('flow.list.filterState')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            interface="popover"
-            @ion-change="state = $event.detail.value"
-          >
-            <IonSelectOption value="">
-              {{ $t('flow.list.stateAll') }}
-            </IonSelectOption>
-            <IonSelectOption value="active">
-              {{ $t('flow.list.stateActive') }}
-            </IonSelectOption>
-            <IonSelectOption value="paused">
-              {{ $t('flow.list.statePaused') }}
-            </IonSelectOption>
-          </IonSelect>
-          <IonSelect
-            data-testid="flow-list-trigger"
-            :value="startsWith"
-            :label="$t('flow.list.filterTrigger')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            interface="popover"
-            @ion-change="startsWith = $event.detail.value"
-          >
-            <IonSelectOption value="">
-              {{ $t('flow.list.triggerAny') }}
-            </IonSelectOption>
-            <IonSelectOption value="event">
-              {{ $t('flow.list.triggerEvent') }}
-            </IonSelectOption>
-            <IonSelectOption value="schedule">
-              {{ $t('flow.list.triggerSchedule') }}
-            </IonSelectOption>
-            <IonSelectOption value="at">
-              {{ $t('flow.list.triggerAt') }}
-            </IonSelectOption>
-            <IonSelectOption value="manual">
-              {{ $t('flow.list.triggerManual') }}
-            </IonSelectOption>
-          </IonSelect>
-          <IonSelect
-            data-testid="flow-list-sort"
-            :value="order"
-            :label="$t('flow.list.sortLabel')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            interface="popover"
-            @ion-change="order = $event.detail.value"
-          >
-            <IonSelectOption value="updated">
-              {{ $t('flow.list.sortUpdated') }}
-            </IonSelectOption>
-            <IonSelectOption value="name">
-              {{ $t('flow.list.sortName') }}
-            </IonSelectOption>
-          </IonSelect>
-          <span
-            class="flow-list__count"
-            data-testid="flow-list-count"
-          >{{ $t('flow.list.count', { shown: result?.total ?? 0, total: allTotal }) }}</span>
-        </div>
+        <IonSelect
+          data-testid="flow-list-sort"
+          :value="order"
+          :aria-label="$t('flow.list.sortLabel')"
+          interface="popover"
+          @ion-change="order = $event.detail.value"
+        >
+          <IonSelectOption value="updated">
+            {{ $t('flow.list.sortUpdated') }}
+          </IonSelectOption>
+          <IonSelectOption value="name">
+            {{ $t('flow.list.sortName') }}
+          </IonSelectOption>
+        </IonSelect>
       </template>
       <template #toolbar>
         <div
@@ -344,15 +323,6 @@ const tableError = computed(() => (status.value === 'error' && listError.value ?
   margin: 0.5rem 0 0;
   font-size: 1.05rem;
   font-weight: 600;
-}
-.flow-list__filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-.flow-list__filters ion-select {
-  min-width: 11rem;
 }
 .flow-list__count,
 .flow-list__when {
