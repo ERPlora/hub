@@ -71,7 +71,11 @@ const small = computed(() => {
   const chosen = table.value;
   const capacity = chosen ? seats.get(chosen.id) : undefined;
   if (!chosen || capacity === undefined || !partySize.value || partySize.value <= capacity) return '';
-  return t('reservation.form.smallTable', { table: chosen.label, capacity, party: partySize.value });
+  return t('reservation.form.smallTable', {
+    table: chosen.label,
+    seats: t('reservation.form.seats', { count: capacity }),
+    guests: t('reservation.form.guests', { count: partySize.value }),
+  });
 });
 
 function reset(): void {
@@ -124,6 +128,11 @@ watch(customer, async (picked) => {
   }
 });
 
+function tableHint(row: FreeTableOut): string {
+  const named = { seats: t('reservation.form.seats', { count: row.capacity }), zone: row.zone_name || t('reservation.form.noZone') };
+  return row.fits ? t('reservation.form.tableHint', named) : t('reservation.form.tableSmall', named);
+}
+
 async function searchTables(query: string): Promise<ComboOption[]> {
   if (!date.value || !time.value) return [];
   const answer = await client.api.call('reservation.availability.tables', {
@@ -139,10 +148,7 @@ async function searchTables(query: string): Promise<ComboOption[]> {
   return free.map((row: FreeTableOut) => ({
     id: row.id,
     label: row.label,
-    hint: t(row.fits ? 'reservation.form.tableHint' : 'reservation.form.tableSmall', {
-      capacity: row.capacity,
-      zone: row.zone_name || t('reservation.form.noZone'),
-    }),
+    hint: tableHint(row),
   }));
 }
 
