@@ -87,6 +87,9 @@ TO_CONFIRM_EVENTS = [
 BLOCKED_TIME_EVENTS = [BLOCKED_TIME_CREATED, BLOCKED_TIME_DELETED]
 RECURRING_EVENTS = [RECURRING_CREATED, RECURRING_UPDATED, RECURRING_DELETED, RECURRING_RESTORED]
 ALL = [*APPOINTMENT_EVENTS, *BLOCKED_TIME_EVENTS, *RECURRING_EVENTS, SETTINGS_UPDATED]
+#: Recorded only by the recovery from a separate copy, never by something done in the business: no automation starts on
+#: them.
+SYSTEM_ONLY = [APPOINTMENT_RESTORED, RECURRING_RESTORED]
 
 # Other apps' events (their WORKBOOKs fix the payloads).
 CUSTOMER_MERGED = "customer.customer.merged"

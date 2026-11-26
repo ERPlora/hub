@@ -44,6 +44,9 @@ ALL = [
     STOCK_THRESHOLD_CROSSED,
     CONFIG_UPDATED,
 ]
+#: Recorded only by the recovery from a separate copy, never by something done in the business: no automation starts on
+#: them.
+SYSTEM_ONLY = [PRODUCT_RESTORED]
 
 #: The amounts a product's events bring, in cents of the business's currency: an automation says them as money in
 #: what a person reads.
