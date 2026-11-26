@@ -1,6 +1,5 @@
 """The groups (MODIFIER-F01, F03): their list, one group, and the Inventory category a group applies to."""
 
-from django.db.models import Q
 from django.db.models.functions import Lower
 from live.context import OperationContext
 from live.operations import operation
@@ -10,6 +9,7 @@ from apps.modifier.schemas.fields import Page
 from apps.modifier.schemas.groups import GroupListIn, GroupOut, GroupRefIn
 from apps.modifier.schemas.links import CategoryRefIn, CategoryRefOut
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 from .reads import _page, find_group, group_row, groups_with_counts
 
@@ -48,11 +48,9 @@ _GROUP_ORDER = {
 def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     groups = groups_with_counts()
     if params.search:
-        groups = groups.filter(
-            Q(name__icontains=params.search) | Q(kitchen_name__icontains=params.search)
-        )
+        groups = groups.filter(contains_text(params.search, "name", "kitchen_name"))
     if params.name:
-        groups = groups.filter(name__icontains=params.name)
+        groups = groups.filter(contains_text(params.name, "name"))
     if params.required is not None:
         groups = (
             groups.filter(min_choices__gte=1)

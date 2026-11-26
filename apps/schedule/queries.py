@@ -36,6 +36,7 @@ from apps.schedule.schemas.special_days import SpecialDayListIn, SpecialDayOut, 
 from apps.schedule.schemas.week import WeekOut
 from base.business import business_zone, zone_name
 from base.ordering import list_order
+from base.text_search import contains_text
 from base.weekdays import weekday_name
 
 SPECIAL_DAY_NOT_FOUND = _("That special day does not exist in this business.")
@@ -213,7 +214,7 @@ def _by_text(rows: QuerySet[Any], field: str, text: str, label: Any) -> Any:
     """The row whose ``field`` is ``text`` (any case), else the one that contains it; 409 if several."""
     matches = list(
         rows.filter(**{f"{field}__iexact": text})[: MAX_CANDIDATES + 1]
-    ) or list(rows.filter(**{f"{field}__icontains": text})[: MAX_CANDIDATES + 1])
+    ) or list(rows.filter(contains_text(text, field))[: MAX_CANDIDATES + 1])
     if len(matches) > 1:
         names = ", ".join(str(match) for match in matches[:MAX_CANDIDATES])
         raise Conflict(
@@ -346,11 +347,9 @@ def get_week(ctx: OperationContext, data: NoParamsIn) -> dict:
 def list_special_days(ctx: OperationContext, params: SpecialDayListIn) -> dict:
     rows = special_days()
     if params.search:
-        rows = rows.filter(
-            Q(name__icontains=params.search) | Q(notes__icontains=params.search)
-        )
+        rows = rows.filter(contains_text(params.search, "name", "notes"))
     if params.name:
-        rows = rows.filter(name__icontains=params.name)
+        rows = rows.filter(contains_text(params.name, "name"))
     if params.date_from:
         rows = rows.filter(date__gte=params.date_from)
     if params.date_to:
@@ -392,9 +391,9 @@ def list_special_days(ctx: OperationContext, params: SpecialDayListIn) -> dict:
 def list_overrides(ctx: OperationContext, params: OverrideListIn) -> dict:
     rows = overrides()
     if params.search:
-        rows = rows.filter(reason__icontains=params.search)
+        rows = rows.filter(contains_text(params.search, "reason"))
     if params.reason:
-        rows = rows.filter(reason__icontains=params.reason)
+        rows = rows.filter(contains_text(params.reason, "reason"))
     for field, lookup in (
         ("start_from", "start_date__gte"),
         ("start_to", "start_date__lte"),

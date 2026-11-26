@@ -14,6 +14,7 @@ from base import access, approvals as approval_rules, blueprint, business
 from base.models.approvals import Approval
 from base.permissions import ADMINISTER_HUB, VIEW_HOME, access_for
 from base.schemas.approvals import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut
+from base.text_search import contains_text
 
 from .access import access_settings, pin_people
 from .people import face_name
@@ -119,8 +120,7 @@ def _approvals_kept(data: ApprovalExportIn, currency: str | None):
             if needle.lower() in approval_action(name, figures, currency).lower()
         ]
         rows = rows.filter(
-            Q(requested_by_name__icontains=needle)
-            | Q(approved_by_name__icontains=needle)
+            contains_text(needle, "requested_by_name", "approved_by_name")
             | Q(operation__in=named)
             | Q(id__in=figured)
         )

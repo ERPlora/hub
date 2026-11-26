@@ -12,6 +12,7 @@ from apps.whatsapp_inbox.queries.reads import page
 from apps.whatsapp_inbox.queries.reasons import template_reason
 from apps.whatsapp_inbox.queries.template_samples import sample_out
 from apps.whatsapp_inbox.schemas.templates import TemplateListIn, TemplateNamedOut, TemplatePage, TemplateRefIn
+from base.text_search import contains_text
 
 TEMPLATE_GONE = _("That template no longer exists.")
 
@@ -146,7 +147,7 @@ def template_out(row: Template) -> dict:
 def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
     rows = listed_templates(ctx.scope).select_related("header_sample")
     if params.search:
-        rows = rows.filter(name__icontains=params.search.strip())
+        rows = rows.filter(contains_text(params.search.strip(), "name"))
     for field in ("status", "category", "language"):
         value = getattr(params, field)
         if value:
