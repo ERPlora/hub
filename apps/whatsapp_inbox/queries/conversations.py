@@ -17,7 +17,7 @@ from apps.customer.queries.reads import business_country
 from apps.customer.queries.contact import holds, sees_contact
 from apps.customer.search import normalize
 from apps.whatsapp_inbox import clock
-from apps.whatsapp_inbox.models import Conversation, Message, name_key
+from apps.whatsapp_inbox.models.conversations import Conversation, Message, name_key
 from apps.whatsapp_inbox.queries.channel import channel, send_blocked
 from apps.whatsapp_inbox.queries.reads import actor_id, live_conversations, page, person_name
 from apps.whatsapp_inbox.schemas.conversations import (
