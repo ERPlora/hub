@@ -4,6 +4,7 @@
 // a card whose apps are missing is hidden and named below; a link can open one.
 import { describe, expect, it } from 'vitest';
 
+import { business } from '../../../../base/frontend/__tests__/business';
 import type { CatalogOut, FlowOut } from '../operations';
 import { click, mountFlow, settle } from '../__tests__/mount-flow';
 import FlowGallery from './FlowGallery.vue';
@@ -83,6 +84,29 @@ describe('Gallery', () => {
     const m = await setup({ catalog: catalog(ALL_EVENTS, ['customer.note.add']) });
     expect(m.wrapper.findAll('[data-testid^="flow-card-open-"]').map((el) => el.attributes('data-testid'))).toEqual(['flow-card-open-bigSaleNote']);
     expect(m.find('flow-gallery-hidden').text()).toBe('Some automations are hidden: they need Tasks.');
+  });
+
+  it("says the amounts in the business's money and the times on the clock of English", async () => {
+    const m = await mountFlow(FlowGallery, { props: { catalog: catalog(), flows: [], openCard: null }, business: business() });
+    await m.live();
+    expect(m.find('flow-card-open-bigSaleNote').text()).toContain('When a sale of €100.00 or more has a customer');
+    expect(m.find('flow-card-open-bigSaleTask').text()).toContain('When a sale over €100.00 is charged');
+    expect(m.find('flow-card-open-weekReview').text()).toContain('Every Friday at 6:00 PM');
+    expect(m.find('flow-card-open-morning').text()).toContain('Every day at 9:00 AM');
+    await click(m.find('flow-card-open-bigSaleNote').element);
+    const panel = m.find('flow-card-panel-bigSaleNote').text();
+    expect(panel).toContain("is €100.00 or more, it writes “Big sale” on the customer's card");
+    expect(panel).toContain('€100.00 is 10000: money is in cents.');
+    expect(panel).not.toMatch(/[«»]|100,00/);
+  });
+
+  it('says them in Spanish as Spanish writes them', async () => {
+    const m = await mountFlow(FlowGallery, { props: { catalog: catalog(), flows: [], openCard: null }, business: business(), locale: 'es' });
+    await m.live();
+    expect(m.find('flow-card-open-bigSaleNote').text()).toContain('Cuando una venta de 100,00 € o más tiene cliente');
+    expect(m.find('flow-card-open-weekReview').text()).toContain('Todos los viernes a las 18:00');
+    await click(m.find('flow-card-open-bigSaleNote').element);
+    expect(m.find('flow-card-panel-bigSaleNote').text()).toContain('es de 100,00 € o más, escribe «Venta grande» en la ficha del cliente');
   });
 
   it('a link opens its card; the guide button asks for the guide', async () => {
