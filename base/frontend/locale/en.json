@@ -345,7 +345,11 @@
         "complete": "Everything went in.",
         "partial": "Not everything went in.",
         "failed": "Nothing went in.",
-        "counts": "{created} created · {already} already there · {failed} failed",
+        "counts": {
+          "created": "{n} new row | {n} new rows",
+          "already": "{n} was already there | {n} were already there",
+          "failed": "{n} failed"
+        },
         "dropped": "Left out on purpose",
         "unfinished": "This is the report of your last import of {name} ({date}). Not everything went in.",
         "retry": "Retry what is missing",
