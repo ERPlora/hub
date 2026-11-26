@@ -19,7 +19,7 @@ from live.executor import Stream, Subscription, executor
 from live.operations import get as operation
 
 from apps.flow.tests.test_api import get, post
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from base.operations import HubContextBuilder
 from base.sensitive import VIEW_CUSTOMER_CONTACT
 from base.tenancy.context import current_alias
