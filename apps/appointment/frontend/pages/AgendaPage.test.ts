@@ -297,6 +297,10 @@ describe('AgendaPage', () => {
     expect(s.find('appointment-agenda-unassigned').text()).toContain('2 appointments have no professional');
     await s.result('appointment.agenda.lanes', { ...LANES, unassigned: 1 });
     expect(s.find('appointment-agenda-unassigned').text()).toContain('1 appointment has no professional: assign it by editing it');
+    // It speaks of the days on screen: the list of the bookings to confirm, of any day, does not carry it.
+    s.toolbar().vm.$emit('update:onlyToConfirm', true);
+    await settle();
+    expect(s.find('appointment-agenda-unassigned').exists()).toBe(false);
     const es = await mountAppointment(AgendaPage, { path: '/appointment/agenda', locale: 'es' });
     await es.live();
     await es.result('appointment.agenda.lanes', { ...LANES, unassigned: 1 });
