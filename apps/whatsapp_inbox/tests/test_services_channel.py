@@ -2,7 +2,8 @@
 and its templates, each business in its own database.
 """
 
-from apps.whatsapp_inbox.models import Channel, Template
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.templates import Template
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, connect, ctx_for, events, receive, run, system, template
 from base.tenancy.context import use_hub
 
