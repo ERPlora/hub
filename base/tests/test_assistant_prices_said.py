@@ -1,5 +1,5 @@
 """Nothing new is sold at 0 because nobody said its price: in every write the assistant calls, an amount named ``price``
-is one the person says (its tool requires it, so the assistant asks for it before the card when it was not said, and
+(or ``…_price``: the unit price of a line) is one the person says (its tool requires it, so the assistant asks for it before the card when it was not said, and
 free is said as 0) or one that, left out, keeps what there was (an edit). Never a figure the write takes in silence."""
 
 from live import assistant as shared
@@ -13,7 +13,7 @@ PRICE = "price"
 
 
 def silent_prices(op: Operation) -> list[str]:
-    """The amounts named ``price`` of ``op``'s input, at any depth, that a write takes as a figure when left out."""
+    """The prices of ``op``'s input (``price``, ``…_price``), at any depth, that a write takes as a figure when left out."""
     schema = shared.input_schema(op)
     found: list[str] = []
     _walk(schema, schema.get("$defs", {}), "", found)
@@ -26,7 +26,7 @@ def _walk(prop: dict, defs: dict, path: str, found: list[str]) -> None:
     for name, inner in prop.get("properties", {}).items():
         datum = shared.resolved(inner, defs)
         where = f"{path}{name}"
-        if name == PRICE and is_money(datum) and name not in required and datum.get("default") is not None:
+        if _is_price(name) and is_money(datum) and name not in required and datum.get("default") is not None:
             found.append(where)
         _walk(datum, defs, f"{where}.", found)
     items = prop.get("items")
@@ -34,6 +34,10 @@ def _walk(prop: dict, defs: dict, path: str, found: list[str]) -> None:
         _walk(items, defs, f"{path.rstrip('.')}[].", found)
     for option in (*prop.get("anyOf", ()), *prop.get("oneOf", ())):
         _walk(option, defs, path, found)
+
+
+def _is_price(name: str) -> bool:
+    return name == PRICE or name.endswith(f"_{PRICE}")
 
 
 def writes() -> list[Operation]:
@@ -52,7 +56,9 @@ class LineIn(Schema):
 class SilentIn(Schema):
     name: str
     price: int = Field(0, json_schema_extra={"money": True})
+    unit_price: int = Field(0, json_schema_extra={"money": True})
     lines: list[LineIn] = []
+    extras: list[LineIn] | None = None
 
 
 class SaidIn(Schema):
@@ -78,7 +84,7 @@ def a_write(input: type[Schema]) -> Operation:
 
 
 def test_the_check_finds_a_price_taken_in_silence_at_any_depth_and_lets_a_said_or_kept_one_pass():
-    assert silent_prices(a_write(SilentIn)) == ["price", "lines[].price"]
+    assert silent_prices(a_write(SilentIn)) == ["price", "unit_price", "lines[].price", "extras[].price"]
     assert silent_prices(a_write(SaidIn)) == []
     assert silent_prices(a_write(KeptIn)) == []
     assert any(op.name == "inventory.product.create" for op in writes())

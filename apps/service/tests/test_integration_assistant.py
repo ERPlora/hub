@@ -410,10 +410,17 @@ def cards(salon: dict, ctx: OperationContext | None, language: str = "es") -> di
     }
 
 
-def referred(shown: dict) -> dict:
-    """What each card of ``shown`` says of the records its write names (``NAMED``), by datum: the card of a new service
-    also says the duration it takes, which names no record."""
-    return {write: {name: value for name, value in values(card).items() if name in NAMED[write]} for write, card in shown.items()}
+#: What a card says that nobody sent and names no record: the duration a new service takes from the Settings.
+TAKEN = {("service.service.create", "duration_minutes")}
+
+
+def referred(shown: dict, said: str = "value") -> dict:
+    """What each card of ``shown`` says (``said``: the value or the label of each datum) but for ``TAKEN``: every other
+    datum has to be a record its write names (``NAMED``)."""
+    return {
+        write: {field["name"]: field[said] for field in card["fields"] if (write, field["name"]) not in TAKEN}
+        for write, card in shown.items()
+    }
 
 
 def named_as_the_screens(language: str = "es") -> dict:
@@ -638,8 +645,7 @@ def test_each_record_is_titled_as_the_screens_title_it(language, hub_a):
     field."""
     with use_hub(hub_a):
         shown = cards(a_salon(), person(hub_a, language=language), language)
-    labels = {write: {field["name"]: field["label"] for field in card["fields"] if field["name"] in NAMED[write]} for write, card in shown.items()}
-    assert labels == {
+    assert referred(shown, "label") == {
         write: {datum: TITLES[language][kind] for datum, kind in data.items()} for write, data in NAMED.items()
     }
 
