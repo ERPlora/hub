@@ -10,7 +10,7 @@ import TableMenu from '../components/TableMenu.vue';
 const route = useRoute();
 const door = openPublicDoor(useLiveClient().config, {
   slug: String(route.params.slug),
-  operations: ['online_order.public.menu', 'online_order.public.options'],
+  operations: ['online_order.public.menu', 'online_order.public.options', 'online_order.public.send'],
 });
 </script>
 

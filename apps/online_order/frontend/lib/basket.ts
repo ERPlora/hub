@@ -2,6 +2,9 @@
 // menu's prices as the page shows them; the order sends only ids, and the server prices it again.
 import type { SendLineIn } from '../operations';
 
+/** The most units of one line, as the server takes them. */
+export const MAX_QUANTITY = 20;
+
 /** An option of a dish, or a dish of a set menu, as picked: once per time it was picked. */
 export interface BasketPick {
   id: string;
