@@ -147,7 +147,10 @@ def _app_report(app: str, bundle: Bundle, chosen: set[str] | None, on: frozenset
 
 
 def _app_status(statuses: set[str]) -> str:
-    if not statuses or statuses == {ALREADY}:
+    # An app with nothing of it in the blueprint, or only empty parts, copied nothing: it was not there already.
+    if not statuses:
+        return EMPTY
+    if statuses == {ALREADY}:
         return ALREADY
     if statuses & {FAILED, PARTIAL}:
         return PARTIAL if statuses & {APPLIED, PARTIAL, ALREADY} else FAILED
@@ -160,6 +163,6 @@ def _overall(app_reports: list[dict], created: dict[str, list[str]]) -> str:
     statuses = {app["status"] for app in app_reports}
     if not statuses & {FAILED, PARTIAL, INACTIVE, UNKNOWN, WAITING}:
         return COMPLETE
-    if created or statuses & {APPLIED, ALREADY, WAITING}:
+    if created or statuses & {APPLIED, ALREADY, EMPTY, WAITING}:
         return PARTIAL
     return FAILED
