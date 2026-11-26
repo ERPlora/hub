@@ -523,7 +523,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 ## Para quien lo mantiene
 
 - Anatomía completa de una app: `apps.py`, `models.py`, `engine.py` (las reglas, sin base de datos),
-  `schemas/`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
+  `schemas/`, `queries.py`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero; las páginas en `frontend/`. `UI-REQUESTS.md` lista lo que se pide
   a `@erplora/ui`.
 - Modelos (UUIDv7, sin `hub_id`): `WeekDay` (un día de la semana, lunes = 0, cerrado o no; un día sin
@@ -534,7 +534,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 - **Borrado de verdad**, no lógico: un día especial borrado libera su fecha (la restricción única cuenta
   solo lo que existe).
 - Las reglas viven en `engine.py` (validar y ordenar tramos, precedencia, ¿abierto?, tramos de un día),
-  sin ORM: las usan `queries.py` y `services.py`, y Citas puede llamar a `schedule.hours.for_range`.
+  sin ORM: las usan `queries.py` y `services/`, y Citas puede llamar a `schedule.hours.for_range`.
 - **Dos cambios temporales no se pisan**: las escrituras de cambios temporales bloquean antes la fila de
   ajustes (`select_for_update`), así que dos altas a la vez se esperan y la segunda ve la primera. Un día
   especial repetido lo para la restricción única, traducida al mismo 409.

@@ -32,7 +32,7 @@ Personal); Citas y Reservas lo leen para no reservar con el negocio cerrado.
 | Usa de otras apps | nada; de la plataforma, la zona horaria (`base.business.business_zone`) |
 | La usan | Citas y Reservas (las dos la requieren): importan `hours_for_range` y `day_label` de `queries.py` (Reservas, también `get_week`) y re-ejecutan sus consultas vivas con sus avisos; la agenda de Citas sigue en vivo `schedule.hours.for_range`; Reservas online, a través de Citas |
 | Pantallas | `/schedule/hours`, `/schedule/special-days` (dos tablas: días especiales y cambios temporales) y `/schedule/settings` |
-| Operaciones | 8 consultas (`queries.py`) y 10 acciones (`services.py`), todas con `ai=`; 16 rutas en `/api/schedule/…` (sin ruta: `schedule.override.get` y `schedule.special_day.get`); 5 consultas abiertas a las API keys |
+| Operaciones | 8 consultas (`queries.py`) y 10 acciones (`services/`), todas con `ai=`; 16 rutas en `/api/schedule/…` (sin ruta: `schedule.override.get` y `schedule.special_day.get`); 5 consultas abiertas a las API keys |
 | Eventos | 8, `schedule.<entidad>.<hecho>` (`events.py`); no reacciona a ninguno |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial` y `0002_default_week` (planta la semana por defecto; su vuelta atrás solo la quita si sigue sin confirmar) |
@@ -52,8 +52,8 @@ pnpm e2e tests/e2e/schedule-flows.spec.ts tests/e2e/schedule-hours.spec.ts tests
 ```
 
 - `test_engine.py` prueba las reglas sin base de datos (precedencia, medianoche, cambio de hora);
-  `test_migrations.py`, la semana por defecto y que nunca pisa una semana tocada; `test_services.py`, las
-  carreras (dos días especiales o dos cambios temporales a la vez) con hilos.
+  `test_migrations.py`, la semana por defecto y que nunca pisa una semana tocada; `test_services_special_days.py` y
+  `test_services_writes.py`, las carreras (dos días especiales o dos cambios temporales a la vez) con hilos.
 - Lo que leen Citas y Reservas se prueba contra Horarios real en
   `apps/appointment/tests/test_integration_schedule.py` y `apps/reservation/tests/test_integration_schedule.py`.
 - `schedule-flows.spec.ts` recorre los flujos con pantalla en 390, 834 y 1440.
