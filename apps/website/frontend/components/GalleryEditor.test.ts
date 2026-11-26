@@ -94,7 +94,7 @@ describe('GalleryEditor', () => {
     const { wrapper } = await editor({ modelValue: twelve });
     expect(wrapper.findAllComponents(ImageUpload).some((component) => component.props('testid') === 'website-gallery-add')).toBe(false);
     expect(wrapper.get('[data-testid="website-gallery-count"]').element.textContent).toContain('12 of 12 photos');
-    expect(wrapper.get('[data-testid="website-gallery-full"]').element.textContent).toContain('The gallery is full');
+    expect(wrapper.get('[data-testid="website-gallery-full"]').element.textContent).toContain('The gallery is full (12 photos)');
   });
 
   it('shows the server’s refusal', async () => {
