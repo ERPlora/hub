@@ -49,8 +49,8 @@ const emit = defineEmits<{
 const t = useT();
 const locale = useLocale();
 
-/** 96 px an hour, 56 px a row: the old scheduler's proportions. */
-const PX_PER_MINUTE = 1.6;
+/** 240 px an hour, so half an hour holds a customer's name on one line; 56 px a row. */
+const PX_PER_MINUTE = 4;
 const LANE_HEIGHT = 56;
 const DRAG_THRESHOLD = 5;
 const TOUCH_HOLD_MS = 400;
@@ -367,7 +367,7 @@ const label = (row: AppointmentRow): string =>
         </div>
         <div
           class="day-grid__track"
-          :style="{ width: `${width}px` }"
+          :style="{ width: `${width}px`, backgroundSize: `${60 * PX_PER_MINUTE}px 100%` }"
         >
           <template v-if="canBook">
             <button
@@ -409,6 +409,7 @@ const label = (row: AppointmentRow): string =>
             data-testid="appointment-grid-appointment"
             :data-id="row.id"
             :aria-label="label(row)"
+            :title="label(row)"
             :style="blockStyle(row)"
             @pointerdown="onPointerDown($event, row)"
             @pointermove="onPointerMove"
@@ -503,7 +504,6 @@ const label = (row: AppointmentRow): string =>
   position: relative;
   flex: 0 0 auto;
   background-image: linear-gradient(to right, var(--ion-border-color, #e7e2d6) 1px, transparent 1px);
-  background-size: 96px 100%;
 }
 .day-grid__slot {
   position: absolute;
@@ -559,6 +559,11 @@ const label = (row: AppointmentRow): string =>
   white-space: nowrap;
   cursor: pointer;
   touch-action: pan-x pan-y;
+}
+/* One line each for the name and the services; what does not fit ends in «…», and the title says it all. */
+.day-grid__appointment > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .day-grid__appointment--movable {
   cursor: grab;

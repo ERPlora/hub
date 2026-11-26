@@ -20,8 +20,8 @@ const NIGHTS = [
     start: '01:30',
     minutes: 60,
     end: '2027-03-28T03:30:00+02:00',
-    left: 144, // 01:30 at 1.6 px a minute
-    width: 192, // two hours on the wall
+    left: 360, // 01:30 at 4 px a minute
+    width: 480, // two hours on the wall
   },
   {
     name: 'day-of-25-hours',
@@ -29,8 +29,8 @@ const NIGHTS = [
     start: '01:37',
     minutes: 90,
     end: '2027-10-31T02:07:00+01:00',
-    left: 155.2, // 01:37 at 1.6 px a minute
-    width: 48, // half an hour on the wall
+    left: 388, // 01:37 at 4 px a minute
+    width: 120, // half an hour on the wall
   },
 ] as const;
 

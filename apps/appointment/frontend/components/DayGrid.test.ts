@@ -92,11 +92,20 @@ describe('DayGrid', () => {
     expect(s.find('appointment-grid-kept').exists()).toBe(false);
   });
 
+  it('half an hour holds a customer’s name on one line, and the whole appointment is its title', async () => {
+    const s = await setup([row('a1', 's1', '10:00', 30, { customer_name: 'Lucía Gómez Santamaría', service_names: 'Corte de mujer' })]);
+    const block = s.block('a1');
+    expect(block.attributes('style')).toContain('width: 120px');
+    expect(block.attributes('title')).toBe('10:00 AM Lucía Gómez Santamaría — Corte de mujer');
+    expect(block.attributes('title')).toBe(block.attributes('aria-label'));
+    expect(s.wrapper.find('[data-testid="appointment-grid-hour"]').attributes('style')).toContain('width: 240px');
+  });
+
   it('places each appointment by its time and length, and paints the blocks', async () => {
     const s = await setup([row('a1', 's1', '10:30', 45, { customer_name: '' })]);
     const style = s.block('a1').attributes('style');
-    expect(style).toContain('left: 240px');
-    expect(style).toContain('width: 72px');
+    expect(style).toContain('left: 600px');
+    expect(style).toContain('width: 180px');
     expect(s.block('a1').text()).toContain('Deleted customer');
     expect(s.wrapper.findAll('[data-testid="appointment-grid-block"]')).toHaveLength(3);
   });
@@ -104,8 +113,8 @@ describe('DayGrid', () => {
   // hub#636: the axis is the business's wall clock, so the block ends at the wall time the appointment ends at. The
   // nights the clock changes that is not its start plus its length.
   it.each([
-    { name: 'an hour over the jump takes two on the wall', day: '2027-03-28', start: '2027-03-28T01:30:00+01:00', end: '2027-03-28T03:30:00+02:00', minutes: 60, left: 144, width: 192 },
-    { name: 'an hour and a half into the repeated hour takes half an hour', day: '2026-10-25', start: '2026-10-25T01:37:00+02:00', end: '2026-10-25T02:07:00+01:00', minutes: 90, left: 155.2, width: 48 },
+    { name: 'an hour over the jump takes two on the wall', day: '2027-03-28', start: '2027-03-28T01:30:00+01:00', end: '2027-03-28T03:30:00+02:00', minutes: 60, left: 360, width: 480 },
+    { name: 'an hour and a half into the repeated hour takes half an hour', day: '2026-10-25', start: '2026-10-25T01:37:00+02:00', end: '2026-10-25T02:07:00+01:00', minutes: 90, left: 388, width: 120 },
   ])('the nights the clock changes: $name', async ({ day, start, end, minutes, left, width }) => {
     const s = await setup([row('a1', 's1', '10:00', minutes, { start, end })], { day, startHour: 0, endHour: 6 });
     const style = s.block('a1').attributes('style');
@@ -121,8 +130,8 @@ describe('DayGrid', () => {
       ],
       { day: '2026-10-25', startHour: 0, endHour: 6 },
     );
-    expect(s.block('a1').attributes('style')).toContain('width: 96px');
-    expect(s.block('a2').attributes('style')).toContain('width: 48px');
+    expect(s.block('a1').attributes('style')).toContain('width: 240px');
+    expect(s.block('a2').attributes('style')).toContain('width: 120px');
   });
 
   it('an hour over the jump is seen in a window that opens after its start plus its length', async () => {
@@ -133,7 +142,7 @@ describe('DayGrid', () => {
     );
     const style = s.block('a1').attributes('style');
     expect(style).toContain('left: 0px');
-    expect(style).toContain('width: 48px');
+    expect(style).toContain('width: 120px');
   });
 
   it('two appointments the jump of the clock makes overlap on the wall take a track each', async () => {
@@ -152,12 +161,12 @@ describe('DayGrid', () => {
     const s = await setup(
       [row('a1', 's1', '10:00', 60, { start: '2026-10-19T19:30:00+02:00', end: '2026-10-19T20:30:00+02:00' })],
     );
-    expect(s.block('a1').attributes('style')).toContain('width: 48px');
+    expect(s.block('a1').attributes('style')).toContain('width: 120px');
     const overnight = await setup(
       [row('a2', 's1', '10:00', 60, { start: '2026-10-19T23:30:00+02:00', end: '2026-10-20T00:30:00+02:00' })],
       { startHour: 22, endHour: 24 },
     );
-    expect(overnight.block('a2').attributes('style')).toContain('width: 48px');
+    expect(overnight.block('a2').attributes('style')).toContain('width: 120px');
   });
 
   // A row's name never ends cut with no way to read it: it wraps to a second line and says
@@ -214,12 +223,12 @@ describe('DayGrid', () => {
     const slot = (s: Awaited<ReturnType<typeof setup>>, time: string) => s.wrapper.find(`[data-testid="appointment-grid-slot"][data-lane="s1"][data-time="${time}"]`);
 
     const open = await setup([], { hours: hours() });
-    // 08:00–09:00, 14:00–16:00 and 19:00–20:00 of the 08:00–20:00 window, at 1.6 px a minute.
-    expect(closed(open)).toEqual(['left: 0px; width: 96px;', 'left: 576px; width: 192px;', 'left: 1056px; width: 96px;']);
+    // 08:00–09:00, 14:00–16:00 and 19:00–20:00 of the 08:00–20:00 window, at 4 px a minute.
+    expect(closed(open)).toEqual(['left: 0px; width: 240px;', 'left: 1440px; width: 480px;', 'left: 2640px; width: 240px;']);
     expect(['08:30', '09:00', '14:30', '16:00', '19:00'].map((time) => slot(open, time).exists())).toEqual([false, true, false, true, false]);
 
     const shut = await setup([], { hours: hours({ is_closed: true, spans: [] }) });
-    expect(closed(shut)).toEqual(['left: 0px; width: 1152px;']);
+    expect(closed(shut)).toEqual(['left: 0px; width: 2880px;']);
     expect(shut.wrapper.findAll('[data-testid="appointment-grid-slot"]')).toHaveLength(0);
 
     // No rule of hours at all: nothing is shaded (the business never refuses on hours).
@@ -240,8 +249,8 @@ describe('DayGrid', () => {
     const s = await setup([item]);
     const el = s.block('a1').element;
     await s.pointer(el, 'pointerdown', 100, 100);
-    await s.pointer(el, 'pointermove', 196, 156); // one hour right, one row down
-    await s.pointer(el, 'pointerup', 196, 156);
+    await s.pointer(el, 'pointermove', 340, 156); // one hour right, one row down
+    await s.pointer(el, 'pointerup', 340, 156);
     expect(s.wrapper.emitted('move')).toEqual([[{ row: item, staffId: 's2', time: '11:00' }]]);
     await click(el);
     expect(s.wrapper.emitted('open')).toBeUndefined();
@@ -251,12 +260,12 @@ describe('DayGrid', () => {
     const s = await setup([row('a1', 's1', '10:00')]);
     const el = s.block('a1').element;
     await s.pointer(el, 'pointerdown', 100, 100, 'touch');
-    await s.pointer(el, 'pointermove', 196, 100, 'touch');
-    await s.pointer(el, 'pointerup', 196, 100, 'touch');
+    await s.pointer(el, 'pointermove', 340, 100, 'touch');
+    await s.pointer(el, 'pointerup', 340, 100, 'touch');
     expect(s.wrapper.emitted('move')).toBeUndefined();
     await s.pointer(el, 'pointerdown', 100, 100);
-    await s.pointer(el, 'pointermove', -300, 100);
-    await s.pointer(el, 'pointerup', -300, 100);
+    await s.pointer(el, 'pointermove', -900, 100);
+    await s.pointer(el, 'pointerup', -900, 100);
     expect(s.wrapper.emitted('move')).toBeUndefined();
   });
 
@@ -264,8 +273,8 @@ describe('DayGrid', () => {
     const s = await setup([row('a1', 's1', '10:00', 30, { status: 'completed' })], { canBook: false });
     const el = s.block('a1').element;
     await s.pointer(el, 'pointerdown', 100, 100);
-    await s.pointer(el, 'pointermove', 196, 100);
-    await s.pointer(el, 'pointerup', 196, 100);
+    await s.pointer(el, 'pointermove', 340, 100);
+    await s.pointer(el, 'pointerup', 340, 100);
     expect(s.wrapper.emitted('move')).toBeUndefined();
     expect(s.wrapper.findAll('[data-testid="appointment-grid-slot"]')).toHaveLength(0);
   });
