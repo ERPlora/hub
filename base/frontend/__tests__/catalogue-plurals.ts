@@ -18,11 +18,14 @@ export function pluralsInParentheses(...catalogues: ReadonlyMap<string, string>[
 /** A placeholder and the word right after it: «{used} usadas», «{n} filas», «{name} pasa». */
 const PLACEHOLDER_AND_WORD = /\{\w+\}\s+(\p{L}{3,})/gu;
 
+/** Words that end in «s» and are never a plural, so they follow an amount or a name too: «{amount} más». */
+const NEVER_PLURAL = new Set(['más', 'menos', 'antes', 'después', 'además', 'tras', 'mientras', 'pues', 'gratis']);
+
 /** Whether the Spanish `message` says a plural word right after a placeholder, so the figure in it counts something.
  *  Spanish is read because a noun or an adjective a figure counts ends in «s» in the plural, and a verb after a name
  *  does not («{name} pasa»), as it does in English («{name} has»). */
 function countsSomething(message: string): boolean {
-  return [...message.matchAll(PLACEHOLDER_AND_WORD)].some(([, word]) => word.endsWith('s'));
+  return [...message.matchAll(PLACEHOLDER_AND_WORD)].some(([, word]) => word.endsWith('s') && !NEVER_PLURAL.has(word.toLowerCase()));
 }
 
 /** Every message of an app's catalogues (`EN`, `ES`, key → message) that counts something with a figure and lacks
