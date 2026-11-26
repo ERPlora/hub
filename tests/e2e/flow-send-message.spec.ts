@@ -309,7 +309,7 @@ test('flow-send-message: the day a notice is expected to name reads as the Hub w
   const dates = [...week, ...months];
   const code = [
     'import datetime as dt, json',
-    'from apps.schedule.queries import day_label',
+    'from apps.schedule.queries.outputs import day_label',
     `print(json.dumps([day_label(dt.date.fromisoformat(d), "es") for d in ${JSON.stringify(dates)}]))`,
   ].join('\n');
   const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
