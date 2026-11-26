@@ -1,11 +1,13 @@
 // flow: PRINTING-F03, PRINTING-F18 — hub#1470: in Printing a refused field loses its mark as soon as it is corrected,
 // without saving again, and only its own. «New printer» is refused for its name, address and port with the same words;
 // «Print from this device» for its name and its printers, and ticking another printer takes the printers' notice
-// alone. At 390, 834 and 1440, and once more in Spanish. Saves are refused in the browser, so nothing is created.
+// alone. At 390, 834 and 1440, and once more in Spanish; the device window as the installed app opens it, the only
+// place it is offered. Saves are refused in the browser, so nothing is created.
 import { expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, psql, shown } from './helpers';
 import { dialog } from './inventory-helpers';
+import { asTheApp } from './printing-helpers';
 import { stamp } from './sale-helpers';
 import {
   expectMarked,
@@ -64,6 +66,8 @@ test.describe('Print from this device', () => {
 
   async function nameAndPrintersOneByOne(page: Page, language: Language, label: string): Promise<void> {
     const words = SAME_WORDS[language];
+    await asTheApp(page.context());
+    await page.reload();
     await shown(page).locator('[data-testid=printing-devices-add]').click();
     const modal = dialog(page, 'printing-device');
     const name = modal.locator('[data-testid=printing-device-name]');
