@@ -508,7 +508,8 @@ Pasos:
 Entra: el menú y la imagen elegida o la foto subida.
 Sale: el menú con su foto (avisa: menú cambiado); el TPV la enseña en su baldosa sin recargar
 (INVENTORY-F32), y la lista de menús, en su fila. La foto propia se guarda en la carpeta del negocio,
-la ven solo las personas del negocio y cuenta en el espacio de su plan; subir otra, elegir una de la
+la ve cualquiera, porque la carta de una mesa la enseña al cliente que escanea su QR (ONLINE_ORDER-F03), y cuenta en
+el espacio de su plan; subir otra, elegir una de la
 librería, «Quitar foto» o retirar el menú (COMBO-F04) la borra.
 Si falla: junto a «Foto», al elegirla, y no se sube nada: «La
 foto pesa más de 2 MB. Elige una más ligera.» y «Ese archivo no es una foto. Sube una imagen JPG, PNG o
@@ -679,8 +680,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   `kitchen_name`, `price` (céntimos), `supply_kind`, `sort_order`, `image` e `image_url` (su foto, COMBO-F14) y
   `groups[]` (`id`, `name`,
   `min_choices`, `max_choices` —0 sin límite—, `allow_repeat`, `options[]` con `id`, `product_id`,
-  `product_name`, `sku`, `price_delta`). Solo menús a la venta que se pueden completar y elecciones
-  disponibles.
+  `product_name`, `sku`, `price_delta` y `allergens`, los del plato en Inventario). Solo menús a la venta que se
+  pueden completar y elecciones disponibles. La carta de la mesa de Pedidos online lee de aquí los alérgenos de los
+  platos de un menú.
 - **Al pedir y al cobrar**: `combo.combo.resolve` con `{id | combo, choices: [{option_id |
   product (+ group), quantity}], amount?, channel?}`; `channel` (`dine_in`, `takeaway`, `delivery`)
   decide «en el local» o «para llevar», y sin él vale el ajuste del menú. Devuelve `combo_id`, `name`, `kitchen_name`,
