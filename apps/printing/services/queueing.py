@@ -200,8 +200,9 @@ def _copies(data: JobCreateIn, settings) -> int:
             ),
         },
         "description": "Print a test page on a printer, named by its name or id («test the kitchen printer»): the device "
-        "next to it prints the sheet with the printer's address and the time, or an A4 page on the system printer. With "
-        "waits_for_device, nothing has come out yet: say the page waits in that printer's queue, never that it printed.",
+        "next to it prints the sheet with the printer's address and the time, or an A4 page on the system printer. When "
+        "the answer says no device that prints that printer is on now, nothing has come out yet: say the page stays in "
+        "that printer's queue and prints once a device set up in Printing › Devices prints it, never that it printed.",
         "risk": "normal",
     },
 )
