@@ -47,3 +47,13 @@ def test_every_screen_of_the_platform_the_person_may_open_may_be_linked(permissi
     may_open = {tab.path for tab in SCREENS if ":" not in tab.path and asking.has(tab.permission)}
 
     assert may_open - set(linked(permissions, "es")) == set()
+
+
+@pytest.mark.parametrize("role", [Membership.Role.MANAGER, Membership.Role.EMPLOYEE, Membership.Role.ACCOUNTANT])
+def test_no_tab_of_the_platform_is_linked_to_who_may_not_open_it(role):
+    permissions = permissions_of_role(role)
+    asking = ctx(permissions)
+    closed = {tab.path for tab in SCREENS if not asking.has(tab.permission)}
+
+    assert {"/employees#apikeys", "/employees#approvals", "/settings#data", "/system#usage"} <= closed
+    assert closed & set(linked(permissions, "es")) == set()
