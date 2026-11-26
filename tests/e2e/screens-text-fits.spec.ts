@@ -5,7 +5,7 @@
 // already known is in text-fits-known.ts with its issue; anything else fails, with a screenshot of where it showed.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, settled, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
+import { A, capture, settled, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { journeyApps, registeredRoutes, screensAmong } from './journey-screens';
 import { cutTexts } from './text-cut';
 import { KNOWN_SITES } from './text-fits-known';
@@ -38,7 +38,7 @@ interface Seen {
 
 const addressOf = (screen: string): string => (screen === '/appointment/agenda' ? `${screen}?date=${BOOKED_DAY}` : screen);
 const known = (seen: Seen): boolean => KNOWN_SITES.some((site) => site.box === seen.box && site.screens.includes(seen.screen));
-const shown = (seen: Seen): string => `${seen.screen} · ${seen.size} · ${seen.kind} · ${seen.box} «${seen.text}»`;
+const described = (seen: Seen): string => `${seen.screen} · ${seen.size} · ${seen.kind} · ${seen.box} «${seen.text}»`;
 const snapName = (seen: Seen): string => `text-fits-${seen.screen.replace(/[^a-z0-9]+/gi, '-')}-${seen.size}`;
 
 /** The texts cut on the screen on view at each size, a screenshot of each size that cuts one it does not know. */
@@ -47,6 +47,8 @@ async function measured(page: Page, screen: string): Promise<Seen[]> {
   for (const size of SIZES) {
     await page.setViewportSize(size);
     await settled(page);
+    // A page Ionic is still bringing in is painted at opacity 0: measured then, it would show nothing to cut.
+    await expect(shown(page), `${screen} at ${size.label} on view`).not.toHaveClass(/ion-page-invisible/, { timeout: 20_000 });
     await expect(page.locator(LOADING), `${screen} at ${size.label} still loading`).toHaveCount(0, { timeout: 20_000 });
     await settled(page);
     const cuts = (await cutTexts(page)).map((cut) => ({ screen, size: size.label, ...cut }));
@@ -87,7 +89,7 @@ test('every screen of the salon and restaurant journeys reads its texts whole, i
     await page.goto(addressOf(screen));
     seen.push(...(await measured(page, screen)));
   }
-  expect(seen.filter((cut) => !known(cut)).map(shown), 'texts cut where no site is known').toEqual([]);
+  expect(seen.filter((cut) => !known(cut)).map(described), 'texts cut where no site is known').toEqual([]);
   const stale = KNOWN_SITES.filter((site) => !seen.some((cut) => cut.box === site.box && site.screens.includes(cut.screen)));
   expect(stale, 'known sites that no longer cut: take them out of text-fits-known.ts').toEqual([]);
 });
