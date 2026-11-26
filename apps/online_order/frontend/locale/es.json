@@ -44,6 +44,28 @@
       "scan": "Escanea para pedir",
       "table": "Mesa {number}",
       "alt": "Código QR de la mesa {table}"
+    },
+    "menu": {
+      "title": "Carta",
+      "loading": "Cargando la carta…",
+      "loadError": "No se ha podido cargar la carta.",
+      "retry": "Reintentar",
+      "notActive": "Este QR ya no está activo",
+      "notActiveMessage": "Pide ayuda al personal.",
+      "empty": "Aún no hay platos en la carta",
+      "emptyMessage": "Pregunta al personal qué puedes pedir.",
+      "menus": "Menús",
+      "moreDishes": "Otros platos",
+      "photo": "Foto de {name}",
+      "loadingOptions": "Cargando sus suplementos…",
+      "optionsError": "No se han podido cargar sus suplementos.",
+      "rule": {
+        "optional": "Opcional",
+        "optionalUpTo": "Opcional · hasta {max}",
+        "exactly": "Elige {min}",
+        "between": "Elige de {min} a {max}",
+        "atLeast": "Elige al menos {min}"
+      }
     }
   }
 }
