@@ -150,9 +150,11 @@ def _owns(ctx: OperationContext, record: Record) -> bool:
 def visible_record(ctx: OperationContext, record_id: UUID) -> Record:
     """A day the caller may see (their own, or any for whoever sees the team or corrects); ``NotFound`` otherwise."""
     record = annotated(Record.objects.filter(pk=record_id)).first()
-    if record is None or not (_reads_any(ctx, READS_ANY_DAY) or _owns(ctx, record)):
-        raise NotFound(str(RECORD_NOT_FOUND))
-    return record
+    if record is not None and (_reads_any(ctx, READS_ANY_DAY) or _owns(ctx, record)):
+        return record
+    if record is not None:
+        only_theirs()
+    raise NotFound(str(RECORD_NOT_FOUND))
 
 
 def _kept_to_own(ctx: OperationContext, records: QuerySet, own: Q | None, *, mine: bool) -> QuerySet:

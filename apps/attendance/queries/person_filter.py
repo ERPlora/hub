@@ -9,6 +9,7 @@ from live.operations import operation
 from apps.attendance.models import Record
 from apps.attendance.schemas import PersonListIn, PersonOut, PersonPage, PersonRefIn
 from apps.staff.models import Member
+from base.only_theirs import only_theirs
 
 from .people import MEMBER_NOT_FOUND, actor_user, member_name_expression, person_out
 from .reads import READS_ANY_PERSON, VIEW_ALL, _page, _reads_any
@@ -83,6 +84,7 @@ def list_people(ctx: OperationContext, params: PersonListIn) -> dict:
 def person_detail(ctx: OperationContext, params: PersonRefIn) -> dict:
     people = listed_people().filter(pk=params.id)
     if not _reads_any(ctx, READS_ANY_PERSON):
+        only_theirs()
         user = actor_user(ctx)
         people = people.filter(user_id=user.pk) if user is not None else people.none()
     member = people.first()

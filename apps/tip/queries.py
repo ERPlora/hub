@@ -171,6 +171,7 @@ def find_tip(ref: TipRefIn, *, lock: bool = False) -> Tip:
 def get_tip(ctx: OperationContext, params: TipRefIn) -> dict:
     tip = find_tip(params)
     if not ctx.has("tip.manage") and (tip.member_id is None or tip.member_id != own_member_id(ctx)):
+        only_theirs()
         raise NotFound(str(TIP_NOT_FOUND), code="tip.tip_not_found")
     return tip_row(tip)
 

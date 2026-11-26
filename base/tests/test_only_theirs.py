@@ -10,7 +10,7 @@ import json
 
 import pytest
 from live.context import OperationContext
-from live.errors import NotFound
+from live.errors import NotFound, PermissionDenied
 from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import Operation, get
 from ninja import Schema
@@ -76,6 +76,11 @@ def not_theirs(ctx, data):
     raise NotFound("That item does not exist in this business.")
 
 
+def refused(ctx, data):
+    only_theirs()
+    raise PermissionDenied("You may not read the items.")
+
+
 def told(op: Operation) -> dict:
     return json.loads(assistant.tools.run(ctx_for("hub_employee"), op, "{}").content)
 
@@ -90,6 +95,12 @@ def test_a_read_kept_to_the_callers_own_says_so_when_it_finds_nothing_of_theirs(
     answer = told(operation(not_theirs))
     assert answer[ONLY_THEIRS]
     assert answer["error"]["code"] == "not_found"
+
+
+def test_a_read_the_person_is_refused_says_only_that():
+    answer = told(operation(refused))
+    assert answer["error"]["code"] == "permission_denied"
+    assert ONLY_THEIRS not in answer
 
 
 def test_a_read_of_everyones_says_nothing_of_the_kind():
