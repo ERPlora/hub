@@ -3,11 +3,17 @@ the booking tools of the market fill in the guest's profile from her phone; with
 it is for is missing and makes no card. A guest who books herself (online, WhatsApp) is still booked under her phone."""
 
 import pytest
-from live.errors import InvalidPayload, NotFound
+from live.context import OperationContext
+from live.errors import InvalidPayload, NotFound, PermissionDenied
+from live.live_registry import live_registry
+from live.ninja import operation_ids
+from live.operations import get
 
 from apps.customer.models import Customer
 from apps.reservation.models import Reservation
 from base.sensitive import VIEW_CUSTOMER_CONTACT
+from base.tenancy.tests.business import A
+from config.api import api
 
 from .conftest import HUB_DB, book, ctx_for, make_customer, open_week, run
 
@@ -80,3 +86,15 @@ def test_the_check_before_the_card_finds_the_customer_said_by_her_phone_or_refus
 def test_the_check_before_the_card_lets_a_named_guest_through_without_reading_a_card():
     answer = run(CHECK, {"guest_name": "Ana", "date": "2026-10-15", "time": "14:00", "party_size": 4}, employee())
     assert answer.id is None
+
+
+def test_the_check_is_only_on_the_card_and_only_for_who_may_take_reservations():
+    """It says whose card a phone is: no route of the API and no live query serve it, and run as someone who may
+    only read the book it refuses."""
+    assert CHECK not in operation_ids(api)
+    assert not live_registry.is_subscribable(CHECK)
+    make_customer("Lucía Gómez", phone="+34600111222")
+    reader = OperationContext(scope=A, actor="leo", permissions=frozenset({"reservation.view_reservation"}))
+    op = get(CHECK)
+    with pytest.raises(PermissionDenied):
+        op(reader, op.input.model_validate({**BY_PHONE, "date": "2026-10-15", "time": "14:00", "party_size": 4}))
