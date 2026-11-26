@@ -26,7 +26,7 @@ from apps.flow import gateway as flow_gateway
 from apps.flow import http, services
 from apps.flow.models import Flow, FlowRun
 from apps.task.models import Task
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models.conversations import Message
 from apps.whatsapp_inbox.tests.conftest import inbound, system
 from base import hub_visits, outbound
 from base.tenancy.context import use_control, use_hub

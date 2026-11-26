@@ -5,7 +5,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.schedule import events
-from apps.schedule.queries import settings_out
+from apps.schedule.queries.outputs import settings_out
 from apps.schedule.schemas.settings import SettingsIn, SettingsOut
 
 from .writes import _locked_settings

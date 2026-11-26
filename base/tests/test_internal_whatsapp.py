@@ -22,7 +22,8 @@ from live.errors import OperationError
 from live.models import OutboxEvent
 from live.operations import get as get_operation
 
-from apps.whatsapp_inbox.models import Channel, Message
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.conversations import Message
 from base import activation, apps_on, internal, internal_whatsapp
 from base.models.activation import AppActivation
 from base.models import Hub
