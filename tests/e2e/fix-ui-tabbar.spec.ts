@@ -13,7 +13,7 @@ import { type Browser, type BrowserContext, type Page, expect, test } from '@pla
 
 import { A, login, record, shot, shown, topbarApps } from './helpers';
 
-/** 360: the most common Android width, the one the 64px floor of the tabs is sized for. */
+/** 360: the most common Android width, the one the 56px floor of the tabs is sized for. */
 const PHONES = [
   { label: '360', width: 360, height: 740 },
   { label: '375', width: 375, height: 667 },
