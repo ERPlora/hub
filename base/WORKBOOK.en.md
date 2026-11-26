@@ -1342,7 +1342,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:94ff4453084e -->
+<!-- from WORKBOOK.md sha256:4cd064b7d3a3 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1362,7 +1362,9 @@ In: the name, the language, what it is for and what is ticked.
 Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows: of Inventory, the categories
 and the products, and of Services, the categories and the services, with their own photos inside (INVENTORY-F33); of
 Tables, the zones and the tables; of Modifiers, the groups, each with its options and the products (by their code) and
-categories it applies to; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
+categories it applies to; of Menus and combos, the menus, each with its closed price, its courses, the products to
+choose in each course (by their code) with their supplement, and its own photo inside; and, only in a backup, the
+customers. Never the sales, people, PINs nor fiscal data. Loaded
 into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
 the business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
