@@ -3,7 +3,7 @@
 from live.context import OperationContext
 from live.operations import INTERNAL, operation
 
-from apps.whatsapp_inbox.models import Channel
+from apps.whatsapp_inbox.models.channel import Channel
 from apps.whatsapp_inbox.queries.channel import channel
 from apps.whatsapp_inbox.schemas.health import ChannelHealthIn, ChannelHealthOut
 
