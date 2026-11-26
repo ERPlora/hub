@@ -34,6 +34,14 @@ def test_what_the_write_refuses_is_shown_as_sent():
 
 
 @HUB_DB
+def test_a_datum_is_taken_by_the_rules_of_its_field():
+    """The write takes each datum by its field's own rules, and the card says it so: the code of a series written «a»
+    is saved, and said, «A»."""
+    card = assistant.cards.card(get("invoice.series.create"), {"code": "a"}, "es")
+    assert shown(card, "code")["value"] == "A"
+
+
+@HUB_DB
 def test_an_amount_inside_a_line_sent_as_a_text_is_money_too():
     """The same inside a list of lines: the card writes each amount as one on top."""
     lines = [{"description": "Menú de cumpleaños", "quantity": "1", "unit_price": "68182", "tax_rate": "10"}]
