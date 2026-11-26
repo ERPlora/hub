@@ -44,6 +44,28 @@
       "scan": "Scan to order",
       "table": "Table {number}",
       "alt": "QR code of table {table}"
+    },
+    "menu": {
+      "title": "Menu",
+      "loading": "Loading the menu…",
+      "loadError": "The menu could not be loaded.",
+      "retry": "Retry",
+      "notActive": "This QR is no longer active",
+      "notActiveMessage": "Ask the staff for help.",
+      "empty": "No dishes on the menu yet",
+      "emptyMessage": "Ask the staff what you can order.",
+      "menus": "Menus",
+      "moreDishes": "More dishes",
+      "photo": "Photo of {name}",
+      "loadingOptions": "Loading its options…",
+      "optionsError": "Its options could not be loaded.",
+      "rule": {
+        "optional": "Optional",
+        "optionalUpTo": "Optional · up to {max}",
+        "exactly": "Choose {min}",
+        "between": "Choose {min} to {max}",
+        "atLeast": "Choose at least {min}"
+      }
     }
   }
 }

@@ -513,7 +513,7 @@ on its own; meanwhile, they stay marked and nobody sells them.
 Involved: INVENTORY-F04, INVENTORY-F34, COMBO-F06, COMBO-F15
 
 ### COMBO-F14 The menu's photo
-<!-- from WORKBOOK.md sha256:c04e4e6ef01b -->
+<!-- from WORKBOOK.md sha256:7b8055380345 -->
 Status: done
 Actor: owner, administrator, manager, assistant
 Screen: Menus
@@ -528,7 +528,8 @@ Steps:
 In: the menu and the image chosen or the photo uploaded.
 Out: the menu with its photo (announces: menu changed); the till shows it on its tile without
 reloading (INVENTORY-F32), and the list of menus, in its row. The photo of its own is kept in the
-business's folder, only the business's people see it and it counts against its plan's space; uploading
+business's folder, anyone sees it, because a table's menu shows it to the customer who scans its QR
+(ONLINE_ORDER-F03), and it counts against its plan's space; uploading
 another one, choosing one of the library, "Remove photo" or withdrawing the menu (COMBO-F04) deletes it.
 If it fails: next to "Photo", on choosing it, and nothing is
 uploaded: "The photo weighs more than 2 MB. Choose a lighter one." and "That file is not a photo. Upload
@@ -699,7 +700,7 @@ To a recovered product it does not react: its choices come back from the copy (F
 | Platform | The recovery from a separate copy (BASE-F114), to which Menus says which menus, courses and choices it gives back | F15 | what its app module declares (recoverable_from_copy) |
 
 ### Contract with Sales
-<!-- from WORKBOOK.md sha256:50ecf0906376 -->
+<!-- from WORKBOOK.md sha256:0a498b784ac8 -->
 
 Sales does not require Menus: it calls it by the operation's name (`call_app`), with the session of
 whoever sells, and if Menus is not active the till offers no menus.
@@ -708,8 +709,9 @@ whoever sells, and if Menus is not active the till offers no menus.
   `kitchen_name`, `price` (cents), `supply_kind`, `sort_order`, `image` and `image_url` (its photo, COMBO-F14) and
   `groups[]` (`id`, `name`,
   `min_choices`, `max_choices` —0 no limit—, `allow_repeat`, `options[]` with `id`, `product_id`,
-  `product_name`, `sku`, `price_delta`). Only menus on sale that can be completed and available
-  choices.
+  `product_name`, `sku`, `price_delta` and `allergens`, those of the dish in Inventory). Only menus on sale that can
+  be completed and available choices. The table's menu of Online orders reads the allergens of a menu's dishes from
+  here.
 - **When ordering and when charging**: `combo.combo.resolve` with `{id | combo, choices: [{option_id |
   product (+ group), quantity}], amount?, channel?}`; `channel` (`dine_in`, `takeaway`, `delivery`)
   decides "eaten in" or "to take away", and without it the menu's setting applies. It returns `combo_id`, `name`, `kitchen_name`,
