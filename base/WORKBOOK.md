@@ -734,7 +734,7 @@ Pasos:
      caídos», con «Una app no recibió lo que otra le mandó: lo que tenía que hacer sigue sin hacerse hasta que lo
      reenvíes.», llega como tarjeta y se recoge en ella.
   3. «Revisar los eventos» abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F43).
-  4. Cuando no queda ninguno, el aviso desaparece.
+  4. Cuando no queda ninguno (reenviados, descartados o ya hechos por otro camino), el aviso desaparece.
 Entra: cuántos avisos de este negocio quedaron sin entregar, solo para quien administra el negocio.
 Sale: nada.
 Si falla: un empleado o un responsable no ve el aviso. Si no se puede preguntar, la campana se queda con
@@ -1523,7 +1523,9 @@ Pasos:
      Arriba, «Reenviar todos». Si la app a la que iba ya no está activa, la tarjeta dice que no se puede reenviar
      hasta activarla, sin «Reenviar».
   4. Salen los 100 más recientes; con más, la pantalla dice cuántos se ven de cuántos.
-  5. La lista y la campana se ponen al día solas cuando un aviso cae, se reenvía o se descarta.
+  5. La lista y la campana se ponen al día solas cuando un aviso cae, se reenvía o se descarta, y también cuando la
+     app a la que iba hace por otro camino lo que pedía: si Facturación emite con «Emitir ahora» el documento de una
+     venta, el aviso de esa venta se va solo.
   6. Sin ninguno: «Todo en orden» — «No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio
      nunca la pierde.».
 Entra: los avisos entre apps de este negocio que agotaron sus reintentos, nunca los de otro.
