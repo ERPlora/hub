@@ -42,6 +42,14 @@ describe('useServerTable: the query', () => {
     expect(s.table.data.value).toEqual({ rows: notes(0, 2), total: 2, limit: 50, offset: 0 });
   });
 
+  it('a list that keeps its own order (newest first) is asked without a sort', async () => {
+    const m = await mountComposable(() => {
+      captured = useServerTable(OP, { maxSearch: 80 });
+    });
+    await m.live();
+    expect(m.params(OP)).toEqual([{ limit: 50, offset: 0 }]);
+  });
+
   it('pages on the server; a new page size goes back to the first page', async () => {
     const s = await setup();
     await s.change(() => s.table.goToPage(2));
