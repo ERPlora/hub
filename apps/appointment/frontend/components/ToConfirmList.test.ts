@@ -45,7 +45,7 @@ describe('ToConfirmList', () => {
     expect(s.params(OP)).toEqual([{ limit: 100, offset: 0 }]);
     expect(s.list().props('loading')).toBe(true);
     await s.result(OP, { ...page([booking], 1, 100), timezone: 'Europe/Madrid' });
-    expect(s.list().props()).toMatchObject({ rows: [booking], withDay: true, canAdd: false, canDelete: true, loading: false });
+    expect(s.list().props()).toMatchObject({ rows: [booking], withDate: true, canAdd: false, canDelete: true, loading: false });
 
     s.list().vm.$emit('action', { actionId: 'confirm', row: booking });
     await s.find('appointment-to-confirm-back').trigger('click');

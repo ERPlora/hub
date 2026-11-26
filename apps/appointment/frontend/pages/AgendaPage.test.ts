@@ -145,7 +145,7 @@ describe('AgendaPage', () => {
     expect(s.toolbar().props('onlyToConfirm')).toBe(true);
     expect(s.wrapper.findComponent(AppointmentList).props()).toMatchObject({
       rows: [tomorrows],
-      withDay: true,
+      withDate: true,
       canAdd: false,
       emptyMessage: 'No appointments left to confirm.',
     });

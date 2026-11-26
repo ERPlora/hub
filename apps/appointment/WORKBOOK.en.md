@@ -98,7 +98,7 @@ it to another time or another professional. The **N to confirm** notice shows yo
 booked that is waiting for your confirmation, whatever its day.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:26078a961e03 -->
+<!-- from WORKBOOK.md sha256:4797ad2b24ee -->
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -124,7 +124,7 @@ professional**, also **Day · Week**.
 - **Repeating**: see the [Repeating](#repeating) screen.
 - **To confirm**: when you tap **N to confirm** (or "Confirm the appointments" in the bell), the list shows, instead
   of the day, every pending appointment that has not started yet, whatever its day, the soonest first and each with
-  its day and time, under the notice "These are the appointments waiting for your confirmation, whatever their day."
+  its date and time, under the notice "These are the appointments waiting for your confirmation, whatever their day."
   with **Back to the agenda**. They are the same ones the notice counts. The day, the status filter and the views do
   not apply and are hidden; tapping **N to confirm** again or **Back to the agenda** brings the day back. With none:
   "No appointments left to confirm.".
@@ -313,13 +313,13 @@ professional. You can still pick a time.".
 Involved: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirm a pending appointment
-<!-- from WORKBOOK.md sha256:1c01788bfc89 -->
+<!-- from WORKBOOK.md sha256:f495da635756 -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda
 Steps:
 1. Come in from the **N to confirm** notice (you tap it and see every appointment to confirm, whatever its day,
-   each with its day: the same ones the notice counts), from the bell in the top bar (its notice "N appointments to
+   each with its date: the same ones the notice counts), from the bell in the top bar (its notice "N appointments to
    confirm", "Customers are waiting for you to confirm their bookings before they start.", opens that same list with
    "Confirm the appointments", and its deadline is the start of the soonest one) or search for the **Pending**
    appointment.

@@ -45,7 +45,7 @@ const error = computed(() => (list.status.value === 'error' ? t('appointment.lis
     :can-delete="canDelete"
     :loading="list.status.value === 'loading'"
     :error="error"
-    with-day
+    with-date
     :empty-message="$t('appointment.toConfirm.empty')"
     @action="emit('action', $event)"
     @retry="list.refresh()"

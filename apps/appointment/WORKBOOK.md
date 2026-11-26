@@ -124,7 +124,7 @@ profesional**, además, **Día · Semana**.
 - **Periódicas**: ver la pantalla [Periódicas](#periódicas).
 - **Por confirmar**: al pulsar **N por confirmar** (o «Confirmar las citas» en la campana), la lista enseña, en vez
   del día, todas las citas pendientes que aún no han empezado, sean del día que sean, la más próxima primero y cada
-  una con su día y su hora, bajo el aviso «Estas son las citas que esperan tu confirmación, sean del día que sean.»
+  una con su fecha y su hora, bajo el aviso «Estas son las citas que esperan tu confirmación, sean del día que sean.»
   con **Volver a la agenda**. Son las mismas que cuenta el aviso. El día, el filtro de estado y las vistas no
   aplican y se ocultan; volver a pulsar **N por confirmar** o **Volver a la agenda** devuelve el día. Sin ninguna:
   «No quedan citas por confirmar.».
@@ -301,7 +301,7 @@ Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
 1. Entra desde el aviso **N por confirmar** (lo pulsas y ves todas las citas por confirmar, sean del día que sean,
-   cada una con su día: las mismas que cuenta el aviso), desde la campana de la barra de arriba (su aviso «N citas por
+   cada una con su fecha: las mismas que cuenta el aviso), desde la campana de la barra de arriba (su aviso «N citas por
    confirmar», «Tus clientes esperan a que les confirmes las citas antes de que empiecen.», abre esa misma lista con
    «Confirmar las citas», y su plazo es el comienzo de la más próxima) o busca la cita **Pendiente**.
 2. Pulsa **Confirmar** en su fila.
