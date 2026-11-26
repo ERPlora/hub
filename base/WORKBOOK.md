@@ -734,7 +734,7 @@ Pasos:
      caídos», con «Una app no recibió lo que otra le mandó: lo que tenía que hacer sigue sin hacerse hasta que lo
      reenvíes.», llega como tarjeta y se recoge en ella.
   3. «Revisar los eventos» abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F43).
-  4. Cuando no queda ninguno, el aviso desaparece.
+  4. Cuando no queda ninguno (reenviados, descartados o ya hechos por otro camino), el aviso desaparece.
 Entra: cuántos avisos de este negocio quedaron sin entregar, solo para quien administra el negocio.
 Sale: nada.
 Si falla: un empleado o un responsable no ve el aviso. Si no se puede preguntar, la campana se queda con
@@ -1210,7 +1210,8 @@ Pasos:
      copiar», «Descartado», «App desactivada», «No está en este negocio», «No elegida», «Preparándose» o «No se ha
      podido preparar». «Ya lo tenías» sale solo cuando todo lo que trae la app ya estaba en el negocio; una app de la
      que no trae nada, como las que la plantilla solo activa, dice «Nada que copiar». Debajo, por cada parte, «12
-     creadas · 3 ya estaban · 2 fallaron» y, de lo que falló, su nombre y el motivo.
+     filas nuevas · 3 ya estaban · 2 con error» y, de lo que falló, su nombre y el motivo; cada cifra va en singular
+     con una sola fila («1 fila nueva · 1 ya estaba · 1 con error»).
   3. Lo dejado fuera a propósito sale en «Se ha dejado fuera a propósito».
   4. «Ver las plantillas» vuelve al catálogo; «Ir al inicio» lleva al Inicio.
   5. Cuando la app queda lista, lo suyo se carga solo y el informe se pone al día sin recargar, esté en esta pantalla
@@ -1526,7 +1527,9 @@ Pasos:
      Arriba, «Reenviar todos». Si la app a la que iba ya no está activa, la tarjeta dice que no se puede reenviar
      hasta activarla, sin «Reenviar».
   4. Salen los 100 más recientes; con más, la pantalla dice cuántos se ven de cuántos.
-  5. La lista y la campana se ponen al día solas cuando un aviso cae, se reenvía o se descarta.
+  5. La lista y la campana se ponen al día solas cuando un aviso cae, se reenvía o se descarta, y también cuando la
+     app a la que iba hace por otro camino lo que pedía: si Facturación emite con «Emitir ahora» el documento de una
+     venta, el aviso de esa venta se va solo.
   6. Sin ninguno: «Todo en orden» — «No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio
      nunca la pierde.».
 Entra: los avisos entre apps de este negocio que agotaron sus reintentos, nunca los de otro.
@@ -1750,7 +1753,9 @@ Pantalla: Acceso
 Pasos:
   1. En un dispositivo compartido de un negocio que pide PIN, **Acceso** abre en la pestaña «PIN»: «Introduce tu
      PIN», «…o pasa tu placa: no hace falta elegir tu nombre antes.» y «Elige tu usuario» con una cara por
-     persona (iniciales y nombre; nunca su correo). Con una sola persona, ya sale elegida.
+     persona (iniciales y nombre; nunca su correo). El nombre es el de su perfil en este negocio; sin él, el de su
+     ficha de Personal vinculada (STAFF-F03), y si tampoco la tiene, el de su cuenta. Con una sola persona, ya sale
+     elegida.
   2. Toca tu nombre: sale «PIN de {name}» y el teclado con tantos círculos como dígitos tenga el PIN del negocio.
      La flecha («Cambiar usuario») vuelve a las caras. El teclado se ve entero, hasta el 0 y el de borrar, sin
      desplazar la pantalla: en una tablet en horizontal (también dentro de su navegador), un portátil o un móvil
@@ -1768,7 +1773,7 @@ Un dispositivo en el que nunca se entró con una cuenta, o que un administrador 
 todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.». Sin
 conexión, «No se pudo entrar. Comprueba la conexión e inténtalo de nuevo.»; si no se puede leer quién trabaja
 aquí, «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.».
-Implicados: BASE-F54, BASE-F67
+Implicados: BASE-F54, BASE-F67, STAFF-F03
 
 ### BASE-F56 Entrar pasando la placa
 Estado: hecho
@@ -1937,7 +1942,8 @@ Pasos:
      paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
      aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo.
 Entra: el perfil de quien tiene la sesión.
-Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
+Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»; sin él, el menú
+lateral y las caras dicen el de su ficha de Personal vinculada, STAFF-F03), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
 su placa o su cuenta. Con «Usar el idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su
 cuenta de erplora.com (BASE-F51). El correo es solo de contacto: no cambia la cuenta de erplora.com.
@@ -2863,7 +2869,11 @@ Pasos:
      y 17 más»); las filas de un fichero que se importa (productos, categorías o clientes), por el nombre de cada una,
      como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
      nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una, por su nombre y su tipo
-     de hoy («Categoría fiscal: Restauración — comida · 10 %»);
+     de hoy («Categoría fiscal: Restauración — comida · 10 %»); las filas de un alta de golpe que dicta la persona,
+     igual, por el nombre de cada una: cada persona de Personal por su nombre y apellidos («Crear en Personal:
+     Carla Ruiz, Diego Martín, Elena Sanz»; una sin nombre o sin apellidos cuenta entre los «más») y cada servicio por
+     su nombre («Servicios: Corte, Tinte»), con las categorías y las categorías fiscales que llevan aparte, una vez cada
+     una;
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre

@@ -29,6 +29,7 @@ from apps.staff.schemas.members import (
     TerminatedOut,
     TerminateIn,
 )
+from base.assistant import file_rows
 from base.models import HubUser, Membership
 
 USER_NOT_IN_BUSINESS = _("That Hub user has no access to this business.")
@@ -113,6 +114,7 @@ def create_member(ctx: OperationContext, data: MemberIn) -> Member | None:
         "description": "Adds several staff members at once (up to 100); a row with a problem is skipped "
         "with its reason and the rest go in.",
         "risk": "normal",
+        "summary": file_rows.rows_named_by("members", "first_name", "last_name"),
     },
 )
 def bulk_create_members(ctx: OperationContext, data: BulkCreateIn) -> dict:
@@ -233,7 +235,7 @@ def update_member(ctx: OperationContext, data: MemberPatchIn) -> Member | None:
             ),
         },
         "description": "Deactivates a staff member (named by id or by name) without deleting anything: "
-        "they stop being bookable.",
+        "they stop being bookable. For a stretch away from the business, never a break within their working day.",
         "risk": "high",
     },
 )
