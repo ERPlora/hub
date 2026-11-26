@@ -178,6 +178,10 @@ class AssistantFieldOut(Schema):
         description="A list whose every item the server said in words (a record by its name, a moment, a value by its "
         "label, an amount): the card says its items; without it, how many it carries.",
     )
+    choice: bool = Field(
+        default=False,
+        description="A value of a closed list («Light», «50 m»): the card says it by the name of its datum, also first.",
+    )
     money: AssistantMoneyOut | None = Field(
         default=None,
         description="The currency of an amount of a preview, as its read answers it (an invoice's); none = the "
