@@ -57,7 +57,7 @@ def people_of(slug: str) -> list[dict[str, Any]]:
         credential = credentials.get(username)
         profile = profiles.get(username)
         own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
-        name = without_address(own or person["name"]) or without_address(person["email"]) or username
+        name = without_address(preferred_name(own, person["name"], person["email"])) or username
         people.append(
             {
                 **person,
@@ -217,14 +217,20 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     return person_detail_out(ctx, person_of(ctx, data.person))
 
 
+def preferred_name(*names: str) -> str:
+    """The first of ``names`` that is not an address, else the first given; empty without any. erplora.com names an
+    account without a name by its address, and «My profile» starts from the account's name: an address names a person
+    only when nothing else does."""
+    named = [name for name in names if name]
+    return next((name for name in named if "@" not in name), named[0] if named else "")
+
+
 def person_label(user, staff_name: str = "") -> str:
     """How ``user`` is named in this hub: its «My profile» name, else the name of its Staff record (``staff_name``),
-    else its erplora.com account's, else its username. erplora.com names an account without a name by its address, and
-    «My profile» starts from the account's name: an address names them only when nothing else does."""
+    else its erplora.com account's (:func:`preferred_name`), else its username."""
     profile = Profile.objects.filter(username=user.get_username()).only("first_name", "last_name").first()
     own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
-    named = [name for name in (own, staff_name, user.get_full_name()) if name]
-    return next((name for name in named if "@" not in name), named[0] if named else user.get_username())
+    return preferred_name(own, staff_name, user.get_full_name()) or user.get_username()
 
 
 def face_name(user, staff_name: str = "") -> str:
