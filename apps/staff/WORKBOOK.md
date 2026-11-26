@@ -278,13 +278,14 @@ Entra: las cuentas activas con acceso a este negocio, solo su identificador y su
 su usuario») le valen las mismas: busca la cuenta en esa lista, y su tarjeta de confirmación dice la ficha y el nombre
 de la cuenta que se vincula. Una cuenta sin acceso a este negocio se comprueba antes de la tarjeta: no sale tarjeta,
 el asistente dice que esa cuenta no tiene acceso y no se cambia nada.
-Sale: el vínculo. Con él, la persona ve su propia ficha (STAFF-F08) y pide sus ausencias (STAFF-F24).
-No cambia ningún permiso ni la comisión: una venta cuenta para quien se eligió al cobrarla (STAFF-F21).
+Sale: el vínculo. Con él, la persona ve su propia ficha (STAFF-F08) y pide sus ausencias (STAFF-F24), y si no
+tiene nombre en su perfil, las caras de la caja y la tarjeta del menú de usuario la llaman por el de la ficha
+(BASE-F55). No cambia ningún permiso ni la comisión: una venta cuenta para quien se eligió al cobrarla (STAFF-F21).
 Dar de baja la ficha libera la cuenta.
 Si falla: «Ese usuario del Hub ya está vinculado a Ana García. Un usuario del Hub solo puede
 pertenecer a un miembro del equipo: desvincúlalo allí primero o elige otro usuario.», también si dos personas lo vinculan a la vez; «Ese usuario del Hub no
 tiene acceso a este negocio.».
-Implicados: ATTENDANCE-F01, TASK-F03
+Implicados: ATTENDANCE-F01, TASK-F03, BASE-F55
 
 ### STAFF-F04 Crear, editar y retirar un rol
 Estado: hecho (servidor y pantalla)
