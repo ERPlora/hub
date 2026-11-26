@@ -6,6 +6,7 @@ import { INVOICE, setup } from '../__tests__/invoice-detail';
 import { ACCOUNTANT, EMPLOYEE, MANAGER, redNotices } from '../__tests__/mount-invoice';
 import { plain } from '../lib/format';
 import type { InvoiceEmailOut } from '../operations/emails';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 const LIST = 'invoice.email.list';
 const SENT: InvoiceEmailOut = {
@@ -35,7 +36,7 @@ describe('InvoiceDetailPage: «Send by email»', () => {
 
   it.each([['the manager', MANAGER], ['an employee', EMPLOYEE]])('is offered to %s', async (_who, session) => {
     const s = await opened([], { session });
-    expect(s.find('invoice-detail-email').text()).toBe('Send by email');
+    expect(accessibleName(s.find('invoice-detail-email').element)).toBe('Send by email');
   });
 
   it('is not offered to whoever only reads, who sees what was sent', async () => {
@@ -103,7 +104,7 @@ describe('InvoiceDetailPage: «Send by email»', () => {
 
   it('speaks Spanish', async () => {
     const s = await opened([FAILED, SENT], { locale: 'es' });
-    expect(s.find('invoice-detail-email').text()).toBe('Enviar por correo');
+    expect(accessibleName(s.find('invoice-detail-email').element)).toBe('Enviar por correo');
     expect(s.said()[0]).toBe('No enviada a ana@example.com');
     expect(s.said()[1]).toMatch(/^Enviada a ana@example\.com el /);
     expect(s.find('invoice-detail-email-failed').text()).toContain('La factura no se ha enviado por correo');
