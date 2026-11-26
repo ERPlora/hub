@@ -44,6 +44,7 @@ async function remove(): Promise<void> {
     :submit-disabled="zone.table_count > 0"
     @submit="remove"
   >
-    <p>{{ $t('table.zones.delete.impact', { count: zone.table_count }) }}</p>
+    <p v-if="zone.table_count > 0">{{ $t('table.zones.delete.impact', { count: zone.table_count }) }}</p>
+    <p v-else>{{ $t('table.zones.delete.emptyImpact') }}</p>
   </FormModal>
 </template>
