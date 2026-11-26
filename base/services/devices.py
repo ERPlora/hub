@@ -261,12 +261,14 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     ai=AI(
         description=(
             "Removes a lost device from the hub: its session ends at once and the PIN stops working on it until "
-            "someone signs in with an account on it again. Removing the one in hand signs the person out. After "
-            "device.list identifies the device, use this to close its access; listing alone changes nothing."
+            "someone signs in with an account on it again. After device.list identifies the device, use this to close "
+            "its access; listing alone changes nothing. Never to sign out: no tool does that, the person does it from "
+            "the user card at the top of the side menu."
         ),
         risk="high",
-        # Two devices without a name read the same («Chrome · Linux»): their last use tells them apart.
-        preview={"operation": "base.device.detail", "fields": ["last_entry_at"]},
+        # Two devices without a name read the same («Chrome · Linux»): their last use tells them apart. The one in hand
+        # is warned of as «Devices» does: removing it closes the person's session.
+        preview={"operation": "base.device.removal", "fields": ["last_entry_at", "yours"]},
         asks={
             "en": (
                 "we lost the terrace tablet, remove it",

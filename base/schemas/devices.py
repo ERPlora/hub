@@ -72,6 +72,14 @@ class DeviceByIdIn(Schema):
     id: UUID = Field(title=gettext_noop("Device"), json_schema_extra=names("base.device.detail", name=DEVICE_NAMES))
 
 
+class DeviceRemovalOut(Schema):
+    last_entry_at: dt.datetime = Field(title=gettext_noop("Last used"))
+    yours: str = Field(
+        title=gettext_noop("It is the device you are using"),
+        description="What removing it does to the person's session; empty when it is another device.",
+    )
+
+
 class DeviceRemoveOut(Schema):
     removed: int
     yours: bool = Field(description="It was the device of the person who removed it: their session ended too.")

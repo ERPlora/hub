@@ -2728,6 +2728,13 @@ msgstr[2] "%(n)s personas tienen este rol. Dales otro antes de borrarlo."
 msgid "Last used"
 msgstr "Último uso"
 
+msgid "It is the device you are using"
+msgstr "Es el dispositivo que estás usando"
+
+#. Translators: it follows «It is the device you are using:» on the same line.
+msgid "removing it will close your session and you will have to enter again."
+msgstr "al quitarlo se cerrará tu sesión y tendrás que volver a entrar."
+
 msgid "Devices to remove"
 msgstr "Dispositivos que se quitan"
 

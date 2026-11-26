@@ -3,13 +3,16 @@
 - «Remove the unused» says, under «What will happen», how many devices it removes and which ones, never the one in
   hand; with none to remove there is no card, and the model hears why.
 - «Remove this device» says when the device was last used: two devices without a name read the same («Chrome ·
-  Linux») and only their last use tells them apart.
+  Linux») and only their last use tells them apart; and, for the one in hand, what «Devices» says of it: removing it
+  closes the person's session.
 """
 
 import datetime as dt
 import json
+from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.test import RequestFactory
 from django.utils import timezone
 from live import assistant as shared
@@ -34,6 +37,12 @@ NOTHING_TO_REMOVE = {
     "es": "Ningún dispositivo lleva 30 días sin usarse, así que no hay nada que quitar.",
 }
 LAST_USE = {"en": ("Last used", "Nov 22, 2026, 4:18\u202fPM"), "es": ("Último uso", "22 nov 2026, 16:18")}
+FRONTEND = Path(apps.get_app_config("base").path) / "frontend/locale"
+#: What «Devices» says before removing the device in hand, in each language.
+REMOVE_YOURS = {
+    language: json.loads((FRONTEND / f"{language}.json").read_text())["base"]["devices"]["removeYours"]
+    for language in ("en", "es")
+}
 
 
 def a_device(days_ago: float = 0, **fields) -> tuple[TrustedDevice, str]:
@@ -99,8 +108,19 @@ def test_removing_one_of_two_devices_with_the_same_name_says_when_it_was_last_us
     assert preview_lines(card) == [("last_entry_at", label, when)]
 
 
-def test_the_read_behind_the_card_is_not_a_tool_of_the_assistant():
-    assert not shared.is_tool(get("base.device.unused"))
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_removing_the_device_in_hand_says_as_devices_does_that_it_closes_the_persons_session(language):
+    here, in_hand = a_device(days_ago=0, name="Bar")
+    card = turn(in_hand, call("base.device.remove", {"id": str(here.pk)}), language=language)["confirm"]
+    [last_use, yours] = card["preview"]
+    assert last_use["name"] == "last_entry_at"
+    assert yours["titled"] is True
+    assert f"{yours['label']}: {yours['value']}" == REMOVE_YOURS[language]
+
+
+@pytest.mark.parametrize("read", ["base.device.unused", "base.device.removal"])
+def test_the_read_behind_the_card_is_not_a_tool_of_the_assistant(read):
+    assert not shared.is_tool(get(read))
 
 
 def test_a_yes_to_a_card_whose_devices_changed_removes_nothing_and_draws_the_card_again():
