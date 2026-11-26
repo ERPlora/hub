@@ -474,8 +474,10 @@ Pasos:
    quieres, «Tipo de IVA / Impuesto» («— (por defecto)» lo deja vacío).
 3. Pulsa «Guardar» o «Guardar cambios». La categoría sale en la tabla con su número de productos.
 Entra: las categorías fiscales y su tipo, de Impuestos.
-Sale: la categoría guardada. Editarla desde la pantalla no toca lo que la pantalla no enseña: la
-descripción, el icono, el color y el orden que se pusieron por el asistente o la API se conservan.
+Sale: la categoría guardada. Una nueva sale la última en el TPV, detrás de las que ya había; la que
+se crea con su posición (por el asistente o la API) la conserva. Editarla desde la pantalla no toca lo
+que la pantalla no enseña: la descripción, el icono, el color y el orden que se pusieron por el
+asistente o la API se conservan.
 Ventas la lee para la tira de categorías del TPV, y Cocina para elegir qué envía a cada estación.
 Una categoría no se desactiva: se crea, se edita o se elimina.
 Si falla: «Guardar» está apagado sin Nombre. Un rechazo sale dentro del panel, con su
@@ -526,8 +528,8 @@ Sale: el enlace entre producto y categoría, guardado junto con el producto; Inv
 cada categoría añadida o quitada. Un producto puede estar en varias. Ventas filtra la rejilla del
 TPV con estos enlaces (solo de productos activos) y Cocina los usa para su reparto. El TPV enseña
 las categorías en la posición que les dio el negocio (por el asistente o la API, y la que trae la
-plantilla del sector) y, a igual posición, por nombre; las que nadie ha colocado van por nombre. Los
-productos, por nombre.
+plantilla del sector) y, a igual posición, por nombre; una categoría creada sin posición toma la
+siguiente a la última (INVENTORY-F06, F10). Los productos, por nombre.
 Si falla: los rechazos del formulario; si algo falla no se guarda ni el producto ni sus
 categorías. Un producto sin categoría se vende igual: sale en «Todos».
 Implicados: KITCHEN-F04, SALE-F01
@@ -588,7 +590,8 @@ Pasos:
    comas o por punto y coma).
 2. Se reconocen las columnas Nombre (obligatoria), Slug y Categoría fiscal por su cabecera, en
    español o inglés («Nombre»/«name», «IVA»/«tax»…).
-3. Se crea una categoría por fila con nombre; el slug, si no viene, se saca del nombre.
+3. Se crea una categoría por fila con nombre, en el orden del fichero y detrás de las que ya había
+   (en el TPV salen las últimas); el slug, si no viene, se saca del nombre.
 4. Al acabar, «Resultado de la importación»: «Filas», «Creadas», «Omitidas (ya existían)»,
    «Fallidas», una línea por fallo y «Copiar informe». La tabla se recarga.
 Entra: el fichero; las categorías fiscales y los textos aprendidos, de Impuestos.
