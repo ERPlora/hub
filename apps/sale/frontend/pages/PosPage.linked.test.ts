@@ -8,6 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { click, settle } from '../__tests__/mount-sale';
 import { freshEachTest, setup } from '../__tests__/pos-page';
 import DirtyCheckDialog from '../components/pos/DirtyCheckDialog.vue';
+import ParkSheet from '../components/pos/ParkSheet.vue';
 import PosCart from '../components/pos/PosCart.vue';
 import PosCatalog from '../components/pos/PosCatalog.vue';
 import { line, order, settings } from '../components/pos/__tests__/fixtures';
@@ -61,6 +62,28 @@ describe('PosPage: a check opened by its address (/sale/pos?order=<id>, APPOINTM
     expect(shows(s)).toEqual({ opening: false, catalogue: true, check: 'o7' });
     expect(s.find('pos-line-l7').exists()).toBe(true);
     expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos');
+  });
+
+  it('a check parked and opened by its address again waits for its customer anew', async () => {
+    const parked = { ...O7, label: 'Ana' };
+    const s = await arrive({
+      '/api/sale/orders/detail': [200, O7],
+      '/api/customer/orders/customer': [200, NO_CUSTOMER],
+      '/api/sale/orders/set_label': [200, parked],
+    });
+    expect(shows(s).check).toBe('o7');
+    await click(s.find('pos-park').element);
+    s.wrapper.findComponent(ParkSheet).vm.$emit('park', 'Ana');
+    await settle();
+    expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBeNull();
+    const customer = held();
+    s.answerBy({ '/api/sale/orders/detail': [200, parked], '/api/customer/orders/customer': customer.route });
+    await s.router.push('/sale/pos?order=o7');
+    await settle();
+    expect(shows(s)).toEqual({ opening: true, catalogue: false, check: null });
+    customer.release(NO_CUSTOMER);
+    await settle();
+    expect(shows(s)).toEqual({ opening: false, catalogue: true, check: 'o7' });
   });
 
   it('opens that check on the till and leaves the address clean', async () => {
