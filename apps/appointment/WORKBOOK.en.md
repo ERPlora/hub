@@ -599,7 +599,7 @@ does not exist in this business.".
 Involved: none
 
 ### APPOINTMENT-F17 Charge the appointment at the till
-<!-- from WORKBOOK.md sha256:150e5bf9d966 -->
+<!-- from WORKBOOK.md sha256:934422bb5ece -->
 Status: done
 Actor: manager, employee (their own appointments), with the right to sell in Sales
 Screen: Agenda
@@ -621,7 +621,7 @@ Steps:
    not cancelled, nor marked as no-show, nor deleted: first the check is charged or voided.
 5. When it is charged, the appointment is **charged** and, if it was not already, **Completed**; **Charge**
    is greyed out. If the sale is voided, the appointment stops being charged and **Charge** is active
-   again. In its history (F10), «Charged», the «Completed» the charge brings and «Sale voided» say who charged
+   again. In its history, «Charged», the «Completed» the charge brings and «Sale voided» say who charged
    or voided the sale at the till, like every other change.
 In: a pending, confirmed, in progress or completed appointment that is not charged.
 Out: the check open in Sales (`sale.order.opened`) and here `appointment.appointment.check_opened`; on
