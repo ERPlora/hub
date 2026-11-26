@@ -8,6 +8,7 @@ import { category, page, product, service } from './__tests__/fixtures';
 import CategoryStrip from './CategoryStrip.vue';
 import PosCatalog from './PosCatalog.vue';
 import ProductGrid from './ProductGrid.vue';
+import ServiceGrid from './ServiceGrid.vue';
 
 const PRODUCTS = 'inventory.product.list';
 const SERVICES = 'service.service.list_for_sale';
@@ -64,6 +65,8 @@ describe('PosCatalog: «All» with the services of Services', () => {
     s.wrapper.findComponent(CategoryStrip).vm.$emit('update:modelValue', 'c1');
     await s.reopen();
     expect(s.inAll('pos-service-sv1')).toHaveLength(0);
+    // The «Services» grid is mounted for the count only: it never shows beside the articles of a category.
+    expect(s.wrapper.findComponent(ServiceGrid).attributes('style')).toContain('display: none');
     await s.result(SERVICES, page([service({ id: 'sv1' }), service({ id: 'sv2' })], 2), {}, 2);
     expect(s.allCount()).toBe(7);
   });
