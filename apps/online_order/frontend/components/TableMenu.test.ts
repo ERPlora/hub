@@ -311,9 +311,10 @@ describe('TableMenu: the order', () => {
     expect(disabled(s.inDoc('oo-menu-sheet-submit'))).toBe(true);
   });
 
-  it('takes up to twenty of a dish, as the order is taken', async () => {
+  it('takes from one to twenty of a dish, as the order is taken', async () => {
     const s = await setup();
     await click(s.inDoc('oo-menu-dish-p2'));
+    expect(disabled(s.inDoc('oo-dish-qty-minus'))).toBe(true);
     const field = s.inDoc('oo-dish-qty-field') as HTMLInputElement;
     field.value = '20';
     field.dispatchEvent(new Event('change', { bubbles: true }));
