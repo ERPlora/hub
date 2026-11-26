@@ -1,18 +1,10 @@
 <script setup lang="ts">
-// APPOINTMENT-F01, F04, F14, F22: the booking panel, the old agenda's side panel as a dialog.
-// «New appointment»: the Customer (Customers' own search, which also creates a card with name and phone),
-// the Services in order (only bookable ones), the Professional (only who does them all: the server's rule
-// read through Services and Staff), the Day and the Time (with the «Free times»), «Duration (min)» (the
-// services' sum unless typed) and the notes. «Duration (min)» and the Total are the professional's own for each service
-// (Services · «Who does it»), the catalog's where she has none — what the server books; the Total is in the
-// business's money (BASE-F50: «65,00 zł» in Poland, a dash until it answers). «Add appointment» books it. «Edit appointment» comes filled in, sends
-// only what changed (`appointment.appointment.update`) and shows the history below; a series occurrence
-// first asks «This appointment only» / «This and all following» (the latter edits the series from its
-// date). An overlap asks first (409 `appointment.overlap_needs_confirmation`: «Book anyway» sends it again
-// confirmed); any other refusal goes on top, a bad field under it, and what was typed stays.
-import { type ComboOption, ConfirmDialog, DateField, FormModal, InlineFeedback, TimeField } from '@erplora/ui/components';
+// «Duration (min)» and the Total are the professional's own for each service, the catalog's where she has none: what
+// the server books. An overlap (409 `appointment.overlap_needs_confirmation`) asks before «Book anyway» sends it again.
+import { type ComboOption, ConfirmDialog, DateField, FormModal, InlineFeedback, StatusPill, TimeField } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
-import { IonButton, IonInput, IonTextarea } from '@ionic/vue';
+import { HubIcon } from '@erplora/ui/shell';
+import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
 import FieldGroup from '../../../../base/frontend/components/FieldGroup.vue';
@@ -21,12 +13,18 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useLocale, useT } from '../composables/useT';
+import { type Chosen, newBooking, noteChanges, refusedFields, seriesChange, slotChanges } from '../lib/booking';
 import { dayOf, timeOf, wallInput } from '../lib/clock';
 import { formatMoney, useBusinessMoney } from '../lib/format';
 import { describeUpdate } from '../lib/outcome';
 import { eligibleStaff, ownTerms, type ServiceFacts, type Terms } from '../lib/pickers';
-import type { AppointmentOut, RecurringUpdateIn, UpdateIn } from '../operations';
+import { STATUS_TONE } from '../lib/states';
+import type { AppointmentOut } from '../operations';
 import AppointmentHistory from './AppointmentHistory.vue';
+import BookingNotes from './BookingNotes.vue';
+import BookingSummary from './BookingSummary.vue';
+import DurationPicker from './DurationPicker.vue';
+import FoldedSection from './FoldedSection.vue';
 import FreeSlots from './FreeSlots.vue';
 import ServicesField from './ServicesField.vue';
 import StaffField from './StaffField.vue';
@@ -85,6 +83,8 @@ const openedMinutes = ref('');
 const notes = ref('');
 const internalNotes = ref('');
 const staffWarning = ref(false);
+/** The free times say the professional does not work that day: no other time of it can be booked. */
+const slotsOff = ref(false);
 
 const create = useCommand('appointment.appointment.create');
 const update = useCommand('appointment.appointment.update');
@@ -104,6 +104,16 @@ const past = computed(() => !!day.value && !!time.value && wallInput(day.value, 
 const ready = computed(
   () => (editing.value || !!customer.value) && services.value.length > 0 && !!staff.value && !!day.value && !!time.value,
 );
+const asking = computed(() => services.value.length > 0 && !!staff.value && !!day.value && !charged.value);
+const chosen = computed<Chosen>(() => ({
+  day: day.value,
+  time: time.value,
+  minutes: minutesTouched.value ? typedMinutes.value : null,
+  staffId: staff.value?.id ?? null,
+  serviceIds: serviceIds.value,
+  notes: notes.value,
+  internalNotes: internalNotes.value,
+}));
 
 function sumMinutes(): string {
   const sum = services.value.reduce((acc, option) => acc + (termsOf(option.id)?.minutes ?? 0), 0);
@@ -181,15 +191,17 @@ watch(termsKey, async (key) => {
   }
 });
 
-// New services: their sum unless the minutes were typed; a professional who does not do them all goes.
+// New services: their sum unless the minutes were typed (the services as booked: the length as booked); a
+// professional who does not do them all goes.
 watch(serviceIds, async (ids, before) => {
   if (ids.join() === (before ?? []).join()) return;
-  if (!minutesTouched.value) minutes.value = sumMinutes();
-  const chosen = staff.value;
-  if (!chosen || props.ownStaff || !ids.length) return;
+  const asBooked = ids.join() === (props.appointment?.services.map((line) => line.service_id).join() ?? null);
+  if (!minutesTouched.value) minutes.value = asBooked ? openedMinutes.value : sumMinutes();
+  const picked = staff.value;
+  if (!picked || props.ownStaff || !ids.length) return;
   try {
     const allowed = await eligibleStaff(client, ids, '');
-    if (staff.value?.id === chosen.id && !allowed.some((option) => option.id === chosen.id)) {
+    if (staff.value?.id === picked.id && !allowed.some((option) => option.id === picked.id)) {
       staff.value = null;
       staffWarning.value = true;
     }
@@ -208,13 +220,13 @@ function typeMinutes(value: string): void {
   minutesTouched.value = true;
 }
 
-const fieldOf: Record<string, string> = { duration_minutes: 'minutes', staff_id: 'staff', customer_id: 'customer' };
-const shown = computed<ApiError | null>(() => {
-  const error = failure.value;
-  if (!error?.fields) return error;
-  const fields = Object.fromEntries(Object.entries(error.fields).map(([key, message]) => [fieldOf[key] ?? key.split('.')[0], message]));
-  return { ...error, fields } as ApiError;
-});
+/** Back to the services' sum: a new appointment follows them again; an edit sends the sum. */
+function useSum(): void {
+  minutes.value = sumMinutes();
+  minutesTouched.value = editing.value;
+}
+
+const shown = computed(() => refusedFields(failure.value));
 
 async function attempt(run: () => Promise<AppointmentOut>): Promise<void> {
   failure.value = null;
@@ -230,60 +242,23 @@ async function attempt(run: () => Promise<AppointmentOut>): Promise<void> {
 }
 
 function bookNew(confirmOverlap: boolean): Promise<AppointmentOut> {
-  return create.run({
-    customer_id: customer.value?.customer_id ?? null,
-    services: serviceIds.value.map((id) => ({ service_id: id })),
-    staff_id: staff.value?.id ?? null,
-    start: wallInput(day.value, time.value),
-    ...(minutesTouched.value && typedMinutes.value ? { duration_minutes: typedMinutes.value } : {}),
-    notes: notes.value,
-    internal_notes: internalNotes.value,
-    confirm_overlap: confirmOverlap,
-  });
-}
-
-/** What the edit changes of the appointment's slot (time, length, professional, services). */
-function slotChanges(booked: AppointmentOut): Partial<UpdateIn> {
-  const out: Partial<UpdateIn> = {};
-  if (wallInput(day.value, time.value) !== booked.start.slice(0, 16)) out.start = wallInput(day.value, time.value);
-  if (minutesTouched.value && typedMinutes.value && typedMinutes.value !== booked.duration_minutes) {
-    out.duration_minutes = typedMinutes.value;
-  }
-  if (staff.value && staff.value.id !== booked.staff_id) out.staff_id = staff.value.id;
-  if (serviceIds.value.join() !== booked.services.map((line) => line.service_id).join()) {
-    out.services = serviceIds.value.map((id) => ({ service_id: id }));
-  }
-  return out;
-}
-
-function noteChanges(booked: AppointmentOut): Partial<UpdateIn> {
-  const out: Partial<UpdateIn> = {};
-  if (notes.value !== booked.notes) out.notes = notes.value;
-  if (internalNotes.value !== booked.internal_notes) out.internal_notes = internalNotes.value;
-  return out;
+  return create.run(newBooking(chosen.value, customer.value?.customer_id ?? null, confirmOverlap));
 }
 
 function saveThis(booked: AppointmentOut, confirmOverlap: boolean): Promise<AppointmentOut> {
-  return update.run({ id: booked.id, ...slotChanges(booked), ...noteChanges(booked), confirm_overlap: confirmOverlap });
+  const changes = { ...slotChanges(booked, chosen.value), ...noteChanges(booked, chosen.value) };
+  return update.run({ id: booked.id, ...changes, confirm_overlap: confirmOverlap });
 }
 
 async function saveFollowing(): Promise<void> {
   const booked = props.appointment;
   if (!booked?.recurring_id || !booked.occurrence_date) return;
-  const slot = slotChanges(booked);
-  const change: RecurringUpdateIn = { id: booked.recurring_id, from_date: booked.occurrence_date };
-  if (slot.start) {
-    change.time = time.value.length === 4 ? `0${time.value}` : time.value;
-    if (day.value !== dayOf(booked.start)) change.day_of_week = (new Date(`${day.value}T00:00:00Z`).getUTCDay() + 6) % 7;
-  }
-  if (slot.duration_minutes) change.duration_minutes = slot.duration_minutes;
-  if (slot.staff_id) change.staff_id = slot.staff_id;
-  if (slot.services) change.services = slot.services;
+  const change = seriesChange(booked, chosen.value);
   scopeOpen.value = false;
   failure.value = null;
   try {
     const result = await editSeries.run(change);
-    const notesOnly = noteChanges(booked);
+    const notesOnly = noteChanges(booked, chosen.value);
     if (Object.keys(notesOnly).length) await update.run({ id: booked.id, ...notesOnly });
     const said = describeUpdate(result, change, t, locale.value);
     emit('outcome', [said.summary, said.skipped.join('; ')].filter(Boolean).join(' '));
@@ -299,7 +274,7 @@ async function save(confirmOverlap = false): Promise<void> {
     await attempt(() => bookNew(confirmOverlap));
     return;
   }
-  if (booked.recurring_id && Object.keys(slotChanges(booked)).length && !confirmOverlap) {
+  if (booked.recurring_id && Object.keys(slotChanges(booked, chosen.value)).length && !confirmOverlap) {
     scopeOpen.value = true;
     return;
   }
@@ -316,9 +291,6 @@ function thisOnly(): void {
   const booked = props.appointment;
   if (booked) void attempt(() => saveThis(booked, false));
 }
-
-const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 </script>
 
 <template>
@@ -326,6 +298,8 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     v-model:open="open"
     :can-dismiss="canDismiss"
     testid="appointment-form"
+    size="xl"
+    phone-layout="fullscreen"
     :title="title"
     :submit-label="editing ? $t('appointment.form.save') : $t('appointment.form.create')"
     :pending="pending"
@@ -334,161 +308,198 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     @submit="save()"
   >
     <template #default="{ fieldErrors }">
-      <div
-        class="appointment-form"
-      >
-        <p
-          v-if="editing"
-          class="appointment-form__hint"
+      <div class="appointment-form">
+        <div
+          class="appointment-form__who"
+          data-testid="appointment-form-who"
         >
-          <strong>{{ appointment?.number }}</strong> · {{ appointment?.customer_name || $t('appointment.list.erasedCustomer') }} ·
-          {{ $t('appointment.form.hint') }}
-        </p>
-        <InlineFeedback
-          v-if="charged"
-          tone="info"
-          data-testid="appointment-form-charged"
-        >
-          {{ $t('appointment.form.charged') }}
-        </InlineFeedback>
-        <FieldGroup
-          v-if="!editing"
-          ref="customerGroup"
-          name="customer"
-          data-testid="appointment-form-customer"
-        >
-          <span class="appointment-form__label">{{ $t('appointment.form.customer') }}</span>
-          <CustomerSearch
-            :model-value="customer"
-            @update:model-value="chooseCustomer"
-          />
+          <div
+            v-if="appointment"
+            class="appointment-form__booked"
+            data-testid="appointment-form-booked"
+          >
+            <strong class="appointment-form__booked-name">{{ appointment.customer_name || $t('appointment.list.erasedCustomer') }}</strong>
+            <span class="appointment-form__booked-number">
+              {{ appointment.number }}
+              <StatusPill
+                size="sm"
+                :tone="STATUS_TONE[appointment.status]"
+                :label="$t(`appointment.status.${appointment.status}`)"
+              />
+            </span>
+            <p class="appointment-form__note">
+              {{ $t('appointment.form.hint') }}
+            </p>
+          </div>
+          <InlineFeedback
+            v-if="charged"
+            tone="info"
+            data-testid="appointment-form-charged"
+          >
+            {{ $t('appointment.form.charged') }}
+          </InlineFeedback>
+          <FieldGroup
+            v-if="!editing"
+            ref="customerGroup"
+            name="customer"
+            class="appointment-form__customer"
+            data-testid="appointment-form-customer"
+          >
+            <span class="appointment-form__label">{{ $t('appointment.form.customer') }}</span>
+            <CustomerSearch
+              :model-value="customer"
+              @update:model-value="chooseCustomer"
+            />
+            <small
+              v-if="fieldErrors.customer"
+              class="appointment-form__error"
+            >{{ fieldErrors.customer }}</small>
+          </FieldGroup>
+          <div class="appointment-form__services">
+            <ServicesField
+              v-model="services"
+              :facts="facts"
+              testid="appointment-form"
+              name="services"
+              :error-text="fieldErrors.services"
+              :disabled="charged"
+            />
+            <p
+              v-if="services.length"
+              class="appointment-form__total"
+              data-testid="appointment-form-total"
+            >
+              {{ $t('appointment.form.total') }}: <strong>{{ formatMoney(total, locale, money) }}</strong>
+            </p>
+          </div>
+          <div class="appointment-form__staff">
+            <StaffField
+              :model-value="staff"
+              :service-ids="serviceIds"
+              testid="appointment-form"
+              name="staff"
+              :error-text="fieldErrors.staff"
+              :own="!!ownStaff"
+              :disabled="charged"
+              @update:model-value="pickStaff"
+            />
+          </div>
           <small
-            v-if="fieldErrors.customer"
-            class="appointment-form__error"
-          >{{ fieldErrors.customer }}</small>
-        </FieldGroup>
-        <div class="appointment-form__services">
-          <ServicesField
-            v-model="services"
-            :facts="facts"
-            testid="appointment-form"
-            name="services"
-            :error-text="fieldErrors.services"
-            :disabled="charged"
-          />
-          <small
-            v-if="services.length"
-            class="appointment-form__total"
-            data-testid="appointment-form-total"
-          >{{ $t('appointment.form.total') }}: {{ formatMoney(total, locale, money) }}</small>
+            v-if="ownStaff"
+            class="appointment-form__note"
+            data-testid="appointment-form-own"
+          >{{ $t('appointment.form.ownOnly') }}</small>
+          <InlineFeedback
+            v-if="staffWarning"
+            tone="warning"
+            data-testid="appointment-form-staff-warning"
+          >
+            {{ $t('appointment.form.staffNotForService') }}
+          </InlineFeedback>
         </div>
-        <StaffField
-          :model-value="staff"
-          :service-ids="serviceIds"
-          testid="appointment-form"
-          name="staff"
-          :error-text="fieldErrors.staff"
-          :own="!!ownStaff"
-          :disabled="charged"
-          @update:model-value="pickStaff"
-        />
-        <small
-          v-if="ownStaff"
-          class="appointment-form__note"
-          data-testid="appointment-form-own"
-        >{{ $t('appointment.form.ownOnly') }}</small>
-        <InlineFeedback
-          v-if="staffWarning"
-          tone="warning"
-          data-testid="appointment-form-staff-warning"
+        <div
+          class="appointment-form__when"
+          data-testid="appointment-form-when"
         >
-          {{ $t('appointment.form.staffNotForService') }}
-        </InlineFeedback>
-        <div class="appointment-form__when">
-          <DateField
-            v-model="day"
-            testid="appointment-form-day"
-            :label="$t('appointment.form.day')"
-            required
-            :disabled="charged"
-          />
-          <TimeField
-            v-model="time"
-            testid="appointment-form-time"
-            :label="$t('appointment.form.time')"
-            required
-            :disabled="charged"
-            name="start"
-            :error-text="fieldErrors.start"
-          />
-          <ion-input
-            data-testid="appointment-form-minutes"
-            type="number"
-            inputmode="numeric"
-            min="1"
-            :value="minutes"
-            :label="$t('appointment.form.minutes')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
+          <div class="appointment-form__day">
+            <DateField
+              v-model="day"
+              testid="appointment-form-day"
+              :label="$t('appointment.form.day')"
+              required
+              :disabled="charged"
+            />
+          </div>
+          <DurationPicker
+            class="appointment-form__duration"
+            :minutes="minutes"
+            :sum="sumMinutes()"
+            :touched="minutesTouched"
             :disabled="charged"
             name="minutes"
             :error-text="fieldErrors.minutes"
-            :class="invalid(fieldErrors.minutes)"
-            @ion-input="typeMinutes(text($event.detail.value))"
+            @type="typeMinutes"
+            @use-sum="useSum"
           />
+          <section class="appointment-form__slots">
+            <h3 v-if="!charged">
+              {{ $t('appointment.slots.label') }}
+            </h3>
+            <FreeSlots
+              v-if="asking && staff"
+              :date="day"
+              :service-ids="serviceIds"
+              :staff-id="staff.id"
+              :staff-name="staff.label"
+              :selected="time"
+              :today="businessNow.slice(0, 10)"
+              :duration-minutes="minutesTouched ? typedMinutes : null"
+              :exclude-id="appointment?.id ?? null"
+              @pick="time = $event"
+              @off="slotsOff = $event"
+            />
+            <p
+              v-else-if="!charged"
+              class="appointment-form__unset"
+              data-testid="appointment-form-slots-unset"
+            >
+              <HubIcon
+                name="ion:calendar-outline"
+                aria-hidden="true"
+              />{{ $t('appointment.slots.hint') }}
+            </p>
+            <div
+              v-if="!asking || !slotsOff"
+              class="appointment-form__other-time"
+              data-testid="appointment-form-other-time"
+            >
+              <span class="appointment-form__other-label">{{ $t('appointment.form.otherTime') }}</span>
+              <TimeField
+                v-model="time"
+                testid="appointment-form-time"
+                :label="$t('appointment.form.time')"
+                required
+                :disabled="charged"
+                name="start"
+                :error-text="fieldErrors.start"
+              />
+            </div>
+            <InlineFeedback
+              v-if="past"
+              tone="warning"
+              data-testid="appointment-form-past"
+            >
+              {{ $t('appointment.form.pastNotice') }}
+            </InlineFeedback>
+          </section>
         </div>
-        <InlineFeedback
-          v-if="past"
-          tone="warning"
-          data-testid="appointment-form-past"
+        <div
+          class="appointment-form__more"
+          data-testid="appointment-form-more"
         >
-          {{ $t('appointment.form.pastNotice') }}
-        </InlineFeedback>
-        <FreeSlots
-          v-if="services.length && staff && day && !charged"
-          :date="day"
-          :service-ids="serviceIds"
-          :staff-id="staff.id"
-          :selected="time"
-          :duration-minutes="minutesTouched ? typedMinutes : null"
-          :exclude-id="appointment?.id ?? null"
-          @pick="time = $event"
-        />
-        <ion-textarea
-          data-testid="appointment-form-notes"
-          :value="notes"
-          :label="$t('appointment.form.notes')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :auto-grow="true"
-          :maxlength="2000"
-          name="notes"
-          :error-text="fieldErrors.notes"
-          @ion-input="notes = text($event.detail.value)"
-        />
-        <ion-textarea
-          data-testid="appointment-form-internal_notes"
-          :value="internalNotes"
-          :label="$t('appointment.form.internalNotes')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
-          :auto-grow="true"
-          :maxlength="2000"
-          name="internal_notes"
-          :error-text="fieldErrors.internal_notes"
-          @ion-input="internalNotes = text($event.detail.value)"
-        />
-        <section
-          v-if="appointment"
-          class="appointment-form__history"
-        >
-          <h3>{{ $t('appointment.form.history') }}</h3>
-          <AppointmentHistory :appointment-id="appointment.id" />
-        </section>
+          <BookingNotes
+            v-model:notes="notes"
+            v-model:internal-notes="internalNotes"
+            :notes-error="fieldErrors.notes"
+            :internal-notes-error="fieldErrors.internal_notes"
+          />
+          <FoldedSection
+            v-if="appointment"
+            :title="$t('appointment.form.history')"
+            testid="appointment-form-history-fold"
+          >
+            <AppointmentHistory :appointment-id="appointment.id" />
+          </FoldedSection>
+        </div>
       </div>
+    </template>
+    <template #summary>
+      <BookingSummary
+        :day="day"
+        :time="time"
+        :minutes="typedMinutes"
+        :staff-name="staff?.label ?? ''"
+      />
     </template>
   </FormModal>
   <ConfirmDialog
@@ -532,39 +543,139 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 </template>
 
 <style scoped>
+/* Phone: one column, the professional and the day side by side. The columns' boxes step aside (`contents`) so their
+   fields share the panel's grid, and `dense` brings the day up beside the professional. */
 .appointment-form {
   display: grid;
-  gap: 14px;
-}
-.appointment-form__when {
-  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-flow: row dense;
+  gap: 14px 10px;
+}
+.appointment-form__who,
+.appointment-form__when {
+  display: contents;
+}
+.appointment-form__who > *,
+.appointment-form__when > *,
+.appointment-form__more {
+  grid-column: 1 / -1;
+}
+.appointment-form__who > .appointment-form__staff {
+  grid-column: 1;
+}
+.appointment-form__when > .appointment-form__day {
+  grid-column: 2;
+}
+.appointment-form__more,
+.appointment-form__slots {
+  display: grid;
   gap: 10px;
+}
+/* Tablet and desktop: who and what on the left, when on the right, the notes under the left column. */
+@media (min-width: 640px) {
+  .appointment-form {
+    grid-template-rows: auto 1fr;
+    gap: 14px 24px;
+  }
+  .appointment-form__who,
+  .appointment-form__when {
+    display: grid;
+    gap: 14px;
+    align-content: start;
+  }
+  .appointment-form__who > *,
+  .appointment-form__when > * {
+    grid-column: auto;
+  }
+  .appointment-form__who,
+  .appointment-form__more {
+    grid-column: 1;
+    align-self: start;
+  }
+  .appointment-form__when {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    padding-inline-start: 24px;
+    border-inline-start: 1px solid var(--ep-border, #d9dde3);
+  }
+}
+.appointment-form__booked {
+  display: grid;
+  gap: 4px;
+}
+.appointment-form__booked-name {
+  font-size: 1.05rem;
+}
+.appointment-form__booked-number {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--ep-text-muted, #646b78);
+  font-variant-numeric: tabular-nums;
 }
 .appointment-form__label {
   display: block;
   font-size: 0.85rem;
-  color: var(--ion-color-medium, #6b7280);
+  color: var(--ep-text-muted, #646b78);
   margin-bottom: 4px;
 }
-.appointment-form__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 6px;
-}
-.appointment-form__hint,
-.appointment-form__note,
-.appointment-form__total {
+.appointment-form__note {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--ion-color-medium, #6b7280);
+  color: var(--ep-text-muted, #646b78);
+}
+.appointment-form__services {
+  display: grid;
+  gap: 6px;
+}
+.appointment-form__total {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0 2px;
+  font-size: 0.9rem;
+  color: var(--ep-text-muted, #646b78);
+}
+.appointment-form__total strong {
+  color: var(--ion-text-color, #1d2025);
+  font-variant-numeric: tabular-nums;
 }
 .appointment-form__error {
   color: var(--ion-color-danger, #c5000f);
 }
-.appointment-form__history h3 {
+.appointment-form__slots h3 {
+  margin: 0;
   font-size: 0.95rem;
-  margin: 8px 0;
+}
+.appointment-form__unset {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed var(--ep-border, #d9dde3);
+  border-radius: var(--ep-radius-sm, 10px);
+  font-size: 0.9rem;
+  color: var(--ep-text-muted, #646b78);
+}
+.appointment-form__unset :deep(svg),
+.appointment-form__unset > :first-child {
+  flex: none;
+  font-size: 22px;
+  color: var(--ep-primary-text, #0b5f8a);
+}
+.appointment-form__other-time {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 150px);
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--ep-border, #d9dde3);
+}
+.appointment-form__other-label {
+  font-size: 0.9rem;
+  color: var(--ep-text-muted, #646b78);
 }
 </style>
