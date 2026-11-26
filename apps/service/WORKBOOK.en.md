@@ -383,7 +383,7 @@ Edit or Archive and tapping it opens nothing.
 Involved: SERVICE-F04
 
 ### SERVICE-F06 Add many services in one go
-<!-- from WORKBOOK.md sha256:32b9acd7f715 -->
+<!-- from WORKBOOK.md sha256:d1377b99cbff -->
 Status: done (assistant and API; there is no importer on screen)
 Actor: manager, assistant
 Screen: none
@@ -391,7 +391,10 @@ Steps:
 1. Ask the assistant to create a list of services (up to 500), each with a name, a price, a duration
    and, if you want, a tax category and a category. The price of each one is always said (0 if it is
    free): if it is missing, the assistant asks for it before the card.
-2. The assistant answers how many were created.
+2. Before creating them, the confirmation card says each service by its name ("Services: Cut, Colour, Blow-dry";
+   with more than four, the first three and how many more) and, below, the categories and the tax categories they
+   take, once each ("Category: Hair", "Tax category: Service — generic · 21%").
+3. The assistant answers how many were created.
 In: the list of services.
 Out: the services, all or none, each with its notice (`service.service.created`). What a line does not
 say takes the Settings, as the single add does.

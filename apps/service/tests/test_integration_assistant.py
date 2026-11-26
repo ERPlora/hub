@@ -653,21 +653,25 @@ def test_each_record_is_titled_as_the_screens_title_it(language, hub_a):
 @HUB_DB
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_the_records_inside_a_list_are_named_too(language, hub_a):
-    """The services of a new package and the category of each service of a bulk create, at any depth."""
+    """The services of a new package and, beside the new services of a bulk create, each by its name, the categories
+    they go into, once each, by their names."""
     with use_hub(hub_a):
         salon = a_salon()
         ctx = person(hub_a, language=language)
         package = assistant.cards.card(
             get("service.package.create"), {"items": [{"service_id": str(salon["service"]), "sessions": 5}]}, language, ctx
         )
-        bulk = assistant.cards.card(
-            get("service.service.bulk_create"),
-            {"services": [{"name": "Tinte", "category_id": str(salon["category"])}]},
-            language,
-            ctx,
-        )
+        rows = [{"name": name, "category_id": str(salon["category"])} for name in ("Tinte", "Mechas")]
+        bulk = assistant.cards.card(get("service.service.bulk_create"), {"services": rows}, language, ctx)
     assert list_field(package, "items")["value"][0]["service_id"] == "Corte"
-    assert list_field(bulk, "services")["value"][0]["category_id"] == "Peluquería"
+    assert [field["name"] for field in bulk["fields"]] == ["services", "category_id"]
+    assert list_field(bulk, "services")["value"] == ["Tinte", "Mechas"]
+    category = list_field(bulk, "category_id")
+    assert (category["label"], category["value"], category.get(shared.NAMED)) == (
+        TITLES[language]["category"],
+        ["Peluquería"],
+        True,
+    )
     assert no_id(package) and no_id(bulk)
 
 

@@ -372,7 +372,10 @@ Pasos:
 1. Pide al asistente que cree una lista de servicios (hasta 500), cada uno con nombre, precio,
    duración y, si quieres, categoría fiscal y categoría. El precio de cada uno se dice siempre (0 si es
    gratis): si falta, el asistente lo pregunta antes de la tarjeta.
-2. El asistente responde cuántos se crearon.
+2. Antes de crearlos, la tarjeta de confirmación dice cada servicio por su nombre («Servicios: Corte, Tinte,
+   Peinado»; con más de cuatro, los tres primeros y cuántos más) y, debajo, las categorías y las categorías fiscales
+   que llevan, una vez cada una («Categoría: Peluquería», «Categoría fiscal: Servicio — general · 21 %»).
+3. El asistente responde cuántos se crearon.
 Entra: la lista de servicios.
 Sale: los servicios, todos o ninguno, cada uno con su aviso (`service.service.created`). Lo que una
 línea no dice toma los Ajustes, como el alta suelta.
