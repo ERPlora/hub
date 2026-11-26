@@ -8,7 +8,8 @@ import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { embedHubHome, forgetHubHome } from '../../../../base/frontend/__tests__/hub-home';
+import { forgetHubHome } from '../../../../base/frontend/__tests__/hub-home';
+import { embedDownloads } from '../__tests__/app-downloads';
 import { EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountPrinting, words } from '../__tests__/mount-printing';
 import DeviceModal from '../components/DeviceModal.vue';
 import type { DeviceOut, PrinterOut } from '../operations';
@@ -147,7 +148,7 @@ describe('DevicesPage', () => {
   });
 
   it('in a browser, nobody sets it up to print: it says why, what to do and where to get the app', async () => {
-    embedHubHome({ name: 'Bar', app_downloads: { windows: 'http://localhost:8001/app/download/windows/' } });
+    embedDownloads();
     const browser =
       'A browser cannot print: the paper comes out of the ERPlora app. Install it on the device next to the printers and set that device up from the app, in Printing → Devices.';
     const manager = await setup({ session: MANAGER });
@@ -172,7 +173,7 @@ describe('DevicesPage', () => {
 
   it('inside the app, no download: it would be the app offering itself', async () => {
     inTheApp();
-    embedHubHome({ name: 'Bar', app_downloads: { windows: 'http://localhost:8001/app/download/windows/' } });
+    embedDownloads();
     const s = await setup({ session: MANAGER });
     await s.result(LIST, page([OTHER]));
     expect(s.prop('addable')).toBe(true);

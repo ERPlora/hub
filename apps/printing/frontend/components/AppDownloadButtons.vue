@@ -1,11 +1,12 @@
 <script setup lang="ts">
 // Where to get the ERPlora app, the one that talks to the printers: one button per system erplora.com publishes
-// (base's `useAppDownloads`), Windows first, each opening outside the hub (`openExternalLink`). It paints nothing
-// inside the installed app, which would be offering itself, nor without the addresses.
+// (base's `useAppDownloads`), Windows first, each opening outside the hub (`openExternalLink`), in Settings' row of
+// buttons. It paints nothing inside the installed app, which would be offering itself, nor without the addresses.
 import { openExternalLink } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 
 import { useAppDownloads } from '../../../../base/frontend/lib/app-downloads';
+import '../../../../base/frontend/settings.css';
 import { useT } from '../composables/useT';
 
 defineProps<{ testid: string }>();
@@ -17,7 +18,7 @@ const { downloads, offered } = useAppDownloads();
 <template>
   <div
     v-if="offered"
-    class="printing-downloads"
+    class="settings-card__actions"
     role="group"
     :aria-label="t('printing.systemCard.downloadTitle')"
     :data-testid="testid"
@@ -38,13 +39,3 @@ const { downloads, offered } = useAppDownloads();
   </div>
 </template>
 
-<style scoped>
-.printing-downloads {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.printing-downloads ion-button {
-  margin: 0;
-}
-</style>

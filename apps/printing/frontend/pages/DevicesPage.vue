@@ -19,6 +19,7 @@ import { waited } from '../lib/format';
 import { refusal } from '../lib/refusal';
 import type { DeviceOut } from '../operations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
+import '../../../../base/frontend/settings.css';
 
 const tabs = useAppTabs('printing');
 
@@ -155,10 +156,10 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
           tone="warning"
           data-testid="printing-devices-this"
         >
-          <p class="printing-devices__browser">
-            {{ $t('printing.devices.browser') }}
-          </p>
-          <AppDownloadButtons testid="printing-devices-download" />
+          <div class="settings-card__field">
+            <span>{{ $t('printing.devices.browser') }}</span>
+            <AppDownloadButtons testid="printing-devices-download" />
+          </div>
         </InlineFeedback>
         <InlineFeedback
           v-else-if="list.status.value !== 'loading' && !tableError"
@@ -243,10 +244,6 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
 .printing-devices__intro {
   margin: 0;
   color: var(--ion-color-medium-shade, var(--ion-color-medium));
-}
-/* A browser's note: what to do, the app's downloads under it. */
-.printing-devices__browser {
-  margin: 0 0 8px;
 }
 /* The name wraps inside its column (a long one is never cut), the «This device» pill under it. */
 .printing-devices__name {
