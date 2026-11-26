@@ -12,20 +12,10 @@ from django import forms
 from django.contrib import admin
 from live.operations import atomic
 
-from apps.service.models import (
-    CATEGORY_CYCLE,
-    CATEGORY_LOOP,
-    Assignment,
-    Category,
-    Grant,
-    GrantAdjustment,
-    Package,
-    PackageItem,
-    Redemption,
-    Service,
-    ServiceSettings,
-    parent_problem,
-)
+from apps.service.models.catalog import CATEGORY_CYCLE, CATEGORY_LOOP, Assignment, Category, Service, parent_problem
+from apps.service.models.grants import Grant, GrantAdjustment, Redemption
+from apps.service.models.packages import Package, PackageItem
+from apps.service.models.settings import ServiceSettings
 from apps.service.services.categories import lock_tree
 
 AUTOMATIC = ("id", "created_at", "updated_at")

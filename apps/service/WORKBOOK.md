@@ -1221,7 +1221,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   paquetes van por la columna elegida, después por su orden y su nombre, y al final por `id`, todo en la dirección de la
   lista y con los vacíos al final en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
   `test_ties_read_backwards_in_a_descending_list`, por lista.
-- Anatomía completa de una app (copia de `apps/tax`): `apps.py`, `models.py`, `migrations/`,
+- Anatomía completa de una app (copia de `apps/tax`): `apps.py`, `models/`, `migrations/`,
   `schemas/`, `queries/`, `services/`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`,
   `frontend/` y un `tests/test_<fichero>.py` por fichero, más `tests/test_integration_tax.py`,
   `test_integration_staff.py`, `test_integration_customer.py` (con las apps reales, sin dobles),

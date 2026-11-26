@@ -8,7 +8,7 @@ touched since the category came back goes into it.
 """
 
 from apps.service import queries
-from apps.service.models import Category, Service
+from apps.service.models.catalog import Category, Service
 from base.recovery import giving_back
 from base.tenancy.tests.test_recovery import fresh, run, run_in
 

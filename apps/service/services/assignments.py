@@ -10,7 +10,7 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.service import events
-from apps.service.models import Assignment
+from apps.service.models.catalog import Assignment
 from apps.service.queries.assignments import ASSIGNMENT_NOT_FOUND, load_assignment
 from apps.service.queries.catalog import find_service
 from apps.service.queries.reads import SYSTEM
