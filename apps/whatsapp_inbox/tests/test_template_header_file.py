@@ -23,7 +23,7 @@ from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.whatsapp_inbox.models import Template, TemplateSample
+from apps.whatsapp_inbox.models.templates import Template, TemplateSample
 from apps.whatsapp_inbox.tests.conftest import HOST, A, HUB_DB, B, connect, ctx_for, run, system, template
 from apps.whatsapp_inbox.tests.test_services_templates import (  # noqa: F401 - shared helpers and fixtures
     delivered,

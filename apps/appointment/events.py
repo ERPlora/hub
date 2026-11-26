@@ -145,3 +145,9 @@ def react(scope: Scope, name: str, payload: dict[str, Any]):
         return None
     reaction = get(operation_name)
     return reaction(system_context(scope), reaction.input.model_validate(payload))
+
+
+def deliver(event):
+    """Hands an outbox event to its reaction, as the relay does, with who recorded it: a sale charged or voided at the
+    till names that person in the appointment's history."""
+    return react(Scope(event.scope_kind, event.scope_key), event.name, {**event.payload, "actor": event.actor})
