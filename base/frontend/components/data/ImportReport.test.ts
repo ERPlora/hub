@@ -58,14 +58,14 @@ describe('ImportReport', () => {
   });
 
   it('says each figure in singular for one row and in plural for more, whatever the part (hub#2596)', async () => {
-    const part = (label: string, n: number) => ({
-      key: `inventory.${label}`, label, rows: 3 * n, status: 'partial' as const, created: n, already: n, failed: n, problems: [],
+    const part = (label: string, created: number, already: number, failed: number) => ({
+      key: `inventory.${label}`, label, rows: created + already + failed, status: 'partial' as const, created, already, failed, problems: [],
     });
     const counted = load({
       report: {
         status: 'partial',
         dropped: [],
-        apps: [{ id: 'inventory', label: 'Inventory', status: 'partial', datasets: [part('Categories', 1), part('Products', 2)] }],
+        apps: [{ id: 'inventory', label: 'Inventory', status: 'partial', datasets: [part('Categories', 1, 2, 1), part('Products', 2, 1, 3)] }],
       },
     });
     const lines = async (locale: 'en' | 'es') => {
@@ -75,12 +75,12 @@ describe('ImportReport', () => {
       return texts;
     };
     expect(await lines('en')).toEqual([
-      'Categories · 1 new row · 1 was already there · 1 failed',
-      'Products · 2 new rows · 2 were already there · 2 failed',
+      'Categories · 1 new row · 2 were already there · 1 failed',
+      'Products · 2 new rows · 1 was already there · 3 failed',
     ]);
     expect(await lines('es')).toEqual([
-      'Categories · 1 fila nueva · 1 ya estaba · 1 con error',
-      'Products · 2 filas nuevas · 2 ya estaban · 2 con error',
+      'Categories · 1 fila nueva · 2 ya estaban · 1 con error',
+      'Products · 2 filas nuevas · 1 ya estaba · 3 con error',
     ]);
   });
 
