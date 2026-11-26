@@ -23,9 +23,9 @@ const TABLES = {
   ],
 };
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', tables = TABLES) {
   const card = { id: 'c1', name: 'Lucía Pérez', phone: '+34600999888', email: 'lucia@x.es' };
-  const m = await openBookingPanel({ props, locale, tables: TABLES, card });
+  const m = await openBookingPanel({ props, locale, tables, card });
   const field = (name: string) => m.inDoc(`reservation-form-${name}`) as Control;
   const submit = () => m.inDoc('reservation-form-submit') as Control;
   const tablePicker = () => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === 'reservation-form-table')!;
@@ -140,6 +140,31 @@ describe('ReservationFormModal: New reservation', () => {
     s.tablePicker().vm.$emit('update:modelValue', { id: 't2', label: '2 (Bar)' });
     await settle();
     expect(s.inDoc('reservation-form-small')?.textContent).toContain('Table 2 (Bar) has 2 seats for 4 guests.');
+  });
+
+  it('says one seat and one guest in the singular, and several in the plural', async () => {
+    const tables = {
+      rows: [
+        freeTable({ id: 't1', number: '1', label: '1 (Bar)', zone_name: 'Bar', capacity: 1, fits: false }),
+        freeTable({ id: 't3', number: '3', label: '3 (Bar)', zone_name: 'Bar', capacity: 2, fits: true }),
+      ],
+    };
+    const said = async (locale: 'en' | 'es', party: string) => {
+      const s = await setup({}, locale, tables);
+      await ionValue(s.field('guest_name'), 'Ana García', 'ionInput');
+      await pick(s.field('time'), '21:00');
+      await ionValue(s.field('party_size'), party, 'ionInput');
+      const options = (await (s.tablePicker().props('search') as (q: string) => Promise<unknown>)('')) as { hint: string }[];
+      s.tablePicker().vm.$emit('update:modelValue', { id: 't1', label: '1 (Bar)' });
+      await settle();
+      return [...options.map((option) => option.hint), s.inDoc('reservation-form-small')?.textContent?.trim()];
+    };
+    expect(await said('en', '2')).toEqual(['1 seat · Bar · too small for the party', '2 seats · Bar', 'Table 1 (Bar) has 1 seat for 2 guests.']);
+    expect(await said('es', '2')).toEqual([
+      '1 plaza · Bar · pequeña para el grupo',
+      '2 plazas · Bar',
+      'La mesa 1 (Bar) tiene 1 plaza para 2 comensales.',
+    ]);
   });
 
   it('asks before filling a full slot, and «Book anyway» books it', async () => {
