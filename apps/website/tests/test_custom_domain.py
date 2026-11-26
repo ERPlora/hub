@@ -265,7 +265,7 @@ def test_a_publication_forgets_the_page_of_the_domain_too(client, connected):
 
 
 def test_the_catalog_is_the_live_one_and_not_the_snapshot_of_the_publication(client, connected):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     publish(catalog={"source": "service", "show_prices": True})
     assert Site.objects.get().published_content["catalog"]["groups"] == []
@@ -278,7 +278,7 @@ def test_the_catalog_is_the_live_one_and_not_the_snapshot_of_the_publication(cli
 
 
 def test_a_hidden_catalog_is_not_even_read(db):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     Service.objects.create(name="Live haircut", price=1250, duration_minutes=30)
     assert queries.public.live_catalog(A, full_content(catalog={"source": "service", "hidden": False}))["groups"]

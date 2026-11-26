@@ -214,7 +214,7 @@ def google_reviews(place_ref: str = PLACE_ID, **overrides) -> dict:
 
 @pytest.fixture
 def services_catalog(db):
-    from apps.service.models import Category, Service
+    from apps.service.models.catalog import Category, Service
 
     hair, nails = Category.objects.create(name="Hair", sort_order=2), Category.objects.create(name="Nails", sort_order=1)
     Service.objects.create(name="Cut", price=1500, duration_minutes=30, category=hair)

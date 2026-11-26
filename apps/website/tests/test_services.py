@@ -74,7 +74,7 @@ def upload(raw: bytes, content_type="image/png", filename="logo.png", ctx=None):
 @pytest.fixture
 def services_catalog(db):
     """Two offered services in «Hair» and one without a category, as Services keeps them."""
-    from apps.service.models import Category, Service
+    from apps.service.models.catalog import Category, Service
 
     hair = Category.objects.create(name="Hair", sort_order=1)
     Service.objects.create(name="Cut", price=1500, duration_minutes=30, category=hair)

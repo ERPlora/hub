@@ -8,7 +8,7 @@ from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload
 from live.operations import atomic
 
-from apps.service.models import ACTOR_MAX_LENGTH
+from apps.service.models.settings import ACTOR_MAX_LENGTH
 from apps.tax.models import TaxCategory
 from apps.tax.queries.categories import held_categories
 from base.queries.people import actor_name

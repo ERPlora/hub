@@ -83,7 +83,7 @@ def test_the_public_catalog_is_read_live_priced_for_the_visitor_and_cached_a_min
     business_in("ES")
     save()
     run("website.site.publish")
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     Service.objects.create(name="Beard", price=900, duration_minutes=20, category=services_catalog["hair"])
     out = run("website.public.catalog", ctx=with_language(visitor(), "es"))

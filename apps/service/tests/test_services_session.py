@@ -14,7 +14,7 @@ from live.operations import get
 from live.models import OutboxEvent
 from pydantic import ValidationError
 
-from apps.service.models import Redemption
+from apps.service.models.grants import Redemption
 from apps.service.schemas.fields import NoIn
 from apps.service.schemas.sessions import ExpiredOut, HoldIn, ReturnIn, SessionOut, SessionRefIn, SessionsOut, SettleIn
 

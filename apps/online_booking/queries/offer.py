@@ -11,7 +11,7 @@ from apps.appointment.queries.booking import bookable_members, check_member
 from apps.appointment.schemas.availability import SlotsIn
 from apps.online_booking.models import Settings
 from apps.online_booking.schemas import PublicServicePage, PublicServicesIn, PublicSlotsIn, PublicSlotsOut
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.service.queries.settings import current_settings as service_settings
 from apps.staff.models import Member
 from apps.staff.queries.reads import resolve_member
