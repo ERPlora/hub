@@ -7,8 +7,9 @@ import { writeFileSync } from 'node:fs';
 
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { addDrawerNamed } from './cash-register-helpers';
 import { cutLabels } from './field-labels';
-import { A, api, collectProblems, horizontalOverflow, psql, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing, uniqueName } from './helpers';
+import { A, api, capture, collectProblems, horizontalOverflow, psql, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing, uniqueName } from './helpers';
 import { dialog } from './inventory-helpers';
 import { ownerPage, rowAction } from './service-helpers';
 import { discardChanges } from './unsaved-back-helpers';
@@ -102,7 +103,7 @@ async function saidOnceUnder(page: Page, scope: Locator, field: Locator, notice:
     expect(await horizontalOverflow(page), `${name} at ${size.label}: no sideways scroll`).toBeLessThanOrEqual(0);
     expect(await cutLabels(scope), `${name} at ${size.label}: no label cut`).toEqual([]);
     test.info().annotations.push({ type: `box ${name} ${size.label}`, description: JSON.stringify({ input: at(input), reason: at(text) }) });
-    writeFileSync(test.info().outputPath(`hub2535-${name}-${size.label}.png`), await page.screenshot());
+    writeFileSync(test.info().outputPath(`hub2535-${name}-${size.label}.png`), await capture(page, `hub2535-${name}-${size.label}`));
   }
 }
 
@@ -110,12 +111,7 @@ for (const language of LANGUAGES) {
   test(`hub#2535 CASH_REGISTER-F02 (${language}): a drawer named like another one says why once, under the name`, async ({ browser }) => {
     const { page, noProblems, close } = await signedIn(browser, language, '/cash_register/settings');
     try {
-      await shown(page).locator('[data-testid=cash-register-registers-heading]').scrollIntoViewIfNeeded();
-      await shown(page).locator('[data-testid=cash-register-registers-add]').click();
-      const modal = dialog(page, 'cash-register-register');
-      const name = modal.locator('[data-testid=cash-register-register-name]');
-      await name.locator('input').fill(DRAWER.toLowerCase());
-      await modal.locator('[data-testid=cash-register-register-submit]').click();
+      const { modal, name } = await addDrawerNamed(page, DRAWER.toLowerCase());
       await saidOnceUnder(page, modal, name, modal.locator('[data-testid=cash-register-register-error]'), DRAWER_TAKEN[language], `drawer-${language}`);
       await modal.locator('[data-testid=cash-register-register-cancel]').click();
       await discardChanges(page);
