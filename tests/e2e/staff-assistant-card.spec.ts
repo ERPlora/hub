@@ -20,8 +20,14 @@ const WEEK = [{ weekday: 0, start_time: '09:00', end_time: '17:00' }];
 
 /** What each screen calls the record and how a day off reads, by the language of the card. */
 const WORDS = {
-  es: { member: 'Miembro del personal', role: 'Rol', schedule: 'Horario', timeOff: 'Ausencia', vacation: 'Vacaciones', days: '2 nov 2026 – 5 nov 2026' },
-  en: { member: 'Staff member', role: 'Role', schedule: 'Schedule', timeOff: 'Time off', vacation: 'Vacation', days: 'Nov 2, 2026 – Nov 5, 2026' },
+  es: {
+    member: 'Miembro del personal', members: 'Miembros del personal', role: 'Rol', schedule: 'Horario', timeOff: 'Ausencia',
+    vacation: 'Vacaciones', days: '2 nov 2026 – 5 nov 2026', more: (items: string, count: number) => `${items} y ${count} más`,
+  },
+  en: {
+    member: 'Staff member', members: 'Staff members', role: 'Role', schedule: 'Schedule', timeOff: 'Time off',
+    vacation: 'Vacation', days: 'Nov 2, 2026 – Nov 5, 2026', more: (items: string, count: number) => `${items} and ${count} more`,
+  },
 };
 /** The word the card calls a record by when nothing titles it, in each language. */
 const GENERIC = { es: 'Registro', en: 'Record' };
@@ -108,14 +114,34 @@ for (const language of ['es', 'en'] as const) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await cancel(page);
 
-    // The role of a record and the people of a batch, each by the role's name (the case the issue names).
+    // The role of a record by its name (the case the issue names).
     const retitled = await datumOf(page, 'staff__member__update', { id: team.member.id, role_id: team.role.id }, 'role_id');
     expect([retitled.label, retitled.value]).toEqual([words.role, team.role.name]);
     await cancel(page);
-    const batch = await datumOf(page, 'staff__member__bulk_create', {
-      members: [{ first_name: `${PREFIX} Bea ${RUN}`, last_name: 'Ruiz', role_id: team.role.id }],
+
+    // «Da de alta a Carla Ruiz, Diego Martín y Elena Sanz» (hub#2619): each person by their names, whatever else the
+    // row says, never «3 items»; five, the first three and how many more.
+    const people = ['Carla Ruiz QA', 'Diego Martín QA', 'Elena Sanz QA', 'Fran Gil QA', 'Gema Mora QA'].map((full) => {
+      const [first, ...last] = full.split(' ');
+      return { first_name: `${PREFIX}${first}`, last_name: last.join(' ') };
+    });
+    const said = people.map((person) => `${person.first_name} ${person.last_name}`);
+    const three = await datumOf(page, 'staff__member__bulk_create', {
+      members: people.slice(0, 3).map((person, index) => ({ ...person, is_bookable: true, role_id: index ? undefined : team.role.id })),
     }, 'members');
-    expect(batch.value).toEqual([expect.objectContaining({ role_id: team.role.name })]);
+    expect([three.label, three.value]).toEqual([words.members, said.slice(0, 3)]);
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(card(page)).toContainText(`${words.members}: ${said.slice(0, 3).join(', ')}`);
+      await expect(card(page)).not.toContainText(AN_ID);
+      await untilStill(page);
+      await capture(page, `hub-2619-batch-${language}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await cancel(page);
+    await datumOf(page, 'staff__member__bulk_create', { members: people }, 'members');
+    await expect(card(page)).toContainText(`${words.members}: ${words.more(said.slice(0, 3).join(', '), 2)}`);
+    await capture(page, `hub-2619-batch-more-${language}`);
     await cancel(page);
 
     // Cancelled, nothing changed.

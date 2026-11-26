@@ -79,8 +79,9 @@ def test_a_record_says_its_role_by_its_name(language, title):
 
 
 @HUB_DB
-def test_each_row_of_a_batch_says_its_role_by_its_name():
-    """The case the issue names: the people a batch adds, each with the role they take, never by its id."""
+def test_each_row_of_a_batch_says_whom_it_adds_by_their_names_never_by_an_id():
+    """The people a batch adds, each by the first name and last name the directory shows, also when they take a role:
+    never «2 items», nor the role's id."""
     stylist, waiter = make_role("Stylist"), make_role("Waiter")
     batch = {
         "members": [
@@ -89,7 +90,7 @@ def test_each_row_of_a_batch_says_its_role_by_its_name():
         ]
     }
     rows = shown("staff.member.bulk_create", batch)["members"]
-    assert [row["role_id"] for row in rows] == ["Stylist", "Waiter"]
+    assert rows == ["Ana Gil", "Bea Ruiz"]
     assert not AN_ID.search(str(rows))
 
 
