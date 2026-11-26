@@ -2,11 +2,12 @@
 // On a phone, in Spanish, the bar of «Automatizaciones» must not read «A» (375 px) or «A…» (390 px) because its one
 // action, «Nueva automatización» with its icon and its text, takes the whole width. The owner of hub `a` opens the list in Spanish at
 // 375, 390, 834 and 1440 px: the title is read whole (its `.toolbar-title` not cut with «…») and «Nueva automatización»
-// is still one tap away, by its name. At every size it is only its «+», named and titled «Nueva automatización». No
-// sideways scroll. Each width leaves its capture. Nothing is created.
+// is still one tap away, by its name: on a phone in the bar's «⋮», from a tablet on, on the bar. At every size it is only
+// its «+», named and titled «Nueva automatización». No sideways scroll. Each width leaves its capture. Nothing is created.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
+import { compactBar, topbarMore, topbarMoreMenu } from './topbar';
 
 const KEY = 'FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE';
 const SIZES = [
@@ -33,8 +34,6 @@ for (const size of SIZES) {
   test(`flow-automations-list at ${size.label}: «Automatizaciones» read whole, «Nueva automatización» one tap away`, async ({ browser }) => {
     const { context, page } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
-      const add = shown(page).getByRole('button', { name: 'Nueva automatización', exact: true });
-      await expect(add).toBeVisible();
       // The list as the owner reads it: its gallery painted, nothing still loading.
       await expect(shown(page).locator('[data-testid^=flow-card-open-]').first()).toBeVisible();
       await expect(shown(page).locator('.flow-page__loading')).toHaveCount(0);
@@ -48,14 +47,19 @@ for (const size of SIZES) {
       });
       expect(cut, `the title «Automatizaciones» at ${size.label} is read whole`).toBe(false);
 
-      // The action is its «+» alone at every size, its name as its title.
-      const words = await shown(page).locator('[data-testid=flow-new]').evaluate((el) => (el as HTMLElement).innerText.trim());
-      expect(words, `the words of the action at ${size.label}`).toBe('');
-      await expect(shown(page).locator('[data-testid=flow-new]')).toHaveAttribute('title', 'Nueva automatización');
-
       const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
+
+      // On a phone the bar's actions are in its «⋮»; from a tablet on, on the bar. At every size the action is its «+»
+      // alone, its name as its title.
+      if (compactBar(page)) await topbarMore(page).click();
+      const where = compactBar(page) ? topbarMoreMenu(page) : shown(page);
+      const add = where.getByRole('button', { name: 'Nueva automatización', exact: true });
+      await expect(add).toBeVisible();
+      const words = await where.locator('[data-testid=flow-new]').evaluate((el) => (el as HTMLElement).innerText.trim());
+      expect(words, `the words of the action at ${size.label}`).toBe('');
+      await expect(where.locator('[data-testid=flow-new]')).toHaveAttribute('title', 'Nueva automatización');
 
       await add.click();
       await page.waitForURL(/\/flow\/automations\/new$/);
