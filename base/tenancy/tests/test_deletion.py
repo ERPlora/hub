@@ -26,7 +26,7 @@ from live.operations import atomic
 
 from apps.attendance.models import Record
 from apps.inventory.models import Category
-from apps.service.models import Assignment, Service
+from apps.service.models.catalog import Assignment, Service
 from apps.staff.models import Member, TimeOff
 from apps.task.models import Project
 from apps.tax.models import TaxCategory
