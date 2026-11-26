@@ -533,6 +533,10 @@
       "retryNo": "Cancel",
       "retried": "Resumed: it finished well.",
       "retriedWaiting": "Resumed: it is waiting. See how it goes here.",
+      "retriedStopped": "Resumed: it finished, the condition was not met.",
+      "retriedCalling": "Resumed: it is calling another system. See how it goes here.",
+      "retriedAsking": "Resumed: it is waiting for an answer in “Waiting for your answer”.",
+      "retriedThinking": "Resumed: the assistant is on it. See how it goes here.",
       "retriedFailed": "It was resumed and stopped by an error again: {message}"
     },
     "events": {

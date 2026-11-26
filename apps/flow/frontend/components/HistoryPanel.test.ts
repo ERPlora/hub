@@ -178,6 +178,51 @@ describe('HistoryPanel', () => {
     expect(m.find('flow-run-retry-problem-r2').text()).toBe('This automation is paused: turn it on to run it.');
   });
 
+  // The notice says what the resumed run is doing right now, as «Run now» does: a run still calling another system,
+  // waiting for an answer or for the assistant has not finished.
+  it.each([
+    ['succeeded', 'command', 'done', 'Resumed: it finished well.'],
+    ['stopped', 'condition', 'stopped', 'Resumed: it finished, the condition was not met.'],
+    ['waiting', 'delay', 'waiting', 'Resumed: it is waiting. See how it goes here.'],
+    ['calling', 'http', 'calling', 'Resumed: it is calling another system. See how it goes here.'],
+    ['calling', 'assistant', 'thinking', 'Resumed: the assistant is on it. See how it goes here.'],
+    ['asking', 'ask', 'asking', 'Resumed: it is waiting for an answer in “Waiting for your answer”.'],
+  ] as const)('a run resumed that is now %s at a %s step says so', async (status, kind, outcome, notice) => {
+    toastSuccess.mockClear();
+    confirm.mockResolvedValue(true);
+    const m = await setup([{ ...FAILED, resumable: true }], 1);
+    const log = [{ step: 's1', kind, outcome, at: '2026-10-15T12:00:00+02:00' }];
+    m.answerBy({ '/api/flow/runs/retry': [200, run('r2', { status, log })] });
+    await click(m.find('flow-run-retry-r2').element);
+    await settle();
+    expect(toastSuccess.mock.calls).toEqual([[notice]]);
+  });
+
+  it('a resumed call that fails again later says so next to the run, with why', async () => {
+    confirm.mockResolvedValue(true);
+    const calling = run('r2', {
+      status: 'calling',
+      finished_at: null,
+      log: [{ step: 's1', kind: 'http', outcome: 'calling', host: 'qa.invalid', at: '2026-10-15T12:00:00+02:00' }],
+    });
+    const m = await setup([{ ...FAILED, resumable: true }], 1);
+    m.answerBy({ '/api/flow/runs/retry': [200, calling] });
+    await click(m.find('flow-run-retry-r2').element);
+    await settle();
+    await m.result(OP, { rows: [calling], total: 1, limit: 20, offset: 0, failed: 0 }, {}, 2);
+    expect(m.find('flow-run-retry-problem-r2').exists()).toBe(false);
+    const failedAgain = { ...calling, status: 'failed' as const, error_code: 'flow.http_timeout', error_message: 'It could not reach qa.invalid.', resumable: true };
+    await m.result(OP, { rows: [failedAgain], total: 1, limit: 20, offset: 0, failed: 1 }, {}, 3);
+    expect(m.find('flow-run-retry-problem-r2').text()).toBe('It was resumed and stopped by an error again: It could not reach qa.invalid.');
+  });
+
+  it('a run that stops by an error without being resumed here says nothing of a resume', async () => {
+    const m = await setup([run('r4', { status: 'calling', finished_at: null })]);
+    await m.result(OP, { rows: [run('r4', { status: 'failed', error_message: 'It could not reach qa.invalid.' })], total: 1, limit: 20, offset: 0, failed: 1 }, {}, 2);
+    expect(m.find('flow-run-trouble-r4').text()).toContain('It could not reach qa.invalid.');
+    expect(m.find('flow-run-retry-problem-r4').exists()).toBe(false);
+  });
+
   it('a run that cannot be resumed offers nothing', async () => {
     const m = await setup([FAILED, run('r1')], 1);
     expect(m.find('flow-run-retry-r2').exists()).toBe(false);

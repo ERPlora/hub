@@ -533,6 +533,10 @@
       "retryNo": "Cancelar",
       "retried": "Reanudada: terminó bien.",
       "retriedWaiting": "Reanudada: está esperando. Mira aquí cómo sigue.",
+      "retriedStopped": "Reanudada: terminó, no se cumplía la condición.",
+      "retriedCalling": "Reanudada: está llamando a otro sistema. Mira aquí cómo sigue.",
+      "retriedAsking": "Reanudada: espera una respuesta en «Esperan tu respuesta».",
+      "retriedThinking": "Reanudada: el asistente está en ello. Mira aquí cómo sigue.",
       "retriedFailed": "Se reanudó y volvió a pararse por un error: {message}"
     },
     "events": {
