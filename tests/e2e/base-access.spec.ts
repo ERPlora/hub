@@ -429,7 +429,7 @@ test('a till of a business that always asks goes back to the PIN pad after its i
   await expect(till).toHaveURL(`${origin}/settings`);
   const again = shown(till).getByTestId('pin-policy-again');
   await again.locator('ion-segment-button', { hasText: /^1 min$/ }).click();
-  await expect(shown(till).getByTestId('pin-policy-card')).toContainText('A till nobody touches for 1 minutes');
+  await expect(shown(till).getByTestId('pin-policy-card')).toContainText('A till nobody touches for 1 minute closes');
   expect(own('SELECT pin_policy || pin_inactivity_minutes FROM base_accesssettings')).toBe('always1');
   await till.clock.install();
   await till.reload();

@@ -55,7 +55,7 @@ function pick(event: CustomEvent<{ value?: string | number }>): void {
       class="file-sheets-muted"
       data-testid="file-preview-cut"
     >
-      {{ t('base.files.preview.tableCut', { shown: TABLE_PREVIEW_ROWS }) }}
+      {{ t('base.files.preview.tableCut', { count: TABLE_PREVIEW_ROWS }) }}
     </p>
     <p
       v-if="!header.length"

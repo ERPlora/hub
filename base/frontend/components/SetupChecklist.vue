@@ -108,7 +108,7 @@ function note(item: SetupItem): string {
       <span
         class="setup-progress"
         data-testid="setup-progress"
-      >{{ $t('base.setup.progress', { done: view.done, total: view.total }) }}</span>
+      >{{ $t('base.setup.progress', { done: view.done, total: view.total, n: view.total }) }}</span>
     </header>
     <ion-progress-bar
       class="setup-bar"

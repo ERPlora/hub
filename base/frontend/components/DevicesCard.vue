@@ -283,7 +283,7 @@ async function confirmPrune(): Promise<void> {
         data-testid="devices-prune"
         @click="pruning = true"
       >
-        {{ data.unused === 1 ? t('base.devices.pruneOne') : t('base.devices.pruneMany', { n: data.unused }) }}
+        {{ t('base.devices.prune', { n: data.unused }) }}
       </ion-button>
       <div
         v-else
@@ -291,7 +291,7 @@ async function confirmPrune(): Promise<void> {
         data-testid="devices-prune-ask"
       >
         <p class="devices__ask">
-          {{ data.unused === 1 ? t('base.devices.pruneAskOne') : t('base.devices.pruneAsk', { n: data.unused }) }}
+          {{ t('base.devices.pruneAsk', { n: data.unused }) }}
         </p>
         <p class="settings-card__note">
           {{ t('base.devices.pruneBody') }}
