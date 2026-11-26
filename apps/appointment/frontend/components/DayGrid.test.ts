@@ -102,6 +102,7 @@ describe('DayGrid', () => {
     expect(block.attributes('title')).toBe('10:00 AM Lucía Gómez Santamaría — Corte de mujer');
     expect(block.attributes('title')).toBe(block.attributes('aria-label'));
     expect(s.wrapper.find('[data-testid="appointment-grid-hour"]').attributes('style')).toContain('width: 120px');
+    expect(s.wrapper.find('.day-grid__track').attributes('style')).toContain('background-size: 120px 100%');
   });
 
   it('today it opens half an hour before the business’s time now', async () => {
