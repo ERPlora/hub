@@ -2861,7 +2861,7 @@ Pasos:
      como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
      nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una, por su nombre y su tipo
      de hoy («Categoría fiscal: Restauración — comida · 10 %»); las filas de un alta de golpe que dicta la persona,
-     igual, por el nombre de cada una: cada persona de Personal por su nombre y apellidos («Miembros del personal:
+     igual, por el nombre de cada una: cada persona de Personal por su nombre y apellidos («Crear en Personal:
      Carla Ruiz, Diego Martín, Elena Sanz»; una sin nombre o sin apellidos cuenta entre los «más») y cada servicio por
      su nombre («Servicios: Corte, Tinte»);
      una lista de líneas que solo llevan

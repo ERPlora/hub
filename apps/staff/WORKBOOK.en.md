@@ -347,14 +347,14 @@ If it fails: "That staff member does not exist in this business." if it was alre
 Involved: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Add several professionals at once
-<!-- from WORKBOOK.md sha256:626d0171a7cb -->
+<!-- from WORKBOOK.md sha256:20a850cbfb07 -->
 Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
 Steps:
 1. Whoever can add asks the assistant to add several people (up to 100 at once) with their name and, if
    they want, email, phone, role, hire date, rate, bookable, bio and specialties.
-2. Before creating them, the confirmation card says each person by their first name and last name ("Staff members:
+2. Before creating them, the confirmation card says each person by their first name and last name ("Create in Staff:
    Carla Ruiz, Diego Martín, Elena Sanz"; with more than four, the first three and how many more). A row without a
    first name or a last name counts among the "more".
 3. An **Active** record is created for each valid row.

@@ -2943,7 +2943,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:c2873ffc1ef3 -->
+<!-- from WORKBOOK.md sha256:0ea1b7f2a68c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2987,7 +2987,7 @@ Steps:
      as the import keeps it ("File rows: Spoons, Stews"; a row without a name counts among the "more", never by
      another of its cells) and, in Inventory, the tax categories they take, once each, by their name and today's rate ("Tax
      category: Restaurant — food · 10%"); the rows of a batch the person dictates, the same way, by the name of each:
-     each person of Staff by their first name and last name ("Staff members: Carla Ruiz, Diego Martín, Elena Sanz"; one
+     each person of Staff by their first name and last name ("Create in Staff: Carla Ruiz, Diego Martín, Elena Sanz"; one
      without a first name or a last name counts among the "more") and each service by its name ("Services: Cut,
      Colour"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also

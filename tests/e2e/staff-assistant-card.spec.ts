@@ -21,11 +21,11 @@ const WEEK = [{ weekday: 0, start_time: '09:00', end_time: '17:00' }];
 /** What each screen calls the record and how a day off reads, by the language of the card. */
 const WORDS = {
   es: {
-    member: 'Miembro del personal', members: 'Miembros del personal', role: 'Rol', schedule: 'Horario', timeOff: 'Ausencia',
+    member: 'Miembro del personal', members: 'Miembros del personal', create: 'Crear en Personal', role: 'Rol', schedule: 'Horario', timeOff: 'Ausencia',
     vacation: 'Vacaciones', days: '2 nov 2026 – 5 nov 2026', more: (items: string, count: number) => `${items} y ${count} más`,
   },
   en: {
-    member: 'Staff member', members: 'Staff members', role: 'Role', schedule: 'Schedule', timeOff: 'Time off',
+    member: 'Staff member', members: 'Staff members', create: 'Create in Staff', role: 'Role', schedule: 'Schedule', timeOff: 'Time off',
     vacation: 'Vacation', days: 'Nov 2, 2026 – Nov 5, 2026', more: (items: string, count: number) => `${items} and ${count} more`,
   },
 };
@@ -120,7 +120,8 @@ for (const language of ['es', 'en'] as const) {
     await cancel(page);
 
     // «Da de alta a Carla Ruiz, Diego Martín y Elena Sanz» (hub#2619): each person by their names, whatever else the
-    // row says, never «3 items»; five, the first three and how many more.
+    // row says, never «3 items»; five, the first three and how many more. A normal write's line says them first, as
+    // what the write is about.
     const people = ['Carla Ruiz QA', 'Diego Martín QA', 'Elena Sanz QA', 'Fran Gil QA', 'Gema Mora QA'].map((full) => {
       const [first, ...last] = full.split(' ');
       return { first_name: `${PREFIX}${first}`, last_name: last.join(' ') };
@@ -132,7 +133,7 @@ for (const language of ['es', 'en'] as const) {
     expect([three.label, three.value]).toEqual([words.members, said.slice(0, 3)]);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
-      await expect(card(page)).toContainText(`${words.members}: ${said.slice(0, 3).join(', ')}`);
+      await expect(card(page)).toContainText(`${words.create}: ${said.slice(0, 3).join(', ')}`);
       await expect(card(page)).not.toContainText(AN_ID);
       await untilStill(page);
       await capture(page, `hub-2619-batch-${language}-${vp.label}`);
@@ -140,7 +141,7 @@ for (const language of ['es', 'en'] as const) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await cancel(page);
     await datumOf(page, 'staff__member__bulk_create', { members: people }, 'members');
-    await expect(card(page)).toContainText(`${words.members}: ${words.more(said.slice(0, 3).join(', '), 2)}`);
+    await expect(card(page)).toContainText(`${words.create}: ${words.more(said.slice(0, 3).join(', '), 2)}`);
     await capture(page, `hub-2619-batch-more-${language}`);
     await cancel(page);
 

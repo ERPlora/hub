@@ -343,9 +343,9 @@ Pasos:
 1. Quien puede dar de alta pide al asistente que dé de alta a varias personas (hasta 100 de una vez)
    con su nombre y, si quiere, email, teléfono, rol, fecha de alta, tarifa, reservable, bio y
    especialidades.
-2. Antes de crearlas, la tarjeta de confirmación dice cada persona por su nombre y apellidos («Miembros del
-   personal: Carla Ruiz, Diego Martín, Elena Sanz»; con más de cuatro, las tres primeras y cuántas más). Una fila
-   sin nombre o sin apellidos cuenta entre las «más».
+2. Antes de crearlas, la tarjeta de confirmación dice cada persona por su nombre y apellidos («Crear en Personal:
+   Carla Ruiz, Diego Martín, Elena Sanz»; con más de cuatro, las tres primeras y cuántas más). Una fila sin nombre
+   o sin apellidos cuenta entre las «más».
 3. Se crea una ficha **Activa** por cada fila válida.
 4. La respuesta dice qué fichas se crearon y qué filas se omitieron con su motivo.
 Entra: las filas del lote; los roles activos del negocio.
