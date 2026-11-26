@@ -1,16 +1,15 @@
 // BasketSheet (ONLINE_ORDER-F04): the order a customer is about to send from their table. Each line with what goes
 // with it, its note, its quantity with one less and one more, and its amount; the total below; «Send order», which
 // waits while it is sent and says why it was refused. With nothing in it, it says the order is empty.
-import type { SessionMe } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
 import { click, mountInShell } from '../__tests__/mount-online-order';
+import { MONEY, VISITOR } from '../__tests__/table-page';
 import type { BasketLine } from '../lib/basket';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import BasketSheet from './BasketSheet.vue';
 
-const VISITOR: SessionMe = { user: null, permissions: [], menu: [], apps: [], language: 'en' };
 const CROQUETTES: BasketLine = {
   key: 1,
   kind: 'dish',
@@ -25,7 +24,7 @@ const CROQUETTES: BasketLine = {
 async function setup(lines: BasketLine[], more: Record<string, unknown> = {}) {
   return mountInShell(
     BasketSheet,
-    { props: { open: true, lines, money: { currency: 'EUR', decimals: 2 }, ...more }, session: VISITOR },
+    { props: { open: true, lines, money: MONEY, ...more }, session: VISITOR },
     { path: '/p/casa-pepe/order/code', session: VISITOR, messages: { en, es } },
   );
 }

@@ -41,7 +41,7 @@ function picked(line: BasketLine): string {
   >
     <EmptyState
       v-if="!lines.length"
-      icon="ion:restaurant-outline"
+      icon="ion:cart-outline"
       :heading="t('online_order.order.empty')"
       :message="t('online_order.order.emptyMessage')"
       data-testid="oo-order-empty"

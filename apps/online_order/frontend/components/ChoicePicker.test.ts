@@ -1,34 +1,22 @@
 // ChoicePicker (ONLINE_ORDER-F04): one group of what goes with a dish or a set menu, as the customer picks it. Its rule
 // above its choices; a checkbox per choice, the unchecked ones waiting once a group with a ceiling is full; one-less
 // and one-more buttons with the count where a choice may repeat. The taps go up.
-import type { SessionMe } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountInShell } from '../__tests__/mount-online-order';
+import { MONEY, SAUCES as GROUP, VISITOR } from '../__tests__/table-page';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import ChoicePicker, { type PickGroup } from './ChoicePicker.vue';
 
-const VISITOR: SessionMe = { user: null, permissions: [], menu: [], apps: [], language: 'en' };
-const SAUCES: PickGroup = {
-  id: 'g1',
-  name: 'Sauces',
-  min_choices: 0,
-  max_choices: 2,
-  allow_repeat: false,
-  options: [
-    { id: 'o1', name: 'Aioli', price_delta: 50, allergens: ['egg'] },
-    { id: 'o2', name: 'Brava', price_delta: 0, allergens: [] },
-    { id: 'o3', name: 'Mojo', price_delta: 0, allergens: [] },
-  ],
-};
+const SAUCES: PickGroup = { ...GROUP, options: [...GROUP.options, { id: 'o3', name: 'Mojo', price_delta: 0, allergens: [] }] };
 
 type Control = Element & { checked?: boolean; disabled?: boolean };
 
 async function setup(group: PickGroup, picks: string[] = []) {
   const mounted = await mountInShell(
     ChoicePicker,
-    { props: { group, choice: { picks, refused: null }, money: { currency: 'EUR', decimals: 2 } }, session: VISITOR },
+    { props: { group, choice: { picks, refused: null }, money: MONEY }, session: VISITOR },
     { path: '/p/casa-pepe/order/code', session: VISITOR, messages: { en, es } },
   );
   const prop = (testid: string, name: 'checked' | 'disabled') =>

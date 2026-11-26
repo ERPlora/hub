@@ -2,19 +2,17 @@
 // menu by category, each dish with its photo, description, allergens and price, and the set menus; the table and its
 // zone above it. Opening a dish shows its options, read then; opening a set menu, its courses. A QR that is no longer
 // active says so and nothing of the business; a menu that could not be loaded, why, with «Retry».
-import type { SessionMe } from '@erplora/ui/shell';
 import { ApiError, type ApiClient } from '@erplora/ui/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
 import { click, ionValue, mountInShell, settle } from '../__tests__/mount-online-order';
+import { MONEY, SAUCES, VISITOR } from '../__tests__/table-page';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { PublicMenuOut, PublicOptionsOut, PublicSentOut } from '../operations';
 import TableMenu from './TableMenu.vue';
 
 const CODE = 'c'.repeat(22);
-const VISITOR: SessionMe = { user: null, permissions: [], menu: [], apps: [], language: 'en' };
-const MONEY = { currency: 'EUR', decimals: 2 };
 const MENU: PublicMenuOut = {
   business_name: 'Casa Pepe',
   table_number: '4',
@@ -54,22 +52,7 @@ const MENU: PublicMenuOut = {
     },
   ],
 };
-const OPTIONS: PublicOptionsOut = {
-  product_id: 'p1',
-  groups: [
-    {
-      id: 'g1',
-      name: 'Sauces',
-      min_choices: 0,
-      max_choices: 2,
-      allow_repeat: false,
-      options: [
-        { id: 'o1', name: 'Aioli', price_delta: 50, allergens: ['egg'] },
-        { id: 'o2', name: 'Brava', price_delta: 0, allergens: [] },
-      ],
-    },
-  ],
-};
+const OPTIONS: PublicOptionsOut = { product_id: 'p1', groups: [SAUCES] };
 
 type Answer = PublicMenuOut | PublicOptionsOut | PublicSentOut | ApiError | Error | 'hang' | Promise<PublicOptionsOut>;
 const SENT: PublicSentOut = { id: 'order-1', status: 'pending', total: 1600 };
@@ -291,6 +274,15 @@ async function addDish(s: Awaited<ReturnType<typeof setup>>, id: string, picks: 
   await click(s.inDoc('oo-menu-sheet-submit'));
 }
 
+/** Adds a bread and sends the order, which the server answers with `answers` in turn. */
+async function sendFailing(s: Awaited<ReturnType<typeof setup>>, ...answers: Answer[]) {
+  s.answers['online_order.public.send'] = answers;
+  await addDish(s, 'p2');
+  await click(s.inDoc('oo-order-view'));
+  await click(s.inDoc('oo-order-sheet-submit'));
+  await settle();
+}
+
 const disabled = (el: Element | null) => (el as Element & { disabled: boolean }).disabled;
 
 describe('TableMenu: the order', () => {
@@ -343,11 +335,7 @@ describe('TableMenu: the order', () => {
   it('says why the order was refused and keeps it to send again', async () => {
     const s = await setup();
     const refusal = 'This is no longer on the menu: take it out of your order and send it again.';
-    s.answers['online_order.public.send'] = [new ApiError(409, 'online_order.not_on_menu', refusal), SENT];
-    await addDish(s, 'p2');
-    await click(s.inDoc('oo-order-view'));
-    await click(s.inDoc('oo-order-sheet-submit'));
-    await settle();
+    await sendFailing(s, new ApiError(409, 'online_order.not_on_menu', refusal), SENT);
     expect(words(s.inDoc('oo-order-sheet')!)).toContain(refusal);
     expect(s.inDoc('oo-order-sent')).toBeNull();
     await click(s.inDoc('oo-order-sheet-submit'));
@@ -357,11 +345,7 @@ describe('TableMenu: the order', () => {
 
   it('says there is no connection when the order does not get through', async () => {
     const s = await setup();
-    s.answers['online_order.public.send'] = [new TypeError('Failed to fetch')];
-    await addDish(s, 'p2');
-    await click(s.inDoc('oo-order-view'));
-    await click(s.inDoc('oo-order-sheet-submit'));
-    await settle();
+    await sendFailing(s, new TypeError('Failed to fetch'));
     expect(words(s.inDoc('oo-order-sheet')!)).toContain('No connection. Check it and send the order again.');
   });
 
