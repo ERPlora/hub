@@ -120,3 +120,12 @@ def test_a_cut_answer_only_asks_for_what_its_read_takes_and_reading_on_brings_th
     }
 
     assert unreadable == {}
+
+
+@pytest.mark.parametrize(
+    "name, data", [("base.role.detail", {"role": "hub_owner"}), ("base.help.get", {"app": "sale"}), ("flow.recipe.list", {})]
+)
+def test_where_to_read_on_from_is_never_before_the_start(olga, name, data):
+    answer = told(asking(olga, "en"), name, {**data, "offset": -1})
+
+    assert (answer["error"]["code"], list(answer["error"]["fields"])) == ("invalid_payload", ["offset"])
