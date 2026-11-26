@@ -348,15 +348,18 @@ If it fails: "That staff member does not exist in this business." if it was alre
 Involved: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Add several professionals at once
-<!-- from WORKBOOK.md sha256:34b070c0893f -->
+<!-- from WORKBOOK.md sha256:20a850cbfb07 -->
 Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
 Steps:
 1. Whoever can add asks the assistant to add several people (up to 100 at once) with their name and, if
    they want, email, phone, role, hire date, rate, bookable, bio and specialties.
-2. An **Active** record is created for each valid row.
-3. The answer says which records were created and which rows were skipped with their reason.
+2. Before creating them, the confirmation card says each person by their first name and last name ("Create in Staff:
+   Carla Ruiz, Diego Martín, Elena Sanz"; with more than four, the first three and how many more). A row without a
+   first name or a last name counts among the "more".
+3. An **Active** record is created for each valid row.
+4. The answer says which records were created and which rows were skipped with their reason.
 In: the rows of the batch; the business's active roles.
 Out: one record per valid row and one `staff.member.created` notice for each (none if none goes in).
 If it fails: a row with a blank name, an email that is not one, a badly written date, a negative rate or a
