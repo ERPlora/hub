@@ -436,18 +436,18 @@ with its check open at the till, "This appointment has a check open in the till:
 Involved: none
 
 ### APPOINTMENT-F10 See an appointment's history
-<!-- from WORKBOOK.md sha256:ac1dd82e7eea -->
+<!-- from WORKBOOK.md sha256:811b4d8d2ddf -->
 Status: done
 Actor: employee (their own), manager
 Screen: Agenda
 Steps:
 1. Tap **History** on the row (in any state) or open the appointment's card.
-2. Each change with its time on the business clock, who made it (a team member, by their name or, if their
-   account has none, by what goes before the @ of their email, never the whole email; "Requested by the customer"
-   if it was them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate
-   copy; an API key, by its name) and what changed (from which professional or service to which, and the new time). A
-   deleted appointment that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted"
-   and "Restored".
+2. Each change with its time on the business clock, who made it (a team member, by their name, the one in My
+   profile or, without it, their account's, or, if they have none, by what goes before the @ of their email, never
+   the whole email; "Requested by the customer" if it was them; "Done by the platform" if no person did: the
+   system, an automation or a recovery from a separate copy; an API key, by its name) and what changed (from which
+   professional or service to which, and the new time). A deleted appointment that ERPlora's staff brought back
+   from a separate copy keeps its lines and adds "Deleted" and "Restored".
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).

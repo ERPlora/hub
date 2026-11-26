@@ -487,7 +487,7 @@ notice that belongs to no field stays until it is saved again.
 Involved: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 See how the room is
-<!-- from WORKBOOK.md sha256:48cde36cc0d2 -->
+<!-- from WORKBOOK.md sha256:bdbfb4d465e8 -->
 Status: done
 Actor: manager, employee
 Screen: Floor plan
@@ -501,7 +501,7 @@ Steps:
 3. An occupied table shows the time ("0:35") and guests ("3/4 pax"); the time moves forward by itself and
    past the warnings in Settings only the time and its arc change colour. A table with a booking today says
    its name and time. Who serves it is seen in its window: whoever serves its check in Sales (the till's
-   "Served by" chip) or, if nobody changed it, whoever seated it, by their name or, if their account has
+   "Served by" chip) or, if nobody changed it, whoever seated it, by their name or, if they have
    none, by what goes before the @ of their e-mail, never the whole e-mail.
 4. The plan changes by itself when somebody seats, transfers, joins, splits, charges or voids: there is no
    need to leave and come back, and the window you have open (split, guests, close, "Edit table") stays at
@@ -513,7 +513,7 @@ If it fails: a failure on loading shows with "Retry".
 Involved: TABLE-F10, TABLE-F25, TABLE-F29, TABLE-F33, TABLE-F34, SALE-F16, SALE-F19, BASE-F119
 
 ### TABLE-F10 Seat a party at a free or reserved table
-<!-- from WORKBOOK.md sha256:81f5b014aff5 -->
+<!-- from WORKBOOK.md sha256:028dda7730b5 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Floor plan (Service); assistant
@@ -526,8 +526,8 @@ Steps:
 3. If you want, before seating "Assign customer" puts the card on the check. On a Reserved one, if you
    pick none, the check carries the booking's customer.
 4. The table turns Occupied and its open check is born in Sales with the title "Table N" (**Open
-   checks** of the till sees it). Whoever seats is the server of the check: their name or, if their account
-   has none, what goes before the @ of their e-mail, never the whole e-mail.
+   checks** of the till sees it). Whoever seats is the server of the check: their name or, if they have
+   none, what goes before the @ of their e-mail, never the whole e-mail.
 5. With the assistant: "seat 3 at table 4" (with its zone if the number repeats).
 In: the table and the guests; on a Reserved one, the booking's guests and customer.
 Out: the table check opened with its guests, the time and the server (announces:
@@ -754,7 +754,7 @@ changed its check); "That check is not open…" (someone else already closed it)
 Involved: TABLE-F15, TABLE-F18, TABLE-F20
 
 ### TABLE-F22 Look up the checks of the room (open and closed)
-<!-- from WORKBOOK.md sha256:16f65a1f7e79 -->
+<!-- from WORKBOOK.md sha256:df4dd1e4599a -->
 Status: done
 Actor: manager, employee
 Screen: Sessions
@@ -762,8 +762,8 @@ Steps:
 1. Open **Tables → Sessions**: it starts in "Open", the most recent first.
 2. "Closed" shows the closed ones with "Charged" (in the currency it was charged in: the business's) and
    "Closed"; "All", also the transferred, merged and parked ones.
-3. Filter by zone, server or status, or search by table number. The server shows by their name or, if their
-   account has none, by what goes before the @ of their e-mail, also on earlier checks, and is never searched
+3. Filter by zone, server or status, or search by table number. The server shows by their name or, if they
+   have none, by what goes before the @ of their e-mail, also on earlier checks, and is never searched
    by their e-mail.
 4. "Details" shows zone, server, status, guests, opening, closing, time, charged and notes.
 In: the table checks and what was charged in Sales.

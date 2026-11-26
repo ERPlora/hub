@@ -587,7 +587,7 @@ Pasos:
    Ventas con una devolución.».
 3. Escribe el Motivo (obligatorio) y pulsa **Anular**.
 Entra: la compra y el motivo.
-Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si su cuenta no tiene,
+Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si no tiene ninguno,
 por lo que va antes de la @ de su correo, nunca el correo entero), cuándo y el motivo (`service.grant.voided`). No mueve dinero ni emite documento. Si una línea de una venta lo pagó, esa parte
 vuelve a contar para quien la vendió, hasta que una devolución diga otra cosa (SALE-F28).
 Si falla: «Ese bono ya se ha usado: no se puede anular.», «Ese bono ya estaba anulado.» o «Indica
