@@ -4,7 +4,7 @@
 // (`flow.events.*`, `flow.actions.*`), composed from the app and a dictionary of facts and verbs for the
 // rest, and the raw words for what nobody wrote down yet. An event or action without a phrase is still
 // offered: hiding it would be a gap, naming it plainly is only cosmetic.
-import type { StatusPillTone } from '@erplora/ui/components';
+import { formatTimeOfDay, type StatusPillTone } from '@erplora/ui/components';
 
 import type { CatalogOut, ClauseOut, LogEntry, RunStatus, Step, Trigger } from '../operations';
 import { callOrigin, delayParts, isPath, valueToParts } from './document';
@@ -26,6 +26,11 @@ function humanize(text: string): string {
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** `text` between the quotation marks of the person's language: “Big sale”, «Venta grande». */
+export function quoted(text: string, p: Phrasing): string {
+  return p.t('flow.quoted', { text });
 }
 
 /** The app's visible name, in the person's language, from the catalog; `null` while it cannot be named (the catalog
@@ -99,17 +104,17 @@ export function formatDate(iso: string, locale: string, timeZone?: string): stri
   return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(date);
 }
 
-/** «When a sale is charged», «Every Friday at 18:00», «Only when you press Run»… */
+/** «When a sale is charged», «Every Friday at 6:00 PM», «Only when you press Run»… */
 export function describeTrigger(trigger: Trigger, catalog: CatalogOut | null | undefined, p: Phrasing): string {
   if (trigger.kind === 'event') {
     return trigger.event ? p.t('flow.trigger.describe.event', { event: eventLabel(trigger.event, catalog, p) }) : p.t('flow.trigger.describe.noEvent');
   }
   if (trigger.kind === 'schedule') {
     if (trigger.every === 'week') {
-      return p.t('flow.trigger.describe.week', { weekday: p.t(`flow.trigger.weekdays.${trigger.weekday ?? 0}`), time: trigger.time });
+      return p.t('flow.trigger.describe.week', { weekday: p.t(`flow.trigger.weekdays.${trigger.weekday ?? 0}`), time: formatTimeOfDay(trigger.time, p.locale) });
     }
-    if (trigger.every === 'month') return p.t('flow.trigger.describe.month', { day: trigger.day ?? 1, time: trigger.time });
-    return p.t('flow.trigger.describe.day', { time: trigger.time });
+    if (trigger.every === 'month') return p.t('flow.trigger.describe.month', { day: trigger.day ?? 1, time: formatTimeOfDay(trigger.time, p.locale) });
+    return p.t('flow.trigger.describe.day', { time: formatTimeOfDay(trigger.time, p.locale) });
   }
   if (trigger.kind === 'at') return trigger.at ? p.t('flow.trigger.describe.at', { date: formatDate(trigger.at, p.locale, p.timeZone) }) : p.t('flow.trigger.describe.noDate');
   return p.t('flow.trigger.describe.manual');
@@ -162,14 +167,14 @@ export function describeStep(step: Step, steps: readonly Step[], catalog: Catalo
   if (step.kind === 'ask') {
     // A datum in the question is named by its words («Amount»), never by its path.
     const title = valueToParts(step.title)
-      .map((part) => (part.kind === 'field' ? `«${pathLabel(part.path, steps, catalog, p)}»` : part.text))
+      .map((part) => (part.kind === 'field' ? quoted(pathLabel(part.path, steps, catalog, p), p) : part.text))
       .join('')
       .trim();
     return title ? p.t('flow.steps.describe.ask', { title }) : p.t('flow.steps.describe.noAsk');
   }
   if (step.kind === 'assistant') {
     const prompt = valueToParts(step.prompt)
-      .map((part) => (part.kind === 'field' ? `«${pathLabel(part.path, steps, catalog, p)}»` : part.text))
+      .map((part) => (part.kind === 'field' ? quoted(pathLabel(part.path, steps, catalog, p), p) : part.text))
       .join('')
       .trim();
     return prompt ? p.t('flow.steps.describe.assistant', { prompt }) : p.t('flow.steps.describe.noAssistant');
@@ -234,7 +239,7 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
       return p.t('flow.history.log.asking', { who: p.t(`flow.ask.roles.${entry.role || 'admin'}`), date: formatDate(entry.until ?? entry.at, p.locale, p.timeZone) });
     case 'answered': {
       const said = p.t(entry.approved ? 'flow.history.log.answeredYes' : 'flow.history.log.answeredNo', { who: entry.by ?? '' });
-      return entry.note ? `${said}: «${entry.note}»` : said;
+      return entry.note ? `${said}: ${quoted(entry.note, p)}` : said;
     }
     case 'expired':
       return p.t('flow.history.log.expired');
@@ -247,7 +252,7 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
     case 'assistant_proposed':
       return p.t('flow.history.log.assistantProposed', { action, date: formatDate(entry.until ?? entry.at, p.locale, p.timeZone) });
     case 'assistant_pinned_empty':
-      return p.t('flow.history.log.assistantPinnedEmpty', { action, fields: (entry.fields ?? []).map((name) => `«${fieldLabel(name, p)}»`).join(', ') });
+      return p.t('flow.history.log.assistantPinnedEmpty', { action, fields: (entry.fields ?? []).map((name) => quoted(fieldLabel(name, p), p)).join(', ') });
     case 'skipped':
       return p.t('flow.history.log.skipped', {
         clauses: (entry.failed ?? []).map((clause) => describeClause(clause, steps, catalog, p)).join('; '),

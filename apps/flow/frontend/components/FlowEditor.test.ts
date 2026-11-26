@@ -276,7 +276,7 @@ describe('FlowEditor: the switch, a run by hand, the permissions and an unreadab
     const s = await setup({ flow: on, initial: fromFlow(on) });
     await ionValue(s.find('flow-editor-name').element, 'Changed', 'ionInput');
     expect((s.find('flow-editor-run').element as unknown as { disabled: boolean }).disabled).toBe(true);
-    expect(s.find('flow-editor-run-hint').text()).toBe('Save it first: «Run now» runs what is saved.');
+    expect(s.find('flow-editor-run-hint').text()).toBe('Save it first: “Run now” runs what is saved.');
   });
 
   it('the permissions are read from what is saved, and ask to save the changes first', async () => {
@@ -373,7 +373,7 @@ describe('FlowEditor: the switch, a run by hand, the permissions and an unreadab
     mocks.confirm.mockResolvedValue(true);
     await click(s.find('flow-editor-run').element);
     await settle();
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is waiting for an answer in «Waiting for your answer».');
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('It ran and is waiting for an answer in “Waiting for your answer”.');
   });
 });
 

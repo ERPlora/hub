@@ -158,7 +158,7 @@ for (const viewport of VIEWPORTS) {
       await choose(page, 'flow-trigger-every', 'Every week');
       await choose(page, 'flow-trigger-weekday', 'Friday');
       await pickTime(page, editor.locator('[data-testid=flow-trigger-time]'), '18:00');
-      await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Every Friday at 18:00');
+      await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Every Friday at 6:00 PM');
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F10');
 
@@ -277,7 +277,7 @@ for (const viewport of VIEWPORTS) {
       await expect(shown(page).locator(`[data-testid=flow-draft-${kept.data.id}]`)).toHaveCount(0);
       await shown(page).locator('[data-testid=flow-list-search] input').fill(stamp);
       const row = shown(page).locator('[data-testid=flow-list-row]', { hasText: name });
-      await expect(row).toContainText('Every Friday at 18:00');
+      await expect(row).toContainText('Every Friday at 6:00 PM');
       await expect(row).toContainText('Finished well');
       await choose(page, 'flow-list-sort', 'Name');
       await choose(page, 'flow-list-state', 'Only the paused ones');
@@ -290,7 +290,7 @@ for (const viewport of VIEWPORTS) {
       await snap('FLOW-F02');
 
       // FLOW-F03: the switch of a row has its name; several, in bulk.
-      const named = shown(page).getByRole('switch', { name: `Turn «${name}» on or off` });
+      const named = shown(page).getByRole('switch', { name: `Turn “${name}” on or off` });
       await named.click();
       await expect(row).toContainText('Paused');
       await expect(row.locator('ion-toggle')).not.toHaveClass(/toggle-checked/);
@@ -320,7 +320,7 @@ for (const viewport of VIEWPORTS) {
       // FLOW-F07: deleted, asked first.
       const copyId = await copy.getAttribute('data-id');
       await rowAction(page, 'flow-list', copyId!, 'delete');
-      await confirmDialog(page, `Delete «Copy of ${name}»?`, () => snap('FLOW-F07'));
+      await confirmDialog(page, `Delete “Copy of ${name}”?`, () => snap('FLOW-F07'));
       await expect(copy).toHaveCount(0);
     } finally {
       await context.close();
