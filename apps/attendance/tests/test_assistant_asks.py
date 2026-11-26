@@ -123,6 +123,16 @@ test_every_probe_of_the_time_clock_offers_its_tool_without_being_one_of_its_asks
 test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(own_words_test(OWN_WORDS, "es"))
 
 
+#: «En pausa» named nothing of Time clock, whose tools are of a «break»: putting a person on a break said so was offered
+#: no break, and the model searched and offered to deactivate the person in Staff instead (hub#2580).
+PUT_ON_A_BREAK = [
+    ("attendance.break.start", "Pon a Javi en pausa", "en pausa"),
+    ("attendance.break.start", "pon que estoy en pausa", "en pausa"),
+]
+
+test_a_break_said_en_pausa_brings_it_by_time_clocks_group = in_hubs(by_group_test(PUT_ON_A_BREAK))
+
+
 #: What the owner says in English in words of their own for each tool of Time clock that needs one, neither
 #: an ask nor a probe of layer 2: its English asks lift it among the first ten (``assert_its_asks_lift``).
 OWN_WORDS_EN = [

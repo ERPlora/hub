@@ -11,7 +11,7 @@
 // the cash register goes back as it was.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, shown } from './helpers';
+import { A, api, capture, login, painted, shown } from './helpers';
 import { dialog, PHOTO_PNG, photoLoaded, VIEWPORTS } from './inventory-helpers';
 import { drawerOff, restoreDrawer, tilePhotoLoaded } from './sale-helpers';
 import { cleanUp, named, post, rowAction } from './service-helpers';
@@ -61,6 +61,37 @@ async function editForm(page: Page, service: Service): Promise<Locator> {
   return form;
 }
 
+/**
+ * The service's form with the Hub in `language`, as the language picker of «My profile» leaves it; the business has no
+ * language of its own here. The cookie goes after a first login: in a fresh context, the login brings back the hub's
+ * cookies, the language among them.
+ */
+async function editFormIn(page: Page, service: Service, language: 'en' | 'es'): Promise<Locator> {
+  await login(page, A, '/service/services');
+  await page.context().addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
+  const form = await editForm(page, service);
+  await expect(page.locator('html')).toHaveAttribute('lang', language);
+  return form;
+}
+
+/**
+ * The names of the library's images that do not show whole right under their image: cut with «…», short of lines,
+ * past their tile, or pushed down away from the image by a taller tile of the same row.
+ */
+async function cutNames(library: Locator): Promise<string[]> {
+  return library.locator('[data-testid^=service-form-image-library-modal-image-] span').evaluateAll((names) =>
+    names
+      .filter((name) => {
+        const tile = name.closest('button')!.getBoundingClientRect();
+        const image = name.previousElementSibling!.getBoundingClientRect();
+        const box = name.getBoundingClientRect();
+        const cut = name.scrollWidth > name.clientWidth + 1 || name.scrollHeight > name.clientHeight + 1;
+        return cut || box.left < tile.left - 1 || box.right > tile.right + 1 || box.top - image.bottom > 8;
+      })
+      .map((name) => name.textContent!.trim()),
+  );
+}
+
 async function detail(page: Page, id: string): Promise<Service> {
   const res = await api<Service>(page.context(), A, 'GET', `/service/services/detail?id=${id}`);
   expect(res.status).toBe(200);
@@ -108,10 +139,7 @@ test('SERVICE-F34: a library image, Hair and Beauty first, is the service’s ph
 test('SERVICE-F34: the library names its images in the language the person reads the Hub in', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 860 });
   for (const [language, title] of [['es', 'Mechas'], ['en', 'Highlights']] as const) {
-    // As the language picker of «My profile» leaves it; the business has no language of its own here.
-    await page.context().addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
-    const form = await editForm(page, colour);
-    await expect(page.locator('html')).toHaveAttribute('lang', language);
+    const form = await editFormIn(page, colour, language);
     await form.locator('[data-testid=service-form-image-library]').click();
     const library = dialog(page, 'service-form-image-library-modal');
     const search = library.locator('[data-testid=service-form-image-library-modal-search] input');
@@ -128,6 +156,36 @@ test('SERVICE-F34: the library names its images in the language the person reads
       await capture(page, `APP-SERVICE-F34-ES-${viewport.label}`);
     }
     await page.setViewportSize({ width: 1280, height: 860 });
+  }
+});
+
+test('SERVICE-F34: every image of the library shows its whole name under it, on a phone, a tablet and a desktop', async ({ page }) => {
+  // The longest Spanish names of the hair sector, and the longest single word of the library.
+  const searches = [
+    ['Mechas', 'mechas_papel'],
+    ['Corte', 'corte_caballero'],
+    ['Microdermoabrasión', 'microdermoabrasion'],
+  ] as const;
+  const sizes = [
+    { width: 375, height: 667 },
+    { width: 820, height: 1180 },
+    { width: 1180, height: 820 },
+    { width: 1440, height: 900 },
+  ];
+  await page.setViewportSize(sizes[3]);
+  const form = await editFormIn(page, colour, 'es');
+  await form.locator('[data-testid=service-form-image-library]').click();
+  const library = dialog(page, 'service-form-image-library-modal');
+  for (const [query, longest] of searches) {
+    await library.locator('[data-testid=service-form-image-library-modal-search] input').fill(query);
+    await expect(library.locator(`[data-testid$=-image-beauty_hair-${longest}], [data-testid$=-image-beauty_body-${longest}]`)).toBeVisible();
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      await painted(page);
+      expect(await cutNames(library), `«${query}» at ${size.width}x${size.height}`).toEqual([]);
+      await capture(page, `APP-SERVICE-F34-NAMES-${query}-${size.width}x${size.height}`);
+    }
+    await page.setViewportSize(sizes[3]);
   }
 });
 
