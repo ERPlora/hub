@@ -345,7 +345,11 @@
         "complete": "Todo ha entrado.",
         "partial": "No todo entró.",
         "failed": "No ha entrado nada.",
-        "counts": "{created} creadas · {already} ya estaban · {failed} fallaron",
+        "counts": {
+          "created": "{n} fila nueva | {n} filas nuevas",
+          "already": "{n} ya estaba | {n} ya estaban",
+          "failed": "{n} con error"
+        },
         "dropped": "Se ha dejado fuera a propósito",
         "unfinished": "Este es el informe de tu última importación de {name} ({date}). No todo entró.",
         "retry": "Reintentar lo que falta",

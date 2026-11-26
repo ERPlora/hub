@@ -444,7 +444,7 @@
         "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo",
         "skipped": "Se saltaría: no se cumple su «Solo si…»",
         "would_call": "Llamaría a {host} con esto",
-        "would_ask": "Preguntaría a {who} y esperaría hasta {hours} horas",
+        "would_ask": "Preguntaría a {who} y esperaría hasta {n} hora | Preguntaría a {who} y esperaría hasta {n} horas",
         "would_ask_assistant": "Se lo pediría al asistente: {prompt}"
       },
       "empty": "Saldría vacío: {fields}",
@@ -525,8 +525,7 @@
         "flow__secret_unreadable": "Vuelve a guardar el secreto en el paso: se selló con otra clave.",
         "flow__secrets_key_missing": "Este servidor todavía no tiene la clave de cifrado de los secretos; mándanos la referencia."
       },
-      "attentionOne": "{n} ejecución se paró por un problema",
-      "attentionMany": "{n} ejecuciones se pararon por un problema",
+      "stopped": "{n} ejecución se paró por un problema | {n} ejecuciones se pararon por un problema",
       "retry": "Reanudar desde el paso que falló",
       "retryTitle": "¿Reanudarla desde el paso que falló?",
       "retryMessage": "Los pasos que ya hizo no se repiten: sigue con los pasos con los que empezó. Hará de verdad lo que dicen.",
@@ -2666,6 +2665,7 @@
       "carts": "Carritos",
       "orders": "Pedidos",
       "queued": "En la cola de impresión",
+      "waits_for_device": "Esperando a un dispositivo que lo imprima",
       "report": "Informe",
       "printers": "Impresoras",
       "this_device": "Este dispositivo",
