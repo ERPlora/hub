@@ -53,8 +53,35 @@ describe('ImportReport', () => {
     const m = await report();
     expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
     expect(pills(m)).toEqual([['inventory', 'Applied']]);
-    expect(m.wrapper.text()).toContain('12 created · 0 already there · 0 failed');
+    expect(m.wrapper.text()).toContain('Products · 12 new rows · 0 were already there · 0 failed');
     expect(m.wrapper.find('[data-testid="report-retry"]').exists()).toBe(false);
+  });
+
+  it('says each figure in singular for one row and in plural for more, whatever the part (hub#2596)', async () => {
+    const part = (label: string, n: number) => ({
+      key: `inventory.${label}`, label, rows: 3 * n, status: 'partial' as const, created: n, already: n, failed: n, problems: [],
+    });
+    const counted = load({
+      report: {
+        status: 'partial',
+        dropped: [],
+        apps: [{ id: 'inventory', label: 'Inventory', status: 'partial', datasets: [part('Categories', 1), part('Products', 2)] }],
+      },
+    });
+    const lines = async (locale: 'en' | 'es') => {
+      const m = await report({ load: counted }, locale);
+      const texts = m.wrapper.findAll('.report-dataset .data-row-detail').map((line) => line.text());
+      m.wrapper.unmount();
+      return texts;
+    };
+    expect(await lines('en')).toEqual([
+      'Categories · 1 new row · 1 was already there · 1 failed',
+      'Products · 2 new rows · 2 were already there · 2 failed',
+    ]);
+    expect(await lines('es')).toEqual([
+      'Categories · 1 fila nueva · 1 ya estaba · 1 con error',
+      'Products · 2 filas nuevas · 2 ya estaban · 2 con error',
+    ]);
   });
 
   it('paints each status in words; one it does not know as «Failed» with its own text', async () => {
