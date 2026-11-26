@@ -94,6 +94,21 @@ describe('CountModal', () => {
     expect(s.inDoc('cash-register-count-nothing')).toBeNull();
   });
 
+  it('brings that notice into view: on a phone it is below the boxes, past the bottom of the window', async () => {
+    const s = await setup();
+    await s.result(CURRENCY, EUR);
+    const scrolled = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => undefined);
+    try {
+      await s.submit();
+      await settle();
+      const notice = s.inDoc('cash-register-count-nothing');
+      expect(notice).not.toBeNull();
+      expect(scrolled.mock.contexts).toContain(notice);
+    } finally {
+      scrolled.mockRestore();
+    }
+  });
+
   it('an opening count is sent as such', async () => {
     const s = await setup();
     await s.result(CURRENCY, EUR);

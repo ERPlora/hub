@@ -10,7 +10,7 @@ import { FormModal, type FormModalError, InlineFeedback, MoneyInput, parseMoney 
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
-import { computed, ref, shallowRef, watch } from 'vue';
+import { type ComponentPublicInstance, computed, nextTick, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
@@ -35,6 +35,7 @@ const notes = shallowRef('');
 const boxes = ref<Record<string, string>>({});
 const typedTotal = shallowRef('');
 const tried = shallowRef(false);
+const nothingNotice = useTemplateRef<ComponentPublicInstance>('nothingNotice');
 
 watch(
   open,
@@ -84,6 +85,8 @@ async function confirm(): Promise<void> {
   if (!session || !table.value || total.value === null) return;
   if (nothingCounted.value) {
     tried.value = true;
+    await nextTick();
+    nothingNotice.value?.$el.scrollIntoView({ block: 'nearest' });
     return;
   }
   const sent = total.value;
@@ -203,6 +206,7 @@ const canDismiss = useUnsavedFormOnOpen(
         </p>
         <InlineFeedback
           v-if="tried && nothingCounted"
+          ref="nothingNotice"
           tone="danger"
           data-testid="cash-register-count-nothing"
         >

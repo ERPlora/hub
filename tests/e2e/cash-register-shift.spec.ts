@@ -164,11 +164,13 @@ test('CASH_REGISTER-F03, F13, F05, F06, F09: a shift from the float to the close
   await rowAction(page, 'cash-register-sessions', opened.id, 'count');
   const count = dialog(page, 'cash-register-count');
   await expect(count).toBeVisible();
-  // With nothing counted, «Register count» records nothing and says why under the boxes (hub#2572): the detail
-  // ends up with the one count below.
-  await count.locator('[data-testid=cash-register-count-submit]').click();
+  // With nothing counted, «Register count» records nothing and says why under the boxes, in sight at every size
+  // (hub#2572): the detail ends up with the one count below.
   const nothing = count.locator('[data-testid=cash-register-count-nothing]');
-  await capturedAtSizes(page, 'APP-CASH_REGISTER-F06-nothing-counted', FLOW_VIEWPORTS, () => expect(nothing).toBeVisible());
+  await capturedAtSizes(page, 'APP-CASH_REGISTER-F06-nothing-counted', FLOW_VIEWPORTS, async () => {
+    await count.locator('[data-testid=cash-register-count-submit]').click();
+    await expect(nothing).toBeInViewport();
+  });
   await page.setViewportSize({ width: 1440, height: 900 });
   await fill(count, 'cash-register-count-denom-100', '1');
   await expect(nothing).toBeHidden();
