@@ -7,7 +7,7 @@ import uuid
 from live.operations import get
 
 from apps.service import queries
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from base.recovery import actor_of
 
 from .conftest import HUB_DB, ctx_for, make_service, make_tax
