@@ -1208,8 +1208,9 @@ Pasos:
      falta entrará solo en cuanto sus apps estén listas. Puedes salir de esta pantalla.», sin nada que pulsar.
   2. Una fila por app con su etiqueta: «Aplicado», «Ya lo tenías», «Aplicado en parte», «Falló», «Nada que
      copiar», «Descartado», «App desactivada», «No está en este negocio», «No elegida», «Preparándose» o «No se ha
-     podido preparar». Debajo, por cada parte, «12 creadas · 3 ya estaban · 2 fallaron» y, de
-     lo que falló, su nombre y el motivo.
+     podido preparar». «Ya lo tenías» sale solo cuando todo lo que trae la app ya estaba en el negocio; una app de la
+     que no trae nada, como las que la plantilla solo activa, dice «Nada que copiar». Debajo, por cada parte, «12
+     creadas · 3 ya estaban · 2 fallaron» y, de lo que falló, su nombre y el motivo.
   3. Lo dejado fuera a propósito sale en «Se ha dejado fuera a propósito».
   4. «Ver las plantillas» vuelve al catálogo; «Ir al inicio» lleva al Inicio.
   5. Cuando la app queda lista, lo suyo se carga solo y el informe se pone al día sin recargar, esté en esta pantalla
