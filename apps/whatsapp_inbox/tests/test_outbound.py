@@ -29,7 +29,8 @@ from django.utils import timezone
 
 from apps.flow.tests.test_relay import heard_by_hub_b
 from apps.whatsapp_inbox import gateway
-from apps.whatsapp_inbox.models import Conversation, Message, Template
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
+from apps.whatsapp_inbox.models.templates import Template
 from apps.whatsapp_inbox.tests.conftest import HUB_DB_COMMITTED, NOW, B, card, connect, ctx_for, receive, run, system, template
 from apps.whatsapp_inbox.tests.test_relay_notify import confirm, salon
 from base import outbound, relay, scheduler

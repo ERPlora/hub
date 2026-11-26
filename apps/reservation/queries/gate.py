@@ -12,7 +12,8 @@ from live.context import OperationContext
 from apps.reservation import engine
 from apps.reservation.models import BlockedDate, Reservation, TimeSlot
 from apps.reservation.queries.business import wall_clock, window_of
-from apps.schedule.queries import get_week, hours_for_range
+from apps.schedule.queries.hours import hours_for_range
+from apps.schedule.queries.week import get_week
 from apps.schedule.schemas.fields import NoParamsIn
 from apps.schedule.schemas.hours import HoursRangeIn
 from apps.table.models import Table

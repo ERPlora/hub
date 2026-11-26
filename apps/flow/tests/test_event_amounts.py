@@ -23,7 +23,7 @@ from apps.flow.models import FlowRun, Question
 from apps.flow.queries.catalog import event_amounts
 from apps.pricing.tests.conftest import make_list, make_product
 from apps.task.models import Task
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models.conversations import Message
 
 from .conftest import A, HUB_DB, TASK_STEP, ctx_for, make_flow, run
 from .test_field_words import PayloadReader, services_source

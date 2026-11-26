@@ -14,7 +14,8 @@ from live.errors import NotFound, PermissionDenied
 from live.operations import get
 from pydantic import ValidationError
 
-from apps.whatsapp_inbox.models import Conversation, Message, Note, Template
+from apps.whatsapp_inbox.models.conversations import Conversation, Message, Note
+from apps.whatsapp_inbox.models.templates import Template
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, A, card, connect, ctx_for, receive, run, template
 from base import assistant
 from base.tenancy.context import use_hub

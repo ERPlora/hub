@@ -10,7 +10,8 @@ from live.outbox import record_event
 
 from apps.schedule import assistant_cards, events
 from apps.schedule.models import SpecialDay, SpecialDayInterval
-from apps.schedule.queries import resolve_special_day, special_day_out
+from apps.schedule.queries.outputs import special_day_out
+from apps.schedule.queries.references import resolve_special_day
 from apps.schedule.schemas.fields import DeletedOut
 from apps.schedule.schemas.intervals import check_intervals
 from apps.schedule.schemas.special_days import (
