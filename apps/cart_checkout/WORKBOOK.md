@@ -482,7 +482,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 - Modelos (`models.py`, PK UUIDv7): `Cart`, `CartItem`, `Order` y `OrderCounter` (último número por
   día). Importes en céntimos (`BigIntegerField`); cantidades `Decimal` con tres decimales, como `sale` e `inventory`.
 - **Quién actúa** (`created_by` y `updated_by` de carritos, líneas y pedidos) se guarda como lo lee un compañero:
-  `_actor` (`services.py`) nombra con `actor_name` de `base.queries.people`, la misma pieza que Caja, Mesas y Cocina:
+  `_actor` (`services/carts.py`) nombra con `actor_name` de `base.queries.people`, la misma pieza que Caja, Mesas y Cocina:
   el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega
   a quien ve el contacto del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
   `0004_actors_without_address`, en la base de datos de cada negocio.

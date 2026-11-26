@@ -1,4 +1,4 @@
-"""Events of the cart_checkout app (``<app>.<entity>.<fact>``): recorded by services.py, cited by live.py.
+"""Events of the cart_checkout app (``<app>.<entity>.<fact>``): recorded by services/, cited by live.py.
 
 Each one is written in the transaction of its change, and only when the change happened: a refused
 action leaves no event (the old module emitted them anyway). Only the flow app listens to them (it hears

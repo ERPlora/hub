@@ -7,7 +7,7 @@ computed when read: nobody has to run the expiry first). The ``find_*`` helpers 
 names a record (assistant, voice): a cart by its id, its session code, or its customer (exact email,
 else part of the name; among several carts of one customer, the only active one; carts of different
 customers, or several active ones, 409 ``cart_checkout.cart_ambiguous`` naming their codes); an order by
-its id or its number; a line by its id. services.py uses them too,
+its id or its number; a line by its id. services/ uses them too,
 inside its own transaction.
 """
 
@@ -89,7 +89,7 @@ def business_currency(ctx: OperationContext) -> str:
     return platform.business_currency(ctx.scope)
 
 
-# --- Shared with services.py, inside the command's own transaction --------------------------------
+# --- Shared with services/, inside the command's own transaction ----------------------------------
 
 
 def is_overdue(cart: Cart) -> bool:
