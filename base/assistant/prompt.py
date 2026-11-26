@@ -9,6 +9,7 @@ from django.utils.translation import get_language_info
 from live.assistant import tool_name
 
 from base.assistant.relevance import FIND_TOOLS
+from base.business import money_text
 from base.models import Membership
 
 #: What the chat's model does when none of the tools a turn gives it does what was asked: a turn offers only the
@@ -41,14 +42,15 @@ def instructions(  # noqa: PLR0913
 ) -> str:
     """The system message of every turn (the gateway's only one): who it serves, in which language, the rules of its
     tools and money (an amount sent in the minor unit of its currency, ``decimals`` the business's; one of a result
-    said as the result tells it, in its currency, ``base.assistant.tools.run``), the screens it may link, and the
-    person's ``role`` in the business with the writes offered to it that a manager must approve (``approvable``, by
-    operation name; BASE-F100). What to do when its tools fall short each caller says after it: the chat,
-    ``SEARCH_FIRST``."""
+    said as the result tells it, as the screens write it in ``language``, ``base.assistant.tools.run``), the screens
+    it may link, and the person's ``role`` in the business with the writes offered to it that a manager must approve
+    (``approvable``, by operation name; BASE-F100). What to do when its tools fall short each caller says after it: the
+    chat, ``SEARCH_FIRST``."""
     language_name = _language_name(language)
     links = "\n".join(f"- [{name}]({path})" for path, name in screens.items())
-    said = f"{17:.{decimals}f} {currency}"
-    example = f"{said} → {17 * 10**decimals}"
+    sent = 17 * 10**decimals
+    said = money_text(sent, currency, language=language)
+    example = f"{said} → {sent}"
     return f"""You are the assistant of the business «{business}» in ERPlora, its point of sale and management app.
 Answer in {language_name}, short and plain, as a colleague who knows the app. In Spanish, address the person as
 they address you, «tú» or «usted» (with no sign of either, «tú», as the app does), and keep it to the end: «dime,
@@ -75,7 +77,7 @@ quieres, puedes» or «dígame, quiere, puede», never a mix. Use Markdown: bold
   description says: the one a datum marked `"currency": true` beside it names, or the one of the record (a cart, a
   price list) a datum marked `"currency": {{"read": …}}` names, which that read gives; else the business's ({example}). A
   tool's result tells each amount in its own currency, as the screens write it (`"{said}"`): say it as it comes, in
-  that currency; an amount of your own, in {currency} with {decimals} decimals; never in the minor unit.
+  that currency; write an amount of your own the same way, in the business's currency; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
 {links}{_who_asks(role, language, approvable)}"""
 
