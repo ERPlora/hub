@@ -858,7 +858,7 @@ answers about a sale they see: someone else's, for an employee, "That sale does 
 Involved: SALE-F29
 
 ### INVOICE-F21 Set up the issuer
-<!-- from WORKBOOK.md sha256:745684432c4c -->
+<!-- from WORKBOOK.md sha256:8803f74e391e -->
 Status: done
 Actor: owner, administrator
 Screen: Home, Invoices, Series, Issuer
@@ -885,9 +885,10 @@ change); announces `invoice.issuer.updated`. With "Registered in the ROI" on, th
 the ticket and the bill print the tax ID with the issuer's country prefix ("Tax ID: ESB12345674"), domestic sales
 too; off, the tax ID as it is. A document already issued is reprinted as it came out. VeriFactu's record and the QR
 always keep the tax ID without the prefix.
-If it fails: without legal name, tax ID or address, under its field; a Spanish tax ID that is not valid,
-"That tax ID is not valid.". A field's reason goes as soon as that field is corrected and comes back if the
-next try is refused too; a refusal that names no field shows above the form and stays until the next try.
+If it fails: without legal name, tax ID or address, "This field is required." under its field; a Spanish tax ID
+that is not valid, "That tax ID is not valid.". A field's reason goes as soon as that field is corrected and comes
+back if the next try is refused too; a refusal that names no field shows above the form and stays until the next
+try.
 Involved: INVOICE-F18, SALE-F21, SALE-F29, BASE-F97
 
 ### INVOICE-F23 Issue ERPlora's invoices (platform hub)
