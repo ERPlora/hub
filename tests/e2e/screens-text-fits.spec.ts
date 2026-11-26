@@ -42,8 +42,14 @@ const described = (seen: Seen): string => `${seen.screen} · ${seen.size} · ${s
 const snapName = (seen: Seen): string => `text-fits-${seen.screen.replace(/[^a-z0-9]+/gi, '-')}-${seen.size}`;
 
 /** The texts cut on the screen on view at each size, a screenshot of each size that cuts one it does not know. */
+/** Every machine measures in the same font: Arial, which Linux draws with Liberation Sans (the same widths), close to
+ *  the tablets' Roboto. The Hub's own, `system-ui`, is another font on each machine, and each one cut other texts. */
+const sameFont = (page: Page): Promise<void> =>
+  page.evaluate(() => document.documentElement.style.setProperty('--ion-font-family', 'Arial, "Liberation Sans", sans-serif'));
+
 async function measured(page: Page, screen: string): Promise<Seen[]> {
   const out: Seen[] = [];
+  await sameFont(page);
   for (const size of SIZES) {
     await page.setViewportSize(size);
     await settled(page);
