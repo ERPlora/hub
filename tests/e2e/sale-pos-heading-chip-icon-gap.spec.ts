@@ -153,6 +153,8 @@ const SEATED = ['pos-table-chip', 'pos-customer-chip', 'pos-staff-chip'];
 
 test('SALE-F19 and F16: the table, customer and «Served by» chips keep their icon apart from their text', async ({ page, context }) => {
   await seatedWithCustomer(page);
+  // The session, for ui-clip-sweep.sh over this same page.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await measureChips(page, 'en', SEATED);
   await inLanguage(page, context, 'es');
   await expect(shown(page).locator('[data-testid=pos-table-chip]').filter({ visible: true })).toHaveText(`Mesa ${NUMBER}`);
