@@ -130,7 +130,11 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await review.locator('[data-testid="review-import"]').click();
     const report = testid(page, 'report');
     await expect(report.locator('[data-testid="report-status"]')).toContainText('Everything went in.');
-    await expect(report.locator('[data-testid="report-app-status"]').first()).toContainText('You had it already');
+    const appStatus = (app: string) =>
+      report.locator(`[data-testid="report-app"][data-id="${app}"] [data-testid="report-app-status"]`);
+    // Inventory brings rows the first load already put here; Customers brings none, the template only turns it on.
+    await expect(appStatus('inventory')).toContainText('You had it already');
+    await expect(appStatus('customer')).toContainText('Nothing to copy');
     await snap(page, 'BASE-G106', width);
 
     // Export Inventory's data without its categories, as a file.

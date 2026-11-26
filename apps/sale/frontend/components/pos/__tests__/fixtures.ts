@@ -219,7 +219,7 @@ export function deferred<T = Response>() {
 export const refused = (code: string, message: string, status = 409) => Response.json({ error: { code, message } }, { status });
 
 /** A dish of a menu of Menus on offer in the till (SALE-F12), its product `p-<id>`. */
-export const menuDish = (id: string, name: string, price_delta = 0) => ({ id, product_id: `p-${id}`, product_name: name, sku: '', price_delta });
+export const menuDish = (id: string, name: string, price_delta = 0) => ({ id, product_id: `p-${id}`, product_name: name, sku: '', price_delta, allergens: [] });
 
 /** «Menú del día», 13,50 € eaten in, with these courses, as the till's menu sheet gets it. */
 export const saleMenu = (groups: SaleComboOut['groups']): SaleComboOut => ({
