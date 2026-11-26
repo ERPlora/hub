@@ -72,7 +72,8 @@ async function drawerNameTaken(page: Page, language: Language, label: string): P
   await name.locator('input').fill(DRAWER.toLowerCase());
   await modal.locator('[data-testid=cash-register-register-submit]').click();
   await expectMarked(name, TAKEN[language]);
-  await expect(modal.locator('[data-testid=cash-register-register-error]')).toBeVisible();
+  await expect(modal.locator('[data-testid=cash-register-register-error]')).toBeHidden();
+  await expect(modal.getByText(TAKEN[language], { exact: true })).toHaveCount(1);
   await capture(page, `CLOSE-CASH_REGISTER-hub1470-drawer-refused-${label}`);
 
   await typeMore(name, ' 2');
@@ -93,7 +94,8 @@ async function floatRequired(page: Page, language: Language, label: string): Pro
   await notes.locator('input').fill('E2E1470');
   await modal.locator('[data-testid=cash-register-open-submit]').click();
   await expectMarked(balance, FLOAT_REQUIRED[language]);
-  await expect(modal.locator('[data-testid=cash-register-open-error]')).toBeVisible();
+  await expect(modal.locator('[data-testid=cash-register-open-error]')).toBeHidden();
+  await expect(modal.getByText(FLOAT_REQUIRED[language], { exact: true })).toHaveCount(1);
   await capture(page, `CLOSE-CASH_REGISTER-hub1470-float-refused-${label}`);
 
   await typeMore(balance, '50');

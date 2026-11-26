@@ -80,8 +80,7 @@ describe('SettingsPage', () => {
     await ionValue(s.field('min_party_size'), '30', 'ionInput');
     await click(s.field('save'));
     expect(s.field('min_party_size').errorText).toBe(message);
-    expect(s.field('save-error')?.textContent).toContain('Could not save the settings');
-    expect(s.field('save-error')?.textContent).toContain(message);
+    expect(s.field('save-error')).toBeNull();
   });
 
   it('whoever may not save them is told so', async () => {

@@ -70,8 +70,7 @@ describe('SettingsPage', () => {
     await ionValue(s.field('warning_minutes'), '40', 'ionInput');
     await click(s.field('save'));
     expect(s.field('warning_minutes').errorText).toBe(message);
-    expect(s.field('save-error')?.textContent).toContain('Could not save the settings.');
-    expect(s.field('save-error')?.textContent).toContain(message);
+    expect(s.field('save-error')).toBeNull();
   });
 
   describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
@@ -93,9 +92,9 @@ describe('SettingsPage', () => {
       return { ...s, notice, says, marked };
     }
 
-    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+    it('each field says the reason, not the red notice, and a field’s message goes as soon as that field is changed', async () => {
       const s = await refused();
-      expect(s.notice()).toBe(true);
+      expect(s.notice()).toBe(false);
       expect([s.says('warning_minutes'), s.says('critical_minutes')]).toEqual([AMBER_FIRST, AMBER_FIRST]);
       await ionValue(s.field('critical_minutes'), '60', 'ionInput');
       expect(s.notice()).toBe(false);

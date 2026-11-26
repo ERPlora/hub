@@ -147,11 +147,11 @@ describe('PrinterModal: a refused field, corrected, loses its mark without savin
 
   const marks = (field: Element | null) => ['ion-invalid', 'ion-touched'].map((mark) => !!field?.classList.contains(mark));
 
-  it('a taken name: typing another one takes its mark and the notice away, before «Save» is pressed again', async () => {
+  it('a taken name is said once, under the name: typing another one takes its mark away, before «Save» is pressed again', async () => {
     const s = await refused({ error: { code: 'printing.printer_exists', message: TAKEN, fields: { name: TAKEN } } }, 'en', 409);
     await s.submit();
     expect(prop(s.field('name'), 'errorText')).toBe(TAKEN);
-    expect(s.inDoc('printing-printer-error')?.textContent).toContain(TAKEN);
+    expect(s.inDoc('printing-printer-error')).toBeNull();
     s.field('name')?.dispatchEvent(new Event('input', { bubbles: true }));
     await ionValue(s.field('name'), 'Front till', 'ionInput');
     expect(prop(s.field('name'), 'errorText') ?? '').toBe('');

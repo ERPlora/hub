@@ -52,7 +52,7 @@ describe('SettingsPage', () => {
     expect(s.sent().at(-1)?.body).toEqual({ timer_critical_minutes: 100 });
   });
 
-  it('a refusal goes under its field', async () => {
+  it('a refusal goes under its field, once (a red warning before the amber one)', async () => {
     const s = await setup();
     await s.show(SETTINGS);
     const refusal = { error: { code: 'invalid_payload', message: 'The red warning cannot come before the amber one.', fields: { timer_critical_minutes: 'The red warning cannot come before the amber one.' } } };
@@ -60,8 +60,7 @@ describe('SettingsPage', () => {
     await ionValue(s.field('timer_warning_minutes'), '120', 'ionInput');
     await click(s.field('save'));
     expect(s.field('timer_critical_minutes').errorText).toBe('The red warning cannot come before the amber one.');
-    expect(s.field('save-error')?.textContent).toContain('Could not save the settings');
-    expect(s.field('save-error')?.textContent).toContain('The red warning cannot come before the amber one.');
+    expect(s.field('save-error')).toBeNull();
   });
 
   describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
