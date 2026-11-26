@@ -335,7 +335,6 @@ const tid = (part: string) => `${props.testid}-${part}`;
   font-size: 0.8rem;
   line-height: 1.2;
   overflow-wrap: anywhere;
-  hyphens: auto;
 }
 .image-library__more {
   display: grid;

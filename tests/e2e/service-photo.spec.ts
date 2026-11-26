@@ -180,7 +180,7 @@ test('SERVICE-F34: every image of the library shows its whole name under it, on 
       await page.setViewportSize(size);
       await painted(page);
       expect(await cutNames(library), `«${query}» at ${size.width}x${size.height}`).toEqual([]);
-      if (query !== 'Microdermoabrasión') await capture(page, `APP-SERVICE-F34-NAMES-${query}-${size.width}x${size.height}`);
+      await capture(page, `APP-SERVICE-F34-NAMES-${query}-${size.width}x${size.height}`);
     }
     await page.setViewportSize(sizes[3]);
   }
