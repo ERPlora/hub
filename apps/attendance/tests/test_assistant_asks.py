@@ -126,8 +126,8 @@ test_a_request_in_the_persons_own_words_reaches_its_tool_by_its_asks = in_hubs(o
 #: «Pausa» named nothing of Time clock, whose tools are of a «break»: putting a person on a break said so was offered no
 #: break, and the model searched and offered to deactivate the person in Staff instead (hub#2580).
 PUT_ON_A_BREAK = [
-    ("attendance.break.start", "Pon a Javi en pausa", "pausa"),
-    ("attendance.break.start", "pon que estoy en pausa", "pausa"),
+    ("attendance.break.start", "Pon a Javi en pausa", "en pausa"),
+    ("attendance.break.start", "pon que estoy en pausa", "en pausa"),
 ]
 
 test_a_break_said_as_pausa_brings_it_by_time_clocks_group = in_hubs(by_group_test(PUT_ON_A_BREAK))
