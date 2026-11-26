@@ -1511,8 +1511,10 @@ o se anula el plato con su motivo y se pide otra vez con la alergia. Sin Cocina 
 el bloque, porque no hay comanda que lo lleve, y la nota sigue sirviendo. Un alérgeno que no es de la lista se
 rechaza, también por el asistente o la API.
 Por el asistente: «la hamburguesa de la mesa 4 es para un alérgico al gluten» marca la alergia en esa línea tras la
-tarjeta de confirmación, que dice la cuenta, el plato y los alérgenos por su nombre.
-Implicados: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
+tarjeta de confirmación, que dice la cuenta, el plato y los alérgenos por su nombre. Si no se dice qué plato, pregunta
+cuál; de un celíaco marca el gluten. No es un dato de salud de la ficha del cliente y no pide su permiso
+(CUSTOMER-F32): lo marca aunque la frase hable de la clienta.
+Implicados: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32, CUSTOMER-F32
 
 ### SALE-F42 Elegir los suplementos de un plato del menú
 Estado: hecho

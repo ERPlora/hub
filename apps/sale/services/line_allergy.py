@@ -16,10 +16,12 @@ from apps.sale.services.orders import _open_order, _out, _pending_line, _touch
     input=OrderSetLineAllergyIn,
     output=OrderOut,
     ai=AI(
-        description="Mark the customer's allergy on a line of an open check not sent to the kitchen yet: all the "
-        "allergens the person it is for must not eat, of the fourteen; an empty list takes it off. The kitchen gets it "
-        "with the dish, and the check says which of them the dish contains. Resolve the check with "
-        "sale.order.list(search=...) and its line with sale.order.get; never ask for order_id or line_id.",
+        description="Mark the allergy of a customer or guest on their plate: on its line of an open check not sent to "
+        "the kitchen yet, all the allergens the person it is for must not eat, of the fourteen (a celiac: gluten); an "
+        "empty list takes it off. It is not the health data of the customer's card and needs no permission of theirs. "
+        "The kitchen gets it with the dish, and the check says which of them the dish contains. If the person does not "
+        "say which dish, ask which one. Resolve the check with sale.order.list(search=...) and its line with "
+        "sale.order.get; never ask for order_id or line_id.",
         risk="normal",
         asks={
             "en": (
@@ -30,6 +32,7 @@ from apps.sale.services.orders import _open_order, _out, _pending_line, _touch
             "es": (
                 "la hamburguesa de la mesa 4 es para un alérgico al gluten",
                 "el cliente del postre tiene alergia a la leche y al huevo",
+                "márcale en el plato la alergia a los frutos secos",
                 "desmarca la alergia de la ensalada, que era un error",
             ),
         },
