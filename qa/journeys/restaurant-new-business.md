@@ -28,8 +28,9 @@ Para qué: el primer día de un restaurante en ERPlora, desde que su dueño lo c
 13. INVOICE-F14 — la numeración del año en curso.
 14. TAX-F17 — los tipos de IVA del país del negocio.
 15. CASH_REGISTER-F01 — una sola caja, la de la barra.
-16. SCHEDULE-F03 — la semana por defecto, de martes a domingo.
-17. TABLE-F02 — las mesas que faltan, desde Inicio.
-18. BASE-F12, BASE-F103 — el asistente repasa lo que queda por configurar.
-19. BASE-F06, BASE-F07 — Caja y Ventas, arriba del tablero.
-20. BASE-F05 — Ventas, desde «Mis apps».
+16. TIP-F01 — el propietario pide propina al cobrar y, con tarjeta, sugiere 2,00 € en lugar del 10 %.
+17. SCHEDULE-F03 — la semana por defecto, de martes a domingo.
+18. TABLE-F02 — las mesas que faltan, desde Inicio.
+19. BASE-F12, BASE-F103 — el asistente repasa lo que queda por configurar.
+20. BASE-F06, BASE-F07 — Caja y Ventas, arriba del tablero.
+21. BASE-F05 — Ventas, desde «Mis apps».
