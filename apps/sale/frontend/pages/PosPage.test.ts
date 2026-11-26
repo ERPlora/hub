@@ -25,12 +25,12 @@ describe('PosPage: the screen', () => {
   it('is «Sales & POS · Sell» with the app’s tabs, once the till settings are read', async () => {
     const s = await setup({ ready: false });
     expect(s.params('sale.pos_settings.get')).toEqual([{}]);
-    expect(s.find('pos-loading').exists()).toBe(true);
+    expect(s.find('pos-settings-loading').exists()).toBe(true);
     const appPage = s.wrapper.findComponent(AppPage);
     expect(appPage.props('title')).toBe('Sales & POS');
     expect((appPage.props('tabs') as Array<{ id: string }>).map((tab) => tab.id)).toEqual(['pos', 'sales', 'quick-notes', 'departments', 'settings']);
     await s.result('sale.pos_settings.get', settings());
-    expect(s.find('pos-loading').exists()).toBe(false);
+    expect(s.find('pos-settings-loading').exists()).toBe(false);
     expect(s.wrapper.findComponent(PosCatalog).exists()).toBe(true);
     expect(s.wrapper.findComponent(PosCart).exists()).toBe(true);
   });
@@ -39,12 +39,12 @@ describe('PosPage: the screen', () => {
     const s = await setup({ ready: false, locale: 'es' });
     s.net.lastStream().push(errorFrame(s.subId('sale.pos_settings.get'), 'internal_error'));
     await s.reopen();
-    expect(s.find('pos-load-error').text()).toContain('Error cargando el TPV');
-    expect(s.find('pos-load-retry').exists()).toBe(true);
+    expect(s.find('pos-settings-error').text()).toContain('Error cargando el TPV');
+    expect(s.find('pos-settings-action').exists()).toBe(true);
     const off = await setup({ ready: false, locale: 'es' });
     off.net.lastStream().push(errorFrame(off.subId('sale.pos_settings.get'), 'app_inactive'));
     await off.reopen();
-    expect(off.find('pos-load-error').text()).toContain('Esta app no está activa en este negocio.');
+    expect(off.find('pos-settings-error').text()).toContain('Esta app no está activa en este negocio.');
   });
 
   it('counts the other open checks on the receipt icon', async () => {
