@@ -11,6 +11,13 @@ export const THREE_SIZES_TALL_TABLET = [
   { label: '1440', width: 1440, height: 900 },
 ] as const;
 
+/** The three sizes a window is measured in: a low phone, a tablet and a desk. */
+export const WINDOW_SIZES = [
+  { label: '375x667', width: 375, height: 667 },
+  { label: '820x1180', width: 820, height: 1180 },
+  { label: '1280x720', width: 1280, height: 720 },
+] as const;
+
 /** Every `ion-icon` on screen: its name and whether its shadow root painted an `<svg>`. */
 export async function iconStates(page: Page): Promise<{ name: string; painted: boolean }[]> {
   return page.evaluate(() =>

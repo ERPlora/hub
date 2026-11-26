@@ -7,12 +7,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { cutLabels } from './field-labels';
 import { A, capture, login, psql, shown, signedInSpanish } from './helpers';
 import { fill, pickCombo, presentedDialog, productRow, productsReady, searchProducts, stamp } from './inventory-helpers';
-
-const SIZES = [
-  { label: '375x667', width: 375, height: 667 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '1280x720', width: 1280, height: 720 },
-] as const;
+import { WINDOW_SIZES } from './screen';
 
 const TEXTS = {
   en: {
@@ -62,7 +57,7 @@ async function hintMisplaced(form: Locator): Promise<string[]> {
   );
 }
 
-async function newProductWithoutSku(page: Page, lang: Lang, size: (typeof SIZES)[number]): Promise<void> {
+async function newProductWithoutSku(page: Page, lang: Lang, size: (typeof WINDOW_SIZES)[number]): Promise<void> {
   const texts = TEXTS[lang];
   await productsReady(page);
   const form = await presentedDialog(page, 'inventory-product-form', () => shown(page).locator('[data-testid=inventory-products-add]').click());
@@ -94,7 +89,7 @@ async function newProductWithoutSku(page: Page, lang: Lang, size: (typeof SIZES)
   await expect(productRow(page, sku)).toBeVisible();
 }
 
-for (const size of SIZES) {
+for (const size of WINDOW_SIZES) {
   const viewport = { width: size.width, height: size.height };
 
   test(`INVENTORY-F01 ${size.label} en: «Save» off says what is missing, and a product without SKU is numbered`, async ({ page }) => {
