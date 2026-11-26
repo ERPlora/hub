@@ -98,7 +98,7 @@ it to another time or another professional. The **N to confirm** notice takes yo
 booked that are waiting for your confirmation.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:cb58acf244b5 -->
+<!-- from WORKBOOK.md sha256:5a2d2c6c2c6a -->
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -111,7 +111,8 @@ professional**, also **Day · Week**.
   still open at the till (then No-show, Cancel and Delete are greyed out).
 - **By professional · Day**: one row per bookable professional and an "Unassigned" row if there are
   appointments without a professional (two appointments that overlap share the row, each in its own lane);
-  the calendar hours run horizontally, with room for a half-hour appointment to show the customer's name, and what
+  the calendar hours run horizontally, with room for a half-hour appointment to show the customer's name (today it
+  opens half an hour before the business's time; another day, at the hour it opens), and what
   the business has closed or blocked is shaded (what is closed, according to Schedules; there you cannot tap to
   book). Each appointment puts the customer on one line and the services on another; what does not fit ends in "…",
   and the whole appointment (time, customer and services) shows when hovering over it and on its card when tapping

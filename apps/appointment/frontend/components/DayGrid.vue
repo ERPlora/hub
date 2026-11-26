@@ -1,20 +1,15 @@
 <script setup lang="ts">
-// «By professional · Day» (APPOINTMENT-F01, F04, F25): the old `ok-scheduler` timeline, as our own grid
-// until @erplora/ui has its `Scheduler` (asked in UI-REQUESTS.md). A row per bookable professional, then
-// whoever no longer takes bookings but keeps appointments that day (warned above: their appointments stay
-// on their row to be handed over), then «Unassigned» when an appointment has nobody; the calendar
-// window's hours across, the blocked periods and the hours the business is closed (Schedules) painted.
-//   - Tapping a free slot books there: that professional and time (on a row that takes no bookings, or
-//     «Unassigned», only the time). Each slot is a button with its own name, so the keyboard books too.
-//     A closed hour has no slot to tap.
-//   - Tapping an appointment opens it (a button: Enter and Space as well).
-//   - Dragging one moves it to another time or row — pointer events, so mouse, pen and finger alike; a
-//     finger must hold it first (400 ms), as Vagaro asks, or a scroll would move a customer's booking. It
-//     snaps to the slot interval, never lands in the past or outside the window, and only what may still
-//     move (pending or confirmed, not charged) drags. The page sends the move; the server decides.
+// «By professional · Day» (APPOINTMENT-F01, F04, F25): a row per bookable professional, then whoever keeps
+// appointments that day without taking bookings (warned above), then «Unassigned»; the calendar's hours across,
+// with what is blocked or closed (Schedules) painted. It opens at the business's time now today, at its opening
+// hour another day. Tapping a free slot books there (a button per slot; a closed hour has none); tapping an
+// appointment opens it; dragging one moves it to another time or row with pointer events (a finger holds it
+// 400 ms first, as Vagaro asks, so a scroll moves nothing). A drag snaps to the slot interval, never lands in the
+// past or outside the window, and only what may still move drags; the server decides.
 import type { OutputOf } from '@erplora/ui/sdk';
 import { computed, ref } from 'vue';
 
+import { useGridStart } from '../composables/useGridStart';
 import { useLocale, useT } from '../composables/useT';
 import { formatTime, minutesOf, wallLength } from '../lib/clock';
 import { allows, customerLabel } from '../lib/states';
@@ -25,6 +20,7 @@ export type DayHours = OutputOf<'schedule.hours.for_range'>['days'][number];
 
 const props = defineProps<{
   day: string;
+  zone: string;
   /** The day's hours (Schedules): what is closed is shaded and books nothing; `null` = not known yet. */
   hours?: DayHours | null;
   lanes: LaneOut[];
@@ -128,6 +124,10 @@ const closedSpans = computed(() =>
     return span ? [{ key: from, ...span }] : [];
   }),
 );
+
+const scroller = ref<HTMLElement | null>(null);
+const startsAt = () => ({ day: props.day, zone: props.zone, now: props.now, closed: closed.value, windowStart: windowStart.value });
+useGridStart(scroller, startsAt, PX_PER_MINUTE);
 
 const slots = computed(() => {
   const step = Math.max(5, props.slotInterval);
@@ -322,6 +322,7 @@ const label = (row: AppointmentRow): string =>
       {{ keptMessage }}
     </p>
     <div
+      ref="scroller"
       class="day-grid__scroller"
       role="grid"
       :aria-label="$t('appointment.grid.label', { date: day })"

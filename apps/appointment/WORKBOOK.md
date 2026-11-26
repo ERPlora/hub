@@ -111,7 +111,8 @@ profesional**, además, **Día · Semana**.
   en el TPV (entonces No-show, Cancelar y Borrar salen en gris).
 - **Por profesional · Día**: una fila por profesional reservable y una fila «Sin asignar» si hay
   citas sin profesional (dos citas que se pisan comparten la fila, cada una en su carril); las horas del
-  calendario van en horizontal, con sitio para que una cita de media hora enseñe el nombre de la clienta, y lo que
+  calendario van en horizontal, con sitio para que una cita de media hora enseñe el nombre de la clienta (hoy se abre
+  media hora antes de la hora del negocio; otro día, a la hora a la que abre), y lo que
   el negocio tiene cerrado o bloqueado sale sombreado (lo cerrado, según Horarios; ahí no se puede tocar para
   reservar). Cada cita pone la clienta en una línea y los servicios en otra; lo que no cabe termina en «…», y la
   cita entera (hora, clienta y servicios) sale al pasar el ratón por encima y en su ficha al tocarla. Un profesional que ya no admite citas (no reservable, inactivo, de baja)

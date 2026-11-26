@@ -55,6 +55,7 @@ async function setup(appointments: AppointmentRow[] = [], props: Record<string, 
   const m = await mountAppointment(DayGrid, {
     props: {
       day: '2026-10-19',
+      zone: 'Europe/Madrid',
       lanes: LANES,
       appointments,
       blocks: [BLOCK],
@@ -99,6 +100,11 @@ describe('DayGrid', () => {
     expect(block.attributes('title')).toBe('10:00 AM Lucía Gómez Santamaría — Corte de mujer');
     expect(block.attributes('title')).toBe(block.attributes('aria-label'));
     expect(s.wrapper.find('[data-testid="appointment-grid-hour"]').attributes('style')).toContain('width: 240px');
+  });
+
+  it('today it opens half an hour before the business’s time now', async () => {
+    const s = await setup([], { now: new Date('2026-10-19T16:10:00+02:00') });
+    expect((s.wrapper.find('[role="grid"]').element as HTMLElement).scrollLeft).toBe((15 * 60 + 40 - 8 * 60) * 4);
   });
 
   it('places each appointment by its time and length, and paints the blocks', async () => {
