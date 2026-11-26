@@ -1,15 +1,16 @@
 """The business's people (``base.person.*``, ``base.hub_user.get``) and how a person is named in this hub."""
 
-from collections.abc import Iterable, Iterator
+import sys
+from collections.abc import Iterable
 from typing import Any
 
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope, system_context
 from live.errors import AppInactive, NotFound
-from live.operations import AI, INTERNAL, UnknownOperation, operation
-from live.operations import get as get_operation
+from live.operations import AI, INTERNAL, operation
 
 from base import access, people as people_rules
+from base.catalog_groups import every_row
 from base.models.access import Credential
 from base.models import Hub, HubUser, Membership
 from base.models.profile import Profile
@@ -245,8 +246,6 @@ def faces_of(scope: Scope, people: Iterable[tuple[Any, Any]]) -> list[dict[str, 
 
 #: Staff's directory: the business's records of its team, each with the business user it hangs from (STAFF-F03).
 STAFF_DIRECTORY = "staff.member.list"
-#: The most records the directory gives in one page.
-STAFF_PAGE = 100
 
 
 def staff_names(scope: Scope, usernames: Iterable[str]) -> dict[str, str]:
@@ -255,25 +254,15 @@ def staff_names(scope: Scope, usernames: Iterable[str]) -> dict[str, str]:
     linked = dict(HubUser.objects.filter(username__in=set(usernames)).values_list("pk", "username"))
     if not linked:
         return {}
+    records = every_row(system_context(scope), STAFF_DIRECTORY, limit=sys.maxsize)
     try:
         return {
             linked[row.user_id]: row.full_name.strip()
-            for row in _staff_records(scope)
+            for row in records
             if row.user_id in linked and row.full_name.strip()
         }
-    except (UnknownOperation, AppInactive):
+    except AppInactive:
         return {}
-
-
-def _staff_records(scope: Scope) -> Iterator[Any]:
-    directory = get_operation(STAFF_DIRECTORY)
-    offset = 0
-    while True:
-        page = directory(system_context(scope), directory.input(limit=STAFF_PAGE, offset=offset))
-        yield from page.rows
-        offset += len(page.rows)
-        if not page.rows or offset >= page.total:
-            return
 
 
 def actor_name(who) -> str:

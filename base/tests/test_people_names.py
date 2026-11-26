@@ -97,10 +97,10 @@ class TestTheGrid:
 
         assert faces(client) == [("ana.qa", "A")]
 
-    def test_a_record_past_the_first_page_of_the_directory_still_names_them(self, client, ana):
+    def test_a_record_far_down_a_long_directory_still_names_them(self, client, ana):
         a_device(client)
         with_pin(ana, "4826")
-        Member.objects.bulk_create(Member(first_name="Aaron", last_name=f"Team {number:03}") for number in range(100))
+        Member.objects.bulk_create(Member(first_name="Aaron", last_name=f"Team {number:03}") for number in range(250))
         staff_record(ana, "Zoe", "Estilista")
 
         assert faces(client) == [("Zoe Estilista", "ZE")]
