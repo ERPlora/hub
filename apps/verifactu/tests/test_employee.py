@@ -87,6 +87,19 @@ def test_the_employee_queries_the_aeat_and_tests_the_connection(issuer, gateway_
     assert run("verifactu.diagnostic.run", {}, employee()).can_send is True
 
 
+def test_every_send_of_the_employee_goes_to_the_aeat_s_test_environment(issuer, gateway_answers, offline):
+    record = waiting(gateway_answers)
+    gateway_answers.set(answering())
+    run("verifactu.record.transmit", {"record_id": str(record.id)}, employee())
+    gateway_answers.set(aeat_holds())
+    run("verifactu.aeat.query", {"year": 2026, "month": 8}, employee())
+    gateway_answers.set(gateway.Reply(kind=gateway.ANSWERED, ready=True, message="Ready."))
+    run("verifactu.diagnostic.run", {}, employee())
+    sent_to = [(path, payload["environment"]) for path, payload in gateway_answers.calls]
+    assert {path for path, _ in sent_to} == {gateway.SUBMIT_PATH, gateway.QUERY_PATH, gateway.PROBE_PATH}
+    assert [call for call in sent_to if call[1] != "testing"] == []
+
+
 def test_the_employee_neither_corrects_nor_cancels_a_record(issuer):
     record = sealed()
     with pytest.raises(PermissionDenied):
