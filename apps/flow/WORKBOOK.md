@@ -587,9 +587,10 @@ Pasos:
    error», «Esperando», «Cancelada»), el día y la hora, **Copiar la referencia** y ▾ para ver sus
    pasos en palabras («Hizo: Crear una tarea», «Encontró 3», «No encontró nada, y siguió», «Esperó 1
    hora», «Se paró aquí porque no se cumplió esto: Total mayor que 10000»).
-4. Una parada por error dice qué pasó y qué hacer, en tu idioma aunque la automatización se guardara en
-   otro («Ha intentado hacer algo que no le has permitido («…»), así que ha parado. Abre Permisos y
-   concédele lo que necesita.»); si el error es de la app que hizo la acción, sale su frase tal cual, en el
+4. Una parada por error dice qué pasó y, debajo y una sola vez, qué hacer, en tu idioma aunque la
+   automatización se guardara en otro («Ha intentado hacer algo que no le has permitido («Crear una
+   tarea»), así que ha parado.» y «Abre Permisos y concédele lo que necesita.»), con la acción nombrada
+   como en Permisos y en Probar; si el error es de la app que hizo la acción, sale su frase tal cual, en el
    idioma de la automatización, con el texto técnico plegado.
 Entra: las ejecuciones de esa automatización de los últimos 90 días, y todas las que siguen esperando.
 Sale: nada. El historial guarda cada ejecución terminada **90 días** y después la olvida; una que
