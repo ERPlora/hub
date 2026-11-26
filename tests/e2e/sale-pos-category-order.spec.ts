@@ -6,7 +6,7 @@
 import { expect, type BrowserContext, type Page, test } from '@playwright/test';
 
 import { A, api, login, shown } from './helpers';
-import { cleanInventory, dialog, fill, stamp } from './inventory-helpers';
+import { cleanInventory, dialog, fill, savedCategoryRow, stamp } from './inventory-helpers';
 import { drawerOff, restoreDrawer } from './sale-helpers';
 
 const RUN = stamp();
@@ -61,10 +61,7 @@ test('a category made in Categories shows last on the till, after the ones alrea
   await shown(page).locator('[data-testid=inventory-categories-add]').click();
   const form = dialog(page, 'inventory-category-form');
   await fill(form, 'inventory-category-name', name);
-  await form.locator('[data-testid=inventory-category-form-submit]').click();
-  await expect(form).toBeHidden();
-  await shown(page).locator('[data-testid=inventory-categories-search] input').fill(name);
-  const row = shown(page).locator('[data-testid=inventory-categories-row]', { hasText: name });
+  const row = await savedCategoryRow(page, form, name);
   made.set((await row.getAttribute('data-id'))!, 'Meats');
 
   await page.goto('/sale/pos');
