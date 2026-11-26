@@ -13,7 +13,7 @@ import pytest
 from live.errors import NotFound, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, card, connect, ctx_for, receive, run, template
 
 pytestmark = HUB_DB

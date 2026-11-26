@@ -161,7 +161,7 @@ class TestWhatTheAppsDoWithWhatComesBack:
             relayed(hub)
 
         with use_hub(hub):
-            from apps.whatsapp_inbox.models import Conversation
+            from apps.whatsapp_inbox.models.conversations import Conversation
 
             assert Conversation.objects.get().customer_id is not None
             linked = OutboxEvent.objects.filter(name="whatsapp_inbox.conversation.customer_linked").latest("created_at")
