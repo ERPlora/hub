@@ -89,8 +89,9 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await askForACard(page, `E2E-ASK printing__job__create ${JSON.stringify(print)}`);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    // The document by the queue's word for it, never as the model sent it.
-    await expect(card(page)).toContainText(`Crear en Impresión: Etiqueta de código de barras · Documento: ${product}`);
+    // The document by the queue's word for it, never as the model sent it, and by the name of its datum: a value of a
+    // closed list alone does not say what it is.
+    await expect(card(page)).toContainText(`Crear en Impresión: Tipo de documento: Etiqueta de código de barras · Documento: ${product}`);
     await expect(card(page)).not.toContainText(jobKey);
     await captureStill(page, `${KEY}-${vp.label}`);
   }
