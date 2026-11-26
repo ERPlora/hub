@@ -168,6 +168,11 @@ def test_a_refunds_failed_event_leaves_with_that_refunds_rectifying_invoice_and_
     assert failed_ids() == (set(), 0)
     assert state(discarded) == (EventDelivery.Status.DISCARDED, relay.MAX_ATTEMPTS)
 
+    # The relay hands every resent event over and each finds its document done: none is issued again.
+    relay_pass()
+    assert (state(first_failed), state(second_failed)) == (("delivered", 1), ("delivered", 1))
+    assert (Invoice.objects.count(), Record.objects.count()) == (4, 4)
+
 
 def test_another_business_failed_events_are_never_touched(charge, hub_b):
     sale = charge("failed-ev-0006")

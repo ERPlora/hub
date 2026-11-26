@@ -22,7 +22,8 @@ from base.catalog.register_apps import RegisterResult
 from base.models.relay import EventDelivery
 
 #: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
-pytestmark = HUB_DB_COMMITTED
+#: What the relay seals for the tax agency never leaves the machine.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("nothing_leaves")]
 
 REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 
