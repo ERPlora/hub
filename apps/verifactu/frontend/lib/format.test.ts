@@ -75,14 +75,16 @@ describe('formatDate', () => {
 });
 
 describe('answerCounts', () => {
-  const answer = { chains: 1, sent: 1, accepted: 1, accepted_with_errors: 1, rejected: 1, waiting: 2, reason: '', message: '' };
+  const answer = { chains: 1, sent: 1, accepted: 1, accepted_with_errors: 0, rejected: 1, waiting: 1, reason: '', message: '' };
   const translator = (locale: 'en' | 'es') => {
     const i18n = createShellI18n({ locale, messages: { en, es } });
     return (key: string, named: Record<string, unknown>) => i18n.global.t(key, named);
   };
 
   it('says what the AEAT answered, each figure with its word in the singular or the plural', () => {
-    expect(answerCounts(answer, translator('es'))).toEqual({ sent: '1 enviado', accepted: '2 aceptados', rejected: '1 rechazado', waiting: '2 en espera' });
-    expect(answerCounts(answer, translator('en'))).toEqual({ sent: '1 sent', accepted: '2 accepted', rejected: '1 rejected', waiting: '2 waiting' });
+    const several = { ...answer, sent: 2, accepted_with_errors: 1, rejected: 2, waiting: 2 };
+    expect(answerCounts(answer, translator('es'))).toEqual({ sent: '1 enviado', accepted: '1 aceptado', rejected: '1 rechazado', waiting: '1 en espera' });
+    expect(answerCounts(several, translator('es'))).toEqual({ sent: '2 enviados', accepted: '2 aceptados', rejected: '2 rechazados', waiting: '2 en espera' });
+    expect(answerCounts(several, translator('en'))).toEqual({ sent: '2 sent', accepted: '2 accepted', rejected: '2 rejected', waiting: '2 waiting' });
   });
 });
