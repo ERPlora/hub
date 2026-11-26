@@ -13,7 +13,7 @@ import respx
 from django.utils import translation
 from live.errors import Conflict, InvalidPayload, NotFound
 
-from apps.whatsapp_inbox.models import Conversation, Message
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import (
     HUB_DB,
     NOW,
