@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
+import { ownImageUrl } from '../../../../base/frontend/lib/own-image';
 import { useT } from '../composables/useT';
 import type { PageOut } from '../operations';
 
@@ -10,16 +11,7 @@ type HeaderInfo = Pick<PageOut, 'business_name' | 'logo_url'> &
 const props = defineProps<{ info: HeaderInfo }>();
 const t = useT();
 const logoAlt = computed(() => t('online_booking.door.logoAlt', { business: props.info.business_name || props.info.title || t('online_booking.door.businessFallback') }));
-const logoUrl = computed(() => {
-  const value = props.info.logo_url.trim();
-  if (value.startsWith('/') && !value.startsWith('//')) return value;
-  try {
-    const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) && url.origin === window.location.origin ? url.href : '';
-  } catch {
-    return '';
-  }
-});
+const logoUrl = computed(() => ownImageUrl(props.info.logo_url));
 </script>
 
 <template>
