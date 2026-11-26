@@ -7,6 +7,8 @@ names each value once, under the path of its datum (``screen_names``).
 """
 
 import json
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from django.utils import translation
@@ -24,70 +26,82 @@ __all__ = ["in_business_a"]
 
 SCREEN_NAMES = shared.SCREEN_NAMES
 
-#: The closed lists the tools answer whose values no app names yet, by app: each one the model reads as a code. A tool
-#: that answers a new one fails here; an app that names one (its field's ``choices``, its ``LiveAppConfig.choices`` or
-#: a ``choices_of`` mark) takes it off.
-UNNAMED: dict[str, set[str]] = {
-    "appointment": {"kind"},
-    "attendance": {"running"},
-    "base": {
-        "actions", "kind", "level", "origin", "pin_inactivity_minutes", "pin_length", "preview", "purpose",
-        "retry_blocked", "state", "status",
-    },
-    "cash_register": {"report"},
-    "combo": {"allergens", "status"},
-    "flow": {"kind", "outcome", "state"},
-    "inventory": {"code", "status"},
-    "invoice": {"verifactu_status"},
-    "kitchen": {"allergy", "allergy_in_dish", "kind"},
-    "modifier": {"target_kind"},
-    "online_booking": {"status"},
-    "pricing": {"kind"},
-    "printing": {"state"},
-    "sale": {"allergens", "allergy_in_dish", "reason", "tax_kind"},
-    "schedule": {"code", "source"},
-    "service": {"default_reason", "kind", "reason", "status"},
-    "table": {"status"},
-    "tax": {"matched_by", "source", "tax_kind", "tax_operation_class"},
-    "verifactu": {"correction_status", "document_type", "documents", "severity", "status"},
-    "website": {"state"},
-    "whatsapp_inbox": {"reason", "send_blocked"},
-}
+#: The closed lists of the tools' answers the class still lets through, kept beside this test: ``unnamed``, by tool and
+#: by path, the values no app names yet, which the model reads as codes; ``undeclared``, by tool, the paths whose field
+#: has choices in its app's models but whose schema does not declare it a closed list, so this test sees it only through
+#: those choices and would lose it with them. A tool that answers a new one fails here; naming a value (its field's
+#: ``choices``, its app's ``LiveAppConfig.choices`` or a ``choices_of`` mark) or declaring the list takes it off.
+KNOWN = json.loads(Path(__file__).with_name("assistant_closed_lists_known.json").read_text())
 
 
-def closed_lists(op: Operation) -> list[tuple[str, str | None, dict]]:
-    """The data of ``op``'s answer that are a closed list, at any depth: its name, the mark that names the field of its
-    values (``CHOICES_OF``, a list's for its items too) and its schema."""
+@dataclass(frozen=True)
+class ClosedList:
+    """A datum of an answer that is a closed list: its path, its name, the ``choices_of`` mark that names the field of
+    its values, its values and whether its schema declares them (``enum``)."""
+
+    path: str
+    name: str
+    mark: str | None
+    values: tuple
+    declared: bool
+
+
+def closed_lists(op: Operation) -> list[ClosedList]:
+    """The data of ``op``'s answer that are a closed list, at any depth: those its schema declares one (``enum``) and
+    those whose field has choices in its app's models, as the result names them (``live.assistant.screen_name``)."""
     schema = shared.output_schema(op)
     defs = schema.get("$defs", {})
-    found: list[tuple[str, str | None, dict]] = []
+    found: list[ClosedList] = []
 
-    def walk(name: str, prop: dict, mark: str | None, depth: int) -> None:
+    def walk(name: str, prop: dict, path: str, mark: str | None, depth: int) -> None:
         prop = shared.resolved(prop, defs)
         mark = prop.get(shared.CHOICES_OF, mark)
         if depth > 8:
             return
-        if "enum" in prop:
-            found.append((name, mark, prop))
+        values = _values(op, name, mark, prop)
+        if values is not None:
+            found.append(ClosedList(path, name, mark, values, "enum" in prop))
         if isinstance(prop.get("items"), dict):
-            walk(name, prop["items"], mark, depth + 1)
+            walk(name, prop["items"], f"{path}[]", mark, depth + 1)
         for inner, inner_prop in prop.get("properties", {}).items():
-            walk(inner, inner_prop, None, depth + 1)
+            walk(inner, inner_prop, f"{path}.{inner}", None, depth + 1)
 
     for name, prop in schema.get("properties", {}).items():
-        walk(name, prop, None, 0)
+        walk(name, prop, name, None, 0)
     return found
 
 
-def unnamed_by_app(operations) -> dict[str, set[str]]:
-    """The closed lists of ``operations``' answers with a value the screens name nothing, by app."""
-    found: dict[str, set[str]] = {}
+def _values(op: Operation, name: str, mark: str | None, prop: dict) -> tuple | None:
+    """The codes of the datum ``name`` when it is a closed list: the ones its schema declares, else its field's choices
+    or the list its app declares; ``None`` when it is none."""
+    if "enum" in prop:
+        return tuple(value for value in prop["enum"] if value not in ("", None) and not isinstance(value, bool))
+    if prop.get("type") not in ("integer", "string") or "format" in prop:
+        return None
+    app_label, field_name = shared.choices_of(op.app_label, name, {shared.CHOICES_OF: mark} if mark else {})
+    for field in shared.model_fields(app_label, op.name.split(".")[1], field_name):
+        if getattr(field, "flatchoices", None):
+            return tuple(code for code, _label in field.flatchoices if code not in ("", None))
+    config = shared.config_of(app_label)
+    declared = config.choices.get(field_name) if config is not None else None
+    return tuple(code for code, _label in declared) if declared else None
+
+
+def unnamed(operations) -> dict[str, dict[str, list[str]]]:
+    """The values of the closed lists of ``operations``' answers the screens name nothing, by tool and by path."""
+    found: dict[str, dict[str, list[str]]] = {}
     for op in operations:
-        for name, mark, prop in closed_lists(op):
-            values = [value for value in prop["enum"] if value not in ("", None) and not isinstance(value, bool)]
-            if any(shared.screen_name(op, name, mark, value) is None for value in values):
-                found.setdefault(op.app_label, set()).add(name)
+        for closed in closed_lists(op):
+            codes = sorted({str(value) for value in closed.values if shared.screen_name(op, closed.name, closed.mark, value) is None})
+            if codes:
+                found.setdefault(op.name, {})[closed.path] = codes
     return dict(sorted(found.items()))
+
+
+def undeclared(operations) -> dict[str, list[str]]:
+    """The closed lists of ``operations``' answers their schema does not declare, by tool: the paths of each."""
+    found = {op.name: sorted({closed.path for closed in closed_lists(op) if not closed.declared}) for op in operations}
+    return {name: paths for name, paths in sorted(found.items()) if paths}
 
 
 # ── A demo read, its closed lists at any depth ───────────────────────────────────────────────────────────────────────
@@ -195,12 +209,41 @@ def test_a_long_answer_with_its_names_still_fits_what_the_model_is_told_at_once(
 # ── The class: every closed list a tool answers ──────────────────────────────────────────────────────────────────────
 
 
-def test_the_ratchet_finds_a_closed_list_nobody_names_and_nothing_else():
-    assert unnamed_by_app([figures(ANSWER)]) == {"demo": {"unnamed"}}
+def test_the_class_finds_the_closed_lists_nobody_names_and_the_undeclared_ones_and_nothing_else():
+    assert unnamed([figures(ANSWER)]) == {"demo.item.figures": {"unnamed": ["one", "two"]}}
+    assert undeclared([figures(ANSWER)]) == {"demo.item.figures": ["state"]}
+
+
+class ThingOut(Schema):
+    status: Literal["zzz_new", "yyy_new", "active"]
+    weekday: int
+
+
+def test_a_new_tool_with_a_list_its_app_names_only_in_part_or_through_its_models_is_found():
+    """A list called like one its app names elsewhere is still told by its own values; a whole number whose field has
+    choices in its app's models (the day of a schedule) is a closed list even if its schema says only a number."""
+    thing = Operation(
+        name="staff.thing.figures",
+        kind="query",
+        permission="staff.view",
+        input=Schema,
+        output=ThingOut,
+        expose_api=False,
+        ai={"description": "A read with closed lists."},
+        fn=lambda ctx, data: {},
+    )
+    assert unnamed([thing]) == {"staff.thing.figures": {"status": ["yyy_new", "zzz_new"]}}
+    assert undeclared([thing]) == {"staff.thing.figures": ["weekday"]}
+    [weekday] = [closed for closed in closed_lists(thing) if closed.name == "weekday"]
+    assert weekday.values == tuple(range(7))
 
 
 def test_every_closed_list_a_tool_answers_is_named_by_its_screens_but_the_known_ones():
-    assert unnamed_by_app(tools()) == UNNAMED
+    assert unnamed(tools()) == KNOWN["unnamed"]
+
+
+def test_every_closed_list_a_tool_answers_is_declared_by_its_schema_but_the_known_ones():
+    assert undeclared(tools()) == KNOWN["undeclared"]
 
 
 def test_no_answer_has_a_datum_of_its_own_called_like_the_names():

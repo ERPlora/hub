@@ -4790,9 +4790,12 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `base/tests/test_assistant_result_amounts.py`; cada valor de una lista cerrada que nombran las pantallas lleva
   además ese nombre en el idioma de la persona, una vez por dato y valor, bajo `screen_names` (`live.assistant`, con
   la etiqueta de las opciones del modelo que usa la tarjeta, `choice_label`): lo comprueban
-  `base/tests/test_assistant_screen_names.py`, que guarda por app las listas cerradas que ninguna app nombra todavía
-  (solo encoge), y `apps/customer/tests/test_assistant_screen_names.py`; el paso del asistente de Automatizaciones
-  lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
+  `base/tests/test_assistant_screen_names.py` (toda lista cerrada que devuelve una herramienta, la que declara su
+  esquema y la que solo tiene opciones en el modelo, como los días de la semana; las que aún no nombra ninguna app o
+  que el esquema no declara van por herramienta en `assistant_closed_lists_known.json`, que solo encoge),
+  `apps/customer/tests/test_assistant_screen_names.py` y `apps/staff/tests/test_assistant_schedule_days.py`; los
+  catorce alérgenos los nombra la plataforma (`base.allergens.NAMED`); el paso del asistente de Automatizaciones lo
+  lee igual), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,

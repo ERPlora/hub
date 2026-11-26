@@ -50,6 +50,8 @@ T_BOOKING = gettext_noop("Booking")
 Status = Literal[
     "pending", "confirmed", "in_progress", "completed", "cancelled", "no_show"
 ]
+#: An appointment's status, named as the appointments' screens name it.
+OF_APPOINTMENT_STATUS = {"choices_of": "appointment.status"}
 BookingSort = Literal[
     "booked_at", "start", "number", "customer_name", "staff_name", "status"
 ]
@@ -209,7 +211,7 @@ class BookingRow(Schema):
     start: dt.datetime = Field(description="On the business's clock.")
     end: dt.datetime
     duration_minutes: int
-    status: Status
+    status: Status = Field(json_schema_extra=OF_APPOINTMENT_STATUS)
     total: int = Field(description="The sum of its services' prices, in cents.", json_schema_extra={"money": True})
     notes: str = Field(description="The customer's note.")
     booked_at: dt.datetime
@@ -460,7 +462,7 @@ class PublicBookIn(In, TrapIn):
 
 class BookedOut(Schema):
     number: str = Field(description="The appointment number the customer quotes.")
-    status: Status
+    status: Status = Field(json_schema_extra=OF_APPOINTMENT_STATUS)
     start: dt.datetime
     end: dt.datetime
     timezone: str
@@ -485,7 +487,7 @@ class PublicCancelIn(TokenIn):
 
 class PublicBookingOut(LinkOwnerOut):
     number: str
-    status: Status
+    status: Status = Field(json_schema_extra=OF_APPOINTMENT_STATUS)
     start: dt.datetime
     end: dt.datetime
     timezone: str
