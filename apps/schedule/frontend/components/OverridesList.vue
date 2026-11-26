@@ -90,14 +90,15 @@ const columns = computed<DataTableColumn<OverrideOut>[]>(() => [
 ]);
 
 /** The screen has two lists: its funnel and view buttons say they are the overrides'.
- *  DataTable fills the `{n}` of the count itself. */
+ *  DataTable picks the label for one active filter or for several, each
+ *  that form of the message, and fills its `{n}`. */
 const tableLabels = computed<Partial<DataTableLabels>>(() => ({
   add: t('schedule.overrides.add'),
   loadError: t('schedule.overrides.loadError'),
   retry: t('schedule.live.retry'),
   filters: t('schedule.overrides.table.filters'),
-  filtersActiveOne: t('schedule.overrides.table.filtersActiveOne', { n: '{n}' }),
-  filtersActiveMany: t('schedule.overrides.table.filtersActiveMany', { n: '{n}' }),
+  filtersActiveOne: t('schedule.overrides.table.filtersActive', { count: 1, n: '{n}' }),
+  filtersActiveMany: t('schedule.overrides.table.filtersActive', { count: 2, n: '{n}' }),
   viewList: t('schedule.overrides.table.viewList'),
   viewCards: t('schedule.overrides.table.viewCards'),
 }));
