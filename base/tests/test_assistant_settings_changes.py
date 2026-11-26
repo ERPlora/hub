@@ -117,6 +117,28 @@ def test_the_writes_of_settings_are_found_and_every_one_named_as_a_setting_is_am
     assert named - set(SETTINGS) == set()
 
 
+#: Heard as they ran though a read of theirs answers their data unasked: the website's whole document, which would be
+#: told three times over, and the mode of the device in use, read by another name.
+HEARD_AS_THEY_RAN = {"base.device.mode_set", "website.site.save"}
+
+
+def read_back_unasked(op: Operation) -> bool:
+    """Whether a read of ``op``'s entity that takes no data answers every datum ``op`` sends, whatever both are called."""
+    entity = op.name.rsplit(".", 1)[0]
+    sent = {info.alias or name for name, info in op.input.model_fields.items()}
+    answers = [
+        set(getattr(read.output, "model_fields", ()))
+        for name, read in registry.items()
+        if read.kind == "query" and name.rsplit(".", 1)[0] == entity and not read.input.model_fields
+    ]
+    return bool(sent) and any(all(datum in told or f"{datum}_id" in told for datum in sent) for told in answers)
+
+
+def test_a_write_of_settings_by_any_other_name_is_among_them_too():
+    one_record = {name for name, op in registry.items() if a_tool_write(op) and read_back_unasked(op)}
+    assert one_record - set(SETTINGS) == HEARD_AS_THEY_RAN
+
+
 @pytest.mark.parametrize("write", SETTINGS)
 def test_every_datum_of_a_write_of_settings_is_read_back(write):
     op = get(write)
