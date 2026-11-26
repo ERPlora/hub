@@ -6,6 +6,7 @@
 // provider answers the panel (README of this folder, «El asistente»).
 import { expect, type Page, test } from '@playwright/test';
 
+import { pressPin, userMenu } from './access-door';
 import { VIEWPORTS } from './assistant-card-helpers';
 import { ask, lastAnswer, openPanel, panel } from './assistant-panel';
 import { GREETING } from './assistant-provider';
@@ -32,21 +33,6 @@ let origin: string;
 let till: Page;
 
 const usernameOf = (email: string): string => psql(`SELECT username FROM auth_user WHERE email = '${email}'`);
-
-async function press(page: Page, digits: string): Promise<void> {
-  for (const digit of digits) await shown(page).getByTestId(`pinpad-key-${digit}`).click();
-}
-
-/** The user menu of the side menu (pinned at 1440), and the entry `id` in it. */
-async function userMenu(page: Page, id: string): Promise<void> {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  const presented = page.evaluate(
-    () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-  );
-  await page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name').click();
-  await presented;
-  await page.locator(`ion-popover [data-testid="user-menu-${id}"]`).click();
-}
 
 /** The name the session gives the person in hand (`base.session.me`). */
 async function whoIsIn(page: Page): Promise<string | null> {
@@ -95,15 +81,15 @@ test.beforeAll(async ({ browser }) => {
   const theirs = employee.page;
   await theirs.goto(`${origin}/`);
   await expect(theirs).toHaveURL(`${origin}/pin/setup?next=%2F`, { timeout: 30_000 });
-  await press(theirs, EMPLOYEE_PIN);
+  await pressPin(theirs, EMPLOYEE_PIN);
   await expect(shown(theirs).getByTestId('pin-setup-step')).toHaveText('Confirm your PIN');
-  await press(theirs, EMPLOYEE_PIN);
+  await pressPin(theirs, EMPLOYEE_PIN);
   await expect(theirs).toHaveURL(`${origin}/`);
   till = owner.page;
   await till.goto(`${origin}/`);
   await expect(till).toHaveURL(/\/login(\?|$)/);
   await shown(till).getByTestId('pin-face').filter({ hasText: 'e2e-switch-panel-owner' }).click();
-  await press(till, OWNER_PIN);
+  await pressPin(till, OWNER_PIN);
   await expect(till).toHaveURL(`${origin}/`);
 });
 
@@ -126,7 +112,7 @@ test('BASE-F102: whoever takes over with their PIN finds the panel closed and em
   await userMenu(till, 'switch-user');
   await expect(till).toHaveURL(`${origin}/switch-user`);
   await shown(till).getByTestId('pin-face').filter({ hasText: 'e2e-switch-panel-employee' }).click();
-  await press(till, EMPLOYEE_PIN);
+  await pressPin(till, EMPLOYEE_PIN);
   await expect(till).toHaveURL(`${origin}/`);
   expect(await whoIsIn(till)).toMatch(/e2e-switch-panel-employee/);
   await closedAndEmpty(till, 'pin');
