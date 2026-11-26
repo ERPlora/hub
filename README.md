@@ -85,7 +85,8 @@ sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
   El SaaS va en su `origin/main`.
 - **El tope**: 20 minutos para los tests (el tope global de Playwright), fijado con las pasadas medidas en el Mac
   cargado. Al llegar, Playwright corta y el humo sale en rojo. Subirlo es una decisión, no el arreglo de una pasada lenta.
-  En el job de GitHub, con todos los grupos dentro, los tests tardan de 11,9 a 14,2 minutos.
+  En el job de GitHub, con todos los grupos dentro, los tests tardan de 11,9 a 15,0 minutos (15,0 con la comprobación de
+  textos, que se lleva 2,5).
 - **Dónde**: `~/.erplora/hub-smoke-e2e/` y el puerto `9780` (el SaaS en el `9781`, como en la noche), aparte de la
   pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
   `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
@@ -109,7 +110,8 @@ sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
   la puerta del SaaS hasta que termina, y ver en otra pestaña, sin recargar, un elemento recién creado); y los textos
   enteros (`screens-text-fits.spec.ts`: cada pantalla de las apps de los recorridos de peluquería y restaurante, en
   español, con nombres largos y en los tres tamaños, sin un texto cortado ni una palabra partida fuera de los sitios
-  ya conocidos de `text-fits-known.ts`, cada uno con su issue; la lista solo encoge). Esta spec tarda unos 4 minutos.
+  ya conocidos de `text-fits-known.json`, cada uno con su issue; un sitio caduca pantalla a pantalla y
+  `tests/test_guardrails_text_fits.py` no deja añadir uno nuevo). Mide en Arial, la misma fuente en todas las máquinas.
   Nada del grupo fiscal llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus
   tests caen si un registro va al entorno de producción de la AEAT. Tampoco pide un PDF al servidor (la factura se
   imprime desde el navegador), así que el job no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la
