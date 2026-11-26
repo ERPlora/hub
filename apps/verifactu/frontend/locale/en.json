@@ -141,7 +141,7 @@
       "correctedLink": "Open the record that corrects it",
       "verify": "Verify at the AEAT",
       "transmit": "Send now",
-      "transmitted": "Sent: {accepted} accepted, {rejected} rejected, {waiting} waiting.",
+      "transmitted": "Sent: {accepted}, {rejected}, {waiting}.",
       "transmitFailed": "It could not be sent",
       "ask": "Ask the AEAT",
       "askHeld": "The AEAT already has {number}: it is out of the queue.",
@@ -160,11 +160,17 @@
       "events": "Events",
       "reasonRequired": "Write why the invoice was issued by error."
     },
+    "answers": {
+      "sent": "{count} sent | {count} sent",
+      "accepted": "{count} accepted | {count} accepted",
+      "rejected": "{count} rejected | {count} rejected",
+      "waiting": "{count} waiting"
+    },
     "contingency": {
       "title": "Contingency queue",
       "process": "Process queue",
       "processing": "Processing…",
-      "processed": "{sent} sent, {accepted} accepted, {rejected} rejected, {waiting} waiting.",
+      "processed": "{sent}, {accepted}, {rejected}, {waiting}.",
       "processFailed": "The queue could not be processed",
       "search": "Search invoice or error…",
       "empty": "Queue empty: everything is in the AEAT.",
@@ -280,7 +286,7 @@
       "holder": "Holder",
       "uploaded": "Uploaded on",
       "expires": "Expires on",
-      "expiresSoon": "Expires in {n} days: upload the renewed one here.",
+      "expiresSoon": "Expires in {n} day: upload the renewed one here. | Expires in {n} days: upload the renewed one here.",
       "expired": "The certificate has expired. Upload a valid one to send to the AEAT.",
       "proof": {
         "label": "AEAT test environment",

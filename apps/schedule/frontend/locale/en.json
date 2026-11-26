@@ -92,8 +92,7 @@
       },
       "table": {
         "filters": "Special day filters",
-        "filtersActiveOne": "Special day filters ({n} active)",
-        "filtersActiveMany": "Special day filters ({n} active)",
+        "filtersActive": "Special day filters ({n} active) | Special day filters ({n} active)",
         "viewList": "View special days as list",
         "viewCards": "View special days as cards"
       }
@@ -125,8 +124,7 @@
       },
       "table": {
         "filters": "Override filters",
-        "filtersActiveOne": "Override filters ({n} active)",
-        "filtersActiveMany": "Override filters ({n} active)",
+        "filtersActive": "Override filters ({n} active) | Override filters ({n} active)",
         "viewList": "View overrides as list",
         "viewCards": "View overrides as cards"
       }
