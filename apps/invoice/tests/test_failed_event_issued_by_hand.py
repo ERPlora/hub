@@ -21,7 +21,8 @@ from base.models.relay import EventDelivery
 from base.services import relay_runs
 from base.tenancy.context import use_hub
 
-pytestmark = HUB_DB
+#: What a test seals for the tax agency never leaves the machine.
+pytestmark = [HUB_DB, pytest.mark.usefixtures("nothing_leaves")]
 
 DEAD = EventDelivery.Status.DEAD
 
