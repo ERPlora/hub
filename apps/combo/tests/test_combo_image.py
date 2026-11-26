@@ -93,13 +93,26 @@ def key(reference: str) -> str:
     return f"{hub_prefix(Hub.objects.get(slug=A.key).id)}/{reference.removeprefix('file:')}"
 
 
-def test_a_menu_is_born_without_an_image_and_its_photos_are_the_hubs_sessions_only():
+def test_a_menu_is_born_without_an_image_and_its_photos_are_served_to_anyone_as_a_table_s_menu_shows_them():
     combo = make_combo()
 
     detail = run("combo.combo.get", {"id": str(combo.id)})
 
     assert (detail.image, detail.image_url) == ("", "")
-    assert django_apps.get_app_config("combo").members_media == [FOLDER]
+    config = django_apps.get_app_config("combo")
+    assert (config.public_media, getattr(config, "members_media", [])) == ([FOLDER], [])
+
+
+@pytest.mark.usefixtures("hub_files")
+def test_a_menus_photo_is_seen_by_the_hubs_sessions_and_by_a_customer_without_one(client, make_user):
+    combo = make_combo()
+    url = upload(str(combo.id)).image_url
+    client.force_login(make_user("boss", host=A.key, role="hub_admin"))
+
+    assert client.get(url, HTTP_HOST=HOST).status_code == 200
+    client.logout()
+    visited = client.get(url, HTTP_HOST=HOST)
+    assert (visited.status_code, visited["Content-Type"]) == (200, "image/webp")
 
 
 def test_the_column_is_added_with_a_database_default():
