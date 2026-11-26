@@ -12,7 +12,7 @@ from live.outbox import record_event
 from apps.customer.models import Customer
 from apps.customer.services.writes import lock_customers
 from apps.whatsapp_inbox import events
-from apps.whatsapp_inbox.models import Conversation
+from apps.whatsapp_inbox.models.conversations import Conversation
 from apps.whatsapp_inbox.queries.reads import live_conversations
 from base import outbound
 

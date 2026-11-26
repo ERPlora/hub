@@ -419,7 +419,7 @@ def test_a_local_save_of_each_app_refused_as_read_only_goes_in_once(boss, hub_a,
     cut = settings.LIVE["database_cut"]
     settings.LIVE = {**settings.LIVE, "database_cut": {**cut, "wait_seconds": 5}}
     if app == "whatsapp_inbox":
-        from apps.whatsapp_inbox.models import Conversation
+        from apps.whatsapp_inbox.models.conversations import Conversation
 
         with context.use_hub(hub_a):
             conversation = Conversation.objects.create(phone="+34600111222", contact_name="Ana")

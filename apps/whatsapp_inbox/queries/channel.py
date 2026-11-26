@@ -6,7 +6,7 @@ from live.context import OperationContext, Scope
 from live.operations import operation
 
 from apps.whatsapp_inbox import clock, gateway
-from apps.whatsapp_inbox.models import Channel
+from apps.whatsapp_inbox.models.channel import Channel
 from apps.whatsapp_inbox.schemas.channel import ChannelGetIn, ChannelOut
 from base.saas_store import plans_url
 
