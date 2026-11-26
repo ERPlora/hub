@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { load, summary, template, waitingLoad } from '../../__tests__/data-fixtures';
-import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
+import { accessibleName, EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
 import type { ImportRow } from '../../operations/blueprints';
 import { SESSION_CHANGED } from '../../lib/access';
 import { BLUEPRINT_FILE } from '../../lib/data';
@@ -83,7 +83,9 @@ describe('ImportPanel', () => {
     const m = await panel();
     expect(m.wrapper.text()).toContain('Load a template: it fills your apps with its data');
     expect(m.wrapper.get('h3').text()).toBe('Choose what to load');
-    expect(m.wrapper.get('[data-testid="import-upload"]').text()).toBe('Upload from file');
+    const upload = m.wrapper.get('[data-testid="import-upload"]');
+    // The upload icon alone: «Upload from file» is its name and its tooltip.
+    expect([upload.text(), accessibleName(upload.element), upload.attributes('title')]).toEqual(['', 'Upload from file', 'Upload from file']);
     expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(true);
   });
 
