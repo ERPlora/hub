@@ -1048,7 +1048,7 @@ If it fails: Tables will say.
 Involved: TABLE-F15
 
 ### SALE-F26 Charge an appointment from the calendar
-<!-- from WORKBOOK.md sha256:668681fa4a91 -->
+<!-- from WORKBOOK.md sha256:7e28657e02da -->
 Status: done (the calendar's "Charge" button belongs to Appointments: APPOINTMENT-F17)
 Vertical: hair salon
 Actor: employee, manager
@@ -1056,7 +1056,9 @@ Screen: Sell
 Steps:
 1. In the Appointments calendar, "Charge" opens the appointment's check (with one line per service, at
    its booked price and with the professional), already in the name of the appointment's customer, and
-   goes to **Sell** with that check on screen.
+   goes to **Sell** with that check on screen. Until the check is on screen with its customer, **Sell**
+   only says "Opening the check…": it shows neither the catalogue nor any other check, so nothing is
+   added to or charged on another one.
 2. It is charged as always; if it is parked and retrieved, the check stays tied to the appointment.
 3. Pressing "Charge" again (or on another device at the same time) goes back to the same open check: an
    appointment has a single open check, never two.
@@ -1064,8 +1066,10 @@ In: the appointment, from Appointments.
 Out: the sale with the appointment, the customer and the professional, and the purchase on the customer's
 card (announces: sale charged and sale born from an appointment, with the appointment, who served and the
 total).
-If it fails: if the appointment's check is no longer open (it was charged or voided), the POS says so
-("That check is not open any more…") and carries on as it was.
+If it fails: if the appointment's check is no longer open (it was charged or voided) or does not exist,
+the POS says so in place of the catalogue and the check ("That check is not open any more: it was charged,
+voided or does not exist."); if it cannot be read, it says why. While it says so, nothing can be sold or
+charged; "Continue" gives the POS back as it was.
 Involved: APPOINTMENT-F17, CUSTOMER-F19
 
 ### SALE-F27 Pay a line with a voucher
