@@ -43,7 +43,7 @@ def recipe_flow(ref: str, *, lock: bool = False) -> Flow | None:
     },
 )
 def list_recipes(ctx: OperationContext, data: RecipeListIn) -> dict:
-    """The recipes from the ``offset``-th on; the ones set aside only with the first ones."""
+    """The recipes from the ``offset``-th on, and the ones set aside."""
     offered, set_aside = recipes.shelf(ctx.scope)
     mine = {flow.recipe: flow for flow in live_flows().exclude(recipe="")}
     rows = []
@@ -88,6 +88,6 @@ def list_recipes(ctx: OperationContext, data: RecipeListIn) -> dict:
                 "message": item.message,
                 "apps": list(item.apps),
             }
-            for item in ([] if data.offset else set_aside)
+            for item in set_aside
         ]
     return {"recipes": rows, "set_aside": aside}

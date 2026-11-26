@@ -85,7 +85,7 @@ def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
     """An app's help in the person's language while its file is current, else in its base language's, else in the
     source's (``language`` says which); its video and each task's short videos likewise. Without the screens whose
     permission the person does not hold, nor the tasks that are only done there or that their role does not do. With an
-    ``offset``, the tasks from that one on, without the screens, which came with the first ones."""
+    ``offset``, the tasks from that one on."""
     config = _ready(data.app)
     if config is None:
         with translation.override(ctx.language):
@@ -100,7 +100,7 @@ def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
     ]
     return {
         **read,
-        "screens": [] if data.offset else [screen for screen in read["screens"] if screen["id"] not in closed],
+        "screens": [screen for screen in read["screens"] if screen["id"] not in closed],
         "video": _in_language(config.help.videos, language),
         "flows": flows[data.offset :],
     }
