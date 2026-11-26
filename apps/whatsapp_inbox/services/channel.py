@@ -15,7 +15,8 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, gateway
-from apps.whatsapp_inbox.models import Channel, Template
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.templates import Template
 from apps.whatsapp_inbox.queries.reasons import META_RATE_LIMITED
 from apps.whatsapp_inbox.queries.templates import live_templates, templates_of
 from apps.whatsapp_inbox.schemas.channel import (
