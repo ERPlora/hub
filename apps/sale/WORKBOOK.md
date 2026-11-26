@@ -916,7 +916,9 @@ deja la cuenta marcada como pedida, salga por la impresora de tiques o por el di
 se cobra entera o se elimina; volver a imprimirla, añadir líneas o cobrar una parte no la quita. Pedida al
 asistente («imprime la cuenta de la mesa 4»), solo sale por la impresora de tiques: si ninguna la recibe, no se
 imprime ni se marca, y su recibo dice que no se hizo, con el motivo: «Ninguna impresora de tiques recibe esta
-cuenta: ábrela en Ventas para imprimirla en este dispositivo.».
+cuenta: ábrela en Ventas para imprimirla en este dispositivo.». Si la recibe pero ningún dispositivo encendido imprime
+su cola, el asistente dice que queda en la cola de esa impresora y que saldrá cuando un dispositivo dado de alta la
+imprima, nunca que la ha impreso.
 Si falla: mientras el negocio no haya dicho todavía su moneda, «Cuenta» sigue cargando y la impresora en gris: el
 papel nunca sale con una cifra supuesta; si la moneda no se puede leer, lo dice con «Reintentar», como si falla
 el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; si la app instalada no abre su
@@ -1177,7 +1179,9 @@ tique»), solo se hace si una impresora de tiques recibe el papel; si no, no se 
 hizo, con el motivo: «Ninguna impresora de tiques recibe el papel de esta venta: abre la venta para imprimirlo en este
 dispositivo.»; con su documento fiscal pendiente, «Su documento fiscal sigue pendiente: abre la venta para
 emitirlo.», y si no se puede leer su registro de VeriFactu, «No se pudo leer su registro de VeriFactu, y su papel
-nunca se imprime sin su QR.».
+nunca se imprime sin su QR.». Si la impresora lo recibe pero ningún dispositivo encendido imprime su cola (ninguno dado
+de alta con ella, o el que la tiene, apagado), el tique queda en esa cola: el asistente dice que queda en la cola de esa
+impresora y que saldrá cuando un dispositivo dado de alta la imprima, nunca que lo ha reimpreso.
 Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Anular una venta cobrada
