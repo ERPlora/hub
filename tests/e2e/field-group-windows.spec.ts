@@ -6,6 +6,7 @@ import { type Browser, expect, type Locator, type Page, test } from '@playwright
 
 import { A, api, capture, horizontalOverflow, login, psql, shown, THREE_SIZES, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { dialog, presentedDialog } from './inventory-helpers';
+import { asTheApp } from './printing-helpers';
 import { pickMember, staffCleanUp } from './staff-helpers';
 
 const TAG = 'E2E Group';
@@ -23,6 +24,8 @@ interface GroupedWindow {
   /** How the window's own class lays the group out. */
   layout: { display: string; rowGap: string };
   open: (page: Page) => Promise<void>;
+  /** Opened inside the installed app: the device window is offered nowhere else. */
+  inTheApp?: boolean;
 }
 
 /** Taps the shown one of `testids` (a screen with two views has a button in each). */
@@ -62,6 +65,7 @@ const WINDOWS: readonly GroupedWindow[] = [
     group: '.printing-device__printers',
     layout: { display: 'grid', rowGap: '10px' },
     open: tap('printing-devices-add'),
+    inTheApp: true,
   },
   {
     key: 'api-key-modes',
@@ -88,8 +92,9 @@ function cleanUp(): void {
   psql(`delete from printing_printer where name like '${TAG}%'`);
 }
 
-async function ownerOn(browser: Browser, path: string) {
+async function ownerOn(browser: Browser, path: string, inTheApp = false) {
   const context = await browser.newContext({ baseURL: A, locale: 'en-US' });
+  if (inTheApp) await asTheApp(context);
   const page = await context.newPage();
   await login(page, A, path);
   return { context, page };
@@ -128,7 +133,7 @@ function paintedAs(group: Locator) {
 
 for (const window of WINDOWS) {
   test(`${window.key}: a group without a box, laid out as its window says, at 390, 834 and 1440`, async ({ browser }) => {
-    const { context, page } = await ownerOn(browser, window.path);
+    const { context, page } = await ownerOn(browser, window.path, window.inTheApp);
     for (const size of THREE_SIZES) {
       await page.setViewportSize({ width: size.width, height: size.height });
       await untilStill(page);
