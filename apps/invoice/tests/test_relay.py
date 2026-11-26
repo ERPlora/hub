@@ -100,3 +100,10 @@ def test_after_the_last_attempt_the_sale_waits_for_issue_now(tick, product, char
     issued = run("sale.sale.issue_documents", {"sale": sale.number})
     ticket = Invoice.objects.get(source_sale_id=sale.id)
     assert (issued.invoice_status, issued.invoice_number) == ("issued", ticket.number)
+
+    # Its failed event goes back to the queue with the ticket, and the next tick finds it done: nothing more is issued.
+    assert to_invoicing(sale) == ("pending", 0)
+    tick(at + dt.timedelta(hours=3))
+    assert to_invoicing(sale) == ("delivered", 1)
+    assert Invoice.objects.filter(source_sale_id=sale.id).count() == 1
+    assert Record.objects.filter(invoice_id=ticket.id).count() == 1
