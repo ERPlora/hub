@@ -769,7 +769,7 @@ already sales on screen, they stay under the notice.
 Involved: SALE-F28
 
 ### BASE-F10 See in the bell the notices between apps that were not delivered
-<!-- from WORKBOOK.md sha256:9dc8306fec6e -->
+<!-- from WORKBOOK.md sha256:fca556381650 -->
 Status: done
 Actor: owner, administrator
 Screen: The bell
@@ -779,7 +779,7 @@ Steps:
      with "An app did not receive what another one sent it: what it had to do stays undone until you send it again.",
      comes in as a card and settles in it.
   3. "Review the events" opens "System" on "Failed events", where they are resent or discarded (BASE-F43).
-  4. When none is left, the notice disappears.
+  4. When none is left (resent, discarded or already done another way), the notice disappears.
 In: how many notices of this business were left undelivered, only for whoever runs the business.
 Out: nothing.
 If it fails: an employee or a manager does not see the notice. If it cannot ask, the bell keeps what it
@@ -1583,7 +1583,7 @@ If it fails: "The log could not be loaded. Check the connection and try again." 
 Involved: none
 
 ### BASE-F43 See the failed events
-<!-- from WORKBOOK.md sha256:7b01ec3e1db1 -->
+<!-- from WORKBOOK.md sha256:75c3f078c4a3 -->
 Status: done
 Actor: owner, administrator
 Screen: System · Failed events
@@ -1597,7 +1597,9 @@ Steps:
      "Discard". On top, "Resend all". If the app it was for is no longer on, the card says it cannot be resent
      until it is turned on, with no "Resend".
   4. The 100 most recent show; with more, the screen says how many show out of how many.
-  5. The list and the bell get up to date by themselves when a notice fails, is resent or is discarded.
+  5. The list and the bell get up to date by themselves when a notice fails, is resent or is discarded, and also when
+     the app it was for does what it asked another way: if Invoicing issues a sale's document with "Issue now",
+     that sale's notice goes by itself.
   6. With none: "All in order" — "No failed events. The queue of events lives in the database: a restart never
      loses it.".
 In: the notices between apps of this business that ran out of retries, never another's.
