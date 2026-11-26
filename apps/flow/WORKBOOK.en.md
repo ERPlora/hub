@@ -391,7 +391,7 @@ saved.
 Involved: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F10 Choose when it starts
-<!-- from WORKBOOK.md sha256:2e4a8b622098 -->
+<!-- from WORKBOOK.md sha256:d16ea527e6ee -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -400,8 +400,10 @@ Steps:
    - **Something happens**: in "Choose what happens", the notices of the business's active apps, said in
      words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…), with
      the word of the app they belong to ("an opening hours override is created", as in Schedule) and with a
-     search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
-     10000"); without them it starts on its own with every notice.
+     search box. Those only the platform records, which start nothing, are left out: the clean-up of old
+     prints and what a recovery from a separate copy brings back ("an appointment is recovered"). Below,
+     **Only when…**: conditions on the notice's data ("the total is greater than 10000"); without them it
+     starts on its own with every notice.
    - **On a schedule**: "How often" (every day, every week, every month), the day of the week or of the
      month when it applies, and the time, in the business's time. A day of the month that does not exist
      (the 31st in April) is skipped that month.
