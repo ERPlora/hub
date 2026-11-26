@@ -267,13 +267,14 @@ async function deactivate(): Promise<void> {
           fill="outline"
           color="medium"
           data-testid="staff-members-mine"
+          :aria-label="$t('staff.members.mine.button')"
+          :title="$t('staff.members.mine.button')"
           @click="recordOpen = true"
         >
           <HubIcon
-            slot="start"
+            slot="icon-only"
             name="ion:person-circle-outline"
           />
-          {{ $t('staff.members.mine.button') }}
         </ion-button>
       </template>
       <template #status="{ row }">

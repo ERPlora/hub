@@ -270,10 +270,13 @@ test('SALE-F22: with a line marked, «Charge» says what it will charge and «To
   await page.goto(`${A}/sale/pos`);
   await juiceAndCake(page);
   const charge = shown(page).locator('[data-testid=pos-charge]');
-  await expect(charge).toContainText(/Cobrar · 6,50\s€/);
+  await expect(charge.locator('button')).toHaveAccessibleName(/Cobrar · 6,50\s€/);
+  // The cash icon and the amount: «Cobrar» is its name, not its text.
+  await expect(charge).toHaveText(/^\s*6,50\s€\s*$/);
 
   await toggleMark(page, juice);
-  await expect(charge).toContainText(/Cobrar 1 línea · 2,50\s€/);
+  await expect(charge.locator('button')).toHaveAccessibleName(/Cobrar 1 línea · 2,50\s€/);
+  await expect(charge).toHaveText(/^\s*2,50\s€\s*$/);
   await expect(shown(page).locator('[data-testid=pos-total]')).toContainText(/6,50/);
   for (const size of FLEET_SIZES) {
     await page.setViewportSize(size);
@@ -288,10 +291,10 @@ test('SALE-F22: with a line marked, «Charge» says what it will charge and «To
   }
 
   await toggleMark(page, cake);
-  await expect(charge).toContainText(/Cobrar 2 líneas · 6,50\s€/);
+  await expect(charge.locator('button')).toHaveAccessibleName(/Cobrar 2 líneas · 6,50\s€/);
   await toggleMark(page, juice);
   await toggleMark(page, cake);
-  await expect(charge).toContainText(/Cobrar · 6,50\s€/);
+  await expect(charge.locator('button')).toHaveAccessibleName(/Cobrar · 6,50\s€/);
 });
 
 test('full screen: the whole page goes full screen and the checkout sheet opens and charges on top', async ({ page, context }) => {
