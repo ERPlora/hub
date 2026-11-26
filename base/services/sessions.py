@@ -327,7 +327,7 @@ def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
         if member.email is not None:
             wanted["email"] = member.email
         if member.name is not None:
-            wanted["name"] = member.name[: HubUser._meta.get_field("name").max_length]
+            wanted["name"] = queries.people.without_address(member.name)[: HubUser._meta.get_field("name").max_length]
         person, created = HubUser.objects.get_or_create(username=username, defaults=wanted)
         if created:
             made += 1
