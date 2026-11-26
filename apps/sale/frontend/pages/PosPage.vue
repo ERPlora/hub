@@ -87,7 +87,11 @@ const charging = shallowRef(false);
 
 const till = useTill({
   settings: () => settings.value,
-  onOpened: (id) => customer.value && void linkCustomer(id, customer.value),
+  // A check opened here has the customer the screen shows: there is nothing to read back.
+  onOpened: (id) => {
+    customerRead.value = id;
+    if (customer.value) void linkCustomer(id, customer.value);
+  },
   // The check on screen was joined with another (TABLE-F16, SALE-F24): the till shows that one, as switching to it does.
   onJoined: (id) => {
     clearScreen();

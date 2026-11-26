@@ -6,7 +6,7 @@ import { toastError } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
 import { click, settle } from '../__tests__/mount-sale';
-import { freshEachTest, setup } from '../__tests__/pos-page';
+import { CHECK, freshEachTest, setup } from '../__tests__/pos-page';
 import DirtyCheckDialog from '../components/pos/DirtyCheckDialog.vue';
 import ParkSheet from '../components/pos/ParkSheet.vue';
 import PosCart from '../components/pos/PosCart.vue';
@@ -121,6 +121,16 @@ describe('PosPage: a check opened by its address (/sale/pos?order=<id>, APPOINTM
     expect(s.find('pos-linked-loading').exists()).toBe(false);
     expect(s.wrapper.findComponent(PosCart).props('order')).toMatchObject({ id: 'o7' });
     expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBe('o7');
+  });
+
+  it('a check opened on this till and then named by its address (its table tapped on the floor plan) is shown at once', async () => {
+    const s = await setup();
+    await s.addProduct();
+    s.answer(200, CHECK);
+    await s.router.push('/sale/pos?order=o1');
+    await settle();
+    await settle();
+    expect(shows(s)).toEqual({ opening: false, catalogue: true, check: 'o1' });
   });
 
   it('a check that is no longer open is said in its place, with nothing to sell on; «Continue» gives the till back as it was', async () => {
