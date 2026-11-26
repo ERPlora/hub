@@ -1,26 +1,13 @@
 // The person's own appearance painted on the open app, as «My profile» and the follower beside the pane paint it:
 // the mode, the palette and the interface scale they chose; empty, the business's.
-import { hasLocalPalette, resetUserThemePreferences, themeMode, themePalette, themeScale } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { hasLocalPalette, themeMode, themePalette, themeScale } from '@erplora/ui/shell';
+import { describe, expect, it } from 'vitest';
 
+import { withColourScheme } from '../__tests__/colour-scheme';
 import { paintAppearance } from './appearance';
 
 const html = document.documentElement;
-let systemDark = false;
-
-beforeEach(() => {
-  systemDark = false;
-  vi.stubGlobal('matchMedia', (query: string) => ({
-    matches: query.includes('dark') && systemDark,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  }));
-  resetUserThemePreferences();
-});
-afterEach(() => {
-  resetUserThemePreferences();
-  vi.unstubAllGlobals();
-});
+const { prefersDark } = withColourScheme();
 
 const BUSINESS = { theme_mode: '', palette: '', ui_scale: 100 } as const;
 
@@ -34,7 +21,7 @@ describe('paintAppearance', () => {
     expect(themeMode.value).toBe('light');
     expect(html.classList.contains('ion-palette-dark')).toBe(false);
 
-    systemDark = true;
+    prefersDark(true);
     paintAppearance({ ...BUSINESS, theme_mode: 'system' });
     expect(themeMode.value).toBe('system');
     expect(html.classList.contains('ion-palette-dark')).toBe(true);

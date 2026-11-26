@@ -2,10 +2,11 @@
 // and, when the language kept in «My profile» changes (the assistant's card, another tab), reads the session again,
 // whose language the shell follows, so the open app speaks it without a reload; an appearance chosen anew there is
 // painted at once, as «My profile» paints it. It paints nothing of its own.
-import { resetUserThemePreferences, type SessionMe, themeMode, themePalette, themeScale } from '@erplora/ui/shell';
+import { type SessionMe, themeMode, themePalette, themeScale } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 
+import { withColourScheme } from '../__tests__/colour-scheme';
 import { openFollower } from '../__tests__/followers';
 import { OWNER } from '../__tests__/mount-base';
 import { sessionChanged } from '../lib/access';
@@ -36,22 +37,13 @@ function profile(language: ProfileLanguage, change: Partial<Profile> = {}): Prof
 const open = () => openFollower(PreferencesFollower, { session: me, path: '/', screens: [] });
 
 const dark = () => document.documentElement.classList.contains('ion-palette-dark');
-let systemDark = false;
+const { prefersDark } = withColourScheme();
 
 beforeEach(() => {
   vi.mocked(sessionChanged).mockClear();
-  systemDark = false;
-  vi.stubGlobal('matchMedia', (query: string) => ({
-    matches: query.includes('dark') && systemDark,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-  }));
-  resetUserThemePreferences();
 });
 afterEach(() => {
   document.body.innerHTML = '';
-  resetUserThemePreferences();
-  vi.unstubAllGlobals();
 });
 
 describe('PreferencesFollower', () => {
@@ -111,7 +103,7 @@ describe('PreferencesFollower', () => {
     await m.result(m.call, 'base.profile.get', profile('en', { theme_mode: 'light' }), 3);
     expect(dark()).toBe(false);
 
-    systemDark = true;
+    prefersDark(true);
     await m.result(m.call, 'base.profile.get', profile('en', { theme_mode: 'system' }), 4);
     expect(themeMode.value).toBe('system');
     expect(dark()).toBe(true);
