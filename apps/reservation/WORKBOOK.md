@@ -331,6 +331,11 @@ Pasos:
    teléfono) o, sin ficha, por el nombre que se dijo, y una sola vez; después, el día y la hora, antes que el
    teléfono («Crear en Reservas: Ana García · Fecha: 15 oct 2026 · Hora: 21:00»). Lleva la mesa con su zona, como la nombra
    Mesas («5 (Terraza)»: el número se repite entre zonas), nunca por un código.
+5. Por voz, con solo el teléfono de quien llama («me llama la del 600 111 222 para mañana a las dos, son
+   cuatro»): la reserva es para el cliente que tiene ese número en su ficha, y la tarjeta lo dice por su
+   nombre («Crear en Reservas: Lucía Gómez · Fecha: 15 oct 2026 · Hora: 14:00»). Si ninguna ficha tiene ese
+   número, el asistente pregunta el nombre antes de sacar ninguna tarjeta, y no se crea ninguna ficha. Quien
+   no ve el contacto de los clientes no nombra a nadie solo por su teléfono.
 Entra: cliente (o nombre y teléfono), fecha, hora, comensales, mesa, duración, origen, notas. El
 teléfono se guarda en formato internacional, como en Clientes (`+34` y las cifras seguidas, sin
 espacios), también el que se teclea con la ficha ya elegida; uno escrito con el prefijo de otro país
@@ -341,7 +346,9 @@ Sale: la reserva, ligada a la ficha del cliente (avisa: `reservation.reservation
 Si falla: no se guarda nada y lo escrito se queda; el primer motivo que aplica, en este orden: un
 teléfono que no es de su país (el motivo de Clientes, «No es un teléfono válido de su país: revisa las
 cifras o escríbelo con su prefijo internacional (+44…).», en el campo Teléfono, antes que nada más: nunca
-después de «¿Reservar igualmente?»; tampoco se crea la ficha); sin teléfono (o sin correo) cuando son
+después de «¿Reservar igualmente?»; tampoco se crea la ficha); sin cliente ni nombre, un teléfono que
+ninguna ficha tiene: «Di para quién es la reserva: un cliente, o el nombre de quien reserva.» (por internet o
+WhatsApp, en cambio, la reserva entra a nombre de ese teléfono); sin teléfono (o sin correo) cuando son
 obligatorios: «Este negocio pide un teléfono en cada reserva.»; una hora ya pasada: «Esa hora ya ha
 pasado.»; solo por internet o WhatsApp, comensales fuera de los límites («Ese número de comensales está
 fuera de los límites del negocio (1–20 comensales).»), menos antelación de la mínima («Hay que reservar
@@ -706,9 +713,11 @@ sale en la tarjeta.
 | La lista de espera, en orden de llegada, con búsqueda, filtros y páginas | ver lista de espera | F14–F16 | `reservation.waitlist.list` |
 | Una entrada de la lista de espera, por su id o por su cliente, con las palabras con que se nombra | ver lista de espera | F14–F16 | `reservation.waitlist.get` |
 | Las reglas (con la zona horaria del negocio) | ver ajustes | F03, F04 | `reservation.settings.get` |
+| Para quién es una reserva antes de enseñar su tarjeta: la ficha elegida o la del teléfono que se dio solo; la rechaza si no hay ninguna | apuntar reservas | F06 | `reservation.reservation.check` |
 
 Se siguen en vivo todas menos una franja, una fecha bloqueada y una entrada de espera sueltas, que solo
-leen la tarjeta del asistente y la API.
+leen la tarjeta del asistente y la API. Para quién es una reserva solo lo lee la tarjeta del asistente: no
+tiene ruta en la API ni es una herramienta.
 
 Cada reserva que dan (la lista, una reserva y la que devuelve cada acción) trae, además de su fecha y su
 hora, el día y la hora listos para decir en el idioma de quien la pide («martes, 5 de marzo de 2030» o

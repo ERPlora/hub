@@ -334,7 +334,7 @@ the section with "Retry".
 Involved: RESERVATION-F01, RESERVATION-F02, SCHEDULE-F02
 
 ### RESERVATION-F06 Take a reservation by hand (phone or counter)
-<!-- from WORKBOOK.md sha256:b1d2347d3c72 -->
+<!-- from WORKBOOK.md sha256:3c917a8bc465 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Reservations ("New reservation")
@@ -349,6 +349,11 @@ Steps:
    or, without a card, by the name that was said, and only once; then the day and the time, before the phone
    ("Create in Reservations: Ana García · Date: Oct 15, 2026 · Time: 9:00 PM"). It carries the table with its zone, as
    Tables names it ("5 (Terrace)": the number repeats across zones), never by a code.
+5. By voice, with only the phone of who is calling ("the lady on 600 111 222 is calling to book tomorrow at two,
+   four of them"): the reservation is for the customer whose card has that number, and the card says it by their
+   name ("Create in Reservations: Lucía Gómez · Date: Oct 15, 2026 · Time: 2:00 PM"). If no card has that number,
+   the assistant asks for the name before showing any card, and no card is created. Whoever does not see the
+   customers' contact details names nobody by their phone alone.
 In: customer (or name and phone), date, time, guests, table, duration, booked through, notes. The phone is
 saved in international format, as in Customers (`+34` and the digits together, without spaces), also the
 one typed with the card already chosen; one written with another country's prefix keeps its own. It is
@@ -359,7 +364,9 @@ Out: the reservation, linked to the customer's card (announces: `reservation.res
 If it fails: nothing is saved and what was typed stays; the first reason that applies, in this order: a
 phone that is not of its country (Customers' reason, "This is not a valid phone number of its country:
 check the digits or write it with its international prefix (+44…).", in the Phone field, before
-anything else: never after "Book it anyway?"; the card is not created either); without a phone (or
+anything else: never after "Book it anyway?"; the card is not created either); without a customer or a
+name, a phone no card has: "Say who the reservation is for: a customer, or the guest's name." (online or
+through WhatsApp, instead, the reservation goes in under that phone); without a phone (or
 without an email) when they are required: "This business requires a phone number for every
 reservation."; a time that has already passed: "That time has already passed."; only online or through
 WhatsApp, guests outside the limits ("That party size is outside the limits of this business (1–20
@@ -738,7 +745,7 @@ whoever confirms cannot see (for example, the card of a customer, without permis
 does not show on the card.
 
 ### What it offers: queries (they read and change nothing)
-<!-- from WORKBOOK.md sha256:bcede70f38e1 -->
+<!-- from WORKBOOK.md sha256:907e179a05c9 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -753,9 +760,11 @@ does not show on the card.
 | The waitlist, in order of arrival, with search, filters and pages | view waitlist | F14–F16 | `reservation.waitlist.list` |
 | A waitlist entry, by its id or by its customer, with the words it is named with | view waitlist | F14–F16 | `reservation.waitlist.get` |
 | The rules (with the business's time zone) | view settings | F03, F04 | `reservation.settings.get` |
+| Whom a reservation is for before its card is shown: the card chosen or the one of the phone given alone; it refuses it when there is none | add reservations | F06 | `reservation.reservation.check` |
 
 All of them can be followed live except a single slot, a single blocked date and a single waitlist
-entry, which only the assistant's card and the API read.
+entry, which only the assistant's card and the API read. Whom a reservation is for is read only by the assistant's
+card: it has no route in the API and is no tool.
 
 Each reservation they give (the list, a reservation and the one each action returns) brings, besides its
 date and its time, the day and the time ready to say in the language of whoever asks for it ("martes, 5

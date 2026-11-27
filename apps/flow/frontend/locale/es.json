@@ -1182,6 +1182,7 @@
       "reservation__blocked_date__create": "Cerrar un día a las reservas",
       "reservation__blocked_date__list": "Buscar días cerrados a las reservas",
       "reservation__blocked_date__get": "Leer un día cerrado a las reservas",
+      "reservation__reservation__check": "Comprobar para quién es una reserva",
       "reservation__reservation__cancel": "Anular una reserva",
       "reservation__reservation__complete": "Completar una reserva",
       "reservation__reservation__confirm": "Confirmar una reserva",

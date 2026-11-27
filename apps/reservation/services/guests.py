@@ -2,8 +2,6 @@
 the phone as Customers keeps it (RESERVATION-F06).
 """
 
-import unicodedata
-
 from live.context import OperationContext
 from live.errors import InvalidPayload
 
@@ -11,12 +9,8 @@ from apps.customer.models import Customer
 from apps.customer.phones import InvalidPhone, to_e164
 from apps.customer.queries.reads import business_country, find_customer
 from apps.customer.services.writes import PHONE_INVALID
+from apps.reservation.queries.guests import card_with_phone, phone_guest, phone_names
 from apps.reservation.services.other_apps import call_app, card_keeper
-
-
-def _folded(text: str) -> str:
-    plain = unicodedata.normalize("NFKD", text.casefold())
-    return "".join(char for char in plain if not unicodedata.combining(char)).strip()
 
 
 #: Where a card made from a reservation comes from, as Customers names it.
@@ -59,22 +53,26 @@ def typed_phone(ctx: OperationContext, raw: str | None) -> str:
         ) from None
 
 
+def booking_card(ctx: OperationContext, data, name: str, phone: str, email: str) -> Customer:
+    """The card of a booking none was chosen for, by the phone typed: when the phone alone says whom a staff booking is
+    for, the card it is on and never a new one (``phone_guest``); else ``card_for_phone``, under the guest's name or,
+    for a guest who books herself without one, her phone."""
+    if phone_names(data):
+        return find_customer(ctx, phone_guest(ctx, phone).id, None, lock=True)
+    return card_for_phone(ctx, name or phone, phone, email, CARD_SOURCES[data.source])
+
+
 def card_for_phone(
     ctx: OperationContext, name: str, phone: str, email: str, source: str
 ) -> Customer:
-    """The live card with ``phone`` (among several, the one with ``name``, case and accents ignored; else
-    the first) or a new one with the guest's name, phone and email, made by Customers (``card_keeper``)."""
-    keeper = card_keeper(ctx)
-    matches = call_app(keeper, "customer.customer.by_phone", {"phone": phone}).rows
-    if matches:
-        wanted = _folded(name)
-        match = next(
-            (row for row in matches if _folded(row.name) == wanted), matches[0]
-        )
+    """The live card with ``phone`` (``card_with_phone``) or a new one with the guest's name, phone and email, made
+    by Customers (``card_keeper``)."""
+    match = card_with_phone(ctx, phone, name)
+    if match is not None:
         return find_customer(ctx, match.id, None, lock=True)  # locked, as ``chosen_card``
     try:
         created = call_app(
-            keeper,
+            card_keeper(ctx),
             "customer.customer.create",
             {"name": name, "phone": phone, "email": email, "source": source},
         )

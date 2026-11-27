@@ -43,8 +43,8 @@ Weekday = Annotated[int, Field(ge=0, le=6, json_schema_extra={"enum": list(range
 
 D_GUEST_NAME = "The guest's name as the staff say it at the door; empty takes the customer card's."
 D_GUEST_PHONE = (
-    "The guest's phone as typed; with no customer chosen, the live card with this number is used, or one "
-    "is created."
+    "The guest's phone as typed, beside the guest's name or card; with no customer chosen, the live card with this "
+    "number is used, or one is created."
 )
 #: The marks of the ids of the records a write names (``names``): the read that names each one, and by what.
 A_RESERVATION = names("reservation.reservation.get", name=("label",))
