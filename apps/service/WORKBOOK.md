@@ -169,7 +169,7 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
   gastada diciendo quién la hizo «Profesional: <nombre>», quién y el motivo. Vacía: «Este bono aún no se ha
   usado.».
 - **Bonos vendidos**: una fila por compra, con **Activo** o **Anulado**, la clienta, la fecha, el
-  importe, «{used} usadas · quedan {remaining}» (o «· sin límite»), «Caduca el …» o «No caduca» y lo
+  importe, «2 usadas · quedan 3» («1 usada · queda 1»; o «· sin límite»), «Caduca el …» o «No caduca» y lo
   regalado o corregido después; en una anulada, «Anulado por {who} el {when}» y el motivo. Botones
   **Gastar una sesión** (en un bono sin anular ni caducar y al que le queda alguna sesión, o sin límite),
   **Ajustar** y **Anular** cuando proceden y para quien puede.

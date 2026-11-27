@@ -145,6 +145,17 @@ describe('GrantsSheet', () => {
     expect([s.text('g1').includes(given), s.text('g1').includes(corrected)]).toEqual([true, true]);
   });
 
+  it.each([
+    { locale: 'es' as const, used: 1, remaining: 1, says: '1 usada · queda 1' },
+    { locale: 'es' as const, used: 1, remaining: 4, says: '1 usada · quedan 4' },
+    { locale: 'es' as const, used: 2, remaining: null, says: '2 usadas · sin límite' },
+    { locale: 'en' as const, used: 1, remaining: 4, says: '1 used · 4 left' },
+  ])('says the sessions used and left in the singular or the plural ($locale): «$says»', async ({ locale, used, remaining, says }) => {
+    const s = await setup(MANAGER, locale);
+    await s.show(page([grant({ used, remaining, max_uses: remaining === null ? null : used + remaining })]));
+    expect(s.text('g1').replace(/\s+/g, ' ')).toContain(says);
+  });
+
   it('says when nobody bought it, and when the sales cannot be loaded', async () => {
     const s = await setup();
     await s.show(page([]));

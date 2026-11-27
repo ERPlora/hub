@@ -46,6 +46,14 @@ describe('PinPolicyCard', () => {
     expect(wrapper.text()).toContain('A till nobody touches for 10 minutes closes the session and shows the PIN pad');
   });
 
+  it.each([
+    { locale: 'en' as const, says: 'A till nobody touches for 1 minute closes the session' },
+    { locale: 'es' as const, says: 'Una caja que nadie toca durante 1 minuto cierra la sesión' },
+  ])('says the one-minute stop in the singular ($locale)', async ({ locale, says }) => {
+    const { wrapper } = await card({ ...FACTORY, pin_policy: 'always', pin_inactivity_minutes: 1 }, { locale });
+    expect(wrapper.text()).toContain(says);
+  });
+
   it('«Until signing out» is per shift', async () => {
     const { sent, fire } = await card({ ...FACTORY, pin_policy: 'always', pin_inactivity_minutes: 15 });
     await fire('pin-policy-again', { value: 'shift' });

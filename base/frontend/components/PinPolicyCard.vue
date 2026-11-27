@@ -128,7 +128,7 @@ function onDigits(value: unknown): void {
             </ion-segment-button>
           </ion-segment>
           <p class="settings-card__note">
-            {{ again === SHIFT ? t('base.pinPolicy.againShift') : t('base.pinPolicy.againMinutes', { n: again }) }}
+            {{ again === SHIFT ? t('base.pinPolicy.againShift') : t('base.pinPolicy.againMinutes', { n: Number(again) }) }}
           </p>
         </div>
         <div class="settings-card__field">

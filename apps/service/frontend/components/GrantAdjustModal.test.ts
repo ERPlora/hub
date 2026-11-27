@@ -83,6 +83,16 @@ describe('GrantAdjustModal', () => {
     expect(s.el('service-grant-adjust-preview')?.textContent).toContain(said);
   });
 
+  it.each([
+    { remaining: 1, add: 'Queda 1. Hasta 100.', remove: 'Queda 1. Puedes quitar hasta 1.' },
+    { remaining: 3, add: 'Quedan 3. Hasta 100.', remove: 'Quedan 3. Puedes quitar hasta 3.' },
+  ])('says what is left now in the singular or the plural (es): «$add»', async ({ remaining, add, remove }) => {
+    const s = await setup({ remaining }, 'es');
+    expect(s.el('service-grant-adjust-uses').helperText).toBe(add);
+    await ionValue(s.el('service-grant-adjust-direction'), 'remove', 'ionChange');
+    expect(s.el('service-grant-adjust-uses').helperText).toBe(remove);
+  });
+
   it('a refusal stays in the dialog', async () => {
     const s = await setup();
     s.answer(409, { error: { code: 'service.grant_adjust_below_used', message: 'You cannot take away more sessions than the customer has left.' } });
