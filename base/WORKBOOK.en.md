@@ -2959,7 +2959,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:10ba4782f35e -->
+<!-- from WORKBOOK.md sha256:17acc1202a91 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3070,14 +3070,18 @@ Steps:
      offer to undo it unless asked to.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
-  5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
-     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". The one
-     of a failure says the reason in one sentence: if its app refuses it, the same one its screen would give ("Not
-     done, it failed: Remove in Employees. That person is not in this business."); if what did not fit was the data
-     the assistant sent, which, with the name the card gives them ("The assistant sent data that does not fit:
-     Products."), and if it asked for a change without saying what to change, that ("The assistant did not say what
-     to change."). If the person changes language, the earlier receipts show entirely in the new one, the app's name
-     too; the reason, said in the other language, no longer shows.
+  5. Under the answer stays the receipt of each action of the turn that was put to the person, with the action named
+     as on its card: "Done: Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done,
+     not allowed: …". The one of a failure says the reason in one sentence: if its app refuses it, the same one its
+     screen would give ("Not done, it failed: Print in Sales / POS. No receipt printer takes the paper of this sale:
+     open the sale to print it on this device."); if what did not fit was the data the assistant sent (an attached file
+     heavier than the action takes), which, with the name the card gives them ("The assistant sent data that does not
+     fit: File."). What the Hub refuses before showing the card (data that do not fit, a change with nothing to
+     change, a record it cannot find) leaves no receipt, as in the assistants of Shopify or Intercom: the person was
+     asked nothing, and the assistant hears the reason and corrects it or tells them. So "Take the paella off the menu"
+     leaves only "Done: Change in Inventory", even if the assistant first tried another action with data that did not
+     fit. If the person changes language, the earlier receipts show entirely in the new one, the app's name too; the
+     reason, said in the other language, no longer shows.
 In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
 done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone; and, if its
 app declares it, the check it makes before the card, as the person: if it refuses the data (adding someone with a role
@@ -3085,8 +3089,8 @@ the business does not have, STAFF-F01), no card shows and the assistant tells it
 Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". Data the action does not take (a country or a currency that does not exist, a value
-outside its list) never reach the card: they go back to the assistant, which corrects them, and the person confirms
-only once. Neither does a change that only names its record, with no data to change (never "Change in Customers:
+outside its list) never reach the card nor leave a receipt: they go back to the assistant, which corrects them, and the
+person confirms only once. Neither does a change that only names its record, with no data to change (never "Change in Customers:
 Lucía QA" alone): the assistant hears there is nothing to change and goes on with what it was asked, with the action
 that does it, or asks what to change; if the record is not there, it hears that. "Run it" holds only for what the card
 shows: if it changes before it is tapped — the action finds another
@@ -3098,7 +3102,7 @@ the card open nothing is done, and the answer ends in "The answer was cut off." 
 Involved: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Dangerous actions: type to confirm, or not from the chat
-<!-- from WORKBOOK.md sha256:e9288e7fa947 -->
+<!-- from WORKBOOK.md sha256:a8a2d0762ade -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3123,8 +3127,9 @@ In: the risk the app declares in each action, and its data; if it declares one, 
 Out: if accepted, as in BASE-F97.
 If it fails: what was typed and does not match does not let it run; cancelling does nothing and the assistant counts
 it as cancelled. If the preview cannot be read (the record is no longer there, or the person cannot see it), no card
-shows and nothing is done: nothing is confirmed blind. The receipt says "Not done, it failed: …" or "Not done, not
-allowed: …" and the assistant tells why.
+shows and nothing is done: nothing is confirmed blind, and the assistant tells why. If the record is not there, no
+receipt is left, since the person was asked nothing (BASE-F97); if they cannot see it, the receipt says "Not done, not
+allowed: …". If it can no longer be read after "Run it" is tapped, the receipt says "Not done, it failed: …".
 Involved: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Check what the assistant says against what it really did

@@ -9,7 +9,7 @@ import datetime as dt
 import pytest
 from live.errors import Conflict
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 
 from .conftest import HUB_DB, TUESDAY, at, booking_data, make_day, make_rules, public, run
 

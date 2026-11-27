@@ -169,10 +169,7 @@ def test_a_new_member_with_a_role_the_business_does_not_have_gets_no_card_and_th
     datum (``invalid_payload`` on ``role`` or ``role_id``) and nothing is created."""
     make_role("Retired", is_active=False)
     plan = turn(call("staff.member.create", {"first_name": "Luis", "last_name": "QA", **role}))
-    assert plan["confirm"] is None
-    assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
-        ("staff.member.create", "error", "invalid_payload")
-    ]
+    assert (plan["confirm"], plan["executed"]) == (None, [])
     error = told(plan)["error"]
     assert (error["code"], set(error["fields"])) == ("invalid_payload", set(role))
     assert not Member.objects.exists()

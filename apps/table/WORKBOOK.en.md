@@ -430,16 +430,17 @@ assistant or the API, is refused with the same out-of-service notice.
 Involved: TABLE-F04, TABLE-F10, TABLE-F25
 
 ### TABLE-F06 Rename or delete a zone
-<!-- from WORKBOOK.md sha256:d0e81853c9ba -->
+<!-- from WORKBOOK.md sha256:9ac36242631b -->
 Status: done
 Actor: manager, administrator
 Screen: Zones, Floor plan (Edit plan)
 Steps:
 1. In **Tables → Zones**, "Edit": change Name, Description, Colour, Order or "Active" and tap "Save
    changes". On the plan, the pencil ("Edit zone") changes Name and Description.
-2. To delete it (the administrator only): "Delete" opens "Delete zone?" with "N tables in this zone. A
-   zone with tables cannot be deleted: move or delete its tables first." (with just one, "1 table in
-   this zone. … move or delete it first."); with tables, "Delete zone" comes out off.
+2. To delete it (the administrator only): "Delete" opens "Delete zone?". Without tables it says "The
+   zone leaves the plan and the lists."; with tables, "N tables in this zone. A zone with tables cannot
+   be deleted: move or delete its tables first." (with just one, "1 table in this zone. … move or delete
+   it first.") and "Delete zone" comes out off.
 3. Without tables, "Delete zone" removes it from the list and from the plan.
 In: the chosen zone.
 Out: the changed zone (announces: `table.zone.updated`) or the deleted one (announces:

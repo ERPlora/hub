@@ -11,16 +11,11 @@ from collections.abc import Callable
 from django.contrib import admin
 from live.operations import atomic
 
-from apps.appointment.models import (
-    Appointment,
-    AppointmentService,
-    BlockedTime,
-    Counter,
-    History,
-    Recurring,
-    RecurringService,
-    Settings,
-)
+from apps.appointment.models.appointments import Appointment, AppointmentService, History
+from apps.appointment.models.blocked_times import BlockedTime
+from apps.appointment.models.numbering import Counter
+from apps.appointment.models.series import Recurring, RecurringService
+from apps.appointment.models.settings import Settings
 from apps.appointment.services.writes import lock_appointments, lock_series
 
 AUTOMATIC = ("id", "created_at", "updated_at")

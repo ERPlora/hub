@@ -59,7 +59,7 @@ SHOWN_ON_WEBSITE = "Whether the website's catalog shows it; off, the till still 
 PRICE_PER_UNIT = per_unit("pricing_unit", "unit", quantity="price_quantity", each="ud")
 COST_PER_UNIT = {**COSTS, **per_unit("unit", each="ud")}
 Name = _text(200, 1)
-Sku = _text(64, 1)
+Sku = _text(64)
 Ean13 = _text(13)
 
 
@@ -142,7 +142,9 @@ class ProductIn(AllergensIn):
         description="The product's name, as the till and the ticket show it."
     )
     sku: Sku = Field(
-        description="The product's code; its identity, never edited afterwards."
+        "",
+        description="The product's code; its identity, never edited afterwards. Left empty, it gets the next number "
+        "of the catalog's own, from 10000.",
     )
     price: Cents = Field(
         description="Sale price in cents, per price_quantity of pricing_unit.", json_schema_extra=PRICE_PER_UNIT

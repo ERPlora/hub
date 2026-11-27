@@ -8,10 +8,10 @@
 // and adds nothing. That notice follows the refused product or service live and goes, with its toast, the moment the
 // reason no longer holds (back on sale, or given its tax category), and on leaving the till. Inventory off: the grid
 // explains it and the open price stays. With products hidden by the till settings, only the open price is offered. With
-// the services of Services (SALE-F38, `showServices`), «Services» follows «All» in the strip and shows their grid
-// (first, when products are hidden; «All» keeps the open price); a sellable service goes up (`service`), the search
-// finds them too. With the menus of Menus (SALE-F12, `showCombos`), «All» shows them first in the grid; a tap goes up
-// (`combo`). With VeriFactu on and readable (`fiscal`), its notice goes first when it refuses new sales now (SALE-F07).
+// the services of Services (SALE-F38, `showServices`), «All» shows them too, after the menus and before the articles,
+// and counts them; «Services» follows «All» in the strip and shows only them (first, when products are hidden); a
+// sellable service goes up (`service`), the search finds them too. With the menus of Menus (SALE-F12, `showCombos`),
+// «All» shows them first in the grid; a tap goes up (`combo`). With VeriFactu on and readable (`fiscal`), its notice goes first when it refuses new sales now (SALE-F07).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, dismissToast, toastWarning } from '@erplora/ui/shell';
@@ -34,6 +34,7 @@ import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
 import ScreenMenu from './ScreenMenu.vue';
 import ServiceGrid from './ServiceGrid.vue';
+import ServiceTiles from './ServiceTiles.vue';
 import SpeakKey from './SpeakKey.vue';
 import { SERVICES } from './till';
 
@@ -73,6 +74,7 @@ watch(
   { immediate: true },
 );
 const servicesMode = computed(() => props.showServices && categoryId.value === SERVICES);
+const inAll = computed(() => categoryId.value === '');
 /** The product grid's category: «All» while the services are on show. */
 const productCategory = computed(() => (categoryId.value === SERVICES ? '' : categoryId.value));
 const searching = shallowRef(false);
@@ -91,7 +93,13 @@ const tapNotice = shallowRef<TapNotice | null>(null);
 const TAP_TOAST = 'sale-pos-tap-notice';
 
 const categories = useLiveWindows<'inventory.category.list', CategoryOut>('inventory.category.list', () => ({ sort: 'order' }), 100);
-const allCount = useLive('inventory.product.list', { is_active: true, include_sold_out: true, limit: 1, offset: 0 });
+const articlesCount = useLive('inventory.product.list', { is_active: true, include_sold_out: true, limit: 1, offset: 0 });
+/** «All» counts what it shows: the articles and the services; unknown until both are known. */
+const allCount = computed(() => {
+  const articles = props.showProducts ? articlesCount.data.value?.total : 0;
+  const services = props.showServices ? servicesCount.value : 0;
+  return articles === undefined || services === undefined ? undefined : articles + services;
+});
 const products = useLiveWindows<'inventory.product.list', ProductOut>(
   'inventory.product.list',
   () => ({
@@ -178,7 +186,7 @@ watch(
         <CategoryStrip
           v-model="categoryId"
           :categories="showProducts ? categories.rows.value : []"
-          :all-count="showProducts ? allCount.data.value?.total : undefined"
+          :all-count="allCount"
           :has-more="showProducts && categories.hasMore.value"
           :with-services="showServices"
           :services-count="servicesCount"
@@ -248,7 +256,7 @@ watch(
       </template>
     </InlineFeedback>
     <ServiceGrid
-      v-if="showServices"
+      v-if="showServices && !inAll"
       v-show="servicesMode"
       @pick="pickService"
       @total="servicesCount = $event"
@@ -264,10 +272,18 @@ watch(
       @load-more="products.loadMore()"
     >
       <template
-        v-if="showCombos && !productCategory"
+        v-if="inAll"
         #lead
       >
-        <ComboTiles @pick="emit('combo', $event)" />
+        <ComboTiles
+          v-if="showCombos"
+          @pick="emit('combo', $event)"
+        />
+        <ServiceTiles
+          v-if="showServices"
+          @pick="pickService"
+          @total="servicesCount = $event"
+        />
       </template>
     </ProductGrid>
     <slot />

@@ -427,8 +427,8 @@ Estado: hecho (lo hace Ventas, SALE-F38)
 Actor: empleado
 Pantalla: Ventas: Vender
 Pasos:
-1. En la tira de categorías del TPV, **Servicios** enseña cada servicio en oferta con su precio y su
-   duración (también salen en el buscador).
+1. En la tira de categorías del TPV, **Todos** y **Servicios** enseñan cada servicio en oferta con su
+   precio y su duración (también salen en el buscador).
 2. Un servicio **Sin configurar** sale con la marca «Falta el IVA» y no se vende.
 3. Un servicio que no es de precio fijo pide el importe, con su precio como sugerencia.
 Entra: los servicios en oferta, su tarifa y su categoría fiscal.

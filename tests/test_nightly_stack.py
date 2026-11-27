@@ -1,6 +1,6 @@
 """Tests of scripts/nightly_stack.py: what one night does, from fetching main to cleaning up its stack.
 
-The nights run as launchd runs them, with the doubles of tests/nightly_doubles.py: real git, fake tools.
+The nights run as GitHub Actions or a person runs them, with the doubles of tests/nightly_doubles.py: real git, fake tools.
 """
 
 import os
@@ -11,7 +11,7 @@ import sys
 import time
 
 import pytest
-from nightly_doubles import NOTHING_RUNS, OPEN_ISSUE, World, alive, fresh_world, git, nightly_stack, wait_for
+from nightly_doubles import NOTHING_RUNS, World, alive, fresh_world, git, nightly_stack, wait_for
 
 
 @pytest.fixture
@@ -95,31 +95,23 @@ def test_the_night_cleans_up_before_and_after_itself(red):
     assert not (red.nightly / "lock").exists()
 
 
-def test_a_red_night_opens_the_issue_and_keeps_its_log(red):
-    bodies = red.read("bodies")
-    assert red.gh(r"^gh issue create") == 1
-    assert "`sale-sales.spec.ts:4` › charges in cash" in bodies
-    assert f"(commit `{red.newest_main[:7]}`)" in bodies
-    assert re.search(r"`~/\.erplora/hub-nightly-e2e/runs/[0-9-]+`", bodies)
+def test_a_red_night_lists_what_came_out_red_in_its_log_and_writes_no_issue(red):
+    log = red.log()
     assert len(red.night_logs()) == 1
-    assert "Pruebas de navegador del Hub: en rojo" in red.night_logs()[0].read_text()
+    assert "Pruebas de navegador del Hub: en rojo" in log
+    assert "`sale-sales.spec.ts:4` › charges in cash" in log
+    assert f"commit `{red.newest_main[:7]}`" in log
+    assert re.search(r"`~/\.erplora/hub-nightly-e2e/runs/[0-9-]+`", log)
+    assert "Sin publicar: no se escribe ninguna issue." in log
+    assert red.read("gh") == ""
     assert red.out() == ""
 
 
-
-def test_a_green_night_closes_the_open_issue_and_a_red_one_comments_on_it(world):
-    world.green(OPEN_ISSUES=OPEN_ISSUE)
-    assert world.gh(r"^gh issue close 9 --reason completed") == 1
-    world.night(OPEN_ISSUES=OPEN_ISSUE)
-    assert world.gh(r"^gh issue comment 9 ") == 1
-    assert world.gh(r"^gh issue create") == 0
-
-
-def test_a_report_that_cannot_reach_github_turns_the_night_red(world):
-    assert world.green(FAKE_GH_EXIT="1") == 1
-    log = world.night_logs()[0].read_text()
-    assert "the report failed: the night's result did not reach GitHub" in log
-    assert "night over: success" in log
+def test_a_report_that_cannot_be_read_through_turns_the_night_red(world):
+    (world.root / "array.json").write_text("[]")
+    assert world.night(FAKE_E2E_EXIT="0", FAKE_RESULTS=str(world.root / "array.json")) == 1
+    assert "the report failed: what came out red is not listed" in world.log()
+    assert "night over: success" in world.log()
 
 
 # --- a night that never reaches the specs -------------------------------------------------------------------------
@@ -138,7 +130,7 @@ def test_a_report_that_cannot_reach_github_turns_the_night_red(world):
 def test_a_step_before_the_specs_that_fails_is_a_red_night_naming_it(world, settings, step):
     assert world.night(**settings) == 1
     assert world.calls_re(r"^e2e ") == 0
-    assert f"La pasada no llegó a las specs: falló «{step}»." in world.read("bodies")
+    assert f"La pasada no llegó a las specs: falló «{step}»." in world.log()
     assert world.alive_servers() == 0
     assert world.worktrees() == (1, 1)
 
@@ -169,7 +161,7 @@ def test_a_server_that_exits_before_answering_is_said_in_the_log(world):
 def test_a_night_that_cannot_fetch_main_is_red(world):
     git("-C", str(world.hub), "remote", "set-url", "origin", str(world.root / "gone"))
     assert world.night() == 1
-    assert "falló «traer origin/main»" in world.read("bodies")
+    assert "falló «traer origin/main»" in world.log()
     assert world.calls_re(NOTHING_RUNS) == 0
     assert "could not drop" not in world.night_logs()[0].read_text()
 
@@ -178,12 +170,12 @@ def test_a_night_without_any_commit_names_it_unknown(world):
     git("-C", str(world.hub), "remote", "set-url", "origin", str(world.root / "gone"))
     git("-C", str(world.hub), "update-ref", "-d", "refs/remotes/origin/main")
     assert world.night() == 1
-    assert "commit `unknown`" in world.read("bodies")
+    assert "commit `unknown`" in world.log()
 
 
 def test_a_worktree_that_cannot_be_pruned_is_a_red_night_and_is_said(world):
     assert world.night(FAKE_PRUNE_EXIT="1") == 1
-    assert "falló «los worktrees»" in world.read("bodies")
+    assert "falló «los worktrees»" in world.log()
     assert f"could not remove {world.nightly}/hub" in world.night_logs()[0].read_text()
 
 
@@ -203,14 +195,14 @@ def test_a_checkout_without_env_still_gets_its_worktree(world):
 
 def test_a_hub_database_that_cannot_be_read_stops_the_seeding(world):
     assert world.night(FAKE_DOCKER_EXIT="1") == 1
-    assert "falló «la siembra del SaaS»" in world.read("bodies")
+    assert "falló «la siembra del SaaS»" in world.log()
     assert "should hold a and b" not in world.night_logs()[0].read_text()
 
 
 def test_a_database_that_cannot_be_dropped_is_said_and_left_to_the_next_night(world):
     world.night(FAKE_DROP_FAILS="hub")
     log = world.night_logs()[0].read_text()
-    assert "falló «borrar lo que dejó una noche anterior»" in world.read("bodies")
+    assert "falló «borrar lo que dejó una noche anterior»" in world.log()
     assert "could not drop hub_e2e_9770: the next night tries again" in log
     assert world.worktrees() == (1, 1)
 
@@ -265,16 +257,21 @@ def test_grep_and_a_commit_not_pushed_run_only_those_tests_on_that_commit(world)
     assert git("-C", str(world.hub), "rev-parse", "HEAD") == world.clone_head
 
 
+def test_shard_runs_only_that_share_of_the_specs(world):
+    assert world.green("--shard", "3/8", "--spec", "tests/e2e/sale-sales.spec.ts") == 0
+    assert world.calls_re(r"^e2e hub args=--global-timeout=[0-9]+ --shard=3/8 tests/e2e/sale-sales\.spec\.ts HEAD=") == 1
+
+
 def test_the_specs_that_spend_real_tokens_stay_off(world):
     world.night(QA_REAL_PROVIDER="1", E2E_HEADED="1", DB_NAME="hub")
     assert world.calls_re(r"QA_REAL_PROVIDER= E2E_OUTPUT_DIR=") == 1
     assert world.calls("database saas DB_NAME= E2E_SAAS_PORT=9771") == 1
 
 
-def test_the_issue_names_the_commit_the_specs_ran_on_when_main_moves_meanwhile(world):
+def test_the_report_names_the_commit_the_specs_ran_on_when_main_moves_meanwhile(world):
     world.night(FAKE_MAIN_MOVES=str(world.root / "remote" / "hub"))
     assert git("-C", str(world.hub), "rev-parse", "origin/main") != world.newest_main
-    assert f"(commit `{world.newest_main[:7]}`)" in world.read("bodies")
+    assert f"commit `{world.newest_main[:7]}`" in world.log()
 
 
 def test_a_server_already_gone_when_the_clean_up_stops_it_keeps_the_night_green(world):
@@ -341,7 +338,7 @@ def test_the_proxy_settings_are_the_var_value_words_printed():
 def test_a_command_that_cannot_start_is_said_and_fails(capsys, tmp_path):
     assert nightly_stack.run(["no-such-command-anywhere"]).returncode == 127
     folder = str(tmp_path)
-    settings = nightly_stack.Settings(folder, folder, folder, folder, 9770, 1, 1, 1, "ERPlora/hub")
+    settings = nightly_stack.Settings(folder, folder, folder, folder, 9770, 1, 1, 1)
     night = nightly_stack.Night(settings, folder, [])
     assert night.start(["no-such-command-anywhere"], folder, {}) is None
     assert night.started == []
