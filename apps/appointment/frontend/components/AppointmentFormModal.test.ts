@@ -1,10 +1,11 @@
-// APPOINTMENT-F01, F04, F14, F22: the booking panel. «New appointment» asks for the Customer (Customers'
-// own search, which also creates a card), one or more Services, the Professional (only who does them all),
-// the Day and the Time (with the free times), «Duration (min)» (the services' sum unless typed) and the notes;
-// «Add appointment» books it. An overlap asks first («Book anyway» / «Pick another time»); a refusal goes on
-// top, a bad field under it, and what was typed stays. «Edit appointment» sends only what changed, asks
-// «This appointment only» / «This and all following» for a series and shows the history below.
-import { ConfirmDialog } from '@erplora/ui/components';
+// APPOINTMENT-F01, F04, F14, F22: the booking panel, wide in two columns (who and what; when) and the whole screen on
+// a phone. «New appointment» asks for the Customer (Customers' own search, which also creates a card), one or more
+// Services, the Professional (only who does them all), the Day, «Duration (min)» (one tap, the services' sum unless
+// changed), the Time (the free times, or another one) and the notes, folded; its foot says what is chosen. «Add
+// appointment» books it. An overlap asks first («Book anyway» / «Pick another time»); a refusal goes on top, a bad
+// field under it, and what was typed stays. «Edit appointment» sends only what changed, asks «This appointment only»
+// / «This and all following» for a series and keeps the history folded below.
+import { ConfirmDialog, FormModal } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
@@ -15,19 +16,54 @@ import AppointmentHistory from './AppointmentHistory.vue';
 import FreeSlots from './FreeSlots.vue';
 
 describe('AppointmentFormModal: New appointment', () => {
-  it('asks for customer, services, professional, day, time and minutes, as the old panel', async () => {
+  it('asks for customer, services, professional, day, length and time, wide in two columns', async () => {
     const s = await setup();
     expect(s.inDoc('appointment-form')?.getAttribute('aria-label')).toBe('New appointment');
-    expect([s.field('day').label, s.field('time').label, s.field('minutes').label]).toEqual(['Day', 'Time', 'Duration (min)']);
+    expect(s.wrapper.findComponent(FormModal).props()).toMatchObject({ size: 'xl', phoneLayout: 'fullscreen' });
+    const within = (part: string, names: string[]) => names.every((name) => s.inDoc(`appointment-form-${part}`)!.contains(s.inDoc(`appointment-form-${name}`)));
+    expect([within('who', ['customer', 'staff']), within('when', ['day', 'duration', 'time']), within('more', ['notes-fold'])]).toEqual([true, true, true]);
+    expect([s.field('day').label, s.field('time').label]).toEqual(['Day', 'Time']);
+    expect(s.inDoc('appointment-form-other-time')?.textContent).toContain('Enter another time');
     expect(s.staffPicker().props('label')).toBe('Professional');
     expect(s.submit().textContent).toContain('Add appointment');
     expect(s.submit().disabled).toBe(true);
   });
 
+  it('says what is missing in the place of the free times, and asks them once services, professional and day are there', async () => {
+    const s = await setup();
+    expect(s.inDoc('appointment-form-slots-unset')?.textContent).toContain('Pick the services, a professional and a day to see the free times.');
+    expect(s.wrapper.findComponent(FreeSlots).exists()).toBe(false);
+    await s.addService('cut', 'Haircut');
+    await s.pickStaff('s1', 'Ana López');
+    expect(s.inDoc('appointment-form-slots-unset')).toBeNull();
+    expect(s.wrapper.findComponent(FreeSlots).props()).toMatchObject({ staffName: 'Ana López', today: '2026-10-14', date: '2026-10-14' });
+  });
+
+  it('a day the professional does not work hides «Enter another time»: the server would refuse any time of it', async () => {
+    const s = await setup();
+    await fillNew(s);
+    s.wrapper.findComponent(FreeSlots).vm.$emit('off', true);
+    await settle();
+    expect(s.inDoc('appointment-form-other-time')).toBeNull();
+    s.wrapper.findComponent(FreeSlots).vm.$emit('off', false);
+    await settle();
+    expect(s.field('time')).not.toBeNull();
+  });
+
+  it('the foot says the time chosen, its length, the day and the professional; nothing without a time', async () => {
+    const s = await setup();
+    expect(s.inDoc('appointment-form-summary')?.textContent?.trim()).toBe('');
+    await fillNew(s);
+    expect(s.inDoc('appointment-form-chosen-span')?.textContent).toBe('10:00 AM – 11:30 AM · 90 min');
+    expect(s.inDoc('appointment-form-chosen-where')?.textContent).toBe('Mon, Oct 19 · Ana López');
+    await click(s.inDoc('appointment-form-duration-45'));
+    expect(s.inDoc('appointment-form-chosen-span')?.textContent).toBe('10:00 AM – 10:45 AM · 45 min');
+  });
+
   it('books with the services in order, the professional and the wall-clock time; the minutes are their sum', async () => {
     const s = await setup();
     await fillNew(s);
-    expect(s.field('minutes').value).toBe('90');
+    expect(s.held()).toBe('90');
     expect(s.wrapper.findComponent(FreeSlots).props()).toMatchObject({ date: '2026-10-19', serviceIds: ['cut', 'colour'], staffId: 's1' });
     s.answer(201, BOOKED);
     await click(s.submit());
@@ -77,15 +113,15 @@ describe('AppointmentFormModal: New appointment', () => {
     await s.businessIn();
     await fillNew(s);
     // Ana does a haircut in 45 minutes for €25.00; the colour, nobody's own: the catalog's.
-    expect(s.field('minutes').value).toBe('105');
+    expect(s.held()).toBe('105');
     expect(s.inDoc('appointment-form-total')?.textContent).toContain('€70.00');
     await s.pickStaff('s2', 'Bea Ruiz');
-    expect(s.field('minutes').value).toBe('90');
+    expect(s.held()).toBe('90');
     expect(s.inDoc('appointment-form-total')?.textContent).toContain('€65.00');
     // Minutes typed by hand stay.
-    await ionValue(s.field('minutes'), '50', 'ionInput');
+    await s.typeMinutes('50');
     await s.pickStaff('s1', 'Ana López');
-    expect(s.field('minutes').value).toBe('50');
+    expect(s.held()).toBe('50');
   });
 
   it('the total of four figures groups its thousands, in both languages (hub#632)', async () => {
@@ -117,7 +153,7 @@ describe('AppointmentFormModal: New appointment', () => {
   it('sends the minutes only when typed, and a free time fills the time', async () => {
     const s = await setup();
     await fillNew(s);
-    await ionValue(s.field('minutes'), '75', 'ionInput');
+    await s.typeMinutes('75');
     s.wrapper.findComponent(FreeSlots).vm.$emit('pick', '11:15');
     await settle();
     expect(s.kept('time')).toBe('11:15');
@@ -125,6 +161,29 @@ describe('AppointmentFormModal: New appointment', () => {
     await click(s.submit());
     const body = s.sent().find((call) => call.path === '/api/appointment/appointments')?.body as Record<string, unknown>;
     expect([body.start, body.duration_minutes]).toEqual(['2026-10-19T11:15', 75]);
+  });
+
+  it('a tap on a length sends it, and «Use the sum» goes back to following the services', async () => {
+    const s = await setup();
+    await fillNew(s);
+    await click(s.inDoc('appointment-form-duration-60'));
+    expect(s.wrapper.findComponent(FreeSlots).props('durationMinutes')).toBe(60);
+    await click(s.inDoc('appointment-form-duration-use-sum'));
+    expect([s.held(), s.wrapper.findComponent(FreeSlots).props('durationMinutes')]).toEqual(['90', null]);
+    await s.addService('cut', 'Haircut');
+    s.answer(201, BOOKED);
+    await click(s.submit());
+    const body = s.sent().find((call) => call.path === '/api/appointment/appointments')?.body as Record<string, unknown>;
+    expect(body.duration_minutes).toBeUndefined();
+  });
+
+  it('the notes come folded; a refusal of one opens it', async () => {
+    const s = await setup();
+    expect([s.field('notes'), s.field('internal_notes')]).toEqual([null, null]);
+    await fillNew(s);
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the fields.', fields: { internal_notes: 'Too long.' } } });
+    await click(s.submit());
+    expect(s.field('internal_notes').errorText).toBe('Too long.');
   });
 
   it('asks before booking on top of another appointment, and «Book anyway» books', async () => {
@@ -247,19 +306,26 @@ describe('AppointmentFormModal: New appointment', () => {
   it('speaks Spanish', async () => {
     const s = await setup({}, 'es');
     expect(s.inDoc('appointment-form')?.getAttribute('aria-label')).toBe('Nueva cita');
-    expect([s.field('day').label, s.field('time').label, s.field('minutes').label]).toEqual(['Día', 'Hora', 'Duración (min)']);
+    expect([s.field('day').label, s.field('time').label]).toEqual(['Día', 'Hora']);
+    expect(s.inDoc('appointment-form-other-time')?.textContent).toContain('Introducir otra hora');
+    expect(s.inDoc('appointment-form-slots-unset')?.textContent).toContain('Elige los servicios, un profesional y un día para ver las horas libres.');
     expect(s.submit().textContent).toContain('Añadir cita');
   });
 });
 
 describe('AppointmentFormModal: Edit appointment', () => {
-  it('comes filled in, sends only what changed and shows the history below', async () => {
+  it('comes filled in, sends only what changed and keeps the history folded below', async () => {
     const s = await setup({ appointment: BOOKED });
     expect(s.inDoc('appointment-form')?.getAttribute('aria-label')).toBe('Edit appointment');
-    expect([s.kept('day'), s.kept('time'), s.field('minutes').value]).toEqual(['2026-10-19', '10:00', '30']);
+    expect(s.inDoc('appointment-form-booked')?.textContent).toMatch(/Lucía Pérez.*APT-20261019-0001.*Confirmed/s);
+    expect(s.inDoc('appointment-form-customer')).toBeNull();
+    expect([s.kept('day'), s.kept('time'), s.held()]).toEqual(['2026-10-19', '10:00', '30']);
+    expect(s.wrapper.findComponent(AppointmentHistory).exists()).toBe(false);
+    await s.unfold('history');
     expect(s.wrapper.findComponent(AppointmentHistory).props('appointmentId')).toBe('a1');
     expect(s.wrapper.findComponent(FreeSlots).props('excludeId')).toBe('a1');
     await s.pick('time', '11:00');
+    await s.unfold('notes');
     await ionValue(s.field('notes'), 'Bring photo', 'ionInput');
     s.answer(200, { ...BOOKED, start: '2026-10-19T11:00:00+02:00' });
     await click(s.submit());
@@ -271,6 +337,19 @@ describe('AppointmentFormModal: Edit appointment', () => {
         body: { id: 'a1', start: '2026-10-19T11:00', notes: 'Bring photo', confirm_overlap: false },
       },
     ]);
+  });
+
+  it('notes with text come open; «Use the sum» shows for a length booked off the sum and sends the sum', async () => {
+    const s = await setup({ appointment: { ...BOOKED, internal_notes: 'Warm water', duration_minutes: 50 } });
+    expect(s.field('internal_notes').value).toBe('Warm water');
+    expect(s.field('notes')).toBeNull();
+    expect(s.held()).toBe('50');
+    await click(s.inDoc('appointment-form-duration-use-sum'));
+    expect(s.held()).toBe('30');
+    s.answer(200, BOOKED);
+    await click(s.submit());
+    const body = s.sent().find((call) => call.path === '/api/appointment/appointments/update')?.body as Record<string, unknown>;
+    expect(body.duration_minutes).toBe(30);
   });
 
   it('a charged appointment keeps its services and professional: both pickers are locked', async () => {
@@ -310,7 +389,7 @@ describe('AppointmentFormModal: fields refused with the same words (hub#888)', (
     await fillNew(s);
     s.answer(422, refusal);
     return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.submit()), settle };
-  }, 'minutes');
+  }, 'start');
 });
 
 describe('AppointmentFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {

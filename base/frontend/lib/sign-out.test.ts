@@ -10,6 +10,9 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   stopNoticeListening: shell.stopNoticeListening,
 }));
 
+import { createAssistant, installAssistant } from '@erplora/ui/components';
+
+import { memoryStorage } from '../__tests__/mount-base';
 import { beforeSignOut, endSession, LOGOUT_PATH } from './sign-out';
 
 const CONFIG = { csrfCookieName: 'csrftoken', csrfHeader: 'X-CSRFToken', lang: 'es', loginUrl: '/auth/login' };
@@ -76,6 +79,23 @@ describe('endSession', () => {
 });
 
 describe('beforeSignOut', () => {
+  afterEach(() => installAssistant(undefined));
+
+  it('leaves the panel closed and empty for whoever enters next, on the device that kept it open', async () => {
+    const storage = memoryStorage();
+    const openStorage = memoryStorage();
+    const leaving = createAssistant({ post: vi.fn(), storage, openStorage });
+    installAssistant(leaving);
+    leaving.forUser('u1');
+    leaving.setOpen(true);
+
+    await beforeSignOut();
+
+    const next = createAssistant({ post: vi.fn(), storage, openStorage });
+    next.forUser('u2');
+    expect({ open: next.state.open, bubbles: next.state.thread.bubbles }).toEqual({ open: false, bubbles: [] });
+  });
+
   it('forgets the conversation with the assistant and waits for the app to stop listening', async () => {
     sessionStorage.setItem('erplora.assistant.history', JSON.stringify({ user: 'u1', bubbles: [], conversation: [] }));
     let stopped!: () => void;

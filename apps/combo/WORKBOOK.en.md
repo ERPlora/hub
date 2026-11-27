@@ -168,15 +168,15 @@ With the window as it opened, Back closes it without asking (BASE-F05); a price 
 | COMBO-F15 | Recover the menus, their courses and their choices from a separate copy | done |
 
 ### COMBO-F01 Look up and search the menus
-<!-- from WORKBOOK.md sha256:3ab0c28c5a73 -->
+<!-- from WORKBOOK.md sha256:539f57014097 -->
 Status: done
 Actor: owner, administrator, manager, employee, assistant
 Screen: Menus
 Steps:
 1. Open **Menus**.
 2. Read the table: name, closed price, how it is sold, whether it is on sale and order.
-3. To find one, type in "Search a menu…", sort by a column or filter by name, by how it is sold or by
-   "On sale".
+3. To find one, type in "Search a menu…" (ignoring case and accents: "menu del dia" finds "Menú del
+   día"), sort by a column or filter by name, by how it is sold or by "On sale".
 4. Tap a row to open its builder.
 In: the menus of the business (right to view).
 Out: nothing; it only reads.

@@ -124,7 +124,8 @@ class TestWhoMayDoIt:
 
         post(client, SETTINGS, CHANGE)
 
-        assert Approval.objects.get().requested_by_name == "saas:7"
+        # With no name anywhere, what goes before the «@»: never the address, nor the account's internal id.
+        assert Approval.objects.get().requested_by_name == "boss"
 
 
 class TestWhatIsNotDone:

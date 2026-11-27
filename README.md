@@ -76,7 +76,7 @@ bash .github/scripts/smoke-e2e.sh --spec tests/e2e/login-and-shell.spec.ts   # s
 Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
 suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
 citas, los servicios y los bonos, el alta de un negocio, activar y desactivar apps, la demo y la actualización en vivo
-entre pestañas. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada nocturna»): sus worktrees,
+entre pestañas. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pila de la pasada»): sus worktrees,
 sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
 
 - **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.
@@ -561,7 +561,11 @@ que prod, con su propio clúster de ECS (`erplora-pre`; prod corre en `erplora-p
 servicios (`hub-pre`, `worker-pre`), BD `pre_*` y repositorio de ECR (`erplora/hub-pre`). Se apaga
 sola cada tarde (plan `knowledge/raw/plans/2026-10-14-entorno-pre.md`, ERPlora/knowledge).
 
-1. Cada push a una rama de trabajo corre `test / test` (`ci.yml`).
+1. Cada push a una rama de trabajo corre `test / test` (`ci.yml`). Si la rama solo cambia ficheros de
+   `apps/<id>/`, su pytest corre solo los tests de esas apps y de las que dependen de ellas (las que las
+   piden en `requires` o importan algo suyo), en los trozos que hagan falta; cualquier otro cambio, o una
+   rama cuyo cambio no se puede calcular, corre la suite entera (`scripts/affected_tests.py`, el job
+   `select` de `test.yml`). `main` y `pre` corren siempre la suite entera antes de desplegar.
 2. Si `pre` avanzó, se integra `origin/pre` en la rama y se vuelve a empujar.
 3. Con el check en verde, `git push origin <rama>:pre` (fast-forward): `deploy.yml` prueba, construye
    la imagen y la despliega en pre; si estaba apagada, la enciende. Sin release: las releases son de

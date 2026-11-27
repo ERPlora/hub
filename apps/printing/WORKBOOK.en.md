@@ -383,7 +383,7 @@ off: "The printer does not answer. Check that it is on and connected.") and, aft
 Involved: PRINTING-F18
 
 ### PRINTING-F06 Choose how the business prints
-<!-- from WORKBOOK.md sha256:fe9be6185920 -->
+<!-- from WORKBOOK.md sha256:9b04cd94978a -->
 Status: done
 Actor: administrator, manager
 Screen: Settings
@@ -398,7 +398,8 @@ In: the business's decisions.
 Out: the print settings, a single row (announces: `printing.settings.updated`). Without saving,
 the factory ones always hold: receipt on checkout on, drawer off, one copy, no printer chosen.
 If it fails: "Could not save the settings." with the reason; if it names a role's printer (deactivated,
-deleted or moved to another role while it was being chosen), the reason also shows below that role. As
+deleted or moved to another role while it was being chosen), the reason shows only below that role, once:
+the notice above "Save settings" does not repeat it. As
 in the form windows, the notice goes as soon as something is changed and a role's reason as soon as
 another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
 field stays until the next try. If the read fails, the screen does not
@@ -544,7 +545,7 @@ the device's error.
 Involved: PRINTING-F06, PRINTING-F07, PRINTING-F22
 
 ### PRINTING-F14 Get a print job unstuck
-<!-- from WORKBOOK.md sha256:e5ac51e3dc4e -->
+<!-- from WORKBOOK.md sha256:b74db612c271 -->
 Status: done
 Actor: owner, administrator
 Screen: Queue
@@ -554,7 +555,7 @@ Steps:
 2. "Try again" sends it back to the queue with the attempts at zero, towards whichever printer fits now:
    "Sent back to the queue: the next device to connect will print it.".
 3. "Cancel" asks for a reason (optional) and withdraws it: "Job cancelled. It will not be printed.". It stays in
-   the queue with who (by their name or, if their account has none, by what goes before the @ of their email,
+   the queue with who (by their name or, if they have none, by what goes before the @ of their email,
    never the whole email), when and why.
 In: the job and, when cancelling, the reason.
 Out: the job waiting again or cancelled (announces: `printing.job.retried`, `printing.job.cancelled`); nobody

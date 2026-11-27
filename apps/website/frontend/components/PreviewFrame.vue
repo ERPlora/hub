@@ -61,6 +61,7 @@ function reload(): void {
         fill="clear"
         data-testid="website-preview-reload"
         :aria-label="t('website.preview.reload')"
+        :title="t('website.preview.reload')"
         @click="reload"
       >
         <HubIcon

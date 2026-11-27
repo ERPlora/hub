@@ -420,14 +420,6 @@ function pillTone(row: UsageRow) {
   min-width: 0;
 }
 
-.system-usage-row--info .system-usage-amount {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  text-align: end;
-  font-weight: 600;
-}
-
 .system-usage-pill {
   grid-column: 2;
   grid-row: 1;
@@ -493,13 +485,6 @@ function pillTone(row: UsageRow) {
 
   .system-usage-row--info {
     grid-template-columns: 10rem minmax(0, 1fr);
-  }
-
-  .system-usage-row--info .system-usage-amount {
-    grid-column: 2;
-    justify-self: start;
-    text-align: start;
-    font-weight: 400;
   }
 }
 </style>

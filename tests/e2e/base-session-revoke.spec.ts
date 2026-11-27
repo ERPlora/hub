@@ -12,7 +12,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { api, login, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn } from './helpers';
 import { listReady } from './demo-items';
-import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
+import { businessOnSaas, joinsAsEmployee, type SaasBusiness, type SaasOwner, signUpOnSaas } from './saas-owner';
 import { rowAction } from './service-helpers';
 import { STACK } from './stack';
 
@@ -35,21 +35,6 @@ async function businessOf(owner: Person): Promise<Business> {
     )
     .toBe('active');
   return business;
-}
-
-/** `person` joins `business` as an employee: the owner invites them and they accept, through the SaaS's API. */
-async function joins(owner: Person, person: Person, business: Business): Promise<string> {
-  const invited = await saasPost(owner.context, '/hubs/members/invite', {
-    hub_id: business.id,
-    email: person.credentials.email,
-    role: 'hub_employee',
-    message: '',
-  });
-  expect(invited.status(), await invited.text()).toBe(200);
-  const { id } = (await invited.json()) as { id: string };
-  const accepted = await saasPost(person.context, '/hubs/invitations/accept', { id });
-  expect(accepted.status(), await accepted.text()).toBe(200);
-  return id;
 }
 
 /** The owner's panel: the business's «Team», on screen. */
@@ -109,7 +94,7 @@ test.beforeAll(async ({ browser }) => {
   owner = await signUpOnSaas(browser, 'revoke-owner');
   employee = await signUpOnSaas(browser, 'revoke-employee');
   business = await businessOf(owner);
-  memberId = await joins(owner, employee, business);
+  memberId = await joinsAsEmployee(owner, employee, business);
   origin = STACK.hub(business.slug);
   // A business is born with every app off but Taxes: its owner turns on Demo,
   // where the employee works.

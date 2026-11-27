@@ -77,8 +77,8 @@ class CategoryIn(Schema):
         "ion:cube-outline", description="Iconify icon (e.g. ion:wine-outline) for the till's strip."
     )
     color: Color = Field("#3880ff", description="Colour #rrggbb for the till's strip.")
-    order: int = Field(
-        0, ge=0, le=1_000_000, description="Position on the till's strip: lower first, ties by name."
+    order: int | None = Field(
+        None, ge=0, le=1_000_000, description="Position on the till's strip: lower first, ties by name; empty = after the last one."
     )
     tax_category_key: TaxKey | None = Field(
         None, title=TAX_RATE, description="Key of a tax category (Taxes app), optional.", json_schema_extra=A_TAX_CATEGORY

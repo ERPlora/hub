@@ -2,7 +2,7 @@
 
 The Hub's admin lives only on hubs.erplora.com and has full CRUD over every table. A cart's lines are edited inside the
 cart. The database still refuses an unknown status, negative totals, a repeated live session code and a repeated order
-number; the rules (totals, steps of an order) and their events are the operations' (services.py), which the screens, the
+number; the rules (totals, steps of an order) and their events are the operations' (services/), which the screens, the
 API and the assistant use.
 """
 

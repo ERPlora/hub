@@ -67,7 +67,8 @@ class FlowListIn(PageIn):
 class CreateIn(In):
     name: Name = Field(
         "",
-        description="What the owner reads in the list; empty: «Untitled automation».",
+        description="What the owner reads in the list; empty: the Hub's name for an automation without one, in the "
+        "person's language.",
     )
     trigger: Trigger = Field(
         default_factory=lambda: ManualTrigger(kind="manual"), title=STARTS_WITH, description=D_TRIGGER
@@ -83,7 +84,7 @@ class CreateIn(In):
 
 class UpdateIn(FlowRefIn):
     name: Name | None = Field(
-        None, description="A new name; empty: «Untitled automation»."
+        None, description="A new name; empty: the Hub's name for an automation without one, in the person's language."
     )
     trigger: Trigger | None = Field(None, title=STARTS_WITH, description=D_TRIGGER)
     steps: Steps | None = Field(None, description=D_STEPS)

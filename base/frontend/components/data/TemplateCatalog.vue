@@ -58,7 +58,6 @@ const actions = computed<DataTableAction<Row>[]>(() => [
     id: 'use',
     label: t('base.data.import.use'),
     icon: 'ion:download-outline',
-    showLabel: true,
     pinned: true,
     color: 'primary',
     loading: (row) => row.key === props.busy,

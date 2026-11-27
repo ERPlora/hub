@@ -4,7 +4,7 @@ import datetime as dt
 
 from django.utils import timezone
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.queries.notices import notices
 from apps.appointment.schemas.appointments import NoticesIn
 

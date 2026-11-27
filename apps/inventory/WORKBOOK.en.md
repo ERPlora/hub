@@ -135,12 +135,12 @@ lost, mark it sold out or delete it. Tapping the row opens its card, with the ba
 The table's buttons import and export the catalog as a CSV file.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:26c3f8b6b683 -->
+<!-- from WORKBOOK.md sha256:155744333e4a -->
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
 Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
 "Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
-"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
+"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU, ignoring case and accents ("cafe" finds "Café con leche"); sorting by
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
 "Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
 is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a
@@ -155,12 +155,14 @@ is, "Put back on sale", "Hide from website" or, if it already is, "Show on websi
 can change products) and "Delete". Tapping the row opens the
 product's card. If the row has no room, the ones in sight go to the "⋮" too.
 
-The **+** and "Edit" open the form's side panel: Name, SKU (locked when editing: "The SKU is the
-product's identity: it is not edited"), Price, "Cost (<currency>)", "Initial stock" (only when
+The **+** and "Edit" open the form's side panel: Name, SKU (when creating, with the note "Leave it empty to
+number it automatically (10000, 10001…)."; locked when editing: "The SKU is the product's identity: it is not
+edited"), Price, "Cost (<currency>)", "Initial stock" (only when
 creating), "Low stock threshold", "EAN-13", "Description", "Type" ("Physical" or "Service", only when
 creating), the "Track stock for this item" box with its note, "Unit of measure", "Tax category"
 ("Pick a tax category"), "Categories" (if there are any) and the "Show on website" box (ticked when
-creating), and "Save" / "Save changes" ("Saving…").
+creating), and "Save" / "Save changes" ("Saving…"). While the name or the tax category is missing, the button
+is off and what is missing shows above the buttons, one thing at a time.
 
 The item's photo (INVENTORY-F30 to F32): the table has the "Photo" column, before the name, with the
 photo's thumbnail or the initials over its colour, and the cards their "Photo" line; the product's card
@@ -224,8 +226,8 @@ reason and the reference, which in a sale is the number of its ticket or its inv
 movement is never edited or deleted. Search by product, SKU or ticket number and filter by type.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:be700bb98314 -->
-Read-only table: Date, Name, SKU, Type ("Initial", "Reception", "Sale", "Void", "Count", "Decrease",
+<!-- from WORKBOOK.md sha256:7cee624c978d -->
+Read-only table: Date, Name, SKU, Type ("Initial", "Reception", "Sale", "Void", "Count", "Write-off",
 "Refund"), Quantity (with its sign), Balance, Reason and Reference (in a sale, the number of its
 ticket, its invoice or the sale itself). Search box by product, SKU, reference or ticket number;
 filters by Type and by Reference; most recent first; 50 per page.
@@ -336,14 +338,18 @@ same, in the browser too (hub#1023).
 All the flows are common to both verticals (restaurant and hair salon).
 
 ### INVENTORY-F01 Create a product
-<!-- from WORKBOOK.md sha256:95d688133d98 -->
+<!-- from WORKBOOK.md sha256:797c2ab1ac47 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
 Steps:
 1. In **Products**, tap **+**: the form's panel opens, with the cursor in Name; if you already went to
    another field while it opens, the cursor stays where you are and what you type goes there.
-2. Type Name, SKU and Price. The price takes "2.20", "1,234.56" or whatever is pasted from the
+2. Type Name and Price. The SKU is optional ("Leave it empty to number it automatically (10000, 10001…)."):
+   left empty, the product gets the catalog's next number of its own, from 10000 (one more than the highest of 5 to
+   9 digits a product already has, a deleted one too; a barcode used as SKU does not count), and that number is
+   its SKU for good, as a typed one is. The assistant and the API do the same when they give none. The
+   price takes "2.20", "1,234.56" or whatever is pasted from the
    screen; on leaving the field it is rewritten in the business's format. Optional are "Cost
    (EUR)" (in the business's currency: "Cost (PLN)" in Poland), "Initial stock", "Low stock threshold"
    (empty = 10), "EAN-13" and "Description".
@@ -370,7 +376,9 @@ setup step "Your catalog" is done (INVENTORY-F28). Through the assistant or the 
 already inactive, out of the till until it is activated (INVENTORY-F03), as one that was inactive comes
 back when it is recovered from a separate copy (BASE-F114). A backup or a template of "Data and backups" (BASE-F35)
 keeps which products are a "Service", and when it is loaded (BASE-F31) they still are.
-If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
+If it fails: "Save" is off while Name or tax category are missing, and above the buttons it says what is
+missing, one thing at a time: "Enter the name to continue." and then "Choose the tax category to
+continue.". It is also off, with no sentence, while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
 as 150,000; until then, leaving the price or the cost keeps it as typed, without inventing decimals for it or judging it: "¥1500" or "12,50 zł" are not marked red as "This is not an amount", and as soon as the currency arrives they are read in it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up. With no tax categories it says
@@ -388,7 +396,7 @@ the products the business no longer has at all, each by this same creation; a de
 INVENTORY-F34)
 
 ### INVENTORY-F02 Edit a product
-<!-- from WORKBOOK.md sha256:3c49452c412e -->
+<!-- from WORKBOOK.md sha256:0f033bce1899 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -407,7 +415,9 @@ categories.
 Out: the product changed, with its categories, in a single step. Inventory tells of the change and of
 each category added or removed. The new price is for what is added to a bill from now on: an open
 bill keeps the price from when it was ordered (Sales decides it).
-If it fails: the same refusals as creating, inside the panel, and nothing is saved.
+If it fails: the same refusals as creating, inside the panel, and nothing is saved. With the name erased, or
+with the tax category Taxes deactivated still set, "Save changes" is off and says what is missing, as when
+creating.
 Asked of the assistant, a product the business does not have, or a name that fits several, draws no card: the
 assistant says which one is not there or asks which one it is (as in every action of Inventory, see "Services").
 The tax category cannot be emptied: the field has no empty option. The unit of a product with stock
@@ -476,7 +486,7 @@ If it fails: the refusals of the product's edit form.
 Involved: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Create and edit a category
-<!-- from WORKBOOK.md sha256:990b87af6aa8 -->
+<!-- from WORKBOOK.md sha256:99bbc859de0e -->
 Status: done
 Actor: administrator, manager
 Screen: Categories
@@ -488,8 +498,10 @@ Steps:
    want, "Tax rate" ("— (default)" leaves it empty).
 3. Tap "Save" or "Save changes". The category shows in the table with its number of products.
 In: the tax categories and their type, from Taxes.
-Out: the category saved. Editing it from the screen does not touch what the screen does not show: the
-description, the icon, the colour and the order set through the assistant or the API are kept. Sales
+Out: the category saved. A new one shows last on the till, after the ones there already were; one
+created with its position (through the assistant or the API) keeps it. Editing it from the screen does
+not touch what the screen does not show: the description, the icon, the colour and the order set
+through the assistant or the API are kept. Sales
 reads it for the till's category strip, and Kitchen to choose what it sends to each station. A
 category is not turned off: it is created, edited or deleted.
 If it fails: "Save" is off without a Name. A refusal shows inside the panel, with its reason.
@@ -525,7 +537,7 @@ If it fails: "The category could not be deleted" (or the reason) above the table
 Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Group products into categories for the till
-<!-- from WORKBOOK.md sha256:ca333a1f5a04 -->
+<!-- from WORKBOOK.md sha256:40ede8a0ed50 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -541,7 +553,8 @@ Out: the link between product and category, saved together with the product; Inv
 category added or removed. A product can be in several. Sales filters the till's grid with these links
 (only of active products) and Kitchen uses them for its routing. The till shows the categories in the
 position the business gave them (through the assistant or the API, and the one the sector's template
-brings) and, at equal position, by name; the ones nobody placed go by name. The products, by name.
+brings) and, at equal position, by name; a category created without a position takes the one after the
+last (INVENTORY-F06, F10). The products, by name.
 If it fails: the form's refusals; if something fails neither the product nor its categories are saved.
 A product without a category is sold all the same: it shows under "All".
 Involved: KITCHEN-F04, SALE-F01
@@ -594,7 +607,7 @@ they may not run and nothing is created.
 Involved: TAX-F02, TAX-F14, TAX-F15, BASE-F119, INVENTORY-F26
 
 ### INVENTORY-F10 Import categories from a CSV
-<!-- from WORKBOOK.md sha256:7aa64b34ec09 -->
+<!-- from WORKBOOK.md sha256:7325e08f39cc -->
 Status: done
 Actor: administrator, manager
 Screen: Categories
@@ -603,7 +616,8 @@ Steps:
    semicolons).
 2. The columns Name (required), Slug and Tax category are recognised by their header, in Spanish or
    English ("Nombre"/"name", "IVA"/"tax"…).
-3. A category is created per row with a name; the slug, if it does not come, is taken from the name.
+3. A category is created per row with a name, in the file's order and after the ones there already
+   were (on the till they show last); the slug, if it does not come, is taken from the name.
 4. When it ends, "Import result": "Rows", "Created", "Skipped (already existed)", "Failed", a line per
    failure and "Copy report". The table reloads.
 In: the file; the tax categories and the learnt texts, from Taxes.
@@ -728,7 +742,7 @@ also the reason of any other refusal.
 Involved: none
 
 ### INVENTORY-F15 Write off stock without a sale (waste, breakage, own consumption)
-<!-- from WORKBOOK.md sha256:53dbde58d7b2 -->
+<!-- from WORKBOOK.md sha256:bbdd44bbb604 -->
 Status: done
 Actor: administrator, manager (screen); assistant
 Screen: Products ("Write-off" window, from the row or the card); assistant
@@ -741,10 +755,10 @@ Steps:
    ("three bottles of water got broken, and I just counted the soft drinks, there are 40 left"), the
    breakage is written off all the same and the count is only of what was counted: a count
    never records a breakage.
-3. In **Movements** "Decrease" shows with the quantity in negative and the reason.
+3. In **Movements** "Write-off" shows with the quantity in negative and the reason.
 In: the product, the quantity (in its unit's step) and the reason. It can also be asked for through the
 API.
-Out: the stock goes down and the "Decrease" movement stays; Inventory tells that the stock changed and,
+Out: the stock goes down and the "Write-off" movement stays; Inventory tells that the stock changed and,
 if it crosses the threshold, of the crossing (INVENTORY-F18). The manager and the administrator can ask
 for it.
 If it fails: if there is not enough and "Allow selling without stock" is off, "There is not enough stock

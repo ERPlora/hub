@@ -70,7 +70,6 @@ const actions = computed<DataTableAction<PrinterOut>[]>(() => [
           id: 'test',
           label: t('printing.printers.actions.test'),
           icon: 'lucide:receipt',
-          showLabel: true,
           hidden: (row: PrinterOut) => !row.is_active,
           loading: (row: PrinterOut) => testing.value === row.id,
         },
@@ -168,13 +167,14 @@ function onAction({ actionId, row }: { actionId: string; row: PrinterOut }): voi
             size="small"
             fill="outline"
             data-testid="printing-printers-discover"
+            :aria-label="$t('printing.discover.action')"
+            :title="$t('printing.discover.action')"
             @click="discovering = true"
           >
             <HubIcon
-              slot="start"
+              slot="icon-only"
               name="ion:search-outline"
             />
-            {{ $t('printing.discover.action') }}
           </ion-button>
         </div>
         <InlineFeedback

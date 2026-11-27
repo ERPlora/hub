@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
-from apps.appointment.models import Appointment, AppointmentService
+from apps.appointment.models.appointments import Appointment, AppointmentService
 from apps.appointment.queries.business import day_bounds, now
 from apps.appointment.queries.ownership import APPOINTMENTS
 from apps.customer.models import Customer
@@ -19,6 +19,7 @@ from apps.online_booking.models import Booking
 from apps.online_booking.schemas import BookingListIn, BookingOut, BookingPage, BookingRefIn
 from base.business import business_zone
 from base.ordering import list_order
+from base.text_search import contains_text
 
 VIEW = "online_booking.view_booking"
 ONLINE = Appointment.Source.ONLINE
@@ -98,9 +99,7 @@ def load_detail(appointment_id) -> dict:
 
 def _with_service(text: str) -> Exists:
     return Exists(
-        AppointmentService.objects.filter(
-            appointment=OuterRef("pk"), name__icontains=text
-        )
+        AppointmentService.objects.filter(contains_text(text, "name"), appointment=OuterRef("pk"))
     )
 
 
@@ -110,16 +109,16 @@ def _person(ctx: OperationContext, text: str) -> Q:
     seen = sees_contact(ctx)
     if seen and "@" in text:
         return Q(customer_email__iexact=text)
-    found = Q(customer_name__icontains=text) | Q(customer__in=searched(ctx, Customer.objects.all(), normalize(text)))
+    found = contains_text(text, "customer_name") | Q(customer__in=searched(ctx, Customer.objects.all(), normalize(text)))
     numbers = candidates(text, business_country(ctx)) if seen else []
     return found | Q(customer_phone__in=numbers) if numbers else found
 
 
 def _searched(ctx: OperationContext, rows: QuerySet, text: str) -> QuerySet:
     digits = "".join(char for char in text if char.isdigit())
-    found = Q(number__icontains=text) | _person(ctx, text) | Q(staff_name__icontains=text) | _with_service(text)
+    found = contains_text(text, "number") | _person(ctx, text) | contains_text(text, "staff_name") | _with_service(text)
     if sees_contact(ctx):
-        found |= Q(customer_email__icontains=text)
+        found |= contains_text(text, "customer_email")
         if len(digits) >= 3:
             found |= Q(customer_phone__contains=digits)
     return rows.filter(found)
@@ -164,13 +163,13 @@ def list_bookings(ctx: OperationContext, params: BookingListIn) -> dict:
     if params.search:
         rows = _searched(ctx, rows, params.search)
     if params.number:
-        rows = rows.filter(number__icontains=params.number)
+        rows = rows.filter(contains_text(params.number, "number"))
     if params.customer_name:
         rows = rows.filter(_person(ctx, params.customer_name))
     if params.service:
         rows = rows.filter(_with_service(params.service))
     if params.staff_name:
-        rows = rows.filter(staff_name__icontains=params.staff_name)
+        rows = rows.filter(contains_text(params.staff_name, "staff_name"))
     if params.status:
         rows = rows.filter(status=params.status)
     if params.staff_id:
