@@ -136,7 +136,7 @@ describe('TestPanel: what each kind of step would do', () => {
       answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [{ ...step, outcome: 'not_allowed' }] }] },
     });
     await settle();
-    expect(refused.find('flow-test-step-s4').text()).toContain('you have not allowed it «Call api.example.com» yet');
+    expect(refused.find('flow-test-step-s4').text()).toContain('you have not allowed it “Call api.example.com” yet');
   });
 
   // FLOW-F28: a question says who it would ask and what, never asking.
@@ -152,6 +152,24 @@ describe('TestPanel: what each kind of step would do', () => {
     expect(text).toContain('Would ask the managers and wait up to 24 hours');
     expect(text).toContain('Refund 12500?');
     expect(text).not.toContain('Hours');
+  });
+
+  it('a question says its hours in the singular or the plural', async () => {
+    const question = { id: 's5', kind: 'ask' as const, title: 'Refund?', details: '', role: 'manager' as const, hours: 1, on_no: 'stop' as const, on_timeout: 'no' as const };
+    const said = async (hours: number, locale: 'en' | 'es') => {
+      const step = { ...ANSWER.steps[2], id: 's5', kind: 'ask', outcome: 'would_ask' as const, operation: '', empty: [], errors: {}, params: { title: 'Refund?', details: '', role: 'manager', hours } };
+      const m = await mountFlow(TestPanel, {
+        locale,
+        props: { document: { ...DOC, steps: [{ ...question, hours }] }, flowId: 'f1', catalog: CATALOG },
+        answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [step] }] },
+      });
+      await settle();
+      return m.find('flow-test-step-s5').element.querySelector('.flow-test__verdict')?.textContent;
+    };
+    expect(await said(1, 'en')).toBe('Would ask the managers and wait up to 1 hour');
+    expect(await said(2, 'en')).toBe('Would ask the managers and wait up to 2 hours');
+    expect(await said(1, 'es')).toBe('Preguntaría a los responsables y esperaría hasta 1 hora');
+    expect(await said(2, 'es')).toBe('Preguntaría a los responsables y esperaría hasta 2 horas');
   });
 
   // FLOW-F37: the data a step fixes, each with the value it would have, and the tool that would not be used because
@@ -185,7 +203,7 @@ describe('TestPanel: what each kind of step would do', () => {
     const reason = m.find(`flow-test-pinned-s1-${CANCEL}-reason`);
     expect(reason.findAll('span').map((part) => part.text())).toEqual(['Cancel a reservation › Reason', 'Asked by WhatsApp']);
     expect(m.find(`flow-test-pinnedempty-s1-${CANCEL}`).text()).toBe(
-      '«Cancel a reservation» would not be used: «On behalf of the customer», fixed by this step, would be empty in this run.',
+      '“Cancel a reservation” would not be used: “On behalf of the customer”, fixed by this step, would be empty in this run.',
     );
     expect(m.find('flow-test-pinnedunknown-s1').text()).toBe('Comes from an earlier step that has not run: Change a reservation › On behalf of the customer');
     // An empty datum has no row of its own: its line says it.

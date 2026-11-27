@@ -6,6 +6,7 @@ from django.db.models.functions import Coalesce
 from live.context import OperationContext
 from live.operations import AI, operation
 
+from apps.customer import consent_notice
 from apps.customer.models import Consent, Customer, CustomField, CustomFieldValue
 from apps.customer.phones import candidates
 from apps.customer.queries.reads import _ordered, business_country, find_customer, page
@@ -19,6 +20,7 @@ from apps.customer.schemas.cards import (
     CustomerStatsOut,
     PhoneMatchOut,
 )
+from base.text_search import contains_text
 from apps.customer.schemas.fields import CustomerRefIn
 from apps.customer.search import search_term
 
@@ -75,6 +77,7 @@ def load_detail(customer: Customer) -> dict:
         "consent": consent,
         "marketing_consent": bool(granted),
         "consent_date": max(granted) if granted else None,
+        "consent_notice": str(consent_notice.WORDS),
     }
 
 
@@ -86,7 +89,7 @@ def _filtered_customers(ctx: OperationContext, params: CustomerFilters) -> Query
     for field in ("name", "email", "tax_id", "company_name"):
         value = (getattr(params, field) or "").strip()
         if value:
-            cards = cards.filter(**{f"{field}__icontains": value})
+            cards = cards.filter(contains_text(value, field))
     phone = search_term(params.phone or "")
     if phone:
         cards = cards.filter(phone__contains=phone)

@@ -79,7 +79,7 @@ describe('RuleEndModal (TAX-F07)', () => {
     await click(s.save());
     expect(s.date().errorText).toBe(message);
     expect(s.date().classList.contains('ion-invalid')).toBe(true);
-    expect(s.inDoc('tax-rule-end-error')?.textContent).toContain(message);
+    expect(s.inDoc('tax-rule-end-error')).toBeNull();
     expect(s.wrapper.emitted('update:open')?.at(-1)).not.toEqual([false]);
   });
 

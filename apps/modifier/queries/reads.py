@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict, NotFound
 
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
+from base.text_search import contains_text
 
 GROUP_NOT_FOUND = _("This group does not exist.")
 GROUP_AMBIGUOUS = _("«%(said)s» names several groups: %(names)s. Say which one.")
@@ -33,7 +34,7 @@ def find_group(
     groups = ModifierGroup.objects.all()
     if group_id is None:
         candidates = _first_match(
-            groups, (Q(name__iexact=said), Q(name__icontains=said))
+            groups, (Q(name__iexact=said), contains_text(said, "name"))
         )
         if len(candidates) > 1:
             names = ", ".join(group.name for group in candidates[:5])
@@ -64,7 +65,7 @@ def find_option(
         options = options.filter(group=find_group(group_id, group_said))
     if option_id is None:
         candidates = _first_match(
-            options, (Q(name__iexact=said), Q(name__icontains=said))
+            options, (Q(name__iexact=said), contains_text(said, "name"))
         )
         if len(candidates) > 1:
             names = ", ".join(_option_label(option) for option in candidates[:5])

@@ -381,6 +381,84 @@ def test_a_free_time_of_the_repeated_hour_that_fits_the_window_on_the_day_of_25_
     ]
 
 
+# The spans of a day the professional works
+
+
+def windows(diary: Agenda, day: dt.date = MONDAY) -> list[tuple[str, str]]:
+    return [
+        (f"{start:%H:%M}", f"{end:%H:%M}") for start, end in engine.windows(diary, day)
+    ]
+
+
+def shift(*spans: tuple[str, str]) -> StaffDay:
+    return StaffDay(
+        MONDAY,
+        has_schedule=True,
+        available=tuple((t(start), t(end)) for start, end in spans),
+    )
+
+
+def test_a_split_shift_is_two_spans_and_a_continuous_one_a_single_span():
+    opening = [open_day(MONDAY, ("09:00", "21:00"))]
+    split = agenda(business=opening, staff=[shift(("10:00", "14:00"), ("16:00", "20:00"))])
+    assert windows(split) == [("10:00", "14:00"), ("16:00", "20:00")]
+    continuous = agenda(business=opening, staff=[shift(("10:00", "18:00"))])
+    assert windows(continuous) == [("10:00", "18:00")]
+    back_to_back = agenda(business=opening, staff=[shift(("10:00", "14:00"), ("14:00", "18:00"))])
+    assert windows(back_to_back) == [("10:00", "18:00")]
+
+
+def test_the_spans_keep_inside_the_opening_hours_and_the_calendar_window():
+    shorter = agenda(business=[open_day(MONDAY, ("10:00", "14:00"))], staff=[shift(("09:00", "19:00"))])
+    assert windows(shorter) == [("10:00", "14:00")]
+    long_day = agenda(business=[open_day(MONDAY, ("07:00", "22:00"))], staff=[shift(("07:00", "21:00"))])
+    assert windows(long_day) == [("08:00", "20:00")]
+
+
+def test_without_a_schedule_an_absence_cuts_or_splits_the_day_and_a_whole_one_empties_it():
+    doctor = StaffDay(MONDAY, has_schedule=False, absences=((t("11:00"), t("12:00")), (t("07:00"), t("09:00"))))
+    assert windows(agenda(staff=[doctor])) == [("09:00", "11:00"), ("12:00", "20:00")]
+    away = StaffDay(MONDAY, has_schedule=False, absences=((None, None),))
+    assert windows(agenda(staff=[away])) == []
+
+
+def test_a_day_off_or_a_closed_day_has_no_spans():
+    assert windows(agenda(staff=[StaffDay(MONDAY, has_schedule=True)])) == []
+    closed = BusinessDay(MONDAY, restricted=True, spans=())
+    assert windows(agenda(business=[closed], staff=[shift(("10:00", "14:00"))])) == []
+
+
+def test_blocks_and_appointments_do_not_cut_the_spans():
+    diary = agenda(
+        staff=[shift(("10:00", "14:00"))],
+        blocks=[Period(at(MONDAY, "11:00"), at(MONDAY, "12:00"))],
+        busy=[Period(at(MONDAY, "12:00"), at(MONDAY, "13:00"))],
+    )
+    assert windows(diary) == [("10:00", "14:00")]
+
+
+def test_without_a_professional_the_spans_are_the_opening_hours_the_eves_small_hours_included():
+    diary = agenda(
+        business=[open_day(SUNDAY, ("20:00", "02:00")), open_day(MONDAY, ("10:00", "14:00"))],
+        calendar_start_hour=0,
+        calendar_end_hour=24,
+    )
+    assert windows(diary) == [("00:00", "02:00"), ("10:00", "14:00")]
+    assert windows(agenda()) == [("08:00", "20:00")]
+
+
+def test_the_spans_are_instants_on_the_business_clock_as_the_free_times():
+    ((start, end),) = engine.windows(agenda(staff=[shift(("10:00", "14:00"))]), MONDAY)
+    assert (start, end) == (at(MONDAY, "10:00"), at(MONDAY, "14:00"))
+    assert start.tzinfo == end.tzinfo == MADRID
+
+
+def test_a_span_that_opens_in_the_hour_the_clock_change_skips_opens_as_the_clock_jumps():
+    diary = agenda(calendar_start_hour=2, calendar_end_hour=4)
+    ((start, end),) = engine.windows(diary, SPRING)
+    assert (f"{start:%H:%M%z}", f"{end:%H:%M%z}") == ("03:00+0200", "04:00+0200")
+
+
 # Series (RFC 5545 through dateutil)
 
 

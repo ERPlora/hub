@@ -141,6 +141,16 @@ class TestWithTheAccessOn:
             assert OutboxEvent.objects.filter(name=ENTERED).count() == 2
         assert [visit["person"] for visit in api(owner, "/support-access")["visits"]] == ["Sam", "Sam"]
 
+    def test_a_support_account_without_a_name_is_noted_by_what_goes_before_its_at(self, client, fake_saas, make_user):
+        # erplora.com names an account without a name by its address, and every person of the business reads the visits.
+        fake_saas(body={**SUPPORT, "name": SUPPORT["email"]})
+        callback(client, {"code": "c1", "next": "/"})
+        employee = Client()
+        employee.force_login(make_user("saas:3", host=A, role=Membership.Role.EMPLOYEE, first_name="Eva"))
+        visits = api(employee, "/support-access")["visits"]
+        assert [visit["person"] for visit in visits] == ["sam"]
+        assert "@" not in json.dumps(visits)
+
     def test_support_is_none_of_the_business_s_people(self, client, fake_saas, owner, make_user):
         support_enters(client, fake_saas)
         assert [person["id"] for person in api(owner, "/people")["people"]] == ["saas:1"]

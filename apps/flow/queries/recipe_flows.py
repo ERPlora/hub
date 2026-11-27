@@ -43,11 +43,12 @@ def recipe_flow(ref: str, *, lock: bool = False) -> Flow | None:
     },
 )
 def list_recipes(ctx: OperationContext, data: RecipeListIn) -> dict:
+    """The recipes from the ``offset``-th on, and the ones set aside."""
     offered, set_aside = recipes.shelf(ctx.scope)
     mine = {flow.recipe: flow for flow in live_flows().exclude(recipe="")}
     rows = []
     with translation.override(ctx.language):
-        for recipe in offered:
+        for recipe in offered[data.offset :]:
             built = recipes.build(recipe, ctx.language)
             reasons = recipes.reasons(recipe, ctx.language)
             flow = mine.get(recipe.ref)

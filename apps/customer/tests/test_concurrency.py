@@ -237,7 +237,7 @@ def _purchase_then(write):
 CARD_WRITES = {
     "note": lambda ana: lambda: run("customer.note.add", NoteIn(customer_id=ana.id, content="Mornings")),
     "consent": lambda ana: lambda: run(
-        "customer.consent.grant", ConsentGrantIn(customer_id=ana.id, channel="email", notice_text="Yes")
+        "customer.consent.grant", ConsentGrantIn(customer_id=ana.id, channel="email")
     ),
     "order link": lambda ana: lambda: run(
         "customer.order.link", OrderLinkIn(order_id=uuid.uuid7(), customer_id=ana.id)

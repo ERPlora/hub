@@ -287,6 +287,7 @@ async function save(): Promise<void> {
         <ConsentPanel
           :customer-id="id"
           :consent="customer?.consent ?? []"
+          :notice="customer?.consent_notice ?? ''"
           :editable="canManage"
         />
       </section>

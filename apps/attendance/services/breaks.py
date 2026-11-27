@@ -40,8 +40,8 @@ NO_BREAK_RUNNING = _("There is no running break to end.")
                 "me tomo cinco minutos de descanso",
             ),
         },
-        "description": "Starts a break inside the open working day of the caller, or of the person named "
-        "(«I'm going on a break»).",
+        "description": "Starts a break inside the open working day of the caller, or of the person named: puts "
+        "them on a break («I'm going on a break»).",
         "check": "attendance.person.check",
         "risk": "normal",
     },

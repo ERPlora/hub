@@ -189,6 +189,7 @@ export interface CustomerDetailOut extends CustomerRow {
   consent: ConsentStateRow[];
   marketing_consent: boolean;
   consent_date: string | null;
+  consent_notice: string;
 }
 
 export interface CustomerStatsOut {
@@ -432,8 +433,6 @@ export interface HealthIn extends CustomerOfIn {
 
 export interface ConsentGrantIn extends CustomerOfIn {
   channel: ConsentChannel;
-  notice_text: string;
-  notice_version?: string;
   purpose?: string;
   source?: ConsentSource;
   evidence?: string;

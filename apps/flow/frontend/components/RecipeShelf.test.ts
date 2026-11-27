@@ -92,7 +92,7 @@ describe('Comes with …', () => {
     await click(m.find('flow-recipe-enable-appointment/customer_cancelled').element);
     await settle();
     expect(m.sent().find((call) => call.path === '/api/flow/recipes/enable')?.body).toEqual({ recipe: 'appointment/customer_cancelled' });
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('«Fill the gap when a customer cancels» is on.');
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('“Fill the gap when a customer cancels” is on.');
   });
 
   it('once on, it says so and offers «Pause it», «See it» and «Restore the factory one»', async () => {
@@ -104,7 +104,7 @@ describe('Comes with …', () => {
     await click(m.find('flow-recipe-disable-appointment/customer_cancelled').element);
     await settle();
     expect(m.sent().find((call) => call.path === '/api/flow/recipes/disable')?.body).toEqual({ recipe: 'appointment/customer_cancelled' });
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('«Fill the gap when a customer cancels» is paused. Nothing was deleted.');
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('“Fill the gap when a customer cancels” is paused. Nothing was deleted.');
   });
 
   it('paused, it offers «Turn it on» again; «See it» opens its automation', async () => {
@@ -157,7 +157,7 @@ describe('Comes with …', () => {
       ],
     });
     expect(m.find('flow-recipes-hidden').text()).toBe('Some automations your apps bring are hidden: they need Tasks.');
-    expect(m.find('flow-recipes-invalid').text()).toContain('«Broken one» cannot be offered: It does not read as an automation: steps.');
+    expect(m.find('flow-recipes-invalid').text()).toContain('“Broken one” cannot be offered: It does not read as an automation: steps.');
   });
 
   it('a list that could not be read says so, with «Retry»', async () => {
