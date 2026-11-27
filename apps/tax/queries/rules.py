@@ -4,7 +4,7 @@
 from decimal import Decimal
 from uuid import UUID
 
-from django.db.models import Case, CharField, F, Q, QuerySet, Value, When
+from django.db.models import Case, CharField, F, QuerySet, Value, When
 from django.db.models.functions import Coalesce
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
@@ -30,6 +30,7 @@ from apps.tax.schemas.rules import (
 )
 from base.business import country_name, percent_text
 from base.ordering import list_order
+from base.text_search import contains_text
 
 RULE_NOT_FOUND = _("This tax rule no longer exists.")
 
@@ -142,7 +143,7 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
         }
         rules = rules.filter(**{column: value for column, value in exact.items() if value})
         if params.region_code:
-            rules = rules.filter(region_code__icontains=params.region_code)
+            rules = rules.filter(contains_text(params.region_code, "region_code"))
         if params.rate_min is not None:
             rules = rules.filter(rate_pct__gte=params.rate_min)
         if params.rate_max is not None:
@@ -158,11 +159,7 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
                 output_field=CharField(),
             )
             rules = rules.annotate(category_shown_name=names).filter(
-                Q(category__key__icontains=search)
-                | Q(category_shown_name__icontains=search)
-                | Q(country_code__icontains=search)
-                | Q(region_code__icontains=search)
-                | Q(operation_class__icontains=search)
+                contains_text(search, "category__key", "category_shown_name", "country_code", "region_code", "operation_class")
             )
         column = _RULE_COLUMNS.get(params.sort, params.sort)
         keys = list_order(column, *_GROUPED, descending=params.dir == "desc", nulls_last=True)
