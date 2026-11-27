@@ -63,6 +63,11 @@
       "unassigned": "Sin asignar",
       "charged": "Cobrada"
     },
+    "toConfirm": {
+      "notice": "Estas son las citas que esperan tu confirmación, sean del día que sean.",
+      "back": "Volver a la agenda",
+      "empty": "No quedan citas por confirmar."
+    },
     "actions": {
       "charge": "Cobrar",
       "goToCheck": "Ir a la cuenta",

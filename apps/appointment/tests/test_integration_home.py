@@ -32,7 +32,7 @@ pytestmark = pytest.mark.usefixtures("anytime")
 COUNTER = {
     "key": "appointment.to_confirm",
     "app": "appointment",
-    "route": "/appointment/agenda",
+    "route": "/appointment/agenda?to_confirm=1",
     "label": "Appointments to confirm",
     "icon": "ion:calendar-outline",
     "severity": "warning",

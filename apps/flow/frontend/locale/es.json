@@ -901,6 +901,7 @@
       "appointment__appointment__history": "Leer el historial de una cita",
       "appointment__appointment__list": "Buscar citas",
       "appointment__appointment__list_for_customer": "Buscar las citas de un cliente",
+      "appointment__appointment__list_to_confirm": "Buscar las citas por confirmar",
       "appointment__appointment__reschedule": "Cambiar de hora una cita",
       "appointment__appointment__start": "Empezar una cita",
       "appointment__appointment__update": "Cambiar una cita",

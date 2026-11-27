@@ -901,6 +901,7 @@
       "appointment__appointment__history": "Read an appointment's history",
       "appointment__appointment__list": "Look for appointments",
       "appointment__appointment__list_for_customer": "Look for a customer's appointments",
+      "appointment__appointment__list_to_confirm": "Look for the appointments to confirm",
       "appointment__appointment__reschedule": "Move an appointment",
       "appointment__appointment__start": "Start an appointment",
       "appointment__appointment__update": "Change an appointment",

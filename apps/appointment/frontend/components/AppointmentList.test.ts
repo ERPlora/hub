@@ -54,6 +54,12 @@ describe('AppointmentList', () => {
     expect(s.prop('searchPlaceholder')).toBe('Search no., customer or service…');
   });
 
+  // The bookings to confirm span months (hub#2640): a weekday and its number alone would not say which day.
+  it('the time says its weekday in a week, and its whole date in a list of any day', async () => {
+    expect((await setup({ withDay: true })).cells(0)[0]).toBe('19 Mon · 10:00 AM');
+    expect((await setup({ withDate: true })).cells(0)[0]).toBe('Oct 19, 2026 · 10:00 AM');
+  });
+
   it('greys out what a row does not allow, and Delete only exists for who may delete', async () => {
     const s = await setup();
     expect(s.actions().map((a) => a.id)).toEqual(['charge', 'edit', 'confirm', 'start', 'complete', 'no_show', 'cancel', 'history', 'delete']);

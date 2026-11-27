@@ -101,9 +101,10 @@ def test_navigation_is_the_agenda_and_its_settings_with_registered_icons():
     ]
 
 
-#: The reads that are no assistant tool: what names a blocked period on the assistant's card (hub#635); the model reads
-#: the blocks by their list.
-INTERNAL_READS = {"appointment.blocked_time.get"}
+#: The reads that are no assistant tool: what names a blocked period on the assistant's card (hub#635), as the model reads
+#: the blocks by their list; and the agenda's list of the bookings to confirm, as the model counts them and lists them
+#: by their status.
+INTERNAL_READS = {"appointment.blocked_time.get", "appointment.appointment.list_to_confirm"}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():
@@ -184,8 +185,9 @@ TO_CONFIRM = [
 
 
 def test_the_bell_counts_the_appointments_to_confirm():
-    """The bell's «Appointments to confirm», on the query the agenda's «N to confirm» reads, leading to the agenda.
-    Whoever sees an agenda sees it (its query counts the person's own, or everybody's for whoever sees them all)."""
+    """The bell's «Appointments to confirm», on the query the agenda's «N to confirm» reads, leading to the agenda's
+    list of every booking to confirm. Whoever sees an agenda sees it (its query counts the person's own, or everybody's for
+    whoever sees them all)."""
     [counter] = appointment().bell
     assert isinstance(counter, BellCounter)
     assert (
@@ -200,7 +202,7 @@ def test_the_bell_counts_the_appointments_to_confirm():
         "to_confirm",
         "appointment.appointment.count_to_confirm",
         {},
-        "/appointment/agenda",
+        "/appointment/agenda?to_confirm=1",
         "Appointments to confirm",
         "ion:calendar-outline",
         "appointment.view_own_appointment",
