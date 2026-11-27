@@ -272,7 +272,7 @@ which starts at "Files" (the very top), with the open folder highlighted; on a n
 folder" and "Upload file" (its cloud alone). Below, what the open folder holds: tapping a file opens it.
 
 #### The open folder
-<!-- from WORKBOOK.md sha256:3e9218268628 -->
+<!-- from WORKBOOK.md sha256:8ce6d0f48f6d -->
 On top, the folder's path, with ⋮ beside it to rename, move or delete that folder; "Space", with what is used and the
 plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder holds: the folders first and then
 the files, each with its icon, its name, its size (in the list, also when it changed) and its ⋮: "Open", "Download",
@@ -1374,7 +1374,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:94ff4453084e -->
+<!-- from WORKBOOK.md sha256:4cd064b7d3a3 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1394,7 +1394,9 @@ In: the name, the language, what it is for and what is ticked.
 Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows: of Inventory, the categories
 and the products, and of Services, the categories and the services, with their own photos inside (INVENTORY-F33); of
 Tables, the zones and the tables; of Modifiers, the groups, each with its options and the products (by their code) and
-categories it applies to; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
+categories it applies to; of Menus and combos, the menus, each with its closed price, its courses, the products to
+choose in each course (by their code) with their supplement, and its own photo inside; and, only in a backup, the
+customers. Never the sales, people, PINs nor fiscal data. Loaded
 into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
 the business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
@@ -2233,7 +2235,7 @@ If it fails: "Could not remove the unused devices. Check the connection and try 
 Involved: BASE-F70, BASE-F98
 
 ### BASE-F72 See the business's files
-<!-- from WORKBOOK.md sha256:efc654bc9574 -->
+<!-- from WORKBOOK.md sha256:a490fba06472 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Files
@@ -3007,7 +3009,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:17acc1202a91 -->
+<!-- from WORKBOOK.md sha256:c292b3532729 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3115,7 +3117,10 @@ Steps:
      on its screen. "Cancel" or Esc do nothing: the assistant knows the person said no and says it was not done
      because they cancelled it, without asking them to confirm it, since that card is already closed. After "Run it",
      the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
-     offer to undo it unless asked to.
+     offer to undo it unless asked to. In a change (a setting, like the till's, or the data of a record), it also knows
+     how the data it sent were, so it never guesses: after "Run it" it says what changed and what was already so ("Done:
+     now the cash has to be counted at closing (it did not before); the opening float was already asked for"), and after
+     "Cancel", how they stay ("I have not changed it: the week still starts on Monday").
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn that was put to the person, with the action named
@@ -3181,7 +3186,7 @@ allowed: …". If it can no longer be read after "Run it" is tapped, the receipt
 Involved: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Check what the assistant says against what it really did
-<!-- from WORKBOOK.md sha256:adbd1b0cc182 -->
+<!-- from WORKBOOK.md sha256:94943fbdee7f -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3205,7 +3210,8 @@ Steps:
 In: what was done in the turn, with its result, what its lookups returned and the web addresses erplora.com's tools
 looked up.
 Out: the notices and the receipts, kept with the conversation.
-If it fails: "Done" means the action of its app ended without an error: if an app answers fine without having changed
+If it fails: "Done" means the action of its app ended without an error. In a change, the assistant knows which data
+changed and which were already so, and says it (BASE-F97); in another action that answers fine without having changed
 anything, it is that action that has to say so. If the turn ends in an error, the bubble carries its failure
 (BASE-F106), the notices of what it got to say and the receipts of what was indeed done.
 Involved: BASE-F96, BASE-F97, BASE-F106

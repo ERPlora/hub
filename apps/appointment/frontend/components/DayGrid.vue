@@ -1,20 +1,15 @@
 <script setup lang="ts">
-// «By professional · Day» (APPOINTMENT-F01, F04, F25): the old `ok-scheduler` timeline, as our own grid
-// until @erplora/ui has its `Scheduler` (asked in UI-REQUESTS.md). A row per bookable professional, then
-// whoever no longer takes bookings but keeps appointments that day (warned above: their appointments stay
-// on their row to be handed over), then «Unassigned» when an appointment has nobody; the calendar
-// window's hours across, the blocked periods and the hours the business is closed (Schedules) painted.
-//   - Tapping a free slot books there: that professional and time (on a row that takes no bookings, or
-//     «Unassigned», only the time). Each slot is a button with its own name, so the keyboard books too.
-//     A closed hour has no slot to tap.
-//   - Tapping an appointment opens it (a button: Enter and Space as well).
-//   - Dragging one moves it to another time or row — pointer events, so mouse, pen and finger alike; a
-//     finger must hold it first (400 ms), as Vagaro asks, or a scroll would move a customer's booking. It
-//     snaps to the slot interval, never lands in the past or outside the window, and only what may still
-//     move (pending or confirmed, not charged) drags. The page sends the move; the server decides.
+// «By professional · Day» (APPOINTMENT-F01, F04, F25): a row per bookable professional, then whoever keeps
+// appointments that day without taking bookings (warned above), then «Unassigned»; the calendar's hours across,
+// with what is blocked or closed (Schedules) painted. It opens at the business's time now today, at its opening
+// hour another day. Tapping a free slot books there (a button per slot; a closed hour has none); tapping an
+// appointment opens it; dragging one moves it to another time or row with pointer events (a finger holds it
+// 400 ms first, as Vagaro asks, so a scroll moves nothing). A drag snaps to the slot interval, never lands in the
+// past or outside the window, and only what may still move drags; the server decides.
 import type { OutputOf } from '@erplora/ui/sdk';
 import { computed, ref } from 'vue';
 
+import { useGridStart } from '../composables/useGridStart';
 import { useLocale, useT } from '../composables/useT';
 import { formatTime, minutesOf, wallLength } from '../lib/clock';
 import { allows, customerLabel } from '../lib/states';
@@ -25,6 +20,7 @@ export type DayHours = OutputOf<'schedule.hours.for_range'>['days'][number];
 
 const props = defineProps<{
   day: string;
+  zone: string;
   /** The day's hours (Schedules): what is closed is shaded and books nothing; `null` = not known yet. */
   hours?: DayHours | null;
   lanes: LaneOut[];
@@ -49,8 +45,8 @@ const emit = defineEmits<{
 const t = useT();
 const locale = useLocale();
 
-/** 96 px an hour, 56 px a row: the old scheduler's proportions. */
-const PX_PER_MINUTE = 1.6;
+/** 120 px an hour, as the market's agendas: half an hour keeps the first name, the day stays on screen; 56 px a row. */
+const PX_PER_MINUTE = 2;
 const LANE_HEIGHT = 56;
 const DRAG_THRESHOLD = 5;
 const TOUCH_HOLD_MS = 400;
@@ -128,6 +124,10 @@ const closedSpans = computed(() =>
     return span ? [{ key: from, ...span }] : [];
   }),
 );
+
+const scroller = ref<HTMLElement | null>(null);
+const startsAt = () => ({ day: props.day, zone: props.zone, now: props.now, closed: closed.value, windowStart: windowStart.value });
+useGridStart(scroller, startsAt, PX_PER_MINUTE);
 
 const slots = computed(() => {
   const step = Math.max(5, props.slotInterval);
@@ -322,6 +322,7 @@ const label = (row: AppointmentRow): string =>
       {{ keptMessage }}
     </p>
     <div
+      ref="scroller"
       class="day-grid__scroller"
       role="grid"
       :aria-label="$t('appointment.grid.label', { date: day })"
@@ -367,7 +368,7 @@ const label = (row: AppointmentRow): string =>
         </div>
         <div
           class="day-grid__track"
-          :style="{ width: `${width}px` }"
+          :style="{ width: `${width}px`, backgroundSize: `${60 * PX_PER_MINUTE}px 100%` }"
         >
           <template v-if="canBook">
             <button
@@ -409,6 +410,7 @@ const label = (row: AppointmentRow): string =>
             data-testid="appointment-grid-appointment"
             :data-id="row.id"
             :aria-label="label(row)"
+            :title="label(row)"
             :style="blockStyle(row)"
             @pointerdown="onPointerDown($event, row)"
             @pointermove="onPointerMove"
@@ -503,12 +505,10 @@ const label = (row: AppointmentRow): string =>
   position: relative;
   flex: 0 0 auto;
   background-image: linear-gradient(to right, var(--ion-border-color, #e7e2d6) 1px, transparent 1px);
-  background-size: 96px 100%;
 }
 .day-grid__slot {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset-block: 0;
   border: 0;
   padding: 0;
   background: transparent;
@@ -521,15 +521,13 @@ const label = (row: AppointmentRow): string =>
 }
 .day-grid__closed {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset-block: 0;
   pointer-events: none;
   background: color-mix(in srgb, var(--ion-color-medium, #9ca3af) 14%, transparent);
 }
 .day-grid__blocked {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset-block: 0;
   pointer-events: none;
   overflow: hidden;
   padding: 2px 4px;
@@ -559,6 +557,10 @@ const label = (row: AppointmentRow): string =>
   white-space: nowrap;
   cursor: pointer;
   touch-action: pan-x pan-y;
+}
+.day-grid__appointment > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .day-grid__appointment--movable {
   cursor: grab;

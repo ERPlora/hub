@@ -60,6 +60,8 @@ class Dataset:
     remove: Callable[[OperationContext, str], None]
     #: Personal data (a person's name, phone, email): it travels in a backup only, never in a template.
     personal: bool = False
+    #: For rows that show an image: the operations that set one of the library and upload a photo of their own.
+    images: tuple[str, str] | None = None
 
     @property
     def app(self) -> str:
@@ -105,6 +107,27 @@ def text_of(row: dict, key: str) -> str:
 
 def natural_key(text: str) -> str:
     return text.strip().casefold()
+
+
+def listed(row: dict, key: str, kind: type) -> list:
+    """The items of ``kind`` in the list ``row`` keeps at ``key``; none when it keeps no list there."""
+    value = row.get(key)
+    return [item for item in value if isinstance(item, kind)] if isinstance(value, list) else []
+
+
+def given(row: dict, fields: tuple[str, ...]) -> dict:
+    """The ``fields`` of ``row`` that have a value."""
+    return {name: row[name] for name in fields if row.get(name) not in (None, "")}
+
+
+def attempt(ctx: OperationContext, loaded: Loaded, label: str, operation: str, /, **data: Any) -> Any:
+    """``operation`` on a part of a row just made; one it refuses leaves the row without it, is told, and gives
+    ``None``."""
+    try:
+        return call(ctx, operation, **data)
+    except (OperationError, pydantic.ValidationError) as exc:
+        loaded.warn(str(ROW_REFUSED) % {"row": label, "reason": reason(exc)})
+        return None
 
 
 def _money(cents: Any) -> str:

@@ -75,4 +75,9 @@ class OnlineBookingConfig(LiveAppConfig):
             permission="online_booking.manage_settings",
         ),
     ]
-    help = Help()
+    help = Help(
+        flow_videos={
+            "ONLINE_BOOKING-F01": {"es": ["yeM0K-_rEaY"], "en": ["msNJQYsx-rg"]},
+            "ONLINE_BOOKING-F07": {"es": ["zY4sujWM2k8"], "en": ["f_w8NuRupjw"]},
+        },
+    )

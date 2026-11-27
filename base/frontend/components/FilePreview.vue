@@ -330,7 +330,7 @@ function mediaFailed(): void {
             >
               {{
                 kind === 'pdf'
-                  ? t('base.files.preview.pdfPages', { shown: PDF_PAGES, total: pdfTotal })
+                  ? t('base.files.preview.pdfPages', { count: PDF_PAGES, total: pdfTotal })
                   : t('base.files.preview.textCut')
               }}
             </p>

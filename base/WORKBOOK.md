@@ -259,7 +259,7 @@ un archivo lo abre.
 
 #### La carpeta abierta
 Arriba, la ruta de la carpeta, con ⋮ al lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y
-el límite del plan («{used} de {limit}») o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las
+el límite del plan («{used} de {limit}») o «{used} en uso · Sin límite»; y lo que hay en la carpeta: primero las
 carpetas y luego los archivos, cada uno con su icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮:
 «Abrir», «Descargar», «Renombrar», «Mover a…» y «Eliminar». En la lista, cada nombre ocupa una línea: lo que no cabe se
 corta con «…» y la extensión se ve siempre entera; en el móvil, el tamaño y la fecha van debajo del nombre, en gris.
@@ -1323,7 +1323,9 @@ Entra: el nombre, el idioma, para qué es y lo marcado.
 Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas: de Inventario, las categorías y los
 productos, y de Servicios, las categorías y los servicios, con sus fotos propias dentro (INVENTORY-F33); de Mesas, las
 zonas y las mesas; de Suplementos, los grupos, cada uno con sus opciones y con los productos (por su código) y las
-categorías a los que se aplica; y, solo en una copia de seguridad, los clientes. Nunca las ventas, las personas, los PIN
+categorías a los que se aplica; de Menús y combos, los menús, cada uno con su precio cerrado, sus platos, los productos
+a elegir en cada plato (por su código) con su suplemento, y su foto propia dentro; y, solo en una copia de seguridad,
+los clientes. Nunca las ventas, las personas, los PIN
 ni los datos fiscales. Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
 negocio no se guarda nada.
 Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un nombre para el archivo.» y no se puede
@@ -2140,7 +2142,7 @@ Pasos:
   2. Ve el árbol de carpetas a la izquierda (en una pantalla estrecha, el selector «Carpetas»), la ruta de la
      carpeta abierta, lo que hay en ella en «Cuadrícula» (lo primero que sale) o en «Lista», y «Espacio»: lo que
      ocupan los archivos del negocio y los de sus apps, contra el límite del plan («1,2 GB de 5 GB») o, si no tiene,
-     «1,2 GB usados · Sin límite».
+     «1,2 GB en uso · Sin límite».
   3. Entra en una carpeta pulsándola en el árbol, en la cuadrícula o en el selector, y vuelve por la ruta. La carpeta
      abierta queda en el enlace, así que se puede compartir con el equipo.
   4. Busca por el nombre en «Buscar archivos…», solo dentro de la carpeta abierta; sin resultados, «Ningún archivo
@@ -2998,7 +3000,10 @@ Pasos:
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que la persona dijo que no y dice que no
      se hizo porque lo canceló, sin pedirle que lo confirme, porque esa tarjeta ya está cerrada. Tras «Ejecutar», el
      asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó hecho y no propone
-     deshacerlo salvo que se lo pidan.
+     deshacerlo salvo que se lo pidan. En un cambio (un ajuste, como los de la caja, o los datos de un registro), sabe
+     además cómo estaban los datos que mandó, así que nunca lo supone: tras «Ejecutar» dice lo que cambió y lo que ya
+     estaba así («Hecho: ahora hay que contar el dinero al cerrar (antes no); el fondo al abrir ya se pedía»), y tras
+     «Cancelar», cómo siguen («No lo he cambiado: la semana sigue empezando en lunes»).
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno que se le propuso a la persona, con la acción nombrada
      como en su tarjeta: «Hecho: Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se
@@ -3084,8 +3089,9 @@ Pasos:
 Entra: lo que se hizo en el turno, con su resultado, lo que devolvieron sus consultas y las direcciones web que
 consultaron las herramientas de erplora.com.
 Sale: los avisos y los recibos, guardados con la conversación.
-Si falla: «Hecho» quiere decir que la acción de su app acabó sin error: si una app responde bien sin haber cambiado
-nada, es esa acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F106), los
+Si falla: «Hecho» quiere decir que la acción de su app acabó sin error. En un cambio, el asistente sabe qué datos
+cambiaron y cuáles ya estaban así, y lo dice (BASE-F97); en otra acción que responde bien sin haber cambiado nada, es esa
+acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F106), los
 avisos de lo que llegó a decir y los recibos de lo que sí se hizo.
 Implicados: BASE-F96, BASE-F97, BASE-F106
 

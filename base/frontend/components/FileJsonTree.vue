@@ -29,8 +29,7 @@ const opened = ref(props.depth < JSON_OPEN_DEPTH);
 const bracket = computed(() => (isList.value ? '[ ]' : '{ }'));
 const holds = computed(() => {
   const count = entries.value.length;
-  if (isList.value) return count === 1 ? t('base.files.preview.json.oneItem') : t('base.files.preview.json.items', { count });
-  return count === 1 ? t('base.files.preview.json.oneField') : t('base.files.preview.json.fields', { count });
+  return isList.value ? t('base.files.preview.json.items', { count }) : t('base.files.preview.json.fields', { count });
 });
 /** A value as JSON writes it: a text in quotes and escaped, a number, true, false or null. */
 const written = computed(() => JSON.stringify(props.value) ?? String(props.value));
