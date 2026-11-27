@@ -2,7 +2,7 @@
 // asks to type its word and says what will happen, and what the person may not do is refused.
 import { expect, test } from '@playwright/test';
 
-import { answers, ask, askForACard, cancelAtComputerSize, captureConfirmation, card, confirmationReady, confirmationSettled, decide, freshPage, lastAnswer, lastAnswerAtEachSize, openPanelAtTheDesk, panel, panelAtTheDesk, shots } from './assistant-panel';
+import { answers, ask, askForACard, cancelAtComputerSize, captureConfirmation, card, confirmationReady, confirmationSettled, decide, freshPage, lastAnswer, lastAnswerAtEachSize, openPanelAtTheDesk, panel, panelAtTheDesk, receipts, shots } from './assistant-panel';
 import { DONE, NOT_DONE, STEPS_SAID } from './assistant-provider';
 import { A, api, EMPLOYEE, login, THREE_SIZES as VIEWPORTS } from './helpers';
 import { panelSpec } from './provider-helpers';
@@ -93,7 +93,7 @@ test('a dangerous write lists its data and runs only after typing the word', asy
 // flow: BASE-F98 (dangerous actions: type to confirm) and BASE-F97 (the card)
 // A dangerous write's card shows what it will do, not only what it sends: Base's «Remove the PIN» names whose PIN goes,
 // as its read (`base.person.detail`) answers it to who asks. One whose preview cannot be read shows no card: nothing to
-// confirm blind. Cancelled, and the second refused: nothing changes.
+// confirm blind. Cancelled, and the second refused: nothing changes. A write confirmed and refused by its app says why.
 test('BASE-F98 — a dangerous card shows what will happen, as its app reads it for the person; one whose preview cannot be read shows no card', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-HIGH-RISK-CARD-NO-OPERATION-PREVIEW';
   // The employee enters once, as on their first day: a fresh database knows only who has entered.
@@ -121,13 +121,22 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
   }
   await cancelAtComputerSize(page);
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText('No se hizo, cancelado: Quitar en Empleados');
-  // A person this business does not have: the preview cannot be read, so no card; the receipt says it failed and why.
+  // A person this business does not have: the preview cannot be read, so no card, and no receipt either, since the
+  // person was never asked: the assistant says it was not done.
+  const shown = await receipts(page).count();
   await ask(page, 'E2E-ASK base__person__pin_remove {"person":"saas:0"}');
   await expect(card(page)).toBeHidden();
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText(
-    'No se hizo, falló: Quitar en Empleados. Esa persona no está en este negocio.',
-  );
+  await expect(receipts(page)).toHaveCount(shown);
+  await lastAnswerAtEachSize(page, 'FIX-HUB-BASE-ASSISTANT-NO-RECEIPT-BEFORE-THE-CARD');
+  // A write the person confirms and its app refuses: its receipt says why, as its screen would.
+  const closed = await api<{ id: string }>(context, A, 'POST', '/demo/items', { name: `Cerrado ${Date.now().toString(36)}`, status: 'done' });
+  expect(closed.status, JSON.stringify(closed.data)).toBe(201);
+  await askForACard(page, `E2E-ASK demo__item__add_line {"id":"${closed.data.id}","text":"Café","qty":"1"}`);
+  await decide(page, 'submit');
+  await expect(receipts(page)).toHaveCount(shown + 1);
+  await expect(receipts(page).last()).toContainText('No se hizo, falló:');
+  await expect(receipts(page).last()).toContainText('Este elemento está cerrado: ábrelo para añadir líneas.');
   await lastAnswerAtEachSize(page, 'FIX-HUB-BASE-ASSISTANT-FAILED-RECEIPT-REASON');
   // On a phone the reason takes a second line: its icon keeps the size of the one-line receipt's above it.
   await page.setViewportSize({ width: 390, height: 844 });
