@@ -3188,7 +3188,7 @@ anything, it is that action that has to say so. If the turn ends in an error, th
 Involved: BASE-F96, BASE-F97, BASE-F106
 
 ### BASE-F100 What the assistant can do depending on who asks: permissions and a manager's PIN
-<!-- from WORKBOOK.md sha256:6782ed15c886 -->
+<!-- from WORKBOOK.md sha256:cf87961c8f8c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3212,7 +3212,10 @@ Steps:
      knows it.
   4. If it tries anyway an action without permission that nobody can approve, it is not done: the receipt reads "Not
      done, not allowed: …" and the assistant explains it cannot.
-  5. What the assistant tells (lists, figures) is what that person may read.
+  5. What the assistant tells (lists, figures) is what that person may read. If their role lets them see only their
+     own (their appointments, their commission, their tasks, their clock-ins, their tips, their sales), the assistant
+     knows it: asked about someone else's, it says it can only see theirs ("I can only see your appointments, not
+     Ana's"), never that the other person has none.
 In: the session of whoever asks, which signs each action; for what a manager approves, their PIN or their badge.
 Out: the action done with that person as its author. The approval is good for that action of that conversation, once
 and for two minutes, and it is spent together with the action (BASE-F84). One a manager could approve and the person may
