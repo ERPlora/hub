@@ -10,6 +10,7 @@ from apps.customer.models import Customer, Purchase
 from apps.customer.queries.reads import _ordered, find_customer, page
 from apps.customer.schemas.purchases import DivergencePage, DivergencesIn, PurchaseListIn, PurchasePage
 from apps.customer.search import normalize
+from base.text_search import contains_text
 
 from . import contact
 
@@ -33,7 +34,7 @@ def list_purchases(ctx: OperationContext, params: PurchaseListIn) -> dict:
     customer = find_customer(ctx, params.customer_id, params.customer)
     purchases = Purchase.objects.filter(customer=customer)
     if params.search:
-        purchases = purchases.filter(sale_id__icontains=params.search.strip())
+        purchases = purchases.filter(contains_text(params.search.strip(), "sale_id"))
     filters = {
         "status": params.status,
         "recorded_at__date__gte": params.recorded_from,

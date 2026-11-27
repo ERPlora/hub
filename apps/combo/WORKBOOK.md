@@ -171,8 +171,8 @@ Pantalla: Menús
 Pasos:
 1. Abre **Menús**.
 2. Lee la tabla: nombre, precio cerrado, cómo se vende, si está a la venta y orden.
-3. Para encontrar uno, escribe en «Buscar un menú…», ordena por una columna o filtra por nombre, por
-   cómo se vende o por «A la venta».
+3. Para encontrar uno, escribe en «Buscar un menú…» (sin distinguir mayúsculas ni tildes: «menu del dia»
+   encuentra «Menú del día»), ordena por una columna o filtra por nombre, por cómo se vende o por «A la venta».
 4. Toca una fila para abrir su constructor.
 Entra: los menús del negocio (permiso de consulta).
 Sale: nada; solo lee.

@@ -1,12 +1,12 @@
 """A card's timeline: its notes and what the apps wrote on it, newest first."""
 
-from django.db.models import Q
 from live.context import OperationContext
 from live.operations import AI, operation
 
 from apps.customer.models import Activity
 from apps.customer.queries.reads import find_customer, page
 from apps.customer.schemas.activity import ActivityListIn, ActivityPage
+from base.text_search import contains_text
 
 
 @operation(
@@ -32,7 +32,5 @@ def list_activity(ctx: OperationContext, params: ActivityListIn) -> dict:
     customer = find_customer(ctx, params.customer_id, params.customer)
     entries = Activity.objects.filter(customer=customer)
     if params.search:
-        entries = entries.filter(
-            Q(text__icontains=params.search) | Q(title__icontains=params.search)
-        )
+        entries = entries.filter(contains_text(params.search, "text", "title"))
     return page(entries.order_by("-created_at", "-id"), params)

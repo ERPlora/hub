@@ -391,7 +391,7 @@ saved.
 Involved: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F10 Choose when it starts
-<!-- from WORKBOOK.md sha256:2e4a8b622098 -->
+<!-- from WORKBOOK.md sha256:4d29160723e9 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -399,9 +399,10 @@ Steps:
 1. Tap the "When this happens…" card and choose:
    - **Something happens**: in "Choose what happens", the notices of the business's active apps, said in
      words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…), with
-     the word of the app they belong to ("an opening hours override is created", as in Schedule) and with a
-     search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
-     10000"); without them it starts on its own with every notice.
+     the word of the app they belong to ("an opening hours override is created", as in Schedule), with the
+     name of that app under each one and never its code, and with a search box. Below, **Only when…**:
+     conditions on the notice's data ("the total is greater than 10000"); without them it starts on its own
+     with every notice.
    - **On a schedule**: "How often" (every day, every week, every month), the day of the week or of the
      month when it applies, and the time, in the business's time. A day of the month that does not exist
      (the 31st in April) is skipped that month.
@@ -420,7 +421,7 @@ that same reason, never with "does not exist".
 Involved: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Add, order and fill in the steps
-<!-- from WORKBOOK.md sha256:7f7588b6c2e4 -->
+<!-- from WORKBOOK.md sha256:f167335140a6 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -429,9 +430,11 @@ Steps:
    it.
 2. Fill in its form:
    - **Do something**: "What to do" (an action of the active apps, chosen from a list with a search box:
-     "Create a task", "Write a note on a customer"…) and "With this information": a field for each piece of
-     data the action asks for (the required ones marked) and **Add information** for the optional ones.
-   - **Look something up**: "What to look up" (a query of the active apps), its data and "What to keep"
+     "Create a task", "Write a note on a customer"…, with the name of its app under each one and never its
+     code) and "With this information": a field for each piece of data the action asks for (the required
+     ones marked) and **Add information** for the optional ones.
+   - **Look something up**: "What to look up" (a query of the active apps, chosen the same way: "Look for
+     WhatsApp conversations", with "WhatsApp inbox" under it), its data and "What to keep"
      ("The first row it finds, field by field" or "Only how many there are"). If it finds nothing, the
      automation carries on; to stop it, an "Only continue if…" on "Found something" is added after it.
    - **Only continue if…**: one or several rows "Data", "Is" ("equal to", "not equal to", "one of",
