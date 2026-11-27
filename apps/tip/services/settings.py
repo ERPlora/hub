@@ -40,7 +40,7 @@ def _suggestions(settings: Settings, data: SettingsPatchIn) -> dict | None:
             "es": ("pide propina al cobrar", "con tarjeta sugiere de propina 1 €, 2 € y 5 €"),
         },
         "description": "Change the tip settings, only in what is sent: whether a tip is asked for at the charge, which "
-        "of the three suggestions comes chosen (0: «No tip»), whether another amount is allowed, and the three "
+        "of the three suggestions comes chosen (0: no tip), whether another amount is allowed, and the three "
         "suggestions of a payment method, each a percentage (1 to 100) or an amount in cents, none twice.",
         "risk": "normal",
         "check": "tip.settings.get",

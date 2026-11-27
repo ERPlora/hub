@@ -120,7 +120,7 @@ const columns = computed<DataTableColumn<PriceListOut>[]>(() => [
 ]);
 
 const actions = computed<DataTableAction<PriceListOut>[]>(() => [
-  { id: 'open', label: t('pricing.lists.actions.open'), icon: 'chevron-forward-outline', color: 'primary', showLabel: true, pinned: true },
+  { id: 'open', label: t('pricing.lists.actions.open'), icon: 'chevron-forward-outline', color: 'primary', pinned: true },
   ...(canManage.value
     ? [
         { id: 'edit', label: t('pricing.lists.actions.edit'), icon: 'create-outline' },

@@ -11,9 +11,9 @@ from base.blueprint.datasets import dataset, every_dataset
 #: is never a tool of the chat, so this is how it learns where that file is made and what it takes.
 TO_ANOTHER_BUSINESS = (
     "To take this business or part of it (the menu, the customers…) to another business or a new venue, it is "
-    "exported on Settings (/settings) › «Data and backups» › «Export» (in Spanish «Ajustes» › «Datos y copias» › "
-    "«Exportar»), as a «Template to share» («Plantilla para compartir»: never the customers) or a «Backup of this "
-    "business» («Copia de seguridad de este negocio»: the customers too), choosing the apps and which of their data "
+    "exported on Settings (/settings) › Data and backups › Export (in Spanish «Ajustes» › «Datos y copias» › "
+    "«Exportar»), as a Template to share («Plantilla para compartir»: never the customers) or a Backup of this "
+    "business («Copia de seguridad de este negocio»: the customers too), choosing the apps and which of their data "
     "go: the products and services go with their own photos inside; never the business's history, people, PINs or "
     "fiscal data. The other business loads that file. It is made only on that screen, never in the chat."
 )

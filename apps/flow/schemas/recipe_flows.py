@@ -9,12 +9,13 @@ from pydantic import StringConstraints
 
 from apps.flow.schemas.fields import In
 from apps.flow.schemas.flows import FlowOut
+from base.schemas.assistant import ReadOn
 
 RecipeRef = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,46}/[a-z][a-z0-9_]{0,47}$")]
 
 
 class RecipeListIn(In):
-    pass
+    offset: ReadOn = 0
 
 
 class RecipeRefIn(In):

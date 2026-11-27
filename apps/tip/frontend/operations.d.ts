@@ -34,17 +34,103 @@ export interface TipAddIn {
   attempt_key: string;
 }
 
-/** `TipOut`, what the charge sheet reads of it. */
+export type TipStatus = 'active' | 'voided';
+export type MethodType = 'cash' | 'card' | 'transfer' | 'other';
+
+/** `TipOut`: a tip as the list and the windows read it. */
 export interface TipOut {
   id: string;
+  /** `null`: to the pool. */
   sale_id: string | null;
+  sale_number: string;
+  pool: boolean;
+  /** `null`: unassigned. */
+  member_id: string | null;
+  member_name: string;
+  method_id: string;
+  method_name: string;
+  method_type: MethodType;
   amount: number;
-  status: 'active' | 'voided';
+  status: TipStatus;
+  created_at: string;
+  created_by: string;
+  adjusted_at: string | null;
+  adjusted_by: string;
+  adjust_reason: string;
+  voided_at: string | null;
+  voided_by: string;
+  void_reason: string;
+}
+
+/** `TipAddIn` from the Tips screen: of a sale by its number with its payment method, or cash to the pool. */
+export type TipRecordIn = { sale: string; method_id: string; amount: number } | { pool: true; amount: number };
+
+export interface TipListIn {
+  limit: number;
+  offset: number;
+  search?: string;
+  member_id?: string;
+  method_type?: MethodType;
+  status?: TipStatus;
+  /** Business days, ISO, both included. */
+  date_from?: string;
+  date_to?: string;
+}
+
+export interface TipPage {
+  rows: TipOut[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/** `TipPatchIn`: only what changes, with why. */
+export interface TipPatchIn {
+  id: string;
+  amount?: number;
+  member_id?: string;
+  reason: string;
+}
+
+export interface TipVoidIn {
+  id: string;
+  reason: string;
+}
+
+/** `Suggestion`: a percentage of the check's total before discounts, or an amount in cents; one of the two. */
+export type Suggestion = { percent: number; amount?: null } | { amount: number; percent?: null };
+
+export interface MethodSuggestionsOut {
+  method_id: string;
+  method_name: string;
+  method_type: MethodType;
+  suggestions: Suggestion[];
+}
+
+export interface SettingsOut {
+  enabled: boolean;
+  allow_custom: boolean;
+  /** Which suggestion comes chosen, 1 to 3; 0: «No tip». */
+  preselected: number;
+  methods: MethodSuggestionsOut[];
+}
+
+/** `SettingsPatchIn`: only what is sent changes. */
+export interface SettingsPatchIn {
+  enabled?: boolean;
+  allow_custom?: boolean;
+  preselected?: number;
+  methods?: { method_id: string; suggestions: Suggestion[] }[];
 }
 
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'tip.suggestion.get': { input: SuggestionIn; output: SuggestionOut };
-    'tip.tip.add': { input: TipAddIn; output: TipOut };
+    'tip.tip.add': { input: TipAddIn | TipRecordIn; output: TipOut };
+    'tip.tip.list': { input: TipListIn; output: TipPage };
+    'tip.tip.update': { input: TipPatchIn; output: TipOut };
+    'tip.tip.void': { input: TipVoidIn; output: TipOut };
+    'tip.settings.get': { input: Record<string, never>; output: SettingsOut };
+    'tip.settings.update': { input: SettingsPatchIn; output: SettingsOut };
   }
 }

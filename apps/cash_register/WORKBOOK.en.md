@@ -192,7 +192,7 @@ or chosen has not been saved: "Keep editing" keeps it and "Discard changes" clos
 With the window as it opened, Back closes it without asking (BASE-F05); the drawer chosen by itself and the cash the closing proposes from the last count are no change.
 
 ## Flows
-<!-- from WORKBOOK.md sha256:60a21bffebfe -->
+<!-- from WORKBOOK.md sha256:abecb0155ecb -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -213,7 +213,7 @@ With the window as it opened, Back closes it without asking (BASE-F05); the draw
 | CASH_REGISTER-F15 | Record a refund in the cash register | common | done |
 | CASH_REGISTER-F16 | Print the session report (X or Z) | common | done |
 | CASH_REGISTER-F17 | See the sale lines in no shift | common | done |
-| CASH_REGISTER-F18 | See the tips in the cash register | common | partial — Tips is not in the store yet |
+| CASH_REGISTER-F18 | See the tips in the cash register | common | done |
 
 ### CASH_REGISTER-F01 Set up how the cash register works
 <!-- from WORKBOOK.md sha256:0654bfa2fb50 -->
@@ -498,7 +498,7 @@ close: "Session S-… was due to close by itself at 04:00: open a new session (t
 Involved: CASH_REGISTER-F17
 
 ### CASH_REGISTER-F11 Look up a session and review a discrepancy
-<!-- from WORKBOOK.md sha256:9e37106bfe56 -->
+<!-- from WORKBOOK.md sha256:31675ba8f059 -->
 Status: done
 Vertical: common
 Actor: manager, administrator, employee
@@ -511,7 +511,7 @@ Steps:
    cash in, cash out, comps apart (they are a cost, not cash; whoever does not see the costs sees them as "—"),
    expected, counted, difference and the notes. The figures are the whole drawer's: also what a colleague
    charged while the session was open. Whoever opened, closed, counted or recorded a movement shows by their
-   name or, if their account has none, by what goes before the @ of their email, never the whole email, also in
+   name or, if they have none, by what goes before the @ of their email, never the whole email, also in
    earlier sessions.
 3. Go over Movements: each sale is named by its document ("Ticket …", "Invoice …"), a refund "Refund of …"
    and a void "Void of …"; a movement recorded by hand shows its concept. And go over Counts.
@@ -672,9 +672,8 @@ If it fails: nothing of its own.
 Involved: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 See the tips in the cash register
-<!-- from WORKBOOK.md sha256:529ae2f7d0f8 -->
-Status: partial — the Cash register shows apart what Tips records, in the Session detail, in Movements, in the
-"Close session" window and on the X or Z report; Tips coming to the store with its screens is missing (hub#1498)
+<!-- from WORKBOOK.md sha256:56383bb55b12 -->
+Status: done
 Vertical: common
 Actor: system, employee, manager
 Screen: Cash register, Session detail

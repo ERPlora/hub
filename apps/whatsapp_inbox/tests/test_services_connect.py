@@ -15,7 +15,7 @@ from django.db import connection
 from live.errors import OperationError, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.whatsapp_inbox.models import Channel
+from apps.whatsapp_inbox.models.channel import Channel
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, HUB_DB_COMMITTED, connect, ctx_for, run, system
 
 pytestmark = HUB_DB

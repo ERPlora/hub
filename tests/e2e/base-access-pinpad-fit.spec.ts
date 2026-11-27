@@ -9,6 +9,7 @@
 // the PIN pad: base-access.spec.ts), and goes with it (`afterAll`).
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { userMenu } from './access-door';
 import { A, api, capture, login, OWNER, psql, shown, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-441-PINPAD-LANDSCAPE';
@@ -49,17 +50,6 @@ async function toTop(page: Page): Promise<void> {
     .locator('ion-content')
     .first()
     .evaluate((content) => (content as unknown as { scrollToTop: (duration: number) => Promise<void> }).scrollToTop(0));
-}
-
-/** The user menu of the side menu (pinned at 1440), and the entry `id` in it. */
-async function userMenu(page: Page, id: string): Promise<void> {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  const presented = page.evaluate(
-    () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-  );
-  await page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name').click();
-  await presented;
-  await page.locator(`ion-popover [data-testid="user-menu-${id}"]`).click();
 }
 
 /** At `size`, unscrolled: the pad's first row and its last (the 0 and erase) inside the screen, and keys a finger hits. */

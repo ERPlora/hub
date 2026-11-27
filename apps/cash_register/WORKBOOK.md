@@ -207,7 +207,7 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | CASH_REGISTER-F15 | Anotar en la caja una devolución | común | hecho |
 | CASH_REGISTER-F16 | Imprimir el informe de la sesión (X o Z) | común | hecho |
 | CASH_REGISTER-F17 | Ver los cobros fuera de turno | común | hecho |
-| CASH_REGISTER-F18 | Ver las propinas en la caja | común | parcial — Propinas aún no está en la tienda |
+| CASH_REGISTER-F18 | Ver las propinas en la caja | común | hecho |
 
 ### CASH_REGISTER-F01 Configurar cómo funciona la caja
 Estado: hecho
@@ -491,7 +491,7 @@ Pasos:
    entradas, salidas, invitaciones aparte (son coste, no efectivo; quien no ve los costes las ve «—»),
    esperado, contado, diferencia y las notas. Las cifras son las de todo el cajón: también lo que cobró un
    compañero mientras la sesión estaba abierta. Quien abrió, cerró, contó o apuntó un movimiento sale por su
-   nombre o, si su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el correo entero, también en
+   nombre o, si no tiene ninguno, por lo que va antes de la @ de su correo, nunca el correo entero, también en
    las sesiones de antes.
 3. Repasa Movimientos: cada venta se nombra por su documento («Tique …», «Factura …»), una devolución
    «Devolución de …» y una anulación «Anulación de …»; un movimiento a mano enseña su concepto. Y repasa
@@ -644,8 +644,7 @@ Si falla: nada propio.
 Implicados: CASH_REGISTER-F04, F10, F13
 
 ### CASH_REGISTER-F18 Ver las propinas en la caja
-Estado: parcial — Caja enseña aparte lo que apunta Propinas, en el Detalle de la sesión, en Movimientos, en la
-ventana «Cerrar sesión» y en el informe X o Z; falta que Propinas salga en la tienda con sus pantallas (hub#1498)
+Estado: hecho
 Vertical: común
 Actor: sistema, empleado, responsable
 Pantalla: Caja, Detalle de la sesión
@@ -791,7 +790,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries.py`, `services.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_sale.py` (ventas reales de Ventas) y
   `tests/test_concurrency.py` (sesiones reales en hilos).
@@ -895,9 +894,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   y fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Quién actúa** (abre, cierra, cuenta, apunta un movimiento, da de alta un cajón o cambia los ajustes) se guarda
   como lo lee un compañero, no como el identificador interno del usuario: `actor` (`queries/people.py`) nombra con
-  `actor_name` de `base.queries.people`, la misma pieza que Mesas, Cocina, Pagos y Carritos: el nombre de la cuenta
-  o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega a quien ve el contacto
-  del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
+  `actor_name` de `base.queries.people`, la misma pieza que Mesas, Cocina, Pagos y Carritos: el nombre de Mi perfil o
+  el de la cuenta o, sin ninguno, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega a
+  quien ve el contacto del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
   `0004_actors_without_address`, en la base de datos de cada negocio.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
   cerrar, cerrar sola, apuntar y contar; y sus `asks`, 2–3 frases en `en` y `es` como las diría quien

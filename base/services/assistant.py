@@ -17,7 +17,7 @@ from live.operations import get as get_operation
 from live.operations import operation
 
 from base import approvals as approval_rules
-from base import activation, assistant, queries
+from base import activation, assistant, platform_screens, queries
 from base.permissions import ADMINISTER_HUB, VIEW_HOME
 from base.schemas.assistant import (
     AssistantReportIn,
@@ -42,7 +42,9 @@ OUT_OF_STEPS = f"Nothing was done. {LAST_ROUND}"
 
 
 def _assistant_screens(ctx: OperationContext, apps: dict) -> dict[str, str]:
-    """The screens the assistant may link: the platform's and the menus of the apps on (``apps``), by name."""
+    """The screens the assistant may link: the platform's, each of its tabs the person may open as its help names it
+    (``platform_screens.SCREENS``) with the menu's «›», and the menus of the apps on (``apps``), by name. A tab of its
+    own keeps a screen of the platform apart from an app's of the same name: Employees › Roles, not Staff › Roles."""
     with translation.override(ctx.language):
         screens = {
             "/": pgettext("base", "Home"),
@@ -56,6 +58,11 @@ def _assistant_screens(ctx: OperationContext, apps: dict) -> dict[str, str]:
             screens["/system"] = pgettext("base", "System")
         if ctx.has(queries.files.VIEW_FILES):
             screens["/files"] = pgettext("base", "Files")
+        screens.update(
+            (tab.path, str(tab.label).replace(" · ", " › "))
+            for tab in platform_screens.SCREENS
+            if "#" in tab.path and ctx.has(tab.permission)
+        )
         for config in apps.values():
             for nav in getattr(config, "navigation", []) or []:
                 screens.setdefault(nav.path, f"{config.verbose_name} › {nav.label}")
@@ -131,6 +138,15 @@ def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.To
     reason = assistant.failure_reason.reason(op, outcome, ctx.language)
     ran = {"call_id": call.call_id, **named, "outcome": outcome.outcome, "code": outcome.code, "reason": reason}
     return {**ran, **assistant.handed_files.receipt(outcome)}
+
+
+def _assistant_receipt(ctx: OperationContext, tools: dict, call, outcome: "shared.ToolOutcome", *, answered: bool) -> list:
+    """The receipt of ``call``, or none for a write the Hub refused before its card: the person was never asked, and
+    the model hears why and corrects it. A write the person answered says how it ended, and a read always does."""
+    op = shared.operation_of(call.name, tools)
+    if op is not None and op.kind == "command" and outcome.outcome == "error" and not answered:
+        return []
+    return [_assistant_ran(ctx, tools, call, outcome)]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -256,11 +272,12 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
             # The call its card waits on goes back with what the card showed: the yes comes with it (hub#1208).
             pending[0] = call.model_copy(update={"shown": shown})
             break
-        if decision is not None and decision.call_id == call.call_id:
+        answered = decision is not None and decision.call_id == call.call_id
+        if answered:
             stopped = decision.stop
             decision = None
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
-        executed.append(_assistant_ran(ctx, runs, call, outcome))
+        executed += _assistant_receipt(ctx, runs, call, outcome, answered=answered)
         pending.pop(0)
     messages = [*data.messages, *append]
     still_open = data.messages[_assistant_opened(data.messages, tools) :]

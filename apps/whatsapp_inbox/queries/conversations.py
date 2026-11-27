@@ -17,7 +17,7 @@ from apps.customer.queries.reads import business_country
 from apps.customer.queries.contact import holds, sees_contact
 from apps.customer.search import normalize
 from apps.whatsapp_inbox import clock
-from apps.whatsapp_inbox.models import Conversation, Message, name_key
+from apps.whatsapp_inbox.models.conversations import Conversation, Message, name_key
 from apps.whatsapp_inbox.queries.channel import channel, send_blocked
 from apps.whatsapp_inbox.queries.reads import actor_id, live_conversations, page, person_name
 from apps.whatsapp_inbox.schemas.conversations import (
@@ -35,6 +35,7 @@ from apps.whatsapp_inbox.schemas.conversations import (
 )
 from apps.whatsapp_inbox.schemas.fields import ConversationRefIn
 from base.ordering import list_order
+from base.text_search import contains_text
 
 CONVERSATION_NOT_FOUND = _("That conversation does not exist in this business.")
 NO_CONVERSATION_MATCHES = _("No conversation matches “%(reference)s”.")
@@ -201,8 +202,8 @@ def _searched(ctx: OperationContext, rows, search: str):
     if sees_contact(ctx) and _PHONE_TEXT.match(search) and len(re.sub(r"\D", "", search)) >= 3:
         return rows.filter(phone__contains=_phone_digits(search))
     return rows.filter(
-        Q(contact_name__icontains=search)
-        | Q(customer__name__icontains=search, customer__deleted_at__isnull=True)
+        contains_text(search, "contact_name")
+        | (contains_text(search, "customer__name") & Q(customer__deleted_at__isnull=True))
         | (holds(ctx, normalize(search), through="customer__") & Q(customer__deleted_at__isnull=True))
     )
 

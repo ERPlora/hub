@@ -14,6 +14,7 @@ from apps.sale.models import FACTORY_METHOD_NAMES, PaymentMethod, Settings
 from apps.sale.queries.rows import held
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.settings import PaymentMethodListIn, PaymentMethodPage
+from base.text_search import contains_text
 
 METHOD_NOT_AVAILABLE = _("That payment method is not available in this business.")
 METHOD_AMBIGUOUS = _(
@@ -153,7 +154,7 @@ def list_payment_methods(ctx: OperationContext, params: PaymentMethodListIn) -> 
         )
         allowed = allowed_types(current_settings(), methods)
         if params.search:
-            methods = methods.filter(name__icontains=params.search.strip())
+            methods = methods.filter(contains_text(params.search.strip(), "name"))
         page = methods[params.offset : params.offset + params.limit]
         return {
             "rows": [payment_method_row(method, allowed) for method in page],

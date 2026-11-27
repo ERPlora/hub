@@ -69,7 +69,7 @@ def role_create(ctx: OperationContext, data: RoleCreateIn) -> dict:
     _held_by_who_asks(ctx, _does(RoleHeld(origin, role)))
     _save(role)
     record_event(ctx, events.ROLE_CREATED, {"id": str(role.pk)})
-    return queries.roles.role_row(ctx.scope, role)
+    return queries.roles.role_row(ctx, role)
 
 
 def _states_of_basic(ctx: OperationContext, origin: str) -> dict[str, str]:
@@ -107,7 +107,8 @@ def _update_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) 
         "description": (
             "Changes a role the business made (never a basic one: duplicate it with base.role.create): its name, its "
             "description or what it allows. Send only the permissions that change, by their name in base.role.detail. "
-            "It never allows more than who changes it may do. Whoever has the role notices at once."
+            "It never allows more than who changes it may do, and nobody changes the role they hold themselves (mine "
+            "in base.role.detail). Whoever has the role notices at once."
         ),
         "risk": "high",
         "preview": {"operation": "base.role.detail", "fields": ["members"]},
@@ -132,6 +133,7 @@ def role_update(ctx: OperationContext, data: RoleUpdateIn) -> dict:
     if not sent:
         raise InvalidPayload(gettext("Nothing to change."), code="base.nothing_to_change")
     role = _own_role(data.role)
+    _not_their_own(ctx, role)
     if data.name is not None:
         role.name = _named(data.name)
     if data.description is not None:
@@ -143,7 +145,7 @@ def role_update(ctx: OperationContext, data: RoleUpdateIn) -> dict:
     _save(role)
     record_event(ctx, events.ROLE_UPDATED, {"id": str(role.pk)})
     on_commit(partial(_wake_open_apps, ctx.scope.key))
-    return queries.roles.role_row(ctx.scope, role)
+    return queries.roles.role_row(ctx, role)
 
 
 def _changed_states(ctx: OperationContext, role: BusinessRole, changes: dict[str, str]) -> dict[str, str]:
@@ -227,8 +229,8 @@ def _assign_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) 
     ai={
         "description": (
             "Gives a person one of the business's own roles (origin own in base.role.list), or returns them to the one "
-            "of their invitation. Never the owner nor oneself, and never more than who gives it may do. It takes effect "
-            "at once. Another basic one is given on erplora.com."
+            "of their invitation. Never the owner, the accountancy firm nor oneself, and never more than who gives it "
+            "may do. It takes effect at once. Another basic one is given on erplora.com."
         ),
         "risk": "high",
         "preview": {"operation": "base.role.detail", "fields": ["members"]},
@@ -301,6 +303,15 @@ def _own_role(key: str) -> BusinessRole:
             gettext("This is one of erplora.com's roles. Duplicate it and change the copy."), code="base.role_basic"
         )
     return queries.roles.business_role(key, for_update=True)
+
+
+def _not_their_own(ctx: OperationContext, role: BusinessRole) -> None:
+    """Nobody changes the role that rules what they may do, not even to give it less: somebody else who manages roles
+    does, as with the role of a person (``base.people.role_refusal``)."""
+    held = queries.roles.signed_in_role_held(ctx)
+    if held is not None and held.own is not None and held.own.pk == role.pk:
+        message = str(people_rules.ROLE_REFUSALS[people_rules.ROLE_OWN])
+        raise PermissionDenied(message, code=people_rules.ROLE_OWN)
 
 
 def _named(name: str) -> str:

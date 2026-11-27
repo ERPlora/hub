@@ -221,6 +221,7 @@ def transmit_record(ctx: OperationContext, data: RecordTransmitIn) -> TransmitOu
             "es": (
                 "concilia con la AEAT el registro 12 que no tuvo respuesta",
                 "mira en Hacienda si consta el registro que nunca tuvo respuesta",
+                "si en Hacienda ya consta el registro sin respuesta, sácalo de la cola",
             ),
         },
     },

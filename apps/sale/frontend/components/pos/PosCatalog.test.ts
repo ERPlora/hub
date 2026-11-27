@@ -302,9 +302,11 @@ describe('PosCatalog: states', () => {
 
 describe('PosCatalog: the services of Services (SALE-F38)', () => {
   const SERVICES = 'service.service.list_for_sale';
-  /** `v-show`: the services' grid stays mounted (its count feeds the chip) and hides with display:none. */
-  const shownGrid = (s: Awaited<ReturnType<typeof setup>>) =>
-    !(s.wrapper.findComponent(ServiceGrid).attributes('style') ?? '').includes('display: none');
+  /** `v-show`: outside «All» the services' grid stays mounted (its count feeds the chips) and hides with display:none. */
+  const shownGrid = (s: Awaited<ReturnType<typeof setup>>) => {
+    const grid = s.wrapper.findComponent(ServiceGrid);
+    return grid.exists() && !(grid.attributes('style') ?? '').includes('display: none');
+  };
 
   it('without services nothing of Services is asked nor shown', async () => {
     const s = await setup();

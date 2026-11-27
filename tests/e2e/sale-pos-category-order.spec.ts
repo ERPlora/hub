@@ -1,11 +1,12 @@
-// flow: SALE-F01, INVENTORY-F08 — the till's category strip follows the position the business gave each category, not
-// the alphabet: «Drinks · Wine and beer · Coffees» with those positions, and a tie goes by name. A new position given
-// as the assistant gives it (`inventory.category.update` with `order`) moves the category in a till already open,
-// without a reload. What this file creates is deleted after it; the cash register goes back as it was.
+// flow: SALE-F01, INVENTORY-F06, INVENTORY-F08 — the till's category strip follows the position the business gave each
+// category, not the alphabet: «Drinks · Wine and beer · Coffees» with those positions, and a tie goes by name. A new
+// position given as the assistant gives it (`inventory.category.update` with `order`) moves the category in a till
+// already open, without a reload. A category made in Categories, whose form asks for no position, goes last, after the
+// ones already placed. What this file creates is deleted after it; the cash register goes back as it was.
 import { expect, type BrowserContext, type Page, test } from '@playwright/test';
 
 import { A, api, login, shown } from './helpers';
-import { cleanInventory, stamp } from './inventory-helpers';
+import { cleanInventory, dialog, fill, savedCategoryRow, stamp } from './inventory-helpers';
 import { drawerOff, restoreDrawer } from './sale-helpers';
 
 const RUN = stamp();
@@ -48,4 +49,23 @@ test('the till shows the categories in their position, ties by name, and follows
   const moved = await api(context, A, 'POST', '/inventory/categories/update', { id: coffees, order: 1 });
   expect(moved.status, 'Coffees to position 1').toBe(200);
   await expect.poll(() => strip(page)).toEqual(['Coffees', 'Drinks', 'Beer on tap', 'Wine and beer']);
+});
+
+test('a category made in Categories shows last on the till, after the ones already placed', async ({ page, context }) => {
+  await login(page, A, '/inventory/categories');
+  await drawerOff(context);
+  await category(context, 'Starters', 1);
+  await category(context, 'Mains', 2);
+
+  const name = `E2E Meats ${RUN}`;
+  await shown(page).locator('[data-testid=inventory-categories-add]').click();
+  const form = dialog(page, 'inventory-category-form');
+  await fill(form, 'inventory-category-name', name);
+  const row = await savedCategoryRow(page, form, name);
+  made.set((await row.getAttribute('data-id'))!, 'Meats');
+
+  await page.goto('/sale/pos');
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await expect.poll(async () => (await strip(page)).at(-1)).toBe('Meats');
+  expect((await strip(page)).filter((each) => ['Starters', 'Mains', 'Meats'].includes(each))).toEqual(['Starters', 'Mains', 'Meats']);
 });

@@ -1,4 +1,5 @@
 import { AppPage, type SessionMe, toastError } from '@erplora/ui/shell';
+import { DOMWrapper } from '@vue/test-utils';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,6 +8,7 @@ import es from '../locale/es.json';
 import type { InvoiceOut } from '../operations';
 import type { PublicTicketOut } from '../operations/public';
 import { click, ionValue, mountInShell, overBase, settle } from '../__tests__/mount-invoice';
+import { iconOnly, iconOnlyNamed } from '../../../../base/frontend/__tests__/icon-only';
 import PublicInvoicePage from './PublicInvoicePage.vue';
 
 const mocks = vi.hoisted(() => ({ print: vi.fn() }));
@@ -216,6 +218,10 @@ describe('PublicInvoicePage', () => {
 
   it('prints the issued paper with its invoice number', async () => {
     const s = await open({ 'invoice.public.ticket': [200, { ...TICKET, invoice: INVOICE, record: RECORD }] });
+    // «Print / PDF» is the till's printer icon alone, as on the invoice's own screen in the Hub.
+    expect(iconOnly(new DOMWrapper(s.el('print')!))).toEqual(iconOnlyNamed('Print / PDF'));
+    const icon = s.wrapper.findAllComponents({ name: 'HubIcon' }).find((found) => s.el('print')!.contains(found.element));
+    expect(icon?.props('name')).toBe('ion:receipt-outline');
     await click(s.el('print'));
     expect(mocks.print).toHaveBeenCalledOnce();
     expect(mocks.print.mock.calls[0][1]).toEqual({ title: 'Invoice FACT-2026-000001' });

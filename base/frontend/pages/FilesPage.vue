@@ -524,14 +524,14 @@ async function askDelete(entry: Entry): Promise<void> {
               <ion-button
                 size="small"
                 data-testid="files-upload"
+                v-bind="{ 'aria-label': t('base.files.upload'), title: t('base.files.upload') }"
                 :disabled="!!progress"
                 @click="picker?.click()"
               >
                 <HubIcon
-                  slot="start"
+                  slot="icon-only"
                   name="ion:cloud-upload-outline"
                 />
-                {{ t('base.files.upload') }}
               </ion-button>
             </div>
             <input
@@ -578,7 +578,7 @@ async function askDelete(entry: Entry): Promise<void> {
               fill="clear"
               size="small"
               data-testid="files-folder-actions"
-              :aria-label="t('base.files.actions.label', { name: nameOf(folder) })"
+              v-bind="{ 'aria-label': t('base.files.actions.label', { name: nameOf(folder) }), title: t('base.files.actions.label', { name: nameOf(folder) }) }"
               @click="openMenu({ path: folder, name: nameOf(folder), folder: true }, $event)"
             >
               <HubIcon
@@ -691,7 +691,7 @@ async function askDelete(entry: Entry): Promise<void> {
                   size="small"
                   class="files-item-actions"
                   data-testid="files-item-actions"
-                  :aria-label="t('base.files.actions.label', { name: entry.name })"
+                  v-bind="{ 'aria-label': t('base.files.actions.label', { name: entry.name }), title: t('base.files.actions.label', { name: entry.name }) }"
                   @click="openMenu(entry, $event)"
                 >
                   <HubIcon
