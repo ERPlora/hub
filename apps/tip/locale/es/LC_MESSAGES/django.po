@@ -166,6 +166,9 @@ msgstr "Venta"
 msgid "For"
 msgstr "Para"
 
+msgid "To the pool"
+msgstr "Al bote"
+
 msgid "Payment method"
 msgstr "Forma de pago"
 

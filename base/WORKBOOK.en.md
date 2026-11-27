@@ -3012,7 +3012,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:967ca2900bfb -->
+<!-- from WORKBOOK.md sha256:c292b3532729 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3031,7 +3031,14 @@ Steps:
      never a bare "110%" or "50 m", which do not say what changes; "Create in Sales & POS: Misc · Tax category: Product — generic · 21% · Position: 0"; "Open in Tables: Table: 4 ·
      Guests: 3". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
-     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
+     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". The
+     card shows each datum as the action takes it, not as the assistant wrote it: a supplement the assistant sends as
+     the text "300" shows "Supplement: €3.00", never "300", and the allergens show in the order they are saved in, the
+     Regulation's. What its screen says in words, the card says too: a maximum that in its app means no limit shows
+     "Maximum choices: No limit", never "0" (the same with the days ahead of a booking and the biggest discount without
+     a manager, whose 100% is no limit); a price that is not per unit says which unit it is for, as the till writes it:
+     "Price per kg: €45.00", "Price per 100 g: €2.50" (and the cost, per the product's unit). A text that is the
+     internal code of a record never shows: if the card cannot name it, it leaves it out. If
      the action names its own currency, the amount shows in it and with its decimals, as in Stripe or Square: a
      payment in dollars says "$15.00", and in yen, without decimals; a currency that does not exist is not made up:
      if the action no longer takes it in its data, no card shows (see "If it fails"); otherwise the amount shows as

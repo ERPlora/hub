@@ -2909,7 +2909,15 @@ Pasos:
      Ventas / TPV: Varios · Categoría fiscal: Producto — general · 21 % · Posición: 0»; «Abrir en Mesas: Mesa: 4 · Comensales:
      3». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
-     asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
+     asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». La
+     tarjeta enseña cada dato tal como lo toma la acción, no como lo escribió el asistente: un suplemento que el
+     asistente manda como el texto «300» sale «Suplemento: 3,00 €», nunca «300», y los alérgenos salen en el orden en
+     que se guardan, el del Reglamento. Lo que su pantalla dice con palabras, la tarjeta también: un máximo que en su
+     app quiere decir sin límite sale «Máximo de elecciones: Sin límite», nunca «0» (igual los días de antelación de
+     una reserva y el descuento máximo sin un responsable, cuyo 100 % es sin límite); un precio que no es por unidad
+     dice para qué unidad es, como lo escribe el TPV: «Precio por kg: 45,00 €», «Precio por 100 g: 2,50 €» (y el
+     coste, por la unidad del producto). Un texto que es un código interno de un registro nunca sale: si la tarjeta no
+     puede nombrarlo, lo deja fuera. Si la
      acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
      «15,00 $», y en yenes, sin decimales; una moneda que no existe no se inventa: si la acción ya no la acepta en sus
      datos, no sale tarjeta (ver «Si falla»); si no, el importe sale tal como se escribió y la acción la rechaza al
