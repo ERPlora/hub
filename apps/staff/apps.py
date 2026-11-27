@@ -23,7 +23,6 @@ class StaffConfig(LiveAppConfig):
     name = "apps.staff"
     label = "staff"
     blueprint_stays = {
-        "Role": "pending",
         "Member": "people",
         "Schedule": "people",
         "ScheduleDay": "people",
@@ -219,3 +218,9 @@ class StaffConfig(LiveAppConfig):
         from apps.staff.queries.records import records_of  # the models are not loaded yet when this module is
 
         return records_of(username)
+
+    def blueprint_datasets(self) -> list:
+        """What of Staff travels in an export of the business (BASE-F35): its roles, never its people."""
+        from apps.staff import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS
