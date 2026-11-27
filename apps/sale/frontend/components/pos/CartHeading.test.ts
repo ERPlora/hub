@@ -93,6 +93,22 @@ describe('CartHeading: the chips', () => {
     expect(m.find('pos-check-context-empty').exists()).toBe(false);
   });
 
+  // Ionic sets a chip's icon 8px apart from the text on the side the text is: an icon that is the chip's only element,
+  // with its text loose beside it, is also its last child and gets pulled 4px over the first letter.
+  it.each([
+    ['pos-table-chip', { tableNumber: '4' }, 'Mesa 4'],
+    ['pos-customer-chip', { customerName: 'Lucía' }, 'Lucía'],
+    ['pos-staff-chip', {}, 'Atiende yo'],
+    ['pos-needs-customer', { needsCustomer: true }, 'Falta el cliente'],
+  ])('%s leads with its icon and keeps its text in an element after it', async (testid, props, text) => {
+    const chip = (await setup(props, 'es')).find(testid).element;
+    expect(chip.firstElementChild?.tagName).toBe('ION-ICON');
+    expect(chip.lastElementChild).not.toBe(chip.firstElementChild);
+    expect(chip.lastElementChild?.textContent?.trim()).toBe(text);
+    const loose = [...chip.childNodes].filter((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+    expect(loose).toEqual([]);
+  });
+
   it('gives the title editor a 44px touch target on coarse-pointer devices', () => {
     expect(source).toMatch(
       /@media \(pointer: coarse\)\s*\{\s*\.pos-heading__edit\s*\{[^}]*min-width: 44px;[^}]*min-height: 44px;/s,

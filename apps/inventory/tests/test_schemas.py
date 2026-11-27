@@ -233,7 +233,7 @@ def test_category_in_defaults():
         "description": "",
         "icon": "ion:cube-outline",
         "color": "#3880ff",
-        "order": 0,
+        "order": None,
         "tax_category_key": None,
     }
     assert invalid_fields(CategoryIn, name="") == {"name"}

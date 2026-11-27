@@ -14,6 +14,7 @@ from apps.inventory.schemas.categories import CategoryFiltersIn, CategoryListIn,
 from apps.inventory.schemas.fields import CategoryRefIn
 from apps.inventory.schemas.product_categories import ProductCategoryListIn, ProductCategoryPage
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 # The till shows the categories in the position the business gave them; the ones it never placed share 0.
 CATEGORY_SORT_COLUMNS = {"order": ("order", "name")}
@@ -52,11 +53,7 @@ def list_product_categories(
         product__is_deleted=False, product__is_active=True, category__is_deleted=False
     )
     if params.search:
-        links = links.filter(
-            Q(product__name__icontains=params.search)
-            | Q(product__sku__icontains=params.search)
-            | Q(category__name__icontains=params.search)
-        )
+        links = links.filter(contains_text(params.search, "product__name", "product__sku", "category__name"))
     if params.product_id:
         links = links.filter(product_id=params.product_id)
     if params.category_id:
@@ -115,13 +112,12 @@ def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
 
 def _filter_categories(categories, params: CategoryFiltersIn):
     if params.search:
-        categories = categories.filter(
-            Q(name__icontains=params.search) | Q(slug__icontains=params.search)
-        )
+        categories = categories.filter(contains_text(params.search, "name", "slug"))
+    for field in ("name", "slug"):
+        if getattr(params, field):
+            categories = categories.filter(contains_text(getattr(params, field), field))
     categories = categories.filter(
         **_bounds(
-            name__icontains=params.name,
-            slug__icontains=params.slug,
             icon=params.icon,
             color=params.color,
             product_count__gte=params.product_count_min,
