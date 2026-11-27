@@ -4,7 +4,7 @@ the finders services/ reuses: the settings row, a tip by its id or its sale's nu
 import datetime as dt
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
@@ -16,6 +16,7 @@ from apps.tip.models import Settings, Tip
 from apps.tip.schemas import SettingsOut, SuggestionIn, SuggestionOut, TipListIn, TipOut, TipPage, TipRefIn
 from base.business import business_zone
 from base.operations import call
+from base.text_search import contains_text
 
 
 TIP_NOT_FOUND = _("That tip no longer exists.")
@@ -187,11 +188,7 @@ def _day_start(day: dt.date) -> dt.datetime:
 def _filtered(params: TipListIn) -> QuerySet[Tip]:
     rows = tips()
     if params.search:
-        rows = rows.filter(
-            Q(sale__number__icontains=params.search)
-            | Q(member__first_name__icontains=params.search)
-            | Q(member__last_name__icontains=params.search)
-        )
+        rows = rows.filter(contains_text(params.search, "sale__number", "member__first_name", "member__last_name"))
     for field in ("member_id", "method_type", "status"):
         if getattr(params, field) is not None:
             rows = rows.filter(**{field: getattr(params, field)})

@@ -9,6 +9,7 @@ from live.errors import Conflict, NotFound
 from apps.kitchen.models import Station
 from apps.kitchen.queries.reads import MAX_CANDIDATES
 from apps.kitchen.queries.views import ItemView, TicketView
+from base.text_search import contains_text
 
 STATION_NOT_FOUND = _("That station does not exist in this business.")
 STATION_AMBIGUOUS = _("“%(said)s” matches several stations: %(names)s. Say which one.")
@@ -33,7 +34,7 @@ def find_station(station_id: UUID | None, said: str | None) -> Station:
     text = (said or "").strip()
     exact = list(stations.filter(name__iexact=text)[:2])
     candidates = exact or list(
-        stations.filter(name__icontains=text).order_by("name", "id")[
+        stations.filter(contains_text(text, "name")).order_by("name", "id")[
             : MAX_CANDIDATES + 1
         ]
     )

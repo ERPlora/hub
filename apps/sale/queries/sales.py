@@ -18,6 +18,7 @@ from apps.sale.queries.receipt_codes import paper_code
 from apps.sale.schemas.sales import SaleByKeyIn, SaleByKeyOut, SaleListIn, SaleOut, SalePage, SaleRefIn
 from base.business import currency_decimals
 from base.ordering import list_order
+from base.text_search import contains_text
 
 SALE_NOT_FOUND = _("That sale does not exist.")
 
@@ -340,9 +341,7 @@ def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
     )
     if params.search:
         text = params.search.strip()
-        sales = sales.filter(
-            Q(number__icontains=text) | Q(customer_name__icontains=text)
-        )
+        sales = sales.filter(contains_text(text, "number", "customer_name"))
     if params.payment_method_name is not None:
         sales = sales.filter(_paid_with(params.payment_method_name))
     exact = {
@@ -358,9 +357,9 @@ def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
         **{key: value for key, value in exact.items() if value is not None}
     )
     if params.customer_name:
-        sales = sales.filter(customer_name__icontains=params.customer_name.strip())
+        sales = sales.filter(contains_text(params.customer_name.strip(), "customer_name"))
     if params.number:
-        sales = sales.filter(number__icontains=params.number.strip())
+        sales = sales.filter(contains_text(params.number.strip(), "number"))
     columns = (
         (_tender_order(),)
         if params.sort == "payment_method_name"

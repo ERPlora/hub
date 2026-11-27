@@ -29,6 +29,7 @@ from apps.payment.schemas import (
 )
 from base.business import currency_decimals
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 METHOD_NOT_FOUND = _("That payment method does not exist in this business.")
 METHOD_AMBIGUOUS = _(
@@ -67,7 +68,7 @@ def find_method(
     """A method by id, or by its name: the exact one, else the only one that contains it."""
     if method_id is None:
         candidates = []
-        for lookup in (Q(name__iexact=said), Q(name__icontains=said)):
+        for lookup in (Q(name__iexact=said), contains_text(said, "name")):
             candidates = list(
                 PaymentMethod.objects.filter(lookup).order_by("name", "id")[
                     : MAX_CANDIDATES + 1
@@ -233,16 +234,14 @@ def list_payments(ctx: OperationContext, params: PaymentListIn) -> dict:  # noqa
     payments = Payment.objects.select_related("method")
     if params.search:
         payments = payments.filter(
-            Q(reference__icontains=params.search)
-            | Q(beneficiary_name__icontains=params.search)
-            | Q(supplier_invoice_ref__icontains=params.search)
+            contains_text(params.search, "reference", "beneficiary_name", "supplier_invoice_ref")
         )
     if params.reference:
-        payments = payments.filter(reference__icontains=params.reference)
+        payments = payments.filter(contains_text(params.reference, "reference"))
     if params.beneficiary_name:
-        payments = payments.filter(beneficiary_name__icontains=params.beneficiary_name)
+        payments = payments.filter(contains_text(params.beneficiary_name, "beneficiary_name"))
     if params.concept:
-        payments = payments.filter(concept__icontains=params.concept)
+        payments = payments.filter(contains_text(params.concept, "concept"))
     if params.method_id:
         payments = payments.filter(method_id=params.method_id)
     if params.method:
@@ -331,10 +330,7 @@ def get_payment(ctx: OperationContext, data: PaymentRefIn) -> dict:
 def list_methods(ctx: OperationContext, params: MethodListIn) -> dict:
     methods = PaymentMethod.objects.all()
     if params.search:
-        methods = methods.filter(
-            Q(name__icontains=params.search)
-            | Q(bank_account_ref__icontains=params.search)
-        )
+        methods = methods.filter(contains_text(params.search, "name", "bank_account_ref"))
     if params.method_type:
         methods = methods.filter(method_type=params.method_type)
     if params.is_active is not None:

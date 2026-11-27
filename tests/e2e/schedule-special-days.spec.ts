@@ -37,12 +37,15 @@ test('SCHEDULE-F04, F13, F06: a special day added, a taken date refused, correct
   await expect(row).toContainText(dayAsShown(CHRISTMAS));
   await expect(row).toContainText('Closed');
 
-  // The same date again: refused in the form (409 schedule.special_day_exists).
+  // The same date again: refused under the date, once (409 schedule.special_day_exists).
   await view.locator('[data-testid=schedule-special-days-add]').click();
   await pickDay(page, page.locator('[data-testid=schedule-special-day-form-date]'), CHRISTMAS);
   await page.locator('[data-testid=schedule-special-day-form-name] input').fill(`${TAG} Again`);
   await page.locator('[data-testid=schedule-special-day-form-submit]').click();
-  await expect(page.locator('[data-testid=schedule-special-day-form-error]')).toContainText('There is already a special day on that date.');
+  const date = page.locator('[data-testid=schedule-special-day-form-date]');
+  await expect(date).toHaveClass(/ion-invalid/);
+  await expect(date).toContainText('There is already a special day on that date.');
+  await expect(page.locator('[data-testid=schedule-special-day-form-error]')).toHaveCount(0);
   await page.screenshot({ path: shot('schedule-special-day-409-1280') });
   // «Cancel» asks before losing the refused day (BASE-F05): the person discards it.
   await page.locator('[data-testid=schedule-special-day-form-cancel]').click();
@@ -89,13 +92,15 @@ test('SCHEDULE-F05, F06: an override added, another over the same dates refused,
   await expect(row).toContainText(dayAsShown(`${YEAR}-07-01`));
   await expect(row).toContainText(dayAsShown(`${YEAR}-08-31`));
 
-  // Another one over those dates: refused (409 schedule.override_overlaps).
+  // Another one over those dates: refused under «From», once (409 schedule.override_overlaps).
   await view.locator('[data-testid=schedule-overrides-add]').click();
   await pickDay(page, from, `${YEAR}-08-15`);
   await pickDay(page, to, `${YEAR}-09-15`);
   await page.locator('[data-testid=schedule-override-form-reason] input').fill(`${TAG} More`);
   await page.locator('[data-testid=schedule-override-form-submit]').click();
-  await expect(page.locator('[data-testid=schedule-override-form-error]')).toContainText(`Those dates overlap the temporary change “${reason}”`);
+  await expect(from).toHaveClass(/ion-invalid/);
+  await expect(from).toContainText(`Those dates overlap the temporary change “${reason}”`);
+  await expect(page.locator('[data-testid=schedule-override-form-error]')).toHaveCount(0);
   await page.screenshot({ path: shot('schedule-override-409-1280') });
   // «Cancel» asks before losing the refused dates (BASE-F05): the person discards them.
   await page.locator('[data-testid=schedule-override-form-cancel]').click();
