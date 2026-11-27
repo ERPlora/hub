@@ -47,6 +47,50 @@ msgctxt "working day status"
 msgid "Needs review"
 msgstr "Por revisar"
 
+msgctxt "attendance export"
+msgid "Date"
+msgstr "Fecha"
+
+msgctxt "attendance export"
+msgid "Person"
+msgstr "Persona"
+
+msgctxt "attendance export"
+msgid "Clock-in"
+msgstr "Entrada"
+
+msgctxt "attendance export"
+msgid "Clock-out"
+msgstr "Salida"
+
+msgctxt "attendance export"
+msgid "Break minutes"
+msgstr "Minutos de pausa"
+
+msgctxt "attendance export"
+msgid "Worked minutes"
+msgstr "Minutos trabajados"
+
+msgctxt "attendance export"
+msgid "Status"
+msgstr "Estado"
+
+msgctxt "attendance export"
+msgid "Clock-in within radius"
+msgstr "Entrada dentro del radio"
+
+msgctxt "attendance export"
+msgid "Clock-out within radius"
+msgstr "Salida dentro del radio"
+
+msgctxt "attendance export"
+msgid "Yes"
+msgstr "Sí"
+
+msgctxt "attendance export"
+msgid "No"
+msgstr "No"
+
 msgctxt "clocking device"
 msgid "Shared device"
 msgstr "Dispositivo compartido"

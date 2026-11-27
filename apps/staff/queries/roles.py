@@ -12,6 +12,7 @@ from apps.staff.models import Member, Role
 from apps.staff.schemas.fields import ByIdIn
 from apps.staff.schemas.roles import RoleListIn, RoleOut, RolePage, RoleResolveIn, RoleResolveOut
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 from .reads import _page
 
@@ -93,9 +94,7 @@ def resolve_role(ctx: OperationContext, params: RoleResolveIn) -> dict:
 def list_roles(ctx: OperationContext, params: RoleListIn) -> dict:
     roles = with_member_count(Role.objects.all())
     if params.search:
-        roles = roles.filter(
-            Q(name__icontains=params.search) | Q(description__icontains=params.search)
-        )
+        roles = roles.filter(contains_text(params.search, "name", "description"))
     if params.is_active is not None:
         roles = roles.filter(is_active=params.is_active)
     if params.color:

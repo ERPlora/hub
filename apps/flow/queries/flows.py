@@ -3,7 +3,7 @@ its screen shows it, with its last run."""
 
 from typing import Any
 
-from django.db.models import OuterRef, Q, QuerySet, Subquery
+from django.db.models import OuterRef, QuerySet, Subquery
 from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -12,6 +12,7 @@ from live.operations import operation
 
 from apps.flow import document, recipes
 from base.ordering import list_order_for
+from base.text_search import contains_text
 from apps.flow.models import Flow, FlowRun
 from apps.flow.schemas.fields import Page
 from apps.flow.schemas.flows import FlowListIn, FlowOut, FlowRefIn, StatusIn, StatusOut
@@ -45,7 +46,7 @@ def resolve_flow(
         flows = live_flows()
         exact = list(flows.filter(name__iexact=text).values_list("pk", "name"))
         matches = exact or list(
-            flows.filter(name__icontains=text)
+            flows.filter(contains_text(text, "name"))
             .order_by(Lower("name"), "id")
             .values_list("pk", "name")
         )
@@ -159,9 +160,7 @@ _FLOW_SORTS = {"name": (Lower("name"),)}
 def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
     flows = live_flows()
     if data.search:
-        flows = flows.filter(
-            Q(search_text__icontains=data.search) | Q(name__icontains=data.search)
-        )
+        flows = flows.filter(contains_text(data.search, "search_text", "name"))
     if data.enabled is not None:
         flows = flows.filter(enabled=data.enabled)
     if data.trigger_kind is not None:
