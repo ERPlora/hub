@@ -200,7 +200,9 @@
       "servicePriceTitle": "Importe de {name}",
       "servicePriceSuggest": "Usar {price}",
       "serviceCount": "{count} servicio | {count} servicios",
-      "linkedCheckGone": "Esa cuenta ya no está abierta (se cobró, se anuló o no existe): el TPV sigue como estaba.",
+      "linkedCheckGone": "Esa cuenta ya no está abierta: se cobró, se anuló o no existe.",
+      "linkedCheckOpening": "Abriendo la cuenta…",
+      "linkedCheckContinue": "Continuar",
       "table": {
         "assign": "Asignar mesa",
         "assignedTo": "Asignar mesa: {table}",

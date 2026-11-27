@@ -200,7 +200,9 @@
       "servicePriceTitle": "Amount of {name}",
       "servicePriceSuggest": "Use {price}",
       "serviceCount": "{count} service | {count} services",
-      "linkedCheckGone": "That check is not open any more (charged, voided or gone): the till carries on as it was.",
+      "linkedCheckGone": "That check is not open any more: it was charged, voided or does not exist.",
+      "linkedCheckOpening": "Opening the check…",
+      "linkedCheckContinue": "Continue",
       "table": {
         "assign": "Assign table",
         "assignedTo": "Assign table: {table}",
