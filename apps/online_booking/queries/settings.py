@@ -7,7 +7,8 @@ from live.operations import operation
 
 from apps.appointment.queries.business import current_settings as current_rules
 from apps.online_booking.models import Settings
-from apps.online_booking.schemas import NoIn, SettingsOut
+from apps.online_booking.schemas.fields import NoIn
+from apps.online_booking.schemas.settings import SettingsOut
 from base.business import zone_name
 
 from .bookings import VIEW

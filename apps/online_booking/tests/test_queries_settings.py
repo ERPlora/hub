@@ -1,7 +1,7 @@
 """The page's settings as they are read: the factory ones until somebody saves them, with the rules of the diary."""
 
 from apps.online_booking.queries.settings import get_settings
-from apps.online_booking.schemas import NoIn
+from apps.online_booking.schemas.fields import NoIn
 
 from .conftest import HUB_DB, ctx_for, make_page, run
 

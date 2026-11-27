@@ -4,7 +4,7 @@ import pytest
 from live.errors import Conflict, OperationError
 
 from apps.online_booking.queries.offer import public_services
-from apps.online_booking.schemas import PublicServicesIn
+from apps.online_booking.schemas.public import PublicServicesIn
 
 from .conftest import (
     HUB_DB,

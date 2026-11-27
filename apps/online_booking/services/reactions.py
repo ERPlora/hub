@@ -4,7 +4,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.online_booking.models import Booking
-from apps.online_booking.schemas import CustomerEventIn, ReactionOut
+from apps.online_booking.schemas.reactions import CustomerEventIn, ReactionOut
 
 #: Run only by the platform (events.py): outside ``online_booking.*``, so no role and no API key holds it.
 SYSTEM = "system.online_booking"

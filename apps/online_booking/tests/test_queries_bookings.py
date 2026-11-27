@@ -9,7 +9,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.online_booking.models import Booking
 from apps.online_booking.queries.bookings import list_bookings
-from apps.online_booking.schemas import BookingListIn
+from apps.online_booking.schemas.bookings import BookingListIn
 from base.services.sessions import ensure_hub_user
 
 from base.tests.ordering import assert_reads_backwards, listed_with

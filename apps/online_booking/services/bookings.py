@@ -5,7 +5,7 @@ from live.operations import get, operation
 
 from apps.appointment.models.appointments import Appointment
 from apps.online_booking.queries.bookings import find_booking, load_detail
-from apps.online_booking.schemas import BookingOut, BookingRefIn, CancelIn, DeletedOut
+from apps.online_booking.schemas.bookings import BookingOut, BookingRefIn, CancelIn, DeletedOut
 
 CHANGE = "online_booking.change_booking"
 CONFIRM = "online_booking.confirm_booking"
