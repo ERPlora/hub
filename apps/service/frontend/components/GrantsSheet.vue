@@ -104,11 +104,8 @@ const day = (value: string | null) => formatDate(value, locale.value);
           <span>{{ day(grant.granted_at) }} · {{ formatMoney(grant.amount, locale, money) }}</span>
         </div>
         <div class="service-sheet-list__line">
-          {{
-            grant.remaining === null
-              ? t('service.grants.usesUnlimited', { used: grant.used })
-              : t('service.grants.uses', { used: grant.used, remaining: grant.remaining })
-          }}
+          {{ t('service.grants.used', { count: grant.used }) }} ·
+          {{ grant.remaining === null ? t('service.grants.noLimit') : t('service.grants.left', { count: grant.remaining }) }}
           · {{ grant.expires_at ? t('service.grants.expires', { when: day(grant.expires_at) }) : t('service.grants.noExpiry') }}
           <StatusPill
             v-if="grant.is_expired"

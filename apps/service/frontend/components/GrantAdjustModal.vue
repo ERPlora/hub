@@ -66,8 +66,8 @@ const preview = computed(() => {
 });
 const usesHelp = computed(() =>
   direction.value === 'remove'
-    ? t('service.adjust.usesRemoveHelp', { remaining: remaining.value })
-    : t('service.adjust.usesAddHelp', { remaining: remaining.value }),
+    ? t('service.adjust.usesRemoveHelp', { count: remaining.value })
+    : t('service.adjust.usesAddHelp', { count: remaining.value }),
 );
 
 const customer = computed(() => props.grant?.customer_name ?? props.grant?.customer_id ?? '');
