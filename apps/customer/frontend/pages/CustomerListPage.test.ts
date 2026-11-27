@@ -26,6 +26,7 @@ import {
   VIEWER,
 } from '../__tests__/mount-customer';
 import { itReadsAmountFiltersAsTheHub } from '../../../../base/frontend/__tests__/amount-filter';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 import CustomerCreateModal from '../components/CustomerCreateModal.vue';
 import CustomerExportButton from '../components/CustomerExportButton.vue';
 import CustomerStats from '../components/CustomerStats.vue';
@@ -325,7 +326,7 @@ describe('CustomerListPage: actions by permission', () => {
   it('the owner gets «Add», «Import CSV», «Export CSV» and «Delete» on each row', async () => {
     const s = await setup();
     await s.show(PAGE);
-    expect(s.testid('customer-list-add').text()).toBe('Add');
+    expect([s.testid('customer-list-add').text(), accessibleName(s.testid('customer-list-add').element), s.testid('customer-list-add').attributes('title')]).toEqual(['', 'Add', 'Add']);
     expect(s.testid('customer-import').exists()).toBe(true);
     expect(s.testid('customer-export').exists()).toBe(true);
     expect([s.prop<{ id: string }[]>('actions').map((a) => a.id), ['c1', 'c2'].map((id) => s.wrapper.find(`[data-testid="customer-list-row-${id}-open"]`).element.shadowRoot?.querySelector('button')?.getAttribute('aria-label'))]).toEqual([['open', 'delete'], ['View: Ana García', 'View: Luis']]);
@@ -496,7 +497,7 @@ describe('CustomerListPage: language and markup', () => {
     await s.show(PAGE);
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Clientes');
     expect(s.prop<{ label: string }[]>('columns').map((c) => c.label)).toEqual(['Nombre', 'Email', 'Teléfono', 'Etapa', 'Gastado']);
-    expect(s.testid('customer-list-add').text()).toBe('Añadir');
+    expect([s.testid('customer-list-add').text(), accessibleName(s.testid('customer-list-add').element), s.testid('customer-list-add').attributes('title')]).toEqual(['', 'Añadir', 'Añadir']);
     expect(s.wrapper.get('[data-testid="customer-list-stage"]').text()).toBe('Activo');
     const fields = s.prop<Array<{ label: string; options?: Array<{ label: string }> }>>('filterFields');
     expect(fields.map((f) => f.label)).toEqual(['Origen', 'Activo']);
