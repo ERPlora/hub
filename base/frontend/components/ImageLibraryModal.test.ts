@@ -4,11 +4,17 @@
 // 60 at a time with «Load more»; each image with its title under it. Loading, empty («No image matches your search…»)
 // and error («The image library could not be loaded.» with «Retry») states. A tap on an image hands it up and closes;
 // «Upload photo» asks the field for the device's picker and closes too.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CatalogImage, CatalogImagePage } from '../operations/catalog_images';
 import { flush, mountBase } from '../__tests__/mount-base';
 import ImageLibraryModal from './ImageLibraryModal.vue';
+
+const mocks = vi.hoisted(() => ({ syncSearchbarInputName: vi.fn() }));
+vi.mock('@erplora/ui/components', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@erplora/ui/components')>()),
+  syncSearchbarInputName: mocks.syncSearchbarInputName,
+}));
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -61,6 +67,13 @@ async function setup(props: Record<string, unknown> = {}, replies: Array<() => A
 
 const ok = (data: unknown) => () => Response.json(data);
 
+/** The names the shared helper was asked to give `box`, in order: it names the first ion-searchbar under the root it
+ *  gets, and reads the name when the input resolves. */
+function namesOf(box: Element | null): string[] {
+  const calls = mocks.syncSearchbarInputName.mock.calls as unknown as [ParentNode | undefined, () => string][];
+  return calls.filter(([root]) => box !== null && root?.querySelector('ion-searchbar') === box).map(([, name]) => name());
+}
+
 describe('ImageLibraryModal', () => {
   it('opens searching the item’s name, with the box written, and shows each image with its title under it', async () => {
     const s = await setup({}, [ok(answer([image('cafe_con_leche', 'Café con leche'), image('latte', 'Latte')]))]);
@@ -77,6 +90,35 @@ describe('ImageLibraryModal', () => {
     ]);
     expect(tile.textContent!.trim()).toBe('Café con leche');
     expect(s.el('image-hospitality-latte')).not.toBeNull();
+  });
+
+  it.each([
+    ['es', 'Buscar imagen…'],
+    ['en', 'Search image…'],
+  ] as const)('a screen reader announces the search box by its hint in %s, never Ionic’s English «search text»', async (locale, hint) => {
+    mocks.syncSearchbarInputName.mockClear();
+    const s = await setup({}, [ok(answer([]))], locale);
+    expect(namesOf(s.el('search')).at(-1)).toBe(hint);
+  });
+
+  it('names the search box again in the language the person switches to', async () => {
+    const s = await setup({}, [ok(answer([]))]);
+    mocks.syncSearchbarInputName.mockClear();
+    await s.setLocale('en');
+    expect(namesOf(s.el('search'))).toEqual(['Search image…']);
+  });
+
+  it('names the search box again when the window, opened again, creates it again', async () => {
+    const s = await setup({}, [ok(answer([]))]);
+    const first = s.el('search');
+    await s.wrapper.setProps({ open: false });
+    await flush();
+    mocks.syncSearchbarInputName.mockClear();
+    await s.wrapper.setProps({ open: true });
+    await flush();
+    const box = s.el('search');
+    expect(box).not.toBe(first);
+    expect(namesOf(box)).toEqual(['Buscar imagen…']);
   });
 
   it('shows placeholders while the library answers', async () => {

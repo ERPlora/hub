@@ -35,6 +35,7 @@ class SetupItemOut(Schema):
 
 
 class SetupStatusOut(Schema):
+    title: str = Field(description="The list's title as the Home shows it, in the person's language.")
     total: int
     pending: int
     unavailable: int

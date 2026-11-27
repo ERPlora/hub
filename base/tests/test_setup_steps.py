@@ -79,4 +79,11 @@ def test_the_document_orders_by_order_then_key_and_counts():
 
 
 def test_an_empty_document():
-    assert home.setup_steps.document([]) == {"total": 0, "pending": 0, "unavailable": 0, "blocking_pending": 0, "items": []}
+    assert home.setup_steps.document([]) == {
+        "title": "Finish setting up your business",
+        "total": 0,
+        "pending": 0,
+        "unavailable": 0,
+        "blocking_pending": 0,
+        "items": [],
+    }
