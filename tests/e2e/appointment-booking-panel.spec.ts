@@ -6,7 +6,7 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { aMonday, salonCleanUp } from './appointment-helpers';
-import { cardDeletes } from './customer-helpers';
+import { cardDeletes, pickCustomer } from './customer-helpers';
 import { pickDay } from './date-time-fields';
 import { api, A, capture, psql, shown } from './helpers';
 import { ownerPage, pick, post, rowAction, VIEWPORTS } from './service-helpers';
@@ -132,11 +132,7 @@ for (const [size, viewport] of Object.entries(VIEWPORTS)) {
       await openNew(page);
       await expect(form(page).locator('[data-testid=appointment-form-slots-unset]')).toBeVisible();
       await capture(page, `APPOINTMENT-F02-unset-${size}`);
-      await form(page).locator('[data-testid=customer-search-trigger]').click();
-      const search = page.locator('ion-modal[data-testid=customer-search-modal]');
-      await search.locator('[data-testid=customer-picker-search] input').fill(who.customer.name);
-      await search.locator(`[data-testid=customer-picker-result-${who.customer.id}]`).click();
-      await expect(search).toBeHidden();
+      await pickCustomer(page, form(page), who.customer);
       await chooseWhatAndWhen(page, DAY);
 
       // The shift in two spans, each a tab with its free times; the first opens.

@@ -11,7 +11,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday, salonCleanUp } from './appointment-helpers';
-import { cardDeletes } from './customer-helpers';
+import { cardDeletes, pickCustomer } from './customer-helpers';
 import { dayAsShown, pickDay, pickTime } from './date-time-fields';
 import { expectTextClearOfLabel } from './field-labels';
 import { A, api, psql, shot, shown } from './helpers';
@@ -100,12 +100,7 @@ async function goToDay(page: Page, day = DAY): Promise<void> {
 }
 
 async function fillBooking(page: Page, who: Cast): Promise<void> {
-  const form = page.locator('ion-modal[data-testid=appointment-form]');
-  await form.locator('[data-testid=customer-search-trigger]').click();
-  const search = page.locator('ion-modal[data-testid=customer-search-modal]');
-  await search.locator('[data-testid=customer-picker-search] input').fill(who.customer.name);
-  await search.locator(`[data-testid=customer-picker-result-${who.customer.id}]`).click();
-  await expect(search).toBeHidden();
+  await pickCustomer(page, page.locator('ion-modal[data-testid=appointment-form]'), who.customer);
   await chooseServiceStaffAndDay(page, who, DAY);
 }
 
