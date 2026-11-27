@@ -146,20 +146,19 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     test.setTimeout(300_000);
     const { context, page } = await ownerPage(browser, '/appointment/settings', vp);
     try {
-      // APPOINTMENT-F19: a refused end hour says so on top and under its field, and both go as soon as it is
-      // corrected (hub#854).
+      // APPOINTMENT-F19: a refused end hour says so once, under its field, and it goes as soon as it is corrected
+      // (hub#854); the red notice above «Save» does not repeat it (hub#2535).
       const end = shown(page).locator('[data-testid=appointment-settings-calendar_end_hour]');
       const refused = shown(page).locator('[data-testid=appointment-settings-save-error]');
       await expect(end.locator('input')).toBeVisible();
       const endWas = await end.locator('input').inputValue();
       await end.locator('input').fill('7');
       await shown(page).locator('[data-testid=appointment-settings-save]').click();
-      await expect(refused).toContainText('The settings could not be saved.');
       await expect(end.locator('.error-text')).toHaveText('The calendar has to end after it starts.');
       await expect(end).toHaveClass(/ion-invalid/);
+      await expect(refused).toHaveCount(0);
       await capture(page, 'APPOINTMENT-F19-refused');
       await end.locator('input').fill(endWas);
-      await expect(refused).toBeHidden();
       await expect(end).not.toHaveClass(/ion-invalid/);
       await expect(end.locator('.error-text')).toBeHidden();
       // APPOINTMENT-F19: a setting changed and saved; only what changed is sent.
@@ -187,8 +186,8 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       // APPOINTMENT-F02, F01: «Add appointment» with her card, the service, its professional and a free time.
       await view.locator('[data-testid=appointment-list-add]').click();
       const form = page.locator('ion-modal[data-testid=appointment-form]');
-      // Still empty, «Duration (min)» sits full size inside its box: it reads whole there too.
-      await expect(form.locator('[data-testid=appointment-form-minutes]')).toBeVisible();
+      // Still empty, every label of the panel reads whole.
+      await expect(form.locator('[data-testid=appointment-form-duration]')).toBeVisible();
       expect(await cutLabels(form), `labels cut in the empty appointment form at ${vp.label}`).toEqual([]);
       await chooseCustomer(page, 'appointment-form', who);
       await pick(page, 'appointment-form-service-add', word(who.service.name), who.service.name);
@@ -216,6 +215,7 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await rowAction(page, 'appointment-list', first.id, 'edit');
       await expect(form).toBeVisible();
       await expect(form.locator('ion-title')).toHaveText('Edit appointment');
+      await form.locator('[data-testid=appointment-form-notes-fold-toggle]').click();
       await form.locator('[data-testid=appointment-form-notes] textarea').fill('Bring the colour reference');
       await capture(page, 'APPOINTMENT-F22');
       await pickTime(page, form.locator('[data-testid=appointment-form-time]'), '11:00');

@@ -6,6 +6,7 @@
     "active": "Activa",
     "paused": "En pausa",
     "unfinished": "Sin terminar",
+    "quoted": "«{text}»",
     "noPermission": "No tienes permiso",
     "error": "Algo ha fallado. No se ha guardado nada.",
     "live": {
@@ -16,7 +17,7 @@
     "list": {
       "new": "Nueva automatización",
       "heading": "Tus automatizaciones",
-      "search": "Busca por nombre, por lo que la arranca o por lo que hace",
+      "search": "Buscar automatización…",
       "count": "Se ven {shown} de {total}",
       "noMatch": "Aquí no hay nada que encaje con eso.",
       "clear": "Volver a verlas todas",
@@ -54,9 +55,7 @@
       "deleteYes": "Sí, bórrala",
       "deleteNo": "Déjala",
       "deleted": "Borrada.",
-      "enabledMissing": "Encendida, pero aún no tiene los permisos que pide: no hará nada hasta que se los concedas en la pestaña Permisos.",
-      "stateAll": "Encendidas y en pausa",
-      "triggerAny": "Cualquier cosa"
+      "enabledMissing": "Encendida, pero aún no tiene los permisos que pide: no hará nada hasta que se los concedas en la pestaña Permisos."
     },
     "drafts": {
       "heading": "Propuestas por el asistente",
@@ -133,10 +132,10 @@
         },
         "bigSaleNote": {
           "name": "Apuntar las ventas grandes en la ficha",
-          "summary": "Cuando una venta de 100,00 € o más tiene cliente, una nota en su ficha.",
-          "plain": "Cuando se cobra una venta, solo si tiene cliente y es de 100,00 € o más, escribe «Venta grande» en la ficha del cliente.",
+          "summary": "Cuando una venta de {amount} o más tiene cliente, una nota en su ficha.",
+          "plain": "Cuando se cobra una venta, solo si tiene cliente y es de {amount} o más, escribe «Venta grande» en la ficha del cliente.",
           "blank": "El importe",
-          "blankHint": "100,00 € son 10000: el dinero va en céntimos.",
+          "blankHint": "{amount} son 10000: el dinero va en céntimos.",
           "note": "Venta grande"
         },
         "newStaff": {
@@ -168,19 +167,19 @@
         },
         "weekReview": {
           "name": "Repasar la semana el viernes",
-          "summary": "Todos los viernes a las 18:00, la tarea de repasar la semana.",
-          "plain": "Todos los viernes a las 18:00 deja la tarea «Repasar la semana».",
+          "summary": "Todos los viernes a las {time}, la tarea de repasar la semana.",
+          "plain": "Todos los viernes a las {time} deja la tarea «Repasar la semana».",
           "blank": "Cuándo",
-          "blankHint": "Los viernes a las 18:00; cámbialo en el disparador.",
+          "blankHint": "Los viernes a las {time}; cámbialo en el disparador.",
           "task": "Repasar la semana",
           "description": "Ventas, citas y las tareas que quedan de la semana."
         },
         "morning": {
           "name": "Revisar la agenda cada mañana",
-          "summary": "Todos los días a las 09:00, la tarea de repasar la agenda de hoy.",
-          "plain": "Todos los días a las 09:00 deja la tarea «Repasar la agenda de hoy», con prioridad alta.",
+          "summary": "Todos los días a las {time}, la tarea de repasar la agenda de hoy.",
+          "plain": "Todos los días a las {time} deja la tarea «Repasar la agenda de hoy», con prioridad alta.",
           "blank": "La hora",
-          "blankHint": "Las 09:00; cámbiala en el disparador.",
+          "blankHint": "Las {time}; cámbiala en el disparador.",
           "task": "Repasar la agenda de hoy"
         },
         "noShow": {
@@ -200,10 +199,10 @@
         },
         "bigSaleTask": {
           "name": "Avisar de una venta grande",
-          "summary": "Cuando se cobra una venta de más de 100,00 €, una tarea para dar las gracias al cliente.",
-          "plain": "Cuando se cobra una venta, solo si es de más de 100,00 €, deja la tarea «Agradecer una venta grande» con el número de la venta.",
+          "summary": "Cuando se cobra una venta de más de {amount}, una tarea para dar las gracias al cliente.",
+          "plain": "Cuando se cobra una venta, solo si es de más de {amount}, deja la tarea «Agradecer una venta grande» con el número de la venta.",
           "blank": "El importe",
-          "blankHint": "Más de 100,00 € (10000 en céntimos); cámbialo en «Solo cuando…».",
+          "blankHint": "Más de {amount} (10000 en céntimos); cámbialo en «Solo cuando…».",
           "task": "Agradecer una venta grande"
         }
       }
@@ -533,6 +532,10 @@
       "retryNo": "Cancelar",
       "retried": "Reanudada: terminó bien.",
       "retriedWaiting": "Reanudada: está esperando. Mira aquí cómo sigue.",
+      "retriedStopped": "Reanudada: terminó, no se cumplía la condición.",
+      "retriedCalling": "Reanudada: está llamando a otro sistema. Mira aquí cómo sigue.",
+      "retriedAsking": "Reanudada: espera una respuesta en «Esperan tu respuesta».",
+      "retriedThinking": "Reanudada: el asistente está en ello. Mira aquí cómo sigue.",
       "retriedFailed": "Se reanudó y volvió a pararse por un error: {message}"
     },
     "events": {
@@ -1283,6 +1286,7 @@
       "service__session__get": "Leer una sesión de un bono",
       "service__settings__get": "Leer los ajustes de los servicios",
       "service__record__get": "Leer el nombre de un registro al que se refiere un bono",
+      "staff__account__list": "Buscar las cuentas a las que se puede vincular una ficha del equipo",
       "staff__availability__for_member": "Leer cuándo está disponible alguien",
       "staff__commission__summary": "Leer las comisiones",
       "staff__commission__report": "Leer la producción y la comisión de cada profesional",
@@ -1692,6 +1696,7 @@
       "consent_at": "Fecha del consentimiento",
       "consent_by": "Consentimiento dado por",
       "consent_date": "Fecha del consentimiento",
+      "consent_notice": "Frase del consentimiento",
       "contact_name": "Nombre de contacto",
       "contact_point": "Punto de contacto",
       "contacted_at": "Fecha del contacto",
@@ -2629,6 +2634,7 @@
       "width": "Ancho",
       "window_expires_at": "La ventana caduca el",
       "window_open": "Ventana abierta",
+      "windows": "Tramos del día",
       "withholding_amount": "Retención de IRPF",
       "withholding_rate": "Retención de IRPF (%)",
       "work_date": "Día de trabajo",

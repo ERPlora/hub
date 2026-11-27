@@ -118,8 +118,8 @@ CARD_ONLY = {
     "customer.order.get",
 }
 #: The writes whose card says their data by a summary of their own (the rows of a file by their names, the custom
-#: fields by their values): a dict, since ``AI`` holds no summary.
-CARD_SUMMARY = {"customer.customer.import", "customer.customer.update"}
+#: fields by their values, the words a consent stores): a dict, since ``AI`` holds no summary.
+CARD_SUMMARY = {"customer.customer.import", "customer.customer.update", "customer.consent.grant"}
 
 
 def customer():

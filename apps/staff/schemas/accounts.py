@@ -20,3 +20,12 @@ class AccountOut(Schema):
 
 
 AccountPage = Page[AccountOut]
+
+
+class AccountCheckIn(Schema):
+    user_id: UUID | None = Field(None, description="The account a record would hang from; none checks nothing.")
+
+
+class AccountCheckOut(Schema):
+    id: UUID | None = Field(description="The account found; none when none was sent.")
+    name: str = Field(description="Its name, or its email when it has none; empty when none was sent.")

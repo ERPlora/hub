@@ -6,7 +6,7 @@ import pytest
 from django.utils import timezone
 from live.errors import InvalidPayload, NotFound
 
-from apps.customer import events
+from apps.customer import consent_notice, events
 from apps.customer.models import Activity, Consent
 from apps.customer.schemas.cards import CustomerPatchIn
 from apps.customer.schemas.consent import ConsentGrantIn, ConsentWithdrawIn
@@ -43,8 +43,6 @@ def test_a_grant_is_a_fact_for_the_cards_address_on_that_channel(channel, addres
         ConsentGrantIn(
             customer_id=ana.id,
             channel=channel,
-            notice_text="I want offers.",
-            notice_version="v1",
         ),
         "hub_employee",
         actor="clara",
@@ -64,11 +62,11 @@ def test_a_grant_is_a_fact_for_the_cards_address_on_that_channel(channel, addres
         "marketing",
         "counter",
     )
-    assert fact.notice_text == "I want offers."
+    assert (fact.notice_text, fact.notice_version) == (str(consent_notice.WORDS), consent_notice.VERSION)
     entry = Activity.objects.get()
     assert (entry.kind, entry.text, entry.related_id) == (
         "consent_granted",
-        "I want offers.",
+        str(consent_notice.WORDS),
         str(fact.id),
     )
     assert outbox() == [
@@ -87,7 +85,6 @@ def test_grant_withdraw_and_grant_again_leave_three_facts_and_the_last_one_rules
         ConsentGrantIn(
             customer_id=ana.id,
             channel="email",
-            notice_text="Yes",
             occurred_at=yesterday,
         ),
     )
@@ -105,7 +102,7 @@ def test_grant_withdraw_and_grant_again_leave_three_facts_and_the_last_one_rules
     clear_outbox()
     run(
         "customer.consent.grant",
-        ConsentGrantIn(customer_id=ana.id, channel="email", notice_text="Yes again"),
+        ConsentGrantIn(customer_id=ana.id, channel="email"),
     )
     assert list(ana.consents.values_list("state", "contact_point")) == [
         ("granted", "new@example.com"),
@@ -128,7 +125,6 @@ def test_a_consent_said_in_the_future_or_for_a_card_that_is_gone_is_refused():
             ConsentGrantIn(
                 customer_id=ana.id,
                 channel="sms",
-                notice_text="Yes",
                 occurred_at=timezone.now() + timedelta(days=1),
             ),
         )

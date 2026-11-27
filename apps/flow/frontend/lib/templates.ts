@@ -3,6 +3,8 @@
 // and born paused and ungranted; it is offered only when this business has its event and its actions
 // (the catalog of the active apps), and the apps that would bring back a hidden one are named.
 // The card that answered WhatsApp messages returns when the WhatsApp inbox declares its event.
+import { formatMoney, formatTimeOfDay, type Money } from '@erplora/ui/components';
+
 import type { CatalogOut, Condition, FlowOut, Step, Trigger } from '../operations';
 import { type FlowDocument, requiredGrants } from './document';
 import type { Phrasing } from './phrasing';
@@ -16,6 +18,8 @@ export interface FlowTemplate {
   icon: string;
   /** Whether the card asks the owner to decide something (`flow.gallery.cards.<id>.blank`). */
   blank: boolean;
+  /** The sale total its condition compares with, in minor units: its texts say it in the business's money. */
+  amount?: number;
   build(p: Phrasing): { trigger: Trigger; steps: Step[] };
 }
 
@@ -26,6 +30,8 @@ function task(id: string, p: Phrasing, priority: string, more: Record<string, un
 }
 
 const event = (name: string, filter?: Condition): Trigger => (filter ? { kind: 'event', event: name, filter } : { kind: 'event', event: name });
+
+const BIG_SALE = 10000;
 
 export const TEMPLATES: readonly FlowTemplate[] = [
   {
@@ -43,10 +49,11 @@ export const TEMPLATES: readonly FlowTemplate[] = [
     sector: 'any',
     icon: 'ion:create-outline',
     blank: true,
+    amount: BIG_SALE,
     build: (p) => ({
       trigger: event('sale.sale.completed'),
       steps: [
-        { id: 's1', kind: 'condition', when: { 'input.customer_id': { exists: true }, 'input.total': { gte: 10000 } } },
+        { id: 's1', kind: 'condition', when: { 'input.customer_id': { exists: true }, 'input.total': { gte: BIG_SALE } } },
         {
           id: 's2',
           kind: 'command',
@@ -61,8 +68,9 @@ export const TEMPLATES: readonly FlowTemplate[] = [
     sector: 'any',
     icon: 'ion:cash-outline',
     blank: true,
+    amount: BIG_SALE,
     build: (p) => ({
-      trigger: event('sale.sale.completed', { 'input.total': { gt: 10000 } }),
+      trigger: event('sale.sale.completed', { 'input.total': { gt: BIG_SALE } }),
       steps: [{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: `${T('bigSaleTask', 'task', p)} {{input.sale_number}}`, priority: 'high' } }],
     }),
   },
@@ -145,6 +153,16 @@ export function templateById(id: string): FlowTemplate | undefined {
 
 export function cardName(card: FlowTemplate, p: Phrasing): string {
   return T(card.id, 'name', p);
+}
+
+/** What a card's texts say from its data: its amount in the business's money (a dash until it is known) and its
+ *  time on the clock of `locale`. */
+export function cardValues(card: FlowTemplate, locale: string, money?: Money): { amount: string; time: string } {
+  const trigger = cardTrigger(card);
+  return {
+    amount: card.amount === undefined ? '' : formatMoney(card.amount, locale, money),
+    time: trigger.kind === 'schedule' ? formatTimeOfDay(trigger.time, locale) : '',
+  };
 }
 
 /** The automation a card creates: its name, paused, its trigger and its steps. */

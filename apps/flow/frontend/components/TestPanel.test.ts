@@ -136,7 +136,7 @@ describe('TestPanel: what each kind of step would do', () => {
       answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [{ ...step, outcome: 'not_allowed' }] }] },
     });
     await settle();
-    expect(refused.find('flow-test-step-s4').text()).toContain('you have not allowed it «Call api.example.com» yet');
+    expect(refused.find('flow-test-step-s4').text()).toContain('you have not allowed it “Call api.example.com” yet');
   });
 
   // FLOW-F28: a question says who it would ask and what, never asking.
@@ -203,7 +203,7 @@ describe('TestPanel: what each kind of step would do', () => {
     const reason = m.find(`flow-test-pinned-s1-${CANCEL}-reason`);
     expect(reason.findAll('span').map((part) => part.text())).toEqual(['Cancel a reservation › Reason', 'Asked by WhatsApp']);
     expect(m.find(`flow-test-pinnedempty-s1-${CANCEL}`).text()).toBe(
-      '«Cancel a reservation» would not be used: «On behalf of the customer», fixed by this step, would be empty in this run.',
+      '“Cancel a reservation” would not be used: “On behalf of the customer”, fixed by this step, would be empty in this run.',
     );
     expect(m.find('flow-test-pinnedunknown-s1').text()).toBe('Comes from an earlier step that has not run: Change a reservation › On behalf of the customer');
     // An empty datum has no row of its own: its line says it.

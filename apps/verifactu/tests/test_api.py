@@ -152,11 +152,19 @@ def test_without_a_gateway_sending_is_a_clear_409_never_accepted(
 
 
 @HUB_DB
-def test_the_employee_reads_but_does_not_send(employee_client, issuer):
+def test_the_employee_reads_and_pushes_the_queue_but_corrects_and_configures_nothing(employee_client, issuer):
     assert get(employee_client, "/verifactu/records").status_code == 200
     assert get(employee_client, "/verifactu/config").status_code == 200
-    response = post(employee_client, "/verifactu/contingency/process")
-    assert response.status_code == 403
+    assert post(employee_client, "/verifactu/contingency/process").status_code == 200
+    invoice = manual(series_code="TICKET")
+    post(employee_client, "/verifactu/records", {"invoice_id": str(invoice.id)})
+    for path, body in (
+        ("/verifactu/records/correct", {"invoice_number": invoice.number}),
+        ("/verifactu/config/go_live", {}),
+    ):
+        response = post(employee_client, path, body)
+        assert response.status_code == 403, path
+        assert response.json()["error"]["code"] == "permission_denied", path
 
 
 @HUB_DB

@@ -1,12 +1,15 @@
 """The task app declares its module metadata, its menu entries, its permissions, what each role gets,
 and the assistant's contract of every operation (``ai`` and described input fields)."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import AI, MIN_ASKS, registry
 
 from apps.task import queries, services  # noqa: F401  (importing them registers the operations)
 from apps.task.tests.test_assistant_yes_for_its_card import CHECKS
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "task.view",
@@ -169,5 +172,20 @@ def test_the_reaction_is_run_only_by_the_platform():
     assert "task.system" not in task_app().permissions
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert task_app().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert task_app().help.videos == {"es": "73wOkcIBVpw", "en": "njU86EpkRC4"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("TASK-F01", "TASK-F08", "TASK-F11"), "cm6YZAImrmg", "s_Hp15-5B18"),
+    (("TASK-F05", "TASK-F06", "TASK-F07"), "R_T_HTZ6fAQ", "ZaLS5IWfcbM"),
+    (("TASK-F04", "TASK-F09", "TASK-F10"), "aVwwCoD-FFo", "NfhAAruRWik"),
+    (("TASK-F12", "TASK-F13", "TASK-F14"), "Z3CpRKoAGtE", "Aw0iv2BJI8g"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("task", language) == help_videos.by_task(TASK_VIDEOS, language)

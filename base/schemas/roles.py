@@ -6,7 +6,7 @@ from django.utils.translation import gettext_noop
 from ninja import Schema
 from pydantic import Field
 
-from base.schemas.assistant import names
+from base.schemas.assistant import ReadOn, names
 from base.schemas.people import PersonIn
 
 #: What a role does with a permission, as ``base.roles`` keeps it.
@@ -36,6 +36,7 @@ class RoleOut(Schema):
     to_review: bool = Field(
         description="The business's own: an app turned on or a permission added after it was saved is still to look at."
     )
+    mine: bool = Field(description="The role that rules what who asks may do: they see it and never change it.")
 
 
 class RoleRowOut(RoleOut):
@@ -48,6 +49,10 @@ class RoleListOut(Schema):
 
 class RoleIn(Schema):
     role: str = Field(title=gettext_noop("Role"), description=ROLE_SAID, json_schema_extra=NAMED)
+
+
+class RoleDetailIn(RoleIn):
+    offset: ReadOn = 0
 
 
 class RolePermissionOut(Schema):

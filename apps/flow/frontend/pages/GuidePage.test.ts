@@ -18,6 +18,14 @@ describe('GuidePage', () => {
     expect(m.find('flow-guide-section-first').findAll('li')).toHaveLength(5);
   });
 
+  // The theme's reset takes the markers off every list; `ep-prose` gives a running text's lists their numbers and bullets.
+  it('is a running text, so its steps are numbered and its limits bulleted', async () => {
+    const m = await setup();
+    const text = m.find('flow-guide-section-first').element.parentElement!;
+    expect(text.classList.contains('ep-prose')).toBe(true);
+    expect(text.contains(m.find('flow-guide-section-limits').element)).toBe(true);
+  });
+
   it('says what it cannot do yet, as it is today', async () => {
     const section = (await setup()).find('flow-guide-section-limits');
     expect(section.findAll('li')).toHaveLength(4);

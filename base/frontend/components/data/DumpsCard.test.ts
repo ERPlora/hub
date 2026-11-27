@@ -44,8 +44,19 @@ describe('DumpsCard', () => {
     expect(rows[1].text()).toContain('Oct 30, 2026');
     const intro = m.wrapper.get('[data-testid="dumps-intro"]').text();
     expect(intro).toContain('keeps it for 90 days');
-    expect(intro).toContain('pg_restore');
     expect(intro).toContain('«Export»');
+  });
+
+  it.each([
+    ['en', '90 days', '«Import»', '«Export»'],
+    ['es', '90 días', '«Importar»', '«Exportar»'],
+  ] as const)('tells the owner what a copy is in plain words, with no database jargon (%s)', async (locale, kept, notIn, instead) => {
+    const m = await card({ dumps: DUMPS }, undefined, locale);
+    const intro = m.wrapper.get('[data-testid="dumps-intro"]').text();
+    expect(intro).not.toMatch(/postgres|pg_restore|pg_dump|sql/i);
+    expect(intro).toContain(kept);
+    expect(intro).toContain(notIn);
+    expect(intro).toContain(instead);
   });
 
   it('asks for the link of a copy on each click and hands it to the browser', async () => {

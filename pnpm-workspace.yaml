@@ -2,7 +2,9 @@
 # never inside packages/ui.
 packages:
   - packages/ui
+# The @ionic/core patch lives in the library, which sets the interface size it fixes and tests it there.
 patchedDependencies:
+  '@ionic/core@8.8.9': packages/ui/patches/@ionic__core@8.8.9.patch
   '@ionic/vue@8.8.9': patches/@ionic__vue@8.8.9.patch
 onlyBuiltDependencies:
   - esbuild

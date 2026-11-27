@@ -32,9 +32,10 @@ test('Categories and services: create, a duplicate refused, a professional assig
     await view.locator('[data-testid=service-categories-add]').click();
     await page.locator('[data-testid=service-category-form-name] input').fill(category.toUpperCase());
     await page.locator('[data-testid=service-category-form-submit]').click();
-    await expect(page.locator('[data-testid=service-category-form-error]')).toContainText(
-      'There is already a category with that name. Pick another name.',
-    );
+    const categoryName = page.locator('[data-testid=service-category-form-name]');
+    await expect(categoryName).toHaveClass(/ion-invalid/);
+    await expect(categoryName).toContainText('There is already a category with that name. Pick another name.');
+    await expect(page.locator('[data-testid=service-category-form-error]')).toHaveCount(0);
     await page.screenshot({ path: shot('service-categories-409') });
     await page.locator('[data-testid=service-category-form-cancel]').click();
 

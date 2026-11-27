@@ -127,19 +127,21 @@ check and pick it up later from **Open checks**; in a restaurant, this is also w
 to a table and send the order to the kitchen.
 
 #### Details
-<!-- from WORKBOOK.md sha256:fe52c4bb26a2 -->
+<!-- from WORKBOOK.md sha256:7dfd85e21598 -->
 It opens in the application's full screen; the ⋮ menu of the category strip has "Full screen" /
 "Exit full screen" (the browser's, when the device allows it) and it closes by tapping outside, with Esc
 or with the phone's back button. Two areas:
 
 - **Catalog**: the strip of Inventory categories with their number of articles, sold-out ones included
   ("All" first and, with Services, "Services" after it; the rest, in the position the business gave them
-  and, at equal position, by name: INVENTORY-F08), the magnifier that opens the search ("Search
-  product…", by name or SKU; with Services it also searches its services), the microphone key ("Speak") and the grid:
-  articles with their initials, their unit and their price (what is sold out, greyed with "Sold out"),
-  and at the end the "Open price" tile. In "Services", each service with its initials, its duration and
-  its price ("From", "Hourly", "Variable" or "Free" if it is not a fixed price). With many articles,
-  "Load more", at the end of the grid, brings the next ones.
+  and, at equal position, by name: INVENTORY-F08; each with its whole name, on two lines if it is very
+  long; if they do not all fit, the strip slides and, from the moment it opens, fades the edge that hides
+  more), the magnifier that opens the search ("Search product…", by name or SKU; with Services it also
+  searches its services), the microphone key ("Speak") and the grid: articles with their initials, their
+  unit and their price (what is sold out, greyed with "Sold out"), and at the end the "Open price" tile. In
+  "Services", each service with its initials, its duration and its price ("From", "Hourly", "Variable" or
+  "Free" if it is not a fixed price). With many articles, "Load more", at the end of the grid, brings the
+  next ones.
 - **Check** (on a phone, a drawer opened by the floating button with the total): at the top, the pause
   button "Park this check", the customer one ("Assign customer" or their name), "Open checks" with their
   number, and "Close" on a phone; the editable title ("New check") and the chips for the customer,
@@ -767,7 +769,7 @@ If it fails: "That change to the line could not be saved. The line is back as it
 Involved: INVENTORY-F21, BASE-F119
 
 ### SALE-F16 Attribute the check or a line to whoever serves
-<!-- from WORKBOOK.md sha256:ca9d61689e0a -->
+<!-- from WORKBOOK.md sha256:1eb449a83b23 -->
 Status: done
 Vertical: common
 Actor: employee, manager, assistant
@@ -795,7 +797,7 @@ person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
-sends it or, if their account has no name, what goes before the @ of their e-mail, never the whole e-mail
+sends it or, if they have no name, what goes before the @ of their e-mail, never the whole e-mail
 (BASE-F119). In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "Who serves the check could not be changed. It stays with whoever served it.";
@@ -1442,14 +1444,16 @@ If it fails: a repeated name is refused: "There is already a payment method with
 Involved: none
 
 ### SALE-F38 Sell a service from Services
-<!-- from WORKBOOK.md sha256:ca62f433f92b -->
+<!-- from WORKBOOK.md sha256:71724d38e649 -->
 Status: done
 Vertical: hair salon
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. With Services active and "Show services in the till" on, tap "Services" in the category strip (or
-   search for it with the magnifier).
+1. With Services active and "Show services in the till" on, the services show in "All", after the menus
+   and before the articles (its number counts both: "13 items"), and on their own in "Services". Tap the
+   service in either, or search for it by name with the magnifier; if the magnifier finds neither articles
+   nor services, it says "No product or service matches your search.".
 2. Tap the service: it goes in as a line with its price. If it is not a fixed price ("From", "Hourly",
    "Variable", "Free"), "Amount of Highlights" opens with its price as a suggestion: enter the amount and
    press "Add €45.00".
@@ -1478,7 +1482,7 @@ made. An archived one, "That service is no longer offered…"; an amount outside
 maximum, "That amount is outside what the service allows (€30.00 – €80.00).". A booked price that
 does not match the appointment: "That is not the price the appointment booked for this service: it is
 cancelled, it is another customer's, it did not book this service or it booked it cheaper.". Without
-Services active, "Services" does not show in the strip.
+Services active, "Services" does not show in the strip and "All" shows and counts only Inventory's articles.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)

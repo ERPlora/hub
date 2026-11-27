@@ -56,6 +56,23 @@ def test_create_a_category_with_its_slug_made_from_the_name():
     )
 
 
+def test_a_category_created_without_a_position_goes_after_the_last_one():
+    assert run("inventory.category.create", CategoryIn(name="Starters", order=1)).order == 1
+    run("inventory.category.create", CategoryIn(name="Desserts", order=3))
+    gone = run("inventory.category.create", CategoryIn(name="Old", order=9))
+    run("inventory.category.delete", CategoryRefIn(id=gone.id))
+
+    meats = run("inventory.category.create", CategoryIn(name="Meats"))
+    fish = run("inventory.category.create", CategoryIn(name="Fish"))
+
+    assert (meats.order, fish.order) == (4, 5)
+    assert run("inventory.category.create", CategoryIn(name="Bread", order=0)).order == 0
+
+
+def test_the_first_category_without_a_position_is_the_first_one():
+    assert run("inventory.category.create", CategoryIn(name="Meats")).order == 0
+
+
 def test_editing_a_category_with_an_empty_slug_makes_it_again_from_the_name():
     created = run("inventory.category.create", CategoryIn(name="Drinks", slug="bar"))
     updated = run("inventory.category.update", CategoryPatchIn(id=created.id, name="Cold drinks", slug=""))

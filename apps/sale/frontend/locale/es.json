@@ -195,6 +195,7 @@
         "free": "Gratis"
       },
       "noServices": "Sin servicios.",
+      "searchFoundNothing": "Ningún producto ni servicio coincide con la búsqueda.",
       "servicesLoadFailed": "No se han podido cargar los servicios.",
       "servicePriceTitle": "Importe de {name}",
       "servicePriceSuggest": "Usar {price}",

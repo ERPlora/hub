@@ -149,7 +149,7 @@ recall it, serve it, reprint it or cancel it; tapping it shows its detail. "New 
 does not go through the till.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:788a53080e5a -->
+<!-- from WORKBOOK.md sha256:0850c369b629 -->
 Menu **Kitchen → Tickets**. Table of all the tickets, newest first, 50 per page (another size is chosen
 at the bottom):
 Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes (in words:
@@ -161,7 +161,7 @@ row, icon only: "Fire", "Ready", "Served", "Recall" and "Cancel" (in the "⋮" m
 optional reason); only the ones the profile can do show up, and the ones the state does not allow are
 hidden. Tapping a row opens its detail: the dishes with the customer's allergy, their menu, their modifiers, their
 station and their state. "New ticket" opens the panel (full screen on the phone) with Type, Destination, Notes and
-its dishes (product of the catalogue, quantity and note; "Add dish"), and "Create ticket". Empty: "No
+its dishes (product of the catalogue, quantity and note; "Add dish", its +), and "Create ticket". Empty: "No
 tickets.". Loading: the table skeleton. Load error: the table's, with retry; a rejection of an action
 shows in its dialog or above the table, and one of the creation, inside the panel.
 
@@ -356,7 +356,7 @@ error.
 Involved: KITCHEN-F01, KITCHEN-F05, KITCHEN-F08, INVENTORY-F04, INVENTORY-F06, INVENTORY-F07, INVENTORY-F27
 
 ### KITCHEN-F05 Receive the round the till sends
-<!-- from WORKBOOK.md sha256:05d8dced4cc1 -->
+<!-- from WORKBOOK.md sha256:18e50afdbbd0 -->
 Status: done
 Actor: system
 Screen: none
@@ -365,7 +365,7 @@ Steps:
    API); the one Sales sends by itself reaches Kitchen a moment later, without anyone doing anything.
 2. Kitchen opens a ticket with the day's number (`YYYYMMDD-NNNN`, the business day, in its time zone), the
    check's round, the check's label ("Table 4"), the type, the priority and the waiter: their name or, if
-   their account has none, what goes before the @ of their e-mail, never the whole e-mail (BASE-F119); a
+   they have none, what goes before the @ of their e-mail, never the whole e-mail (BASE-F119); a
    ticket saved before with the e-mail reads the same way.
 3. Each line that is not a service is a dish, in the order of the check, sent to its station
    (KITCHEN-F04); a menu, one dish for each dish chosen (KITCHEN-F06). Service lines are not cooked.

@@ -387,8 +387,8 @@ def test_a_refusal_says_what_its_app_said_about_the_field_once():
     with_detail = InvalidPayload("The row could not be saved.", code="invalid_field", fields={"sku": "That code is taken."})
     repeated = InvalidPayload("That code is taken.", code="invalid_field", fields={"sku": "That code is taken."})
 
-    assert blueprint.calls._reason(with_detail) == "The row could not be saved. That code is taken."
-    assert blueprint.calls._reason(repeated) == "That code is taken."
+    assert blueprint.calls.reason(with_detail) == "The row could not be saved. That code is taken."
+    assert blueprint.calls.reason(repeated) == "That code is taken."
 
 
 def test_a_product_whose_category_is_not_there_is_created_and_the_missing_link_is_told(ctx):

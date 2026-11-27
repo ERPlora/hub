@@ -8,7 +8,8 @@ from uuid import UUID
 from django.db.models import Q
 from live.context import OperationContext
 
-from apps.appointment.models import Appointment, Recurring
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring
 from base.queries.ownership import Me, Owned, me
 
 VIEW_ALL = "appointment.view_appointment"
