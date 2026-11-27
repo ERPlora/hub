@@ -533,6 +533,10 @@
       "retryNo": "Cancelar",
       "retried": "Reanudada: terminó bien.",
       "retriedWaiting": "Reanudada: está esperando. Mira aquí cómo sigue.",
+      "retriedStopped": "Reanudada: terminó, no se cumplía la condición.",
+      "retriedCalling": "Reanudada: está llamando a otro sistema. Mira aquí cómo sigue.",
+      "retriedAsking": "Reanudada: espera una respuesta en «Esperan tu respuesta».",
+      "retriedThinking": "Reanudada: el asistente está en ello. Mira aquí cómo sigue.",
       "retriedFailed": "Se reanudó y volvió a pararse por un error: {message}"
     },
     "events": {
@@ -1283,6 +1287,7 @@
       "service__session__get": "Leer una sesión de un bono",
       "service__settings__get": "Leer los ajustes de los servicios",
       "service__record__get": "Leer el nombre de un registro al que se refiere un bono",
+      "staff__account__list": "Buscar las cuentas a las que se puede vincular una ficha del equipo",
       "staff__availability__for_member": "Leer cuándo está disponible alguien",
       "staff__commission__summary": "Leer las comisiones",
       "staff__commission__report": "Leer la producción y la comisión de cada profesional",
@@ -2629,6 +2634,7 @@
       "width": "Ancho",
       "window_expires_at": "La ventana caduca el",
       "window_open": "Ventana abierta",
+      "windows": "Tramos del día",
       "withholding_amount": "Retención de IRPF",
       "withholding_rate": "Retención de IRPF (%)",
       "work_date": "Día de trabajo",

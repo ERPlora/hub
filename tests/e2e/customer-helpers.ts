@@ -63,6 +63,15 @@ export const rowNamed = (page: Page, prefix: string, name: string): Locator =>
 /** The text an `ion-input` holds. */
 export const inputOf = (scope: Page | Locator, testid: string): Locator => scope.locator(`[data-testid=${testid}] input`);
 
+/** The customer of the form `form`: her card, found by name in Customers' own search, which then closes. */
+export async function pickCustomer(page: Page, form: Locator, card: { id: string; name: string }): Promise<void> {
+  await form.locator('[data-testid=customer-search-trigger]').click();
+  const search = page.locator('ion-modal[data-testid=customer-search-modal]');
+  await search.locator('[data-testid=customer-picker-search] input').fill(card.name);
+  await search.locator(`[data-testid=customer-picker-result-${card.id}]`).click();
+  await expect(search).toBeHidden();
+}
+
 const quoted = (ids: Iterable<string>): string => [...ids].map((id) => `'${id.replace(/'/g, '')}'`).join(',');
 
 /** The statements that delete the cards `cards` (a `select id …`) with the rows that hang from them. */

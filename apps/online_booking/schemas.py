@@ -23,7 +23,7 @@ from pydantic import (
     model_validator,
 )
 
-from apps.appointment.schemas.fields import A_MEMBER, A_SERVICE, AN_APPOINTMENT
+from apps.appointment.schemas.fields import A_MEMBER, A_SERVICE, AN_APPOINTMENT, OF_STATUS
 from apps.appointment.schemas.settings import AdvanceDays
 from apps.customer.schemas.contact import EMAIL, PHONE
 from apps.customer.schemas.fields import Email
@@ -210,7 +210,7 @@ class BookingRow(Schema):
     start: dt.datetime = Field(description="On the business's clock.")
     end: dt.datetime
     duration_minutes: int
-    status: Status
+    status: Status = Field(json_schema_extra=OF_STATUS)
     total: int = Field(description="The sum of its services' prices, in cents.", json_schema_extra={"money": True})
     notes: str = Field(description="The customer's note.")
     booked_at: dt.datetime
@@ -244,7 +244,7 @@ class SettingsIn(In):
 
     is_enabled: bool | None = Field(None, description="The public page takes bookings.")
     page_title: _text(120) | None = Field(
-        None, description="The page's title; empty = «Book an appointment»."
+        None, description="The page's title; empty: its usual title, in the visitor's language."
     )
     welcome_message: Text | None = Field(
         None, description="The text at the top of the page."
@@ -459,7 +459,7 @@ class PublicBookIn(In, TrapIn):
 
 class BookedOut(Schema):
     number: str = Field(description="The appointment number the customer quotes.")
-    status: Status
+    status: Status = Field(json_schema_extra=OF_STATUS)
     start: dt.datetime
     end: dt.datetime
     timezone: str
@@ -484,7 +484,7 @@ class PublicCancelIn(TokenIn):
 
 class PublicBookingOut(LinkOwnerOut):
     number: str
-    status: Status
+    status: Status = Field(json_schema_extra=OF_STATUS)
     start: dt.datetime
     end: dt.datetime
     timezone: str

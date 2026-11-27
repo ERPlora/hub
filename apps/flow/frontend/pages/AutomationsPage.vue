@@ -11,12 +11,10 @@
 // Until the questions, the drafts and the list have their first answer, «Loading…» above the gallery: with the
 // business slow, the gallery alone looked as if there were none (hub#950). A list that could not be read shows,
 // with its message and «Retry».
-// On a phone «New automation» is its «+» alone, named by `aria-label`, so the title keeps its room (Material's top
-// app bar, iOS's navigation bars). From a tablet on, its icon and its words.
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import CatalogError from '../components/CatalogError.vue';
@@ -62,16 +60,6 @@ const openCard = computed(() =>
   aboveReady.value && typeof route.query.template === 'string' ? route.query.template : null,
 );
 
-/** The width at or below which the bar is a phone's: the shell's own (`AppTopbar`, hub#111). */
-const PHONE_QUERY = '(max-width: 767px)';
-const phoneQuery = typeof window.matchMedia === 'function' ? window.matchMedia(PHONE_QUERY) : null;
-const phone = ref(!!phoneQuery?.matches);
-const onPhoneChange = (event: { matches: boolean }): void => {
-  phone.value = event.matches;
-};
-phoneQuery?.addEventListener('change', onPhoneChange);
-onBeforeUnmount(() => phoneQuery?.removeEventListener('change', onPhoneChange));
-
 function openFlow(flow: FlowOut, tab?: string): void {
   void router.push(tab ? `/flow/automations/${flow.id}?tab=${tab}` : `/flow/automations/${flow.id}`);
 }
@@ -87,22 +75,13 @@ function openFlow(flow: FlowOut, tab?: string): void {
         mode="md"
         data-testid="flow-new"
         :aria-label="$t('flow.list.new')"
-        :title="phone ? $t('flow.list.new') : undefined"
+        :title="$t('flow.list.new')"
         @click="router.push('/flow/automations/new')"
       >
         <HubIcon
-          v-if="phone"
           slot="icon-only"
           name="ion:add-outline"
-          data-testid="flow-new-icon"
         />
-        <template v-else>
-          <HubIcon
-            slot="start"
-            name="ion:add-outline"
-            data-testid="flow-new-icon"
-          />{{ $t('flow.list.new') }}
-        </template>
       </IonButton>
     </template>
     <QuestionInbox

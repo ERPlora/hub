@@ -767,7 +767,7 @@ If it fails: "That change to the line could not be saved. The line is back as it
 Involved: INVENTORY-F21, BASE-F119
 
 ### SALE-F16 Attribute the check or a line to whoever serves
-<!-- from WORKBOOK.md sha256:ca9d61689e0a -->
+<!-- from WORKBOOK.md sha256:1eb449a83b23 -->
 Status: done
 Vertical: common
 Actor: employee, manager, assistant
@@ -795,7 +795,7 @@ person.
 Out: the sale and each line attributed to that person, for the close by professional and Staff's
 commissions (STAFF-F21). With "Me", the sale belongs to the record of whoever charges; without a record,
 it counts for nobody. The kitchen order sent carries their name (KITCHEN-F18); with "Me", that of whoever
-sends it or, if their account has no name, what goes before the @ of their e-mail, never the whole e-mail
+sends it or, if they have no name, what goes before the @ of their e-mail, never the whole e-mail
 (BASE-F119). In Tables, the table's window and the floor plan say that person serves it (TABLE-F09).
 If it fails: "The team could not be loaded. The sale is still attributed to whoever is signed in.";
 "Who serves the check could not be changed. It stays with whoever served it.";

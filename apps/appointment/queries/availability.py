@@ -1,6 +1,7 @@
 """The free times of a day, and whether a time can be booked and why not."""
 
 import datetime as dt
+from dataclasses import replace
 
 from live.context import OperationContext
 from live.operations import operation
@@ -41,6 +42,12 @@ def _who_and_how_long(
     return services, members, lengths
 
 
+def _windows(agenda: engine.Agenda, day: dt.date, *, professional: bool) -> list[dict]:
+    """The spans the chosen professional works on ``day``; with none chosen, the business's opening hours."""
+    shown = agenda if professional else replace(agenda, staff=None)
+    return [{"start": start, "end": end} for start, end in engine.windows(shown, day)]
+
+
 @operation(
     "appointment.availability.slots",
     kind="query",
@@ -60,7 +67,8 @@ def _who_and_how_long(
             ),
         },
         "description": "The free times of a business day to book some services (or a length), for one professional "
-        "(by name) or for anybody who does them: each time says which professionals are free. It crosses the "
+        "(by name) or for anybody who does them: each time says which professionals are free, and the day says the "
+        "spans the professional works (empty: not that day; without one, the opening hours). It crosses the "
         "opening hours (Schedules), each professional's shift and time off (Staff), blocked time and the appointments "
         "already booked. for_customer=true when the customer books herself (the minimum notice applies)."
     },
@@ -126,6 +134,9 @@ def availability_slots(ctx: OperationContext, data: SlotsIn) -> dict:
         "date": data.date,
         "timezone": zone_name(),
         "duration_minutes": duration,
+        # ``agenda`` is always set: the chosen professional's, another one's (only its opening hours count) or the
+        # business's alone.
+        "windows": _windows(agenda, data.date, professional=bool(data.staff_id or data.staff)),
         "slots": [
             {
                 **entry,

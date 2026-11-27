@@ -27,6 +27,8 @@ A_BLOCK = names("appointment.blocked_time.get", name=("label",))
 A_CUSTOMER = names("customer.customer.detail")
 A_SERVICE = names("service.service.get")
 A_MEMBER = names("staff.member.detail", name=("full_name",))
+#: An appointment's status in an answer of an app that requires this one, named as these screens name it.
+OF_STATUS = {"choices_of": "appointment.status"}
 #: What the card calls them, as their lists call one (or many): «Cita», «Citas», «Cita periódica»; a blocked period,
 #: which no list shows, as this app's catalog calls one («Bloqueo»).
 T_APPOINTMENT = gettext_noop("Appointment")

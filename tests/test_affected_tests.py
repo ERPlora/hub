@@ -5,6 +5,7 @@ another, and a branch that changes some of their files. The script runs in it as
 the test reads what it hands to the python job (the test paths and the shards) and what it says in the log.
 """
 
+import importlib.util
 import json
 import subprocess
 import sys
@@ -23,6 +24,22 @@ APPS = {
     "flow": ([], ["sale"]),
 }
 PLATFORM_TESTS = 6
+A_TEST = "def test_it():\n    pass\n"
+#: The Hub's tests that read each kind of file outside the apps only some tests read.
+SIZE_TESTS = ["tests/test_guardrails_size.py"]
+E2E_TESTS = [
+    "tests/test_guardrails_lint.py", "tests/test_guardrails_size.py", "tests/test_no_internal_references.py",
+]
+WORKBOOK_TESTS = [
+    "base/tests/test_api_help.py", "base/tests/test_catalog_app_registry.py", "base/tests/test_catalog_verticals.py",
+    "base/tests/test_catalog_workbooks.py", "base/tests/test_platform_screens.py", "base/tests/test_qa_assistant.py",
+    "base/tests/test_queries_app_help.py", "base/tests/test_register_apps.py", "base/tests/test_routers.py",
+    "base/tests/test_translate_workbooks.py", "base/tests/test_workbooks_scheduled_tasks.py",
+    "tests/test_help_videos.py", "tests/test_help_workbooks.py", "tests/test_no_internal_references.py",
+    "tests/test_qa_coverage.py", "tests/test_workbook_only_useful.py", "tests/test_workbook_page_quotes.py",
+    "tests/test_workbook_translations.py",
+]
+READERS = sorted({*SIZE_TESTS, *E2E_TESTS, *WORKBOOK_TESTS})
 
 
 def git(repo: Path, *args: str) -> str:
@@ -48,26 +65,43 @@ def app_config(name: str, requires: list[str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def build(repo: Path, extra: dict[str, str]) -> Path:
+    """A repository on branch work, which has just left origin/main and changes nothing yet; extra are more files of
+    main, by their path."""
+    git(repo, "init", "-q")
+    write(repo, "pytest.ini", "[pytest]\ntestpaths = base apps tests\n")
+    write(repo, "pyproject.toml", "[project]\nname = 'hub'\n")
+    write(repo, "apps/__init__.py")
+    write(repo, "base/helpers.py", "HELP = 1\n")
+    for number in range(PLATFORM_TESTS):
+        write(repo, f"base/tests/test_platform_{number}.py", A_TEST)
+    for name, (requires, imports) in APPS.items():
+        write(repo, f"apps/{name}/apps.py", app_config(name, requires))
+        write(repo, f"apps/{name}/models.py")
+        body = "".join(f"from apps.{other}.models import *\n" for other in imports)
+        write(repo, f"apps/{name}/tests/test_{name}.py", body + "\n\n" + A_TEST)
+    for path, text in extra.items():
+        write(repo, path, text)
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "main")
+    git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    git(repo, "switch", "-q", "-c", "work")
+    return repo
+
+
 @pytest.fixture
 def repo(tmp_path):
-    """A repository on branch work, which has just left origin/main and changes nothing yet."""
-    git(tmp_path, "init", "-q")
-    write(tmp_path, "pytest.ini", "[pytest]\ntestpaths = base apps tests\n")
-    write(tmp_path, "pyproject.toml", "[project]\nname = 'hub'\n")
-    write(tmp_path, "apps/__init__.py")
-    write(tmp_path, "base/helpers.py", "HELP = 1\n")
-    for number in range(PLATFORM_TESTS):
-        write(tmp_path, f"base/tests/test_platform_{number}.py", "def test_it():\n    pass\n")
-    for name, (requires, imports) in APPS.items():
-        write(tmp_path, f"apps/{name}/apps.py", app_config(name, requires))
-        write(tmp_path, f"apps/{name}/models.py")
-        body = "".join(f"from apps.{other}.models import *\n" for other in imports)
-        write(tmp_path, f"apps/{name}/tests/test_{name}.py", body + "\n\ndef test_it():\n    pass\n")
-    git(tmp_path, "add", "-A")
-    git(tmp_path, "commit", "-q", "-m", "main")
-    git(tmp_path, "update-ref", "refs/remotes/origin/main", "HEAD")
-    git(tmp_path, "switch", "-q", "-c", "work")
-    return tmp_path
+    return build(tmp_path, {})
+
+
+@pytest.fixture
+def shared(tmp_path):
+    """The repository, with the Hub's tests that read the files outside the apps only some tests read, and a test module
+    that another one imports, as tests/test_guardrails_module_tests.py imports tests/test_guardrails_size.py."""
+    extra = dict.fromkeys(READERS, A_TEST)
+    extra["tests/test_listing.py"] = A_TEST
+    extra["tests/test_listing_more.py"] = "from test_listing import test_it as listed\n\n\n" + A_TEST
+    return build(tmp_path, extra)
 
 
 def commit(repo: Path, *paths: str) -> None:
@@ -112,14 +146,17 @@ def test_changes_in_several_apps_run_each_one_with_the_apps_that_depend_on_it(re
 
 @pytest.mark.parametrize(
     "outside",
-    ["base/helpers.py", "pyproject.toml", "uv.lock", ".github/workflows/test.yml", "conftest.py", "tests/test_x.py",
-     "apps/__init__.py", "apps/conftest.py"],
+    ["base/helpers.py", "pyproject.toml", "uv.lock", ".github/workflows/test.yml", "conftest.py", "tests/helpers.py",
+     "base/tests/conftest.py", "base/tests/fake_gateway.py", "apps/__init__.py", "apps/conftest.py",
+     ".dup-guard-allow", "complexipy-snapshot.json", "qa/journeys/restaurant.md", "base/frontend/locale/es.json",
+     "tests/e2e/qa/probes/sale.json", "tests/e2e/qa/scenarios/bar.json", "tests/e2e/README.md",
+     "docker/test_image.py"],
 )
-def test_a_change_outside_the_apps_runs_the_whole_suite_and_says_which_file(repo, outside):
-    commit(repo, "apps/table/services.py", outside)
-    outputs, log = select(repo)
+def test_a_change_outside_the_apps_runs_the_whole_suite_and_says_which_file(shared, outside):
+    commit(shared, "apps/table/services.py", outside)
+    outputs, log = select(shared)
     assert outputs == WHOLE_SUITE
-    assert outside in log
+    assert outside in log and "::warning" not in log
 
 
 def test_a_removed_app_runs_the_whole_suite(repo):
@@ -137,7 +174,8 @@ def test_a_file_moved_from_the_platform_into_an_app_runs_the_whole_suite(repo):
 
 
 def test_a_branch_that_changes_no_python_file_inside_an_app_still_runs_that_app_and_its_dependents(repo):
-    commit(repo, "apps/sale/WORKBOOK.md", "apps/sale/frontend/pages/SaleList.vue", "apps/sale/locale/es/django.po")
+    commit(repo, "apps/sale/frontend/routes.ts", "apps/sale/frontend/pages/SaleList.vue",
+           "apps/sale/locale/es/django.po")
     assert select(repo)[0] == {"paths": "apps/flow apps/sale apps/table", "shards": [1]}
 
 
@@ -174,3 +212,59 @@ def test_when_an_app_s_requires_cannot_be_read_it_runs_the_whole_suite_and_warns
     outputs, log = select(repo)
     assert outputs == WHOLE_SUITE
     assert "::warning" in log and "apps/sale/apps.py" in log
+
+
+def test_a_change_to_the_size_allow_list_runs_the_size_test_alone(shared):
+    commit(shared, ".file-size-allow")
+    outputs, log = select(shared)
+    assert outputs == {"paths": " ".join(SIZE_TESTS), "shards": [1]}
+    assert "::notice" in log and "::warning" not in log
+
+
+def test_a_change_to_an_e2e_spec_or_helper_runs_only_the_tests_that_read_tests_e2e(shared):
+    commit(shared, "tests/e2e/sale-pos.spec.ts", "tests/e2e/helpers.ts")
+    assert select(shared)[0] == {"paths": " ".join(E2E_TESTS), "shards": [1]}
+
+
+def test_a_change_to_base_s_workbook_runs_the_tests_that_read_the_workbooks(shared):
+    commit(shared, "base/WORKBOOK.md")
+    assert select(shared)[0]["paths"] == " ".join(WORKBOOK_TESTS)
+
+
+def test_an_app_s_workbook_in_either_language_runs_its_app_its_dependents_and_the_tests_that_read_the_workbooks(shared):
+    commit(shared, "apps/sale/WORKBOOK.en.md")
+    assert select(shared)[0]["paths"] == " ".join(sorted(["apps/flow", "apps/sale", "apps/table", *WORKBOOK_TESTS]))
+
+
+def test_a_changed_test_module_outside_the_apps_runs_itself_beside_the_apps_the_branch_changes(shared):
+    commit(shared, "base/tests/test_platform_1.py", "apps/table/services.py")
+    assert select(shared)[0] == {"paths": "apps/table base/tests/test_platform_1.py", "shards": [1]}
+
+
+def test_a_test_module_another_file_imports_is_a_shared_helper_and_runs_the_whole_suite(shared):
+    commit(shared, "tests/test_listing.py")
+    outputs, log = select(shared)
+    assert outputs == WHOLE_SUITE
+    assert "tests/test_listing.py" in log and "tests/test_listing_more.py" in log
+
+
+def test_a_removed_test_module_no_file_imports_adds_nothing_to_run(shared):
+    git(shared, "rm", "-q", "base/tests/test_platform_2.py")
+    commit(shared, "apps/table/services.py")
+    assert select(shared)[0] == {"paths": "apps/table", "shards": [1]}
+
+
+def test_when_a_test_that_reads_a_changed_file_is_missing_it_runs_the_whole_suite_and_warns(repo):
+    commit(repo, ".file-size-allow")
+    outputs, log = select(repo)
+    assert outputs == WHOLE_SUITE
+    assert "::warning" in log and SIZE_TESTS[0] in log
+
+
+def test_every_test_the_script_runs_for_a_file_only_some_tests_read_exists_in_the_hub():
+    spec = importlib.util.spec_from_file_location("affected_tests", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    named = sorted({test for _, tests in module.READ_BY for test in tests})
+    assert named == READERS
+    assert [test for test in named if not (SCRIPT.parent.parent / test).is_file()] == []

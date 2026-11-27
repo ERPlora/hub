@@ -146,10 +146,11 @@ def told(plan: dict) -> dict:
 
 def test_a_new_member_tells_the_model_where_the_roles_are_and_checks_its_role_before_the_card():
     """The tool invites the model to read the business's roles first (``staff.role.list``), and the write names the
-    read that checks its role before its card (``staff.role.resolve``, with the write's own permission)."""
+    reads that check its role (``staff.role.resolve``, with the write's own permission) and its account
+    (``staff.account.check``) before its card."""
     create = get("staff.member.create")
     assert "staff.role.list" in shared.description(create)
-    assert assistant.cards.check_of(create) == "staff.role.resolve"
+    assert assistant.cards.check_of(create) == ("staff.role.resolve", "staff.account.check")
     resolve = get("staff.role.resolve")
     assert (resolve.kind, assistant.tools.is_tool(resolve), resolve.permission) == ("query", False, create.permission)
 

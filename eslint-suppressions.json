@@ -1,9 +1,4 @@
 {
-  "apps/appointment/frontend/components/AppointmentFormModal.vue": {
-    "vue/max-lines-per-block": {
-      "count": 1
-    }
-  },
   "apps/appointment/frontend/components/DayGrid.vue": {
     "vue/max-lines-per-block": {
       "count": 2

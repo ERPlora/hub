@@ -9,6 +9,7 @@ from apps.online_booking.events import SETTINGS_UPDATED
 from apps.online_booking.models import Settings
 from apps.online_booking.queries.settings import RULE_FIELDS, settings_out
 from apps.online_booking.schemas import SettingsIn, SettingsOut
+from base.queries.people import actor_name
 
 from .logo import check_logo
 
@@ -16,13 +17,7 @@ MANAGE = "online_booking.manage_settings"
 
 
 def _actor(ctx: OperationContext) -> str:
-    """Who acted, as a person reads it: an account's full name, else its email, else its username."""
-    actor = ctx.actor
-    if actor is None:
-        return ""
-    if hasattr(actor, "get_username"):
-        return (actor.get_full_name() or actor.email or actor.get_username())[:128]
-    return str(actor)[:128]
+    return actor_name(ctx.actor)[:128]
 
 
 @operation(

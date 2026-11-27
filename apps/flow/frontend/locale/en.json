@@ -533,6 +533,10 @@
       "retryNo": "Cancel",
       "retried": "Resumed: it finished well.",
       "retriedWaiting": "Resumed: it is waiting. See how it goes here.",
+      "retriedStopped": "Resumed: it finished, the condition was not met.",
+      "retriedCalling": "Resumed: it is calling another system. See how it goes here.",
+      "retriedAsking": "Resumed: it is waiting for an answer in “Waiting for your answer”.",
+      "retriedThinking": "Resumed: the assistant is on it. See how it goes here.",
       "retriedFailed": "It was resumed and stopped by an error again: {message}"
     },
     "events": {
@@ -1283,6 +1287,7 @@
       "service__session__get": "Read a voucher session",
       "service__settings__get": "Read the services settings",
       "service__record__get": "Read the name of a record a voucher refers to",
+      "staff__account__list": "Look for the accounts a staff record can be linked to",
       "staff__availability__for_member": "Read when somebody is available",
       "staff__commission__summary": "Read the commissions",
       "staff__commission__report": "Read each professional's production and commission",
@@ -2629,6 +2634,7 @@
       "width": "Width",
       "window_expires_at": "Window expires at",
       "window_open": "Window open",
+      "windows": "Spans of the day",
       "withholding_amount": "IRPF withholding",
       "withholding_rate": "IRPF withholding (%)",
       "work_date": "Work date",

@@ -253,7 +253,7 @@ La página que sale en la dirección de un negocio que erplora.com aún está pr
 Desde «Archivos» en el menú lateral; la ve todo el equipo. A la izquierda, «Carpetas»: el árbol de carpetas del
 negocio, que empieza en «Archivos» (lo de arriba del todo), con la carpeta abierta resaltada; en una pantalla
 estrecha, el árbol se pliega en el selector «Carpetas». A la derecha, «Buscar archivos…», «Lista» y «Cuadrícula» y,
-para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, lo que hay en la carpeta abierta: pulsar
+para quien administra el negocio, «Nueva carpeta» y «Subir archivo» (solo su nube). Debajo, lo que hay en la carpeta abierta: pulsar
 un archivo lo abre.
 
 #### La carpeta abierta
@@ -779,7 +779,8 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
-  1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente» (o pregúntaselo desde su panel).
+  1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente», sus destellos (o pregúntaselo desde su
+     panel).
   2. El asistente lee la misma lista del Inicio, con lo que esa persona puede ver, y le dice qué falta y
      dónde se hace; cada paso sigue teniendo su «Configurar» en la lista. Si nombra la lista, la llama como sale
      en el Inicio, en el idioma de esa persona: «Te faltan 4 pasos de Termina de configurar tu negocio».
@@ -1295,8 +1296,11 @@ Pasos:
      en Ajustes › Datos y copias › Exportar, con «Plantilla para compartir» o «Copia de seguridad de este negocio», y
      qué lleva: los productos y los servicios van con sus fotos propias dentro. El archivo no lo saca él.
 Entra: el nombre, el idioma, para qué es y lo marcado.
-Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas, con las fotos propias de los
-productos y los servicios dentro (INVENTORY-F33); nunca las ventas, las personas, los PIN ni los datos fiscales. En el
+Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas: de Inventario, las categorías y los
+productos, y de Servicios, las categorías y los servicios, con sus fotos propias dentro (INVENTORY-F33); de Mesas, las
+zonas y las mesas; de Suplementos, los grupos, cada uno con sus opciones y con los productos (por su código) y las
+categorías a los que se aplica; y, solo en una copia de seguridad, los clientes. Nunca las ventas, las personas, los PIN
+ni los datos fiscales. Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
 negocio no se guarda nada.
 Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un nombre para el archivo.» y no se puede
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
@@ -2130,7 +2134,7 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Archivos
 Pasos:
-  1. En la carpeta abierta pulsa «Subir archivo» y elige uno o varios, o los arrastra al gestor («Suelta los
+  1. En la carpeta abierta pulsa «Subir archivo» (la nube) y elige uno o varios, o los arrastra al gestor («Suelta los
      archivos para subirlos aquí»). Mientras suben: «Subiendo 2 de 5…».
   2. Sale «Archivos subidos.» y aparecen en la carpeta. Si ya había uno con el mismo nombre, no se pisa: el nuevo se
      guarda como «carta (1).pdf» y sale «Se ha subido como «carta (1).pdf»: ya había uno con ese nombre.».
@@ -2743,7 +2747,9 @@ Pasos:
      cobra, cómo se abre y se cierra la caja, si cada reserva pide teléfono); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
      pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18. Todo
      importe que dice va en la moneda y con los decimales que enseñan las pantallas: lo que la ficha de un cliente dice
-     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €.
+     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €. Una opción de una lista cerrada la dice con el nombre
+     que le dan las pantallas en su idioma, nunca con su código: de una clienta recién dada de alta dice que ha quedado en
+     la etapa «Contacto» y con origen «En el local», no «lead» ni «walk_in».
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -3113,7 +3119,8 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
-  1. En el Inicio, mientras falta algo, «Termina de configurar tu negocio» lleva «Pedírselo al asistente». Abre el
+  1. En el Inicio, mientras falta algo, «Termina de configurar tu negocio» lleva «Pedírselo al asistente», sus
+     destellos. Abre el
      panel con «Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.».
   2. Abierto desde la barra, la conversación vacía ofrece los mismos atajos: «¿Qué falta por configurar?» y, por cada
      paso pendiente que esta persona puede hacer (hasta cuatro, en el orden de la lista), «¿Cómo configuro «Tu
@@ -3719,7 +3726,7 @@ Pasos:
   6. «Otras pantallas» trae las demás pestañas del módulo, o las demás pantallas del Hub que la persona puede ver,
      plegadas, cada una con su resumen corto. Un enlace de la ayuda a una pantalla del Hub lleva a ella y cierra la
      ayuda.
-  7. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
+  7. «Pregúntale al asistente», los destellos del pie, cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
      esto: <tarea>?» sobre la última tarea que se abrió o, si no se abrió ninguna, «¿Cómo uso <módulo> en
      <pantalla>?»; si ya había algo escrito, la pregunta va debajo. «Cerrar» cierra la ayuda.
 Entra: el módulo, o la pantalla del Hub, y la pestaña en la que se está.
@@ -4803,10 +4810,19 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   puede correrla; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
   el modelo lee de una herramienta sale de `base.assistant.tools.run`, que llama a `run_tool` de `live` con
   `zone=business_zone()` y `money`, así que sus horas van en la zona del negocio y no en UTC, y cada importe marcado
-  como dinero va como lo escriben las pantallas («3.60 EUR»), en la moneda del objeto que la nombra (`currency`, con
-  sus `currency_decimals` si los da) o en la del negocio, nunca en la unidad menor: lo comprueban
+  como dinero va como lo escriben las pantallas en el idioma de la persona («3,60 €» en español, «€3.60» en inglés:
+  lo escribe `base.business.money_text`), en la moneda del objeto que la nombra (`currency`) o en la del negocio,
+  nunca en la unidad menor: lo comprueban
   `base/tests/test_business_facts.py`, también con dos negocios en zonas distintas, y
-  `base/tests/test_assistant_result_amounts.py`; el paso del asistente de Automatizaciones lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
+  `base/tests/test_assistant_result_amounts.py`; cada valor de una lista cerrada que nombran las pantallas lleva
+  además ese nombre en el idioma de la persona, una vez por dato y valor, bajo `screen_names` (`live.assistant`, con
+  la etiqueta de las opciones del modelo que usa la tarjeta, `choice_label`): lo comprueban
+  `base/tests/test_assistant_screen_names.py` (toda lista cerrada que devuelve una herramienta, la que declara su
+  esquema y la que solo tiene opciones en el modelo, como los días de la semana; las que aún no nombra ninguna app o
+  que el esquema no declara van por herramienta en `assistant_closed_lists_known.json`, que solo encoge),
+  `apps/customer/tests/test_assistant_screen_names.py` y `apps/staff/tests/test_assistant_schedule_days.py`; los
+  catorce alérgenos los nombra la plataforma (`base.allergens.NAMED`); el paso del asistente de Automatizaciones lo
+  lee igual), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,

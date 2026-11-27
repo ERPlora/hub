@@ -187,7 +187,7 @@ class HeroSection(Strict):
 
 class AboutSection(Strict):
     hidden: bool = Field(False, description="True: not on the page.")
-    title: Text80 = Field("", description="The section's heading; empty = «About us».")
+    title: Text80 = Field("", description="The section's heading; empty: its usual heading, in the visitor's language.")
     text: Annotated[str, StringConstraints(strip_whitespace=True, max_length=4000)] = Field(
         "", description="A few words about the business, in Markdown (no HTML)."
     )
@@ -196,7 +196,9 @@ class AboutSection(Strict):
 
 class CatalogSection(Strict):
     hidden: bool = Field(False, description="True: not on the page.")
-    title: Text80 = Field("", description="The section's heading; empty = «Our products» or «Our services».")
+    title: Text80 = Field(
+        "", description="The section's heading; empty: its usual heading for what it shows, in the visitor's language."
+    )
     source: CatalogSource | None = Field(
         None, description="inventory (the products on sale) or service (the offered services); none = no catalog."
     )
@@ -210,7 +212,7 @@ class CatalogSection(Strict):
 
 class GallerySection(Strict):
     hidden: bool = Field(False, description="True: not on the page.")
-    title: Text80 = Field("", description="The section's heading; empty = «Gallery».")
+    title: Text80 = Field("", description="The section's heading; empty: its usual heading, in the visitor's language.")
     images: list[ImageRef] = Field(
         default_factory=list,
         max_length=MAX_GALLERY_IMAGES,
@@ -221,7 +223,7 @@ class GallerySection(Strict):
 
 class ReviewsSection(Strict):
     hidden: bool = Field(False, description="True: not on the page.")
-    title: Text80 = Field("", description="The section's heading; empty = «What our customers say».")
+    title: Text80 = Field("", description="The section's heading; empty: its usual heading, in the visitor's language.")
     place_ref: PlaceRef = Field(
         "",
         description="The business on Google Maps: the link of its page there (the address bar's or the Share button's) "
@@ -254,7 +256,7 @@ class DayHours(Strict):
 
 class ContactSection(Strict):
     hidden: bool = Field(False, description="True: not on the page.")
-    title: Text80 = Field("", description="The section's heading; empty = «Contact».")
+    title: Text80 = Field("", description="The section's heading; empty: its usual heading, in the visitor's language.")
     phone: Phone = Field("", description="Phone number.")
     whatsapp: Phone = Field("", description="WhatsApp number, with its country code.")
     email: Email = Field("", description="Email address.")
@@ -274,7 +276,7 @@ class ContactSection(Strict):
 
 class LocationSection(Strict):
     hidden: bool = Field(False, description="True: not on the page.")
-    title: Text80 = Field("", description="The section's heading; empty = «Find us».")
+    title: Text80 = Field("", description="The section's heading; empty: its usual heading, in the visitor's language.")
     address_lines: list[Text120] = Field(default_factory=list, max_length=4, description="The address, line by line.")
     map_url: HttpsUrl = Field("", description="A map link (https://…), opened in a new tab.")
 

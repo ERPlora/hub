@@ -85,6 +85,7 @@ async function copy(url: string, target: Target): Promise<void> {
           <ion-button
             data-testid="website-share-close"
             :aria-label="t('website.share.close')"
+            :title="t('website.share.close')"
             @click="close"
           >
             <HubIcon
@@ -107,20 +108,21 @@ async function copy(url: string, target: Target): Promise<void> {
         >
           {{ one.label }}
         </p>
-        <p class="ws-share__url">
+        <div class="ws-share__url">
           <code :data-testid="`${one.testid}-url`">{{ one.url }}</code>
-        </p>
-        <ion-button
-          expand="block"
-          :data-testid="`${one.testid}-copy`"
-          @click="copy(one.url, one.target)"
-        >
-          <HubIcon
-            slot="start"
-            name="ion:copy-outline"
-          />
-          {{ t('website.share.copy') }}
-        </ion-button>
+          <ion-button
+            fill="outline"
+            :data-testid="`${one.testid}-copy`"
+            :aria-label="t('website.share.copy')"
+            :title="t('website.share.copy')"
+            @click="copy(one.url, one.target)"
+          >
+            <HubIcon
+              slot="icon-only"
+              name="ion:copy-outline"
+            />
+          </ion-button>
+        </div>
         <p
           v-if="copyFailed === one.target"
           class="ws-share__error"
@@ -194,10 +196,22 @@ async function copy(url: string, target: Target): Promise<void> {
   color: var(--ion-color-medium);
   font-size: 0.875rem;
 }
+/* The address and, beside it, its «Copy link». */
 .ws-share__url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 4px 0 12px;
   font-size: 1rem;
+}
+.ws-share__url code {
+  flex: 1;
+  min-width: 0;
   word-break: break-all;
+}
+.ws-share__url ion-button {
+  flex: none;
+  margin: 0;
 }
 .ws-share__note {
   font-size: 0.875rem;
