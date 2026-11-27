@@ -39,6 +39,7 @@ function onDidDismiss(): void {
           fill="clear"
           class="pos-sheet__close"
           :aria-label="$t('sale.pos.close')"
+          :title="$t('sale.pos.close')"
           :data-testid="`${testid}-close`"
           @click="open = false"
         >

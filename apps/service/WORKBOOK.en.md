@@ -380,14 +380,17 @@ Edit or Archive and tapping it opens nothing.
 Involved: SERVICE-F04
 
 ### SERVICE-F06 Add many services in one go
-<!-- from WORKBOOK.md sha256:5d20e8b3bfeb -->
+<!-- from WORKBOOK.md sha256:2d8935165630 -->
 Status: done (assistant and API; there is no importer on screen)
 Actor: manager, assistant
 Screen: none
 Steps:
 1. Ask the assistant to create a list of services (up to 500), each with a name, a price, a duration
    and, if you want, a tax category and a category.
-2. The assistant answers how many were created.
+2. Before creating them, the confirmation card says each service by its name ("Services: Cut, Colour, Blow-dry";
+   with more than four, the first three and how many more) and, below, the categories and the tax categories they
+   take, once each ("Category: Hair", "Tax category: Service — generic · 21%").
+3. The assistant answers how many were created.
 In: the list of services.
 Out: the services, all or none, each with its notice (`service.service.created`). What a line does not
 say takes the Settings, as the single add does.
@@ -442,13 +445,13 @@ already and is not filled: what the business took out of it since stays out; if 
 failed halfway, asking for it again from the same copy fills it with what the business keeps untouched)
 
 ### SERVICE-F09 Sell a service at the till
-<!-- from WORKBOOK.md sha256:6a4c836211cc -->
+<!-- from WORKBOOK.md sha256:61c94280c58e -->
 Status: done (Sales does it, SALE-F38)
 Actor: employee
 Screen: Sales: Sell
 Steps:
-1. In the till's strip of categories, **Services** shows each service on offer with its price and its
-   duration (they also show in the search).
+1. In the till's strip of categories, **All** and **Services** show each service on offer with its price
+   and its duration (they also show in the search).
 2. A **Not configured** service shows with the mark "VAT missing" and is not sold.
 3. A service that is not at a fixed price asks for the amount, with its price as a suggestion.
 In: the services on offer, their pricing and their tax category.
@@ -474,7 +477,7 @@ Involved: APPOINTMENT-F01, SALE-F01, ONLINE_BOOKING-F01, ONLINE_BOOKING-F07, PRI
 WHATSAPP_INBOX-F21
 
 ### SERVICE-F11 Change the Services settings
-<!-- from WORKBOOK.md sha256:3a300e36522f -->
+<!-- from WORKBOOK.md sha256:e6a5e0b56f01 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -489,8 +492,8 @@ booking and the default tax category are taken by every new service that does no
 assistant, API and add in one go); the form brings the default tax category chosen.
 "Show prices" and "Show duration" are used by the Online booking page: without them it does not show the
 price or the duration of each service.
-If it fails: "The settings could not be saved." and the reason below the field (a duration of 0, a tax
-category that does not exist). As in the form windows, the notice goes as soon as something is changed and
+If it fails: the reason below the field, once (a duration of 0, a tax category that does not exist): the
+notice "The settings could not be saved." above "Save" does not repeat it. As in the form windows, the notice goes as soon as something is changed and
 a field's reason as soon as that field is corrected; both come back if the next try is refused too. A
 refusal that names no field stays until the next try.
 Involved: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
@@ -607,7 +610,7 @@ vouchers" with the reason.
 Involved: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Void a voucher sold by mistake
-<!-- from WORKBOOK.md sha256:40ffc7422eff -->
+<!-- from WORKBOOK.md sha256:9b28e73309c6 -->
 Status: done
 Actor: manager, assistant
 Screen: Packages
@@ -619,7 +622,7 @@ Steps:
    with a return.".
 3. Type the Reason (required) and tap **Void**.
 In: the purchase and the reason.
-Out: the voucher can no longer be spent and stays as a trace, with who (by their name or, if their account has
+Out: the voucher can no longer be spent and stays as a trace, with who (by their name or, if they have
 none, by what goes before the @ of their email, never the whole email), when and the reason (`service.grant.voided`). It moves no money and issues no document. If a line of a sale paid for it, that part
 counts for whoever sold it again, until a refund says otherwise (SALE-F28).
 If it fails: "That voucher was already used: it cannot be voided.", "That voucher was already voided." or

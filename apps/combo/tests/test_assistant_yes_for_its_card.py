@@ -143,7 +143,7 @@ def test_a_name_two_menus_fit_draws_no_card_and_the_model_hears_it(write):
 def test_a_name_no_menu_has_draws_no_card(write):
     combo = vegan_menu()
     plan = turn_as(as_admin(), call(write, by_its_name("infantil", combo)[write]))
-    assert (plan["confirm"], [row["code"] for row in plan["executed"]]) == (None, ["not_found"])
+    no_card_but_the_model_hears(plan, "not_found")
     assert Combo.objects.count() == 1
 
 
@@ -303,7 +303,7 @@ def test_a_name_no_course_or_choice_has_draws_no_card(write):
     vegan_desserts()
     datum, _ = BY_NAME[write]
     plan = turn_as(as_admin(), call(write, course_or_choice(write, "Menú vegano", NONE_HAS[datum])))
-    assert (plan["confirm"], [row["code"] for row in plan["executed"]]) == (None, ["not_found"])
+    no_card_but_the_model_hears(plan, "not_found")
 
 
 @pytest.mark.parametrize("write", COURSE_OR_CHOICE_WRITES)

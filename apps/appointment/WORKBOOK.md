@@ -122,18 +122,25 @@ profesional**, además, **Día · Semana**.
   citas de cada día en orden. Tocar una cita abre su ficha; arrastrarla a otro día u otra fila la
   mueve conservando la hora.
 - **Periódicas**: ver la pantalla [Periódicas](#periódicas).
-- Botón **Añadir cita** → **Nueva cita**: Cliente (buscador «Buscar por nombre, teléfono, email…»; si no está,
-  **+ Nuevo cliente** la crea con nombre y teléfono sin salir), Servicios (uno o varios, en orden),
-  Profesional (solo los que hacen todos esos servicios), Día, Hora (con las **Horas libres** como
-  botones), «Duración (min)» (la suma de las duraciones, cambiable), Notas para la clienta y Notas
-  internas. «Duración (min)» y el **Total** salen con la duración y el precio propios del profesional
+- Botón **Añadir cita** → **Nueva cita**, un panel ancho a dos columnas (en el móvil, a pantalla completa y en una
+  sola columna, con Profesional y Día lado a lado). A la izquierda, quién y qué: Cliente (buscador «Buscar por
+  nombre, teléfono, email…»; si no está, **+ Nuevo cliente** la crea con nombre y teléfono sin salir), Servicios
+  (uno o varios, en orden, con su **Total**), Profesional (solo los que hacen todos esos servicios) y, plegadas
+  hasta que se piden, Notas para la clienta y Notas internas. A la derecha, cuándo: Día, «Duración (min)» y las
+  **Horas libres**. «Duración (min)» son botones de un toque (15, 30, 45, 60, 90 y 120) y **Otra** para teclearla;
+  por defecto marca la suma de las duraciones y, una vez cambiada, **Usar la suma** vuelve a ella. Las horas
+  libres son botones grandes repartidos en una pestaña por tramo del turno del profesional ese día, cada una con
+  cuántas horas libres le quedan, bajo la frase del turno («Pablo Serrano trabaja hoy de 10:00 a 14:00 y de 16:00
+  a 20:00.»); debajo, **Introducir otra hora**. El pie resume lo elegido junto a los botones: «12:00 – 12:30 · 30
+  min» y, debajo, el día y el profesional. «Duración (min)» y el **Total** salen con la duración y el precio propios del profesional
   elegido para cada servicio (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que
   la cita reserva. Los importes van en la moneda del negocio, la de su país, con sus decimales (BASE-F50: «65,00 zł» en un negocio de
   Polonia; «—» mientras el negocio no contesta, nunca en euros ni con decimales supuestos) y salen agrupados desde cuatro
   cifras («1.234,56 €»; en inglés, «€1,234.56»).
   Avisos: «Esta cita empieza en el pasado. Se guardará a esa hora.» y el profesional que no hace un servicio.
-- **Editar** → **Editar la cita**: Día, Hora, «Duración (min)», Servicios, Profesional, las notas y **Guardar
-  cambios**; debajo, el historial. La clienta no se cambia.
+- **Editar** → **Editar la cita**: el mismo panel, con la clienta, el número y el estado de la cita arriba (la
+  clienta no se cambia); Servicios, Profesional, Día, «Duración (min)», Hora y las notas (las que tienen texto
+  salen abiertas) y **Guardar cambios**; debajo, plegado, el historial.
 - Diálogos: **Cita solapada** (**Reservar igual** / **Elegir otra hora**), **Editar cita periódica**
   (**Solo esta cita** / **Esta y todas las siguientes**), **Cancelar la cita** (motivo opcional) y
   **Borrar la cita** (confirmación).
@@ -173,9 +180,9 @@ reserva la clienta»; botón **Guardar**.
 
 | Estado | Qué ve la persona |
 |---|---|
-| Cargando | «Cargando…» mientras llega el primer resultado; bajo Servicios y Profesional, «Cargando servicios…» / «Cargando profesionales…». |
-| Vacío | «Sin citas para este día.», «Todavía no hay citas periódicas.»; sin profesionales reservables, «Aún no hay profesionales reservables.»; en el alta, «Todavía no hay servicios reservables. Dalos de alta en Servicios.». |
-| Error | El aviso de la tabla o de la rejilla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo bajo su campo, sin perder lo tecleado, y cada campo rechazado pierde su motivo en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888), también en los buscadores (**Servicios**, al añadir uno, y **Profesional**, al elegir otro). Un conflicto (409) sale encima del botón y en un aviso. |
+| Cargando | «Cargando…» mientras llega el primer resultado; bajo Servicios y Profesional, «Cargando servicios…» / «Cargando profesionales…»; en las horas libres del panel de la cita, «Buscando horas libres…» sobre los botones en gris. |
+| Vacío | «Sin citas para este día.», «Todavía no hay citas periódicas.»; sin profesionales reservables, «Aún no hay profesionales reservables.»; en el alta, «Todavía no hay servicios reservables. Dalos de alta en Servicios.». En las horas libres: mientras falten servicios, profesional o día, «Elige los servicios, un profesional y un día para ver las horas libres.»; sin horas, «No quedan horas libres ese día para este profesional. Puedes elegir una hora igualmente.»; si el profesional no trabaja ese día, que no trabaja y «Elige otro día u otro profesional.». |
+| Error | El aviso de la tabla, de la rejilla o de las horas libres con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo bajo su campo, sin perder lo tecleado, y cada campo rechazado pierde su motivo en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888), también en los buscadores (**Servicios**, al añadir uno, y **Profesional**, al elegir otro). Un conflicto (409) sale encima del botón y en un aviso. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
@@ -239,9 +246,10 @@ Pasos:
 2. Elige la clienta (se busca por nombre, teléfono o email, y por teléfono o email solo quien ve el contacto de
    los clientes; si no está, **+ Nuevo cliente** la crea con nombre y teléfono), uno o varios servicios y el profesional. Con servicios elegidos solo salen los
    profesionales **Activos y Reservables que los hacen todos**; si un servicio no tiene a nadie
-   asignado, para ese servicio vale todo el equipo reservable. «Duración (min)» se rellena con la suma de las
-   duraciones (la propia del profesional si la tiene, si no la del catálogo).
-3. Elige el día y toca una de las **Horas libres** (o elige otra hora).
+   asignado, para ese servicio vale todo el equipo reservable. «Duración (min)» marca la suma de las
+   duraciones (la propia del profesional si la tiene, si no la del catálogo); se cambia con un toque o con **Otra**.
+3. Elige el día y toca una de las **Horas libres**, en la pestaña del tramo del turno que quieras, o elige otra
+   hora en **Introducir otra hora**.
 4. Pulsa **Añadir cita**. Si el negocio permite solapes y esa hora choca con otra cita del
    profesional, responde a «Cita solapada».
 5. La cita aparece como **Confirmada** con su número (por ejemplo, APT-20261116-0001).
@@ -270,23 +278,33 @@ Estado: hecho
 Actor: empleado, asistente, clienta
 Pantalla: Agenda (alta y edición)
 Pasos:
-1. Con servicios, profesional y día elegidos aparecen las **Horas libres** como botones.
+1. Con servicios, profesional y día elegidos aparecen las **Horas libres** como botones grandes, en una pestaña
+   por tramo del día en que trabaja el profesional, cada una con cuántas horas libres le quedan (con un solo tramo
+   no hay pestañas), bajo la frase del turno («Pablo Serrano trabaja hoy de 10:00 a 14:00 y de 16:00 a 20:00.»; otro
+   día, con su fecha). Se abre la pestaña de la hora elegida o, si no, la primera con horas libres. Mientras falte
+   algo, en su sitio: «Elige los servicios, un profesional y un día para ver las horas libres.».
 2. Las horas candidatas salen cada «Intervalo entre huecos (minutos)» dentro de la ventana del calendario
    («El calendario empieza a las (hora)», «El calendario termina a las (hora)»). Solo sale la que cabe entera: dentro del horario del negocio
    (Horarios: el tramo de ese día o la madrugada del anterior), dentro del turno del profesional y fuera
    de sus ausencias (Personal), sin bloqueo y sin otra cita suya; con los solapes permitidos, una hora
    ocupada también sale. La cita puede terminar justo a la hora de cierre.
-3. Desde el mostrador salen también las horas dentro de la antelación mínima (marcadas), nunca las ya
+3. Con las horas llegan los **tramos del día** en que trabaja el profesional, en orden: el horario del negocio
+   cruzado con su turno y sin sus ausencias, dentro de la ventana del calendario (sin turno, el día menos sus
+   ausencias). Los bloqueos y las citas no los parten (eso ya lo dicen las horas libres) y dos tramos seguidos
+   son uno. Sin tramos, ese día no trabaja.
+4. Desde el mostrador salen también las horas dentro de la antelación mínima (marcadas), nunca las ya
    pasadas; a la clienta, solo las que respetan la antelación mínima.
-4. Sin profesional (el asistente: «¿qué horas hay mañana para corte?»), cada hora dice qué
-   profesionales la tienen libre.
-5. Al preguntar si una hora concreta se puede reservar, se contesta por qué no; con qué citas choca se
+5. Sin profesional (el asistente: «¿qué horas hay mañana para corte?»), cada hora dice qué
+   profesionales la tienen libre, y los tramos son los del horario del negocio: no hay un turno que enseñar.
+6. Al preguntar si una hora concreta se puede reservar, se contesta por qué no; con qué citas choca se
    dice solo a quien puede ver esa agenda (a un empleado, de un compañero, solo «ya tiene una cita»).
 Entra: el horario del negocio, el turno y las ausencias, los bloqueos, las citas y los ajustes.
-Sale: la lista de horas; no guarda nada.
+Sale: la lista de horas y los tramos del día en que trabaja el profesional; no guarda nada.
 Si falla: «No se han podido cargar las horas libres. Puedes elegir una hora igualmente.» con
 **Reintentar**; la hora elegida se juzga al guardar. Sin horas: «No quedan horas libres ese día para este
-profesional. Puedes elegir una hora igualmente.».
+profesional. Puedes elegir una hora igualmente.». Si ese día no trabaja: «Pablo Serrano no trabaja el jueves, 26 de
+noviembre.» y «Elige otro día u otro profesional.», sin horas ni **Introducir otra hora**, porque cualquier hora de
+ese día se rechazaría al guardar.
 Implicados: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirmar una cita pendiente
@@ -311,10 +329,12 @@ Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
-1. Pulsa **Editar** (o toca la cita en «Por profesional»): se abre «Editar la cita».
+1. Pulsa **Editar** (o toca la cita en «Por profesional»): se abre «Editar la cita», con las horas libres del
+   profesional ese día (la de la propia cita cuenta como libre).
 2. Cambia Día, Hora, «Duración (min)», Servicios o Profesional y pulsa **Guardar cambios**. Si la cita es de una
    serie, elige **Solo esta cita** o **Esta y todas las siguientes**. Desde el
-   mostrador se puede llevar a una hora ya pasada (para apuntar lo que ya ocurrió).
+   mostrador se puede llevar a una hora ya pasada (para apuntar lo que ya ocurrió). Una cita reservada con otra
+   duración que la suma de sus servicios abre con **Usar la suma**, que la lleva a esa suma.
 3. Atajo: en «Por profesional» arrástrala a otra hora, otro día u otra fila. Arrastrando no se lleva a
    una hora ya pasada (eso, desde el panel).
 4. La cita conserva su número y el historial dice «Cambio de hora», «Cambio de profesional» o «Cambio
@@ -415,12 +435,12 @@ Actor: empleado (las suyas), responsable
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Historial** en la fila (en cualquier estado) o abre la ficha de la cita.
-2. Cada cambio con su hora en el reloj del negocio, quién lo hizo (una persona del equipo, por su nombre o, si
-   su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el correo entero; «Lo pidió la clienta» si
-   fue ella; «Lo hizo la plataforma» si no fue una persona: el sistema, una automatización o una recuperación desde
-   una copia aparte; una API key, por su nombre) y qué cambió (de qué profesional o servicio a cuál, y la nueva hora). Una
-   cita borrada que el personal de ERPlora devolvió desde una copia aparte conserva sus líneas y suma «Borrada» y
-   «Recuperada».
+2. Cada cambio con su hora en el reloj del negocio, quién lo hizo (una persona del equipo, por su nombre, el de Mi
+   perfil o, sin él, el de su cuenta, o, si no tiene ninguno, por lo que va antes de la @ de su correo, nunca el
+   correo entero; «Lo pidió la clienta» si fue ella; «Lo hizo la plataforma» si no fue una persona: el sistema,
+   una automatización o una recuperación desde una copia aparte; una API key, por su nombre) y qué cambió (de qué
+   profesional o servicio a cuál, y la nueva hora). Una cita borrada que el personal de ERPlora devolvió desde una
+   copia aparte conserva sus líneas y suma «Borrada» y «Recuperada».
 3. Es solo de lectura: un único botón, **Cerrar**.
 Entra: una cita en cualquier estado.
 Sale: nada (solo lee).
@@ -630,8 +650,9 @@ Pasos:
    Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar.
 Entra: los ajustes actuales de Citas.
 Sale: `appointment.settings.updated`.
-Si falla: «No se pudieron guardar los ajustes.» con cada motivo bajo su campo, sin perder lo escrito;
-un calendario que termina antes de empezar, «El calendario tiene que terminar después de empezar.». Como en
+Si falla: cada motivo bajo su campo, una sola vez, sin perder lo escrito: el aviso «No se pudieron
+guardar los ajustes.» de encima de «Guardar» no lo repite; un calendario que termina antes de empezar, «El calendario
+tiene que terminar después de empezar.». Como en
 las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
 corrige ese campo; los dos vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda
 hasta el siguiente intento.
@@ -803,7 +824,7 @@ elija.
 | Cuántas reservas de clientas esperan confirmación | ver citas | F03, F18 | `appointment.appointment.count_to_confirm` |
 | Lo que la clienta reservó o canceló ella misma en las últimas 24 horas, lo más nuevo primero | ver citas (todas o las suyas) | F28 | `appointment.appointment.notices` |
 | Las filas de la agenda (profesionales reservables y los que conservan citas) | ver citas | F01, F04, F25, F27 | `appointment.agenda.lanes` |
-| Las horas libres de un día | ver disponibilidad | F02, F18 | `appointment.availability.slots` |
+| Las horas libres de un día y los tramos en que trabaja el profesional | ver disponibilidad | F02, F18 | `appointment.availability.slots` |
 | Si una hora concreta se puede reservar y por qué no | ver disponibilidad | F02 | `appointment.availability.check` |
 | Los bloqueos de un rango | ver disponibilidad | F16 | `appointment.blocked_time.list` |
 | Las series, con búsqueda y filtros | ver citas | F12–F15 | `appointment.recurring.list` |
@@ -924,7 +945,7 @@ agenda tuya que enseñar.».
   migración que quite o renombre una de sus columnas cambia también `appointments_in_copy` y su `reads_since`. Las
   series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
   negocio y su copia) y `base/tenancy/tests/test_recovery_appointments.py`.
-- Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
+- Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models/`, `migrations/`,
   `schemas/` (un módulo por tema), `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries/`
   (un módulo por tema), `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`
@@ -1085,6 +1106,10 @@ cada flujo hecho con pantalla, su título, sus pasos y «Si falla», sin nombres
   `WeekBoard.vue`) mientras `@erplora/ui` no tenga el `Scheduler` (port de `ok-scheduler`, pedido en
   `UI-REQUESTS.md`).
 - El cliente se elige con `CustomerSearch` de Clientes (por su ruta pública).
+- El panel de la cita (`AppointmentFormModal.vue`) es un `FormModal` ancho (`size="xl"`, a pantalla completa en el
+  móvil): `FreeSlots.vue` reparte las horas libres en pestañas por tramo (`lib/free-times.ts`), `DurationPicker.vue`
+  son los botones de duración, `BookingNotes.vue` y `FoldedSection.vue` pliegan las notas y el historial,
+  `BookingSummary.vue` es el resumen del pie y `lib/booking.ts` dice lo que se envía.
 - Datos solo por `useLive`/`useCommand`; listas en ventanas de 100 (`useLiveWindows`).
 
 ## Lo que queda fuera

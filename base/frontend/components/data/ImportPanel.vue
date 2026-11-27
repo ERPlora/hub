@@ -194,19 +194,20 @@ function toCatalogue(): void {
         fill="outline"
         data-testid="import-upload"
         :disabled="reading !== ''"
+        :aria-label="t('base.data.import.upload')"
+        :title="t('base.data.import.upload')"
         @click="fileInput?.click()"
       >
         <ion-spinner
           v-if="reading === 'file'"
-          slot="start"
+          slot="icon-only"
           name="crescent"
         />
         <HubIcon
           v-else
-          slot="start"
+          slot="icon-only"
           name="ion:cloud-upload-outline"
         />
-        {{ t('base.data.import.upload') }}
       </ion-button>
       <input
         ref="fileInput"

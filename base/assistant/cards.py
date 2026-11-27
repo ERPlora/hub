@@ -342,7 +342,8 @@ def preview(
 
 
 def check_of(op: Operation) -> Any:
-    """The read ``op``'s ``ai=`` names to check its data before its card (``check``), or ``None``."""
+    """The read ``op``'s ``ai=`` names to check its data before its card (``check``), or the reads, in order; or
+    ``None``."""
     declared = op.ai
     return declared.get("check") if isinstance(declared, dict) else getattr(declared, "check", None)
 
@@ -350,19 +351,21 @@ def check_of(op: Operation) -> Any:
 def checked(
     ctx: OperationContext, op: Operation, arguments: dict, *, found: list | None = None
 ) -> ToolOutcome | None:
-    """Why the read the write ``op`` names as its check (``check_of``) refuses ``arguments`` — run as ``ctx``'s person,
-    with the data of the write its input takes —, or ``None`` when it takes them or the write names none (hub#538: a
-    role the business does not have reached the card, and the write refused it only after the person's yes). Nothing
-    of its answer is shown: a normal write's card stays a single line; the id of what it found goes to ``found``
-    (``fingerprint``: a record the write takes by its name is the one the check found)."""
-    name = check_of(op)
-    if name is None:
-        return None
-    read = registry[name]
-    failure, answer = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
-    if failure is None and found is not None:
-        found.append(answer.model_dump(mode="json").get("id"))
-    return failure
+    """Why the first of the reads the write ``op`` names as its check (``check_of``) that refuses ``arguments`` does
+    — each run as ``ctx``'s person, with the data of the write its input takes —, or ``None`` when all of them take
+    them or the write names none (hub#538: a role the business does not have reached the card, and the write refused
+    it only after the person's yes). Nothing of their answers is shown: a normal write's card stays a single line; the
+    id of what each found goes to ``found`` (``fingerprint``: a record the write takes by its name is the one the check
+    found)."""
+    declared = check_of(op)
+    for name in (declared,) if isinstance(declared, str) else declared or ():
+        read = registry[name]
+        failure, answer = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
+        if failure is not None:
+            return failure
+        if found is not None:
+            found.append(answer.model_dump(mode="json").get("id"))
+    return None
 
 
 def fingerprint(drawn: dict, found: list) -> str:

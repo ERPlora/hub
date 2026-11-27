@@ -25,6 +25,7 @@ from apps.inventory.schemas.stock import LowStockListIn, LowStockPage
 from base import images
 from base.queries.catalog_images import image_suggestion, titled_search
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 #: Products that cannot be sold for lack of a live tax category.
 UNTAXED = Q(tax_category__isnull=True) | Q(tax_category__is_active=False)
@@ -180,9 +181,7 @@ def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
         .annotate(tracks=tracks_stock_expression(current_settings()))
     )
     if params.search:
-        products = products.filter(
-            Q(name__icontains=params.search) | Q(sku__icontains=params.search)
-        )
+        products = products.filter(contains_text(params.search, "name", "sku"))
     if params.show_on_website is not None:
         products = products.filter(show_on_website=params.show_on_website)
     return _page(products.order_by("name", "id"), params, partial(_sale_row, urls=images.Urls(ctx.scope)))
@@ -220,9 +219,7 @@ def list_low_stock(ctx: OperationContext, params: LowStockListIn) -> dict:
         .filter(tracks=True, stock__lte=F("low_stock_threshold"))
     )
     if params.search:
-        products = products.filter(
-            Q(name__icontains=params.search) | Q(sku__icontains=params.search)
-        )
+        products = products.filter(contains_text(params.search, "name", "sku"))
     if params.sku:
         products = products.filter(sku=params.sku)
     products = products.filter(
@@ -249,13 +246,11 @@ def list_low_stock(ctx: OperationContext, params: LowStockListIn) -> dict:
 def filter_products(products, params: ProductFiltersIn):  # noqa: C901
     """The product list's search, filters and order (the export takes the same)."""
     if params.search:
-        products = products.filter(
-            Q(name__icontains=params.search) | Q(sku__icontains=params.search)
-        )
+        products = products.filter(contains_text(params.search, "name", "sku"))
     if params.name:
-        products = products.filter(name__icontains=params.name)
+        products = products.filter(contains_text(params.name, "name"))
     if params.sku:
-        products = products.filter(sku__icontains=params.sku)
+        products = products.filter(contains_text(params.sku, "sku"))
     products = products.filter(
         **_bounds(
             price__gte=params.price_min,

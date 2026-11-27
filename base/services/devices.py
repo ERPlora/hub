@@ -221,7 +221,7 @@ def _device(device_id) -> TrustedDevice:
     input=DeviceRenameIn,
     output=DeviceByIdIn,
     ai=AI(
-        description="Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»).",
+        description="Names a device of the hub after its place: the bar, the kitchen, the office laptop.",
         asks={
             "en": (
                 "call this tablet Bar",

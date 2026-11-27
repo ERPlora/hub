@@ -491,7 +491,7 @@ Pasos:
    entradas, salidas, invitaciones aparte (son coste, no efectivo; quien no ve los costes las ve «—»),
    esperado, contado, diferencia y las notas. Las cifras son las de todo el cajón: también lo que cobró un
    compañero mientras la sesión estaba abierta. Quien abrió, cerró, contó o apuntó un movimiento sale por su
-   nombre o, si su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el correo entero, también en
+   nombre o, si no tiene ninguno, por lo que va antes de la @ de su correo, nunca el correo entero, también en
    las sesiones de antes.
 3. Repasa Movimientos: cada venta se nombra por su documento («Tique …», «Factura …»), una devolución
    «Devolución de …» y una anulación «Anulación de …»; un movimiento a mano enseña su concepto. Y repasa
@@ -894,9 +894,9 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
   y fechas de solo lectura. Lo que guarda no pasa por las operaciones ni deja aviso.
 - **Quién actúa** (abre, cierra, cuenta, apunta un movimiento, da de alta un cajón o cambia los ajustes) se guarda
   como lo lee un compañero, no como el identificador interno del usuario: `actor` (`queries/people.py`) nombra con
-  `actor_name` de `base.queries.people`, la misma pieza que Mesas, Cocina, Pagos y Carritos: el nombre de la cuenta
-  o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega a quien ve el contacto
-  del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
+  `actor_name` de `base.queries.people`, la misma pieza que Mesas, Cocina, Pagos y Carritos: el nombre de Mi perfil o
+  el de la cuenta o, sin ninguno, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega a
+  quien ve el contacto del equipo (BASE-F119). Lo guardado antes con un correo lo limpió una vez la migración
   `0004_actors_without_address`, en la base de datos de cada negocio.
 - **Asistente**: cada operación declara `ai` (descripción; en las escrituras, `risk`: `high` en abrir,
   cerrar, cerrar sola, apuntar y contar; y sus `asks`, 2–3 frases en `en` y `es` como las diría quien
