@@ -127,19 +127,21 @@ check and pick it up later from **Open checks**; in a restaurant, this is also w
 to a table and send the order to the kitchen.
 
 #### Details
-<!-- from WORKBOOK.md sha256:fe52c4bb26a2 -->
+<!-- from WORKBOOK.md sha256:7dfd85e21598 -->
 It opens in the application's full screen; the ⋮ menu of the category strip has "Full screen" /
 "Exit full screen" (the browser's, when the device allows it) and it closes by tapping outside, with Esc
 or with the phone's back button. Two areas:
 
 - **Catalog**: the strip of Inventory categories with their number of articles, sold-out ones included
   ("All" first and, with Services, "Services" after it; the rest, in the position the business gave them
-  and, at equal position, by name: INVENTORY-F08), the magnifier that opens the search ("Search
-  product…", by name or SKU; with Services it also searches its services), the microphone key ("Speak") and the grid:
-  articles with their initials, their unit and their price (what is sold out, greyed with "Sold out"),
-  and at the end the "Open price" tile. In "Services", each service with its initials, its duration and
-  its price ("From", "Hourly", "Variable" or "Free" if it is not a fixed price). With many articles,
-  "Load more", at the end of the grid, brings the next ones.
+  and, at equal position, by name: INVENTORY-F08; each with its whole name, on two lines if it is very
+  long; if they do not all fit, the strip slides and, from the moment it opens, fades the edge that hides
+  more), the magnifier that opens the search ("Search product…", by name or SKU; with Services it also
+  searches its services), the microphone key ("Speak") and the grid: articles with their initials, their
+  unit and their price (what is sold out, greyed with "Sold out"), and at the end the "Open price" tile. In
+  "Services", each service with its initials, its duration and its price ("From", "Hourly", "Variable" or
+  "Free" if it is not a fixed price). With many articles, "Load more", at the end of the grid, brings the
+  next ones.
 - **Check** (on a phone, a drawer opened by the floating button with the total): at the top, the pause
   button "Park this check", the customer one ("Assign customer" or their name), "Open checks" with their
   number, and "Close" on a phone; the editable title ("New check") and the chips for the customer,

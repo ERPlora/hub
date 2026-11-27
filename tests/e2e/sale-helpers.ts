@@ -407,6 +407,16 @@ export function restoreDrawer(): void {
   drawerWasOn = null;
 }
 
+/** A till spec's `beforeAll`: the owner signed in at the till on a context of its own, the cash register off (the
+ *  drawer's lock is sale-cash-gate.spec.ts's), then `then` on that context, which closes after it. */
+export async function asOwnerAtTheTill(browser: Browser, then: (context: BrowserContext) => Promise<void> = async () => {}): Promise<void> {
+  const context = await browser.newContext({ baseURL: A });
+  await login(await context.newPage(), A, '/sale/pos');
+  await drawerOff(context);
+  await then(context);
+  await context.close();
+}
+
 /** The e2e checks: their lines name an `E2E-` product or an `e2e ` department, or their title is `e2e …`. */
 const E2E_ORDERS =
   "select distinct order_id as id from sale_orderline where sku like 'E2E-%' or name like 'e2e %' union select id from sale_order where label like 'e2e %'";

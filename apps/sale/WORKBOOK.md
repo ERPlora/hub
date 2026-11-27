@@ -136,12 +136,13 @@ cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
 
 - **Catálogo**: la tira de categorías de Inventario con su número de artículos, agotados incluidos
   («Todos» primero y, con Servicios, «Servicios» detrás; las demás, en la posición que les dio el negocio
-  y, a igual posición, por nombre: INVENTORY-F08), la lupa que abre el buscador («Buscar
-  producto…», por nombre o SKU; con Servicios busca también sus servicios), la tecla del micrófono («Hablar») y la
-  rejilla: artículos con sus iniciales, su unidad y su precio (lo agotado, en gris con «Agotado»), y al
-  final la baldosa «Precio libre». En «Servicios», cada servicio con sus iniciales, su duración y su
-  precio («Desde», «Por hora», «Variable» o «Gratis» si no es de precio fijo). Con muchos artículos,
-  «Cargar más», al final de la rejilla, trae los siguientes.
+  y, a igual posición, por nombre: INVENTORY-F08; cada una con su nombre entero, en dos líneas si es muy
+  largo; si no caben todas, la tira se desliza y, desde que se abre, difumina el borde que esconde más),
+  la lupa que abre el buscador («Buscar producto…», por nombre o SKU; con Servicios busca también sus
+  servicios), la tecla del micrófono («Hablar») y la rejilla: artículos con sus iniciales, su unidad y su
+  precio (lo agotado, en gris con «Agotado»), y al final la baldosa «Precio libre». En «Servicios», cada
+  servicio con sus iniciales, su duración y su precio («Desde», «Por hora», «Variable» o «Gratis» si no es
+  de precio fijo). Con muchos artículos, «Cargar más», al final de la rejilla, trae los siguientes.
 - **Cuenta** (en el móvil, un cajón que abre el botón flotante con el total): arriba, el botón de
   pausa «Aparcar esta cuenta», el de cliente («Asignar cliente» o su nombre), «Cuentas abiertas» con
   su número, y «Cerrar» en el móvil; el título editable («Cuenta nueva») y los chips de cliente,
