@@ -129,6 +129,53 @@
         "amount": "Escribe un importe mayor que cero.",
         "same": "Esa sugerencia ya está."
       }
+    },
+    "figures": {
+      "total": "Total",
+      "card": "Con tarjeta",
+      "cash": "En efectivo",
+      "other": "Otras formas",
+      "count": "{count} propina | {count} propinas"
+    },
+    "report": {
+      "by": {
+        "label": "Ver",
+        "person": "Por persona",
+        "shift": "Por turno"
+      },
+      "columns": {
+        "person": "Persona",
+        "shift": "Jornada",
+        "count": "Propinas",
+        "card": "Con tarjeta",
+        "cash": "En efectivo",
+        "other": "Otras formas",
+        "total": "Total"
+      },
+      "outside": "Fuera de una jornada fichada",
+      "open": "en curso",
+      "loading": "Cargando el informe…",
+      "loadError": "No se ha podido cargar el informe.",
+      "empty": "No hay propinas en este periodo.",
+      "emptyMessage": "Aquí se suman las propinas cobradas en caja y las que se anotan en Propinas.",
+      "noShifts": {
+        "heading": "Control horario no está activo",
+        "message": "El informe por turno sale de las jornadas fichadas en Control horario: actívalo en Apps o mira el informe por persona."
+      },
+      "entity": {
+        "one": "línea",
+        "many": "líneas"
+      },
+      "export": "Exportar"
+    },
+    "mine": {
+      "today": "Hoy",
+      "thisWeek": "Esta semana",
+      "week": "Esta semana, desde el {day}",
+      "loadError": "No se han podido cargar tus propinas.",
+      "retry": "Reintentar",
+      "empty": "Todavía no tienes propinas esta semana.",
+      "emptyMessage": "Las propinas de las cuentas que atiendes salen aquí en cuanto se cobran."
     }
   }
 }

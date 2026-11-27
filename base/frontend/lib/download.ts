@@ -66,3 +66,8 @@ export async function saveFile(filename: string, blob: Blob, t: Translate, win: 
   toastError(t(`base.download.refusal.${refusal}`));
   return false;
 }
+
+/** A CSV the page holds, saved by `saveFile` with a BOM: a spreadsheet then reads the accents of the names as UTF-8. */
+export function saveCsv(filename: string, csv: string, t: Translate): Promise<boolean> {
+  return saveFile(filename, new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }), t);
+}

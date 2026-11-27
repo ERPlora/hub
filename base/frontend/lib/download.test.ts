@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { browserDownloads, insideTheAppSaving, keyText as t, outOfTheApp } from '../__tests__/app-download';
-import { saveFile, SAVE_DOWNLOAD_COMMAND } from './download';
+import { saveCsv, saveFile, SAVE_DOWNLOAD_COMMAND } from './download';
 
 const mocks = vi.hoisted(() => ({ toastSuccess: vi.fn(async () => undefined), toastError: vi.fn(async () => undefined) }));
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
@@ -117,5 +117,28 @@ describe('saveFile inside the installed app', () => {
     await saveFile('x.pdf', new Blob(['x']), t, { __TAURI__: { core: { invoke } } });
 
     expect(invoke).toHaveBeenCalledWith('save_download', expect.objectContaining({ name: 'x.pdf' }));
+  });
+});
+
+describe('saveCsv', () => {
+  it('saves the text with a BOM, as UTF-8 CSV, so a spreadsheet reads the accents of the names', async () => {
+    const saved = browserDownloads();
+
+    await expect(saveCsv('tips-2026-11-25.csv', 'Person,Total\r\nPeña,2.50\r\n', t)).resolves.toBe(true);
+
+    expect(saved.map((file) => [file.name, file.blob.type])).toEqual([['tips-2026-11-25.csv', 'text/csv;charset=utf-8']]);
+    const bytes = new Uint8Array(await saved[0].blob.arrayBuffer());
+    expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+    expect(new TextDecoder().decode(bytes.slice(3))).toBe('Person,Total\r\nPeña,2.50\r\n');
+  });
+
+  it('inside the installed app the same bytes go to its Downloads, never a link', async () => {
+    const saved = browserDownloads();
+    const invoke = insideTheAppSaving({ path: 'Download/tips.csv' });
+
+    await expect(saveCsv('tips.csv', 'Person\r\n', t)).resolves.toBe(true);
+
+    expect(invoke).toHaveBeenCalledWith('save_download', { name: 'tips.csv', dataBase64: btoa('\xef\xbb\xbfPerson\r\n') });
+    expect(saved).toEqual([]);
   });
 });

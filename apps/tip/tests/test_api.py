@@ -26,6 +26,8 @@ ROUTES = {
     ("POST", "/tip/tips", "tip.tip.add"),
     ("POST", "/tip/tips/update", "tip.tip.update"),
     ("POST", "/tip/tips/void", "tip.tip.void"),
+    ("GET", "/tip/report", "tip.report.get"),
+    ("GET", "/tip/report/mine", "tip.report.mine"),
 }
 #: The platform's own reactions to Sales' events: no route.
 REACTIONS = {"tip.sale.void", "tip.sale.refund"}
@@ -103,3 +105,15 @@ def test_the_suggestions_of_a_charge_are_read_over_http(employee_client):
     read = get(employee_client, "/tip/suggestions", method_id=str(card.id), total=1000)
     assert read.status_code == 200, read.content
     assert (read.json()["enabled"], read.json()["suggestions"]) == (False, [])
+
+
+@HUB_DB
+def test_the_report_is_read_by_whoever_manages_and_my_tips_by_the_employee(coffee, employee_client, admin_client):
+    added = post(admin_client, "/tip/tips", {"sale": charge(payments=CARD).number, "method": "card", "amount": 150})
+    assert added.status_code == 201, added.content
+    report = get(admin_client, "/tip/report", by="shift")
+    assert report.status_code == 200, report.content
+    assert (report.json()["by"], report.json()["totals"]["card"]) == ("shift", 150)
+    assert get(employee_client, "/tip/report").status_code == 403
+    unlinked = get(employee_client, "/tip/report/mine")
+    assert (unlinked.status_code, unlinked.json()["error"]["code"]) == (409, "tip.member_not_linked")

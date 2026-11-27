@@ -6,11 +6,11 @@
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { offeredRowActions, pressRowAction } from '@erplora/ui/testing/data-table';
 import { AppPage } from '@erplora/ui/shell';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import { errorFrame, flush, words } from '../../../../base/frontend/__tests__/mount-in-shell';
-import { EMPLOYEE, MANAGER, mountTip } from '../__tests__/mount-tip';
+import { EMPLOYEE, MANAGER, mountTip, onTheTwentyFifth } from '../__tests__/mount-tip';
 import TipAdjustModal from '../components/TipAdjustModal.vue';
 import TipFormModal from '../components/TipFormModal.vue';
 import TipVoidModal from '../components/TipVoidModal.vue';
@@ -45,11 +45,7 @@ const ROWS = [
 const PAGE = { rows: ROWS, total: 3, limit: 50, offset: 0 };
 const EMPTY = { rows: [], total: 0, limit: 50, offset: 0 };
 
-beforeEach(() => {
-  vi.useFakeTimers({ toFake: ['Date'] });
-  vi.setSystemTime(new Date(2026, 10, 25, 9, 0));
-});
-afterEach(() => vi.useRealTimers());
+onTheTwentyFifth();
 
 async function setup(locale: 'en' | 'es' = 'en', session = MANAGER) {
   const m = await mountTip(TipsPage, { path: '/tip/tips', locale, session });
@@ -79,7 +75,7 @@ describe('TipsPage: the list', () => {
     const s = await setup();
     const page = s.wrapper.findComponent(AppPage);
     expect([page.props('title'), page.props('tabsLabel')]).toEqual(['Tips', 'Tips sections']);
-    expect((page.props('tabs') as Array<{ to: string }>).map((tab) => tab.to)).toEqual(['/tip/tips', '/tip/settings']);
+    expect((page.props('tabs') as Array<{ to: string }>).map((tab) => tab.to)).toEqual(['/tip/tips', '/tip/report', '/tip/settings', '/tip/mine']);
   });
 
   it('follows today’s tips, 50 from the first, «Loading tips…» until the first result', async () => {

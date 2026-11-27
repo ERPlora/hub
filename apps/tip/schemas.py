@@ -225,6 +225,54 @@ class TipOut(Schema):
 TipPage = Page[TipOut]
 
 
+# The report and my tips
+
+ReportBy = Literal["person", "shift"]
+
+
+class ReportIn(Closed):
+    by: ReportBy = Field(
+        "person", description="person: a line per person; shift: a line per working day clocked in Time clock."
+    )
+    date_from: date | None = Field(None, description="From this business day on; empty: date_to.")
+    date_to: date | None = Field(None, description="Up to this business day; empty: today.")
+
+
+class FiguresOut(Schema):
+    card: int = Field(description="By card, in cents.", json_schema_extra={"money": True})
+    cash: int = Field(description="In cash, in cents.", json_schema_extra={"money": True})
+    other: int = Field(description="Any other way (transfer, Bizum…), in cents.", json_schema_extra={"money": True})
+    total: int = Field(description="All of them, in cents.", json_schema_extra={"money": True})
+    count: int = Field(description="How many tips.")
+
+
+class ReportRowOut(FiguresOut):
+    member_id: UUID | None = Field(description="Whose; empty: unassigned or to the pool, or outside a working day.")
+    member_name: str = Field(description="Their name.")
+    shift_id: UUID | None = Field(description="By shift, the working day; empty: outside a clocked working day.")
+    clock_in_at: datetime | None = Field(description="When that working day was clocked in.")
+    clock_out_at: datetime | None = Field(description="When it was clocked out; empty: still open.")
+
+
+class ReportOut(Schema):
+    by: ReportBy = Field(description="person or shift.")
+    date_from: date = Field(description="Its first business day.")
+    date_to: date = Field(description="Its last business day.")
+    shifts_available: bool = Field(
+        description="By shift, false when Time clock's working days cannot be read (the app off): no lines."
+    )
+    rows: list[ReportRowOut] = Field(description="By person, the unassigned last; by shift, the outside ones last.")
+    totals: FiguresOut = Field(description="The period's active tips.")
+
+
+class MineOut(Schema):
+    member_name: str = Field(description="Whose they are: the caller's record of the team.")
+    today: date = Field(description="Today's business day.")
+    week_from: date = Field(description="The Monday the week starts on.")
+    day: FiguresOut = Field(description="Today's.")
+    week: FiguresOut = Field(description="From week_from to today.")
+
+
 # Reactions to Sales' events
 
 

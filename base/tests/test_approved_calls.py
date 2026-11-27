@@ -22,7 +22,7 @@ from live.operations import get as get_operation
 from apps.demo.models import Item
 from base.approvals import Approved, approval_of, consequence_context
 from base.models.approvals import Approval
-from base.operations import call
+from base.operations import answer_if_on, call
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests.test_approvals import APPROVABLE, CHANGE, SETTINGS, adam, approvable, approve, code, eva, post, with_pass
 
@@ -253,3 +253,23 @@ class TestCall:
         assert refused.value is self.UNAVAILABLE
         with pytest.raises(AppInactive):
             call(ctx, OTHER_COMMAND, {"name": "Off"})
+
+
+class TestAnswerIfOn:
+    """A read of an app the caller's app does not require, which only adds to what that app says on its own."""
+
+    def test_the_answer_of_the_other_apps_read(self):
+        call(context(permissions=frozenset({OTHER_PERMISSION})), OTHER_COMMAND, {"name": "Read"})
+        assert answer_if_on(context(permissions=frozenset({OTHER_PERMISSION})), OTHER_READ, {}).total == 1
+
+    def test_nothing_when_that_app_does_not_exist_is_off_or_is_not_the_callers_to_read(self, monkeypatch):
+        assert answer_if_on(context(permissions=frozenset({OTHER_PERMISSION})), "nowhere.thing.list", {}) is None
+        assert answer_if_on(context(permissions=frozenset({"demo.view"})), OTHER_READ, {}) is None
+        from base import activation
+
+        monkeypatch.setattr(activation, "off_apps", lambda scope: frozenset({"demo"}))
+        assert answer_if_on(context(permissions=frozenset({OTHER_PERMISSION})), OTHER_READ, {}) is None
+
+    def test_any_other_refusal_reaches_the_caller(self):
+        with pytest.raises(InvalidPayload):
+            answer_if_on(context(permissions=frozenset({OTHER_PERMISSION})), OTHER_COMMAND, {})

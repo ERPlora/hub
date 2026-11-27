@@ -2811,6 +2811,14 @@
     "method": "post",
     "path": "/api/tip/tips/void"
   },
+  "tip.report.get": {
+    "method": "get",
+    "path": "/api/tip/report"
+  },
+  "tip.report.mine": {
+    "method": "get",
+    "path": "/api/tip/report/mine"
+  },
   "verifactu.config.get": {
     "method": "get",
     "path": "/api/verifactu/config"

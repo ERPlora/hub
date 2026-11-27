@@ -192,3 +192,18 @@ msgstr "Esa propina se está anotando ahora mismo: inténtalo de nuevo en un mom
 
 msgid "That tip is voided: it no longer changes."
 msgstr "Esa propina está anulada: ya no cambia."
+
+msgid "Report"
+msgstr "Informe"
+
+msgid "My tips"
+msgstr "Mis propinas"
+
+msgid "Your user is not linked to any staff record: ask a manager to link it in Staff."
+msgstr "Tu usuario no está vinculado a ninguna ficha de Personal: pide a un responsable que la vincule en Personal."
+
+msgid "By person"
+msgstr "Por persona"
+
+msgid "By shift"
+msgstr "Por turno"
