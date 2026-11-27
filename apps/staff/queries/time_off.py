@@ -18,6 +18,7 @@ from apps.staff.schemas.time_off import (
 )
 from base.business import babel_locale
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 from .reads import _page, business_today, own_member
 from .time_off_reads import TIME_OFF_NOT_FOUND, _away_on, _name_approvers, _with_approver, live_time_off, load_time_off
@@ -60,7 +61,7 @@ TIME_OFF_ORDER = {
 def list_time_off(ctx: OperationContext, params: TimeOffListIn) -> dict:  # noqa: C901
     time_off = live_time_off()
     if params.search:
-        time_off = time_off.filter(member_name__icontains=params.search)
+        time_off = time_off.filter(contains_text(params.search, "member_name"))
     if params.member_id:
         time_off = time_off.filter(member_id=params.member_id)
     if params.status:

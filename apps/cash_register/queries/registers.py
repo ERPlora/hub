@@ -15,6 +15,7 @@ from apps.cash_register.schemas import (
     RegisterOut,
     RegisterPage,
 )
+from base.text_search import contains_text
 
 REGISTER_NOT_FOUND = _("That drawer is not available.")
 
@@ -69,7 +70,7 @@ def find_register(
 def list_registers(ctx: OperationContext, params: RegisterListIn) -> dict:
     registers = Register.objects.all()
     if params.search:
-        registers = registers.filter(name__icontains=params.search.strip())
+        registers = registers.filter(contains_text(params.search.strip(), "name"))
     if params.is_active is not None:
         registers = registers.filter(is_active=params.is_active)
     registers = registers.order_by(Lower("name"), "id")
