@@ -86,7 +86,7 @@ def test_a_write_on_a_card_says_whose_it_is_and_titles_it_as_its_screens_do(writ
     [
         ("customer.note.add", {"content": "Window table"}),
         ("customer.activity.add", {"kind": "appointment.visit", "title": "Visit"}),
-        ("customer.consent.grant", {"channel": "email", "notice_text": "May we email you?"}),
+        ("customer.consent.grant", {"channel": "email"}),
         ("customer.consent.withdraw", {"channel": "email"}),
     ],
 )
@@ -202,7 +202,7 @@ EXTRA = {
     "customer.customer.update": {"city": "Madrid"},
     "customer.note.add": {"content": "Window table"},
     "customer.activity.add": {"kind": "appointment.visit", "title": "Visit"},
-    "customer.consent.grant": {"channel": "email", "notice_text": "May we email you?"},
+    "customer.consent.grant": {"channel": "email"},
     "customer.consent.withdraw": {"channel": "email"},
     "customer.order.link": {"order_id": A_MISSING_ID},
     "customer.group.update": {"color": "#ff0000"},
@@ -543,7 +543,7 @@ def test_a_stage_a_source_and_a_channel_go_by_their_word_in_both_languages(langu
 )
 def test_a_consent_says_its_channel_and_where_it_was_given_in_both_languages(language, channel, source):
     card = a_card()
-    sent = {"customer_id": str(card.id), "channel": "postal", "source": "web_form", "notice_text": "May we write?"}
+    sent = {"customer_id": str(card.id), "channel": "postal", "source": "web_form"}
     said = shown("customer.consent.grant", sent, language)
     assert (said["channel"], said["source"]) == (channel, source)
 

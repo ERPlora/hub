@@ -15,10 +15,6 @@ class ConsentGrantIn(CustomerOfIn):
     channel: ConsentChannel = Field(
         description="The channel: email, sms, whatsapp, phone or postal."
     )
-    notice_text: _text(2000, 1) = Field(
-        description="The exact words shown to the customer, stored as proof."
-    )
-    notice_version: _text(60) = Field("", description="The version of those words.")
     purpose: Purpose = Field(
         "marketing", description="What the consent is for; marketing by default."
     )

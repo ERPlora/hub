@@ -85,7 +85,12 @@ describe('CustomerDetailPage: the card, live', () => {
       ['groups', DETAIL.group_ids],
       ['tags', DETAIL.tag_ids],
     ]);
-    expect(s.wrapper.findComponent(ConsentPanel).props()).toMatchObject({ customerId: 'c1', consent: DETAIL.consent, editable: true });
+    expect(s.wrapper.findComponent(ConsentPanel).props()).toMatchObject({
+      customerId: 'c1',
+      consent: DETAIL.consent,
+      notice: DETAIL.consent_notice,
+      editable: true,
+    });
     expect(s.wrapper.findComponent(CustomerCardBlocks).props('customerId')).toBe('c1');
     // CUSTOMER-F32: the allergies right after the data, where whoever does the service looks first.
     expect(s.wrapper.findComponent(HealthPanel).props()).toMatchObject({ customerId: 'c1', editable: true });
