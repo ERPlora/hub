@@ -8,6 +8,7 @@ import pytest
 from live.ninja import ensure_api_parity
 
 from apps.cash_register.api import router
+from apps.cash_register.models import Count
 from apps.cash_register.tests.conftest import HUB_DB
 from apps.flow.tests.test_api import get, post
 from base.tests.routes import spa_routes
@@ -72,6 +73,20 @@ def test_every_operation_has_a_route_and_is_open_to_api_keys():
     ops = {name for name in registry if name.startswith("cash_register.")}
     assert ops == {operation for _m, _p, operation in ROUTES}
     assert all(registry[name].expose_api for name in ops)
+
+
+@HUB_DB
+def test_an_empty_count_is_refused_over_http_and_records_nothing(employee_client):
+    post(employee_client, "/cash_register/sessions/open", {"opening_balance": 10000})
+    refused = post(
+        employee_client,
+        "/cash_register/counts",
+        {"type": "closing", "denominations": {"bills": {}, "coins": {}}},
+    )
+    assert refused.status_code == 422
+    assert refused.json()["error"]["code"] == "invalid_payload"
+    assert set(refused.json()["error"]["fields"]) == {"__all__"}
+    assert not Count.objects.exists()
 
 
 @HUB_DB
