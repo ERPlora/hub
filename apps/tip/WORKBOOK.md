@@ -3,8 +3,8 @@ Prefijo: TIP
 Alcance MVP: etapa TPV (restaurante y peluquería)
 Estado de la app: parcial — la hoja Cobro propone la propina y la anota con su venta en un cobro de una sola forma de pago;
 en la pantalla Propinas se anota, se ajusta, se anula y se echa al bote, y sale aparte en la caja; Ajustes guarda las
-sugerencias de cada forma de pago; faltan el informe y «Mis propinas» (hub#1498), la propina de cada cobro al repartir y
-«Quédese el cambio» (hub#1500) y el reparto (hub#1501)
+sugerencias de cada forma de pago; el Informe da las propinas por persona y por turno y cada empleado ve las suyas en «Mis
+propinas»; faltan la propina de cada cobro al repartir y «Quédese el cambio» (hub#1500) y el reparto y el pago (hub#1501)
 
 > Manual de usuario y especificación de la app `tip`. Se escribe **antes** que el código: no se programa
 > nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde (servidor y
@@ -95,8 +95,8 @@ Configuración inicial, paso a paso:
 
 ## Pantallas
 
-Propinas se abre desde el menú **Propinas** y tiene cuatro entradas: **Propinas**, **Reparto**, **Informe** y
-**Ajustes**. Quien no puede gestionar ve solo **Mis propinas**.
+Propinas se abre desde el menú **Propinas**. Quien gestiona tiene **Propinas**, **Reparto**, **Informe**, **Ajustes**
+y también **Mis propinas**; quien no puede gestionar ve solo **Mis propinas**.
 
 ### Paso «Propina» en el Cobro
 Dentro de la hoja **Cobro** de Ventas (SALE-F39), solo con las propinas encendidas: la fila «Propina» con
@@ -118,11 +118,17 @@ días y servicios por aprobar con «Aprobar» (TIP-F11) y los aprobados con «Pa
 «Sin reparto: cada propina es de quien atendió.».
 
 ### Informe
-Por persona o por turno (TIP-F13): propinas con tarjeta, en efectivo y declaradas, lo que aportó al bote y lo
-que recibió, pagado y pendiente. Exportar en CSV.
+El periodo («Hoy», «7 días», «30 días») y la vista, «Por persona» o «Por turno» (TIP-F13). Arriba, las cifras del
+periodo: «Total», «Con tarjeta», «En efectivo» y «Otras formas», con cuántas propinas son. Debajo, una línea por persona
+(o por jornada fichada) con «Propinas», «Con tarjeta», «En efectivo», «Otras formas» y «Total», en tabla o en tarjetas,
+y «Exportar», que baja en CSV lo que se ve. Con el reparto, además lo declarado, lo aportado al bote y lo recibido, lo
+pagado y lo pendiente (TIP-F07, TIP-F11, TIP-F12). Vacío: «No hay propinas en este periodo.»; cargando: «Cargando el
+informe…».
 
 ### Mis propinas
-Las propias, de hoy y de la semana (TIP-F14), con lo pagado y lo pendiente.
+Las propias, de hoy y de la semana (TIP-F14): para cada una, «Total», «Con tarjeta», «En efectivo» y «Otras formas».
+Con el reparto, además lo recibido del reparto, lo pagado y lo pendiente (TIP-F11, TIP-F12). Vacía: «Todavía no tienes
+propinas esta semana.».
 
 ### Ajustes
 «Pedir propina al cobrar», y por cada forma de pago activa sus tres sugerencias (cada una en «%» o en
@@ -155,8 +161,8 @@ importe), cuál sale marcada, «Permitir otra cantidad» y «Guardar».
 | TIP-F10 | Ver la vista previa del reparto | restaurante | no hecho |
 | TIP-F11 | Aprobar el reparto de un día o servicio | restaurante | no hecho |
 | TIP-F12 | Pagar las propinas | común | no hecho |
-| TIP-F13 | Ver el informe por persona y por turno | común | no hecho |
-| TIP-F14 | Ver mis propinas | común | no hecho |
+| TIP-F13 | Ver el informe por persona y por turno | común | hecho |
+| TIP-F14 | Ver mis propinas | común | hecho |
 
 ### TIP-F01 Configurar las propinas
 Estado: hecho
@@ -344,8 +350,9 @@ Pasos:
 1. En **Reparto**, en el día o servicio por aprobar, revisa lo de cada persona y pulsa «Aprobar».
 2. Para corregir algo de un día aprobado, pulsa «Reabrir», corrige y vuelve a aprobar.
 Entra: las propinas, declaraciones, ventas y fichajes del día y las reglas vigentes ese día.
-Sale: lo de cada persona, fijado (avisa: `tip.pool.settled`, `tip.pool.reopened`). Sin reglas, cada propina ya es
-de quien atendió y no hay nada que aprobar. Mientras el día está aprobado, sus propinas no se anotan, ni se ajustan ni
+Sale: lo de cada persona, fijado (avisa: `tip.pool.settled`, `tip.pool.reopened`), que entra como aportado y recibido
+en el Informe (TIP-F13) y como recibido en Mis propinas (TIP-F14). Sin reglas, cada propina ya es de quien atendió y no
+hay nada que aprobar. Mientras el día está aprobado, sus propinas no se anotan, ni se ajustan ni
 se anulan: «Ese día ya está repartido: reábrelo para añadir propinas.» y «Ese día ya está repartido: reábrelo para
 cambiar sus propinas.».
 Si falla: con un fichaje de ese día abierto o por revisar, «Hay jornadas de ese día sin cerrar o por revisar:
@@ -363,38 +370,50 @@ Pasos:
 2. Elige «En efectivo, de la caja» o «Por otra vía» (transferencia, nómina) y confirma.
 Entra: lo pendiente de esa persona (aprobado o, sin reparto, sus propias propinas).
 Sale: el pago (avisa: `tip.payout.paid`). En efectivo, sale del cajón como «Propinas pagadas» y baja el esperado
-(CASH_REGISTER-F18), para que la caja no salga descuadrada.
+(CASH_REGISTER-F18), para que la caja no salga descuadrada. Lo pagado y lo pendiente de cada persona salen en el
+Informe (TIP-F13) y en Mis propinas (TIP-F14).
 Si falla: en efectivo con la caja cerrada, «La caja está cerrada: abre una sesión de caja para pagar en
 efectivo.»; un pago que dejaría la caja en negativo sin permitirlo, el aviso de Caja (CASH_REGISTER-F05); pagar
 más de lo pendiente, «No se puede pagar más de lo pendiente.».
 Implicados: CASH_REGISTER-F05, CASH_REGISTER-F18
 
 ### TIP-F13 Ver el informe por persona y por turno
-Estado: no hecho — faltan el informe y «Mis propinas» (hub#1498)
+Estado: hecho
 Vertical: común
-Actor: responsable, administrador
+Actor: responsable, administrador, asistente
 Pantalla: Informe
 Pasos:
-1. En **Propinas → Informe**, elige el periodo y «Por persona» o «Por turno» (la jornada fichada).
-2. Sale, por persona: propinas con tarjeta, en efectivo y declaradas, lo aportado y lo recibido en el reparto,
-   lo pagado y lo pendiente. «Exportar» lo baja en CSV.
-Entra: propinas, declaraciones, repartos, pagos y jornadas.
-Sale: nada; enseña.
-Si falla: el error de carga con «Reintentar».
+1. En **Propinas → Informe**, elige el periodo («Hoy», «7 días» o «30 días») y «Por persona» o «Por turno» (la jornada
+   fichada en Control horario).
+2. Arriba salen las cifras del periodo: el total, con tarjeta, en efectivo y de otras formas (transferencia, Bizum…),
+   con cuántas propinas son. Se cuentan las propinas activas, no las anuladas.
+3. «Por persona», una línea por persona con cuántas propinas tiene y cuánto con tarjeta, en efectivo, de otras formas
+   y en total; las del bote y las que no son de nadie van juntas al final, en «Sin asignar».
+4. «Por turno», una línea por jornada fichada (la persona, la entrada y la salida, o «en curso») con las propinas de esa
+   persona anotadas mientras duraba, también las jornadas sin propinas; las anotadas fuera de toda jornada van juntas
+   al final, en «Fuera de una jornada fichada».
+5. «Exportar» baja en CSV las líneas que se ven, con los importes como números.
+Entra: las propinas y las jornadas fichadas.
+Sale: nada; enseña. Una propina anotada, ajustada o anulada, o una jornada fichada o corregida, cambia el informe solo.
+Si falla: el error de carga con «Reintentar». «Por turno» con Control horario apagado dice «Control horario no está
+activo» en lugar de las líneas, con las cifras del periodo arriba. Sin permiso para gestionar las propinas, «No tienes
+permiso».
 Implicados: ATTENDANCE-F01
 
 ### TIP-F14 Ver mis propinas
-Estado: no hecho — faltan el informe y «Mis propinas» (hub#1498)
+Estado: hecho
 Vertical: común
-Actor: empleado
+Actor: empleado, asistente
 Pantalla: Mis propinas
 Pasos:
 1. Abre **Propinas** (quien no gestiona ve directamente **Mis propinas**).
-2. Ve las suyas de hoy y de la semana, por forma de pago, lo recibido del reparto, lo pagado y lo pendiente.
-Entra: las propinas y pagos de su ficha de Personal.
-Sale: nada; enseña.
+2. Ve las suyas de hoy y de la semana, desde el lunes: el total, con tarjeta, en efectivo y de otras formas, con cuántas
+   propinas son. Solo las suyas y solo las activas.
+Entra: las propinas de su ficha de Personal.
+Sale: nada; enseña. Una propina suya anotada, ajustada o anulada la cambia sola.
 Si falla: sin ficha de Personal vinculada, «Tu usuario no está vinculado a ninguna ficha de Personal: pide a un
-responsable que la vincule en Personal.».
+responsable que la vincule en Personal.». Sin propinas esta semana, «Todavía no tienes propinas esta semana.». El
+error de carga, con «Reintentar».
 Implicados: STAFF-F03
 
 ## Servicios: lo que entra y lo que sale
@@ -412,8 +431,8 @@ permisos. Una propina se nombra por su venta («la propina de la 20261114-0007»
 | Una propina, por su id o por el número de su venta (la activa) | ver propinas | F06 | `tip.tip.get` |
 | Las reglas del reparto | gestionar | F08, F09 | `tip.policy.get` |
 | La vista previa del reparto de un día | gestionar | F10 | `tip.policy.preview` |
-| El informe por persona y por turno | gestionar | F13 | `tip.report.by_employee`, `tip.report.by_shift` |
-| Las propias de quien pregunta | ver propinas | F14 | `tip.report.mine` |
+| El informe de un periodo, por persona o por turno | gestionar | F13 | `tip.report.get` |
+| Las propias de quien pregunta, de hoy y de la semana | ver propinas | F14 | `tip.report.mine` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -446,8 +465,8 @@ confirmar.
 ### A qué reacciona
 
 - `sale.sale.voided` y `sale.sale.refunded` (devolución entera): anula la propina de esa venta (F06).
-- `attendance.record.clocked_out` y `attendance.record.corrected`: las pantallas del reparto y del informe se
-  refrescan solas.
+- `attendance.record.clocked_in`, `attendance.record.clocked_out` y `attendance.record.corrected`: el informe por turno
+  se refresca solo, y la pantalla del reparto cuando llegue.
 
 ### Lo que necesita de otras apps
 
@@ -456,8 +475,8 @@ confirmar.
 - **Caja** (requisito): apunta en la sesión abierta lo que entra y sale de propinas (`cash_register.movement.add`,
   CASH_REGISTER-F18).
 - **Personal** (requisito): las personas y su rol, para saber de quién es cada propina y repartir por puesto.
-- **Control horario**: las horas fichadas, para el reparto por horas y el informe por turno; se enciende con
-  Propinas cuando llegan el reparto y el informe.
+- **Control horario**: las jornadas fichadas, para el informe por turno, que las lee si Control horario está activo (si
+  no, lo dice), y las horas fichadas, para el reparto por horas; se enciende con Propinas cuando llega el reparto.
 
 ### Quién puede qué
 

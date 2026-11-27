@@ -45,6 +45,8 @@ ALL = [
     DEVICE_UPDATED,
     DEVICE_RETIRED,
 ]
+#: The system's own upkeep, never something done in the business: no automation starts on it.
+SYSTEM_ONLY = [JOB_PRUNED]
 #: Every change of the devices that print.
 DEVICE_EVENTS = [DEVICE_REGISTERED, DEVICE_UPDATED, DEVICE_RETIRED]
 #: Every change of the queue: what re-runs the screens that show it.

@@ -19,7 +19,7 @@ from apps.online_order import events
 from apps.online_order.models import Order, OrderLine, TableCode
 from apps.online_order.queries import COMBO_PAGE, PUBLIC, code_row, table_of
 from apps.online_order.schemas import PublicSendIn, PublicSentOut, SendLineIn, TableCodeOut
-from apps.table.schemas import TableRefIn
+from apps.table.schemas.tables import TableRefIn
 from base.apps_on import active_apps
 from base.catalog_groups import every_row
 from base.operations import call

@@ -162,7 +162,7 @@ describe('MenuBuilderPage', () => {
     s.cards()[2].vm.$emit('remove');
     await flush();
     const dialog = s.wrapper.findAllComponents(ConfirmDialog).find((d) => d.props('testid') === 'combo-course-delete')!;
-    expect([dialog.props('title'), dialog.props('message')]).toEqual(['Remove this course?', 'Remove the course «Drink» and its choices?']);
+    expect([dialog.props('title'), dialog.props('message')]).toEqual(['Remove this course?', 'Remove the course “Drink” and its choices?']);
     s.answer(200, { id: 'g3' });
     dialog.vm.$emit('confirm');
     await flush();

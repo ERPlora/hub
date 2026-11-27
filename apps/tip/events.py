@@ -30,6 +30,9 @@ SALE_REFUNDED = "sale.sale.refunded"
 PAYMENT_METHOD_CREATED = "sale.payment_method.created"
 SALE_SETTINGS_UPDATED = "sale.settings.updated"
 
+#: Time clock's working days, which the report by shift follows (no reaction: it only reads them again).
+SHIFT_EVENTS = ["attendance.record.clocked_in", "attendance.record.clocked_out", "attendance.record.corrected"]
+
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {SALE_VOIDED: "tip.sale.void", SALE_REFUNDED: "tip.sale.refund"}
 

@@ -156,7 +156,7 @@ for (const vp of VIEWPORTS) {
     const dayId = psql(`select id from schedule_specialday where name = '${name}'`);
     await rowAction(page, 'schedule-special-days', dayId, 'delete');
     const confirm = page.locator('ion-modal[data-testid=schedule-special-day-delete]');
-    await expect(confirm).toContainText(`«${name}» will be deleted. This cannot be undone.`);
+    await expect(confirm).toContainText(`“${name}” will be deleted. This cannot be undone.`);
     await expect(page.locator('[data-testid=schedule-special-day-delete-submit]')).toBeInViewport({ ratio: 1 });
     await settled(page);
     await page.screenshot({ path: shot(`APP-SCHEDULE-SCHEDULE-F06-${vp.label}`) });

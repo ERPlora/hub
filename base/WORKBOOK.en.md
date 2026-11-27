@@ -1353,7 +1353,7 @@ If it fails: "The retry failed:" with the reason and the report stays in sight.
 Involved: BASE-F32
 
 ### BASE-F34 Undo an import
-<!-- from WORKBOOK.md sha256:63445c3e5c16 -->
+<!-- from WORKBOOK.md sha256:09fbceedeb5f -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Reset)
@@ -1368,13 +1368,14 @@ Steps:
      (something another app still uses) shows apart with its reason. What each section has gets up to date.
 In: the import chosen.
 Out: exactly the rows it brought removed, also what came in later because it waited for an app, and what it still
-waited for no longer comes in; what was created afterwards stays (`base.import.undone`).
+waited for no longer comes in; what was created afterwards stays (`base.import.undone`). The own tax categories and
+rates it brought stay, like the rest of the business's settings: they do not count among the rows to remove.
 If it fails: the reason shows in the dialog itself, which does not close; an
 import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:4cd064b7d3a3 -->
+<!-- from WORKBOOK.md sha256:2a92cefa684f -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1395,8 +1396,9 @@ Out: a .blueprint.zip with the apps ticked and, of those that take their data, t
 and the products, and of Services, the categories and the services, with their own photos inside (INVENTORY-F33); of
 Tables, the zones and the tables; of Modifiers, the groups, each with its options and the products (by their code) and
 categories it applies to; of Menus and combos, the menus, each with its closed price, its courses, the products to
-choose in each course (by their code) with their supplement, and its own photo inside; and, only in a backup, the
-customers. Never the sales, people, PINs nor fiscal data. Loaded
+choose in each course (by their code) with their supplement, and its own photo inside; of Taxes, the business's own
+tax categories, each with its rates and its surcharges, never the factory ones, which every business already has and
+no file touches; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
 into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
 the business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
@@ -1425,7 +1427,7 @@ be exported.
 Involved: none
 
 ### BASE-F37 Reset the business by sections
-<!-- from WORKBOOK.md sha256:36c8b38f7f57 -->
+<!-- from WORKBOOK.md sha256:a605cd01b7fc -->
 Status: done
 Actor: owner
 Screen: Settings · Data and backups (Reset)
@@ -1435,7 +1437,8 @@ Steps:
   2. It says what is never removed: "Only what each section lists here is removed. Sales, invoices, fiscal
      records, people and their access, files and the business's settings always stay.", and "Before emptying, a
      full copy of the business's data is made and kept for 90 days, in «Copies» below.".
-  3. One row per section (an app) that has something, with what it has (each part and its rows) and its total.
+  3. One row per section (an app) that has something, with what it has (each part and its rows) and its total. Taxes
+     is no section: its tax categories and rates are the business's settings.
   4. Tick the sections and tap "Reset the business": "This cannot be undone", with "120 rows will be removed for
      good:" and the breakdown. Type the business's name ("Type «Casa Ramón» to confirm") and tap "Remove for good" (or
      "Cancel").
@@ -1951,7 +1954,7 @@ If it fails: without a network, the screen does not take the session as ended.
 Involved: BASE-F13, BASE-F70
 
 ### BASE-F59 Close the session of a till nobody touches
-<!-- from WORKBOOK.md sha256:c212f35c2ffd -->
+<!-- from WORKBOOK.md sha256:5172da3679bb -->
 Status: done
 Actor: system
 Screen: Access
@@ -1960,10 +1963,13 @@ Steps:
      15 or 30) and this device is shared.
   2. Nobody touches the screen (no finger, key or wheel) for those minutes.
   3. The session closes and the till goes back to **Access**, to the PIN pad.
-In: the business's minutes, which come with the page itself (there is no separate read that could fail).
+In: the business's minutes, which come with the page itself. If the business changes them while the till is already
+open, or this device stops being shared, the till counts with the new ones from that moment, without reloading: with
+"1 min" it closes a minute later without being touched, and with "Until signing out" it stops closing.
 Out: the session closed in the business. The open check is kept by its app.
 If it fails: with "Until signing out", on a personal device or where no PIN is asked nothing closes; even if the
-screen hangs, a session opened while the business always asks for the PIN lasts no more than 1 hour.
+screen hangs, a session opened while the business always asks for the PIN lasts no more than 1 hour. If the till
+cannot read the new minutes, it keeps the ones it had.
 Involved: BASE-F67
 
 ### BASE-F60 Switch user without losing the sale
@@ -3009,7 +3015,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:967ca2900bfb -->
+<!-- from WORKBOOK.md sha256:c292b3532729 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3028,7 +3034,14 @@ Steps:
      never a bare "110%" or "50 m", which do not say what changes; "Create in Sales & POS: Misc · Tax category: Product — generic · 21% · Position: 0"; "Open in Tables: Table: 4 ·
      Guests: 3". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
-     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
+     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". The
+     card shows each datum as the action takes it, not as the assistant wrote it: a supplement the assistant sends as
+     the text "300" shows "Supplement: €3.00", never "300", and the allergens show in the order they are saved in, the
+     Regulation's. What its screen says in words, the card says too: a maximum that in its app means no limit shows
+     "Maximum choices: No limit", never "0" (the same with the days ahead of a booking and the biggest discount without
+     a manager, whose 100% is no limit); a price that is not per unit says which unit it is for, as the till writes it:
+     "Price per kg: €45.00", "Price per 100 g: €2.50" (and the cost, per the product's unit). A text that is the
+     internal code of a record never shows: if the card cannot name it, it leaves it out. If
      the action names its own currency, the amount shows in it and with its decimals, as in Stripe or Square: a
      payment in dollars says "$15.00", and in yen, without decimals; a currency that does not exist is not made up:
      if the action no longer takes it in its data, no card shows (see "If it fails"); otherwise the amount shows as

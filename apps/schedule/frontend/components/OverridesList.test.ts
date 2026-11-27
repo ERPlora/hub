@@ -144,7 +144,7 @@ describe('OverridesList', () => {
     s.answer(200, { id: 'o1' });
     await s.action('o1', 'delete');
     const dialog = s.wrapper.findComponent(ConfirmDialog);
-    expect(dialog.props('message')).toBe('«Easter» will be deleted. This cannot be undone.');
+    expect(dialog.props('message')).toBe('“Easter” will be deleted. This cannot be undone.');
     dialog.vm.$emit('confirm');
     await settle();
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/schedule/overrides/delete', query: {}, body: { id: 'o1' } }]);

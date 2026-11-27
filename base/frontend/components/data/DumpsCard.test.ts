@@ -44,11 +44,11 @@ describe('DumpsCard', () => {
     expect(rows[1].text()).toContain('Oct 30, 2026');
     const intro = m.wrapper.get('[data-testid="dumps-intro"]').text();
     expect(intro).toContain('keeps it for 90 days');
-    expect(intro).toContain('«Export»');
+    expect(intro).toContain('“Export”');
   });
 
   it.each([
-    ['en', '90 days', '«Import»', '«Export»'],
+    ['en', '90 days', '“Import”', '“Export”'],
     ['es', '90 días', '«Importar»', '«Exportar»'],
   ] as const)('tells the owner what a copy is in plain words, with no database jargon (%s)', async (locale, kept, notIn, instead) => {
     const m = await card({ dumps: DUMPS }, undefined, locale);

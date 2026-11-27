@@ -46,7 +46,7 @@ describe('table catalogues (en source + es)', () => {
       ['table.form.titleEdit', 'Edit table', 'Editar mesa'],
       ['table.form.name', 'Name (optional)', 'Nombre (opcional)'],
       ['table.zones.search', 'Search zone…', 'Buscar zona…'],
-      ['table.zones.empty', 'No zones. Tap «+» to create the first one (Dining room, Terrace, Bar…).', 'No hay zonas. Pulsa «+» para crear la primera (Salón, Terraza, Barra…).'],
+      ['table.zones.empty', 'No zones. Tap “+” to create the first one (Dining room, Terrace, Bar…).', 'No hay zonas. Pulsa «+» para crear la primera (Salón, Terraza, Barra…).'],
       ['table.zones.delete.title', 'Delete zone?', '¿Borrar la zona?'],
       ['table.tables.empty', 'No tables.', 'Sin mesas.'],
       ['table.sessions.noTable', 'No table (parked)', 'Sin mesa (aparcada)'],

@@ -67,7 +67,7 @@ describe('kitchen catalogues (en source + es)', () => {
       ['kitchen.stations.add', 'Add station', 'Añadir estación'],
       ['kitchen.stations.form.namePlaceholder', 'e.g. Grill', 'p. ej. Plancha'],
       ['kitchen.stations.form.create', 'Create station', 'Crear estación'],
-      ['kitchen.stations.delete.title', 'Delete «{name}»?', '¿Eliminar «{name}»?'],
+      ['kitchen.stations.delete.title', 'Delete “{name}”?', '¿Eliminar «{name}»?'],
       [
         'kitchen.stations.delete.message',
         'The station leaves the list and stops receiving tickets. Tickets already sent keep it in their history.',

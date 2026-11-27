@@ -218,7 +218,7 @@
         "delete": "Delete"
       },
       "delete": {
-        "title": "Delete «{name}»?",
+        "title": "Delete “{name}”?",
         "message": "The station leaves the list and stops receiving tickets. Tickets already sent keep it in their history.",
         "confirm": "Delete station"
       },
@@ -239,8 +239,8 @@
     },
     "routing": {
       "title": "Product/category routing → station",
-      "hint": "Where each product and category goes. What has no route goes to «No station» and prints in the kitchen.",
-      "empty": "Nothing routed yet: everything goes to «No station».",
+      "hint": "Where each product and category goes. What has no route goes to “No station” and prints in the kitchen.",
+      "empty": "Nothing routed yet: everything goes to “No station”.",
       "search": "Search product or category…",
       "route": "Route",
       "remove": "Remove",

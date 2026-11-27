@@ -118,7 +118,7 @@
     },
     "links": {
       "form": {
-        "title": "Apply «{group}» to…",
+        "title": "Apply “{group}” to…",
         "kind": "What it applies to",
         "product": "Product",
         "category": "Category",
@@ -128,7 +128,7 @@
       },
       "detach": {
         "title": "Stop applying",
-        "message": "«{group}» will no longer be asked for {target}.",
+        "message": "“{group}” will no longer be asked for {target}.",
         "confirm": "Stop applying"
       }
     }

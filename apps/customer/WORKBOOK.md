@@ -916,14 +916,16 @@ entrada en la «Actividad» y su aviso `customer.health.consent_granted` o
 `customer.health.consent_withdrawn`), y los datos de salud, con «Datos de salud actualizados» en la
 actividad (sin su contenido) y el aviso `customer.health.updated`. Los avisos solo llevan
 identificadores. Retirar el permiso BORRA los datos de salud en el mismo paso. El asistente no lee ni
-apunta datos de salud: si se le pide una alergia, manda a este bloque (CUSTOMER-F05).
+apunta datos de salud: si se le pide guardar una alergia en la ficha, manda a este bloque (CUSTOMER-F05). La alergia
+de quien va a comer un plato no es un dato de la ficha: la marca en la línea de ese plato, sin este permiso
+(SALE-F41).
 Si falla: sin el permiso en vigor no se guarda nada: «Registra antes su permiso para guardar datos de
 salud.». Una prueba con fecha futura: «Esta fecha está en el futuro.»; un resultado sin fecha: «Pon la
 fecha de la prueba.», cada uno debajo de su campo: se quita en cuanto se corrige ese campo y vuelve si el
 siguiente intento también se rechaza; lo que no es de un campo sale en el bloque y se queda hasta el siguiente
 intento. «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona
 fichas ve el bloque sin botones.
-Implicados: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16
+Implicados: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16, SALE-F41
 
 ### CUSTOMER-F33 Recuperar una ficha eliminada
 Estado: hecho
@@ -1199,8 +1201,9 @@ asistente.
   art. 9, minimización). No salen en la lista, la búsqueda, la exportación ni `customer.customer.detail`.
   Los textos libres de la ficha que escribe el asistente (`customer.note.add`, el dato `notes` del alta y
   de la edición, los valores de los campos propios, `field_values`, y el texto de una entrada de
-  `customer.activity.add`) llevan `schemas/health.NOT_FOR_HEALTH_DATA`, que le dice que la salud no va ahí
-  y a qué bloque mandar; lo fija `tests/test_assistant_health_data.py` (hub#2278).
+  `customer.activity.add`) llevan `schemas/health.NOT_FOR_HEALTH_DATA`, que le dice que la salud no va ahí,
+  a qué bloque mandar y que la alergia de un plato va en su línea, con la herramienta que encuentra buscándola; lo
+  fijan `tests/test_assistant_health_data.py` (hub#2278) y `apps/sale/tests/test_assistant_line_allergy.py`.
 - La frase del consentimiento de marketing y su versión viven solo en `consent_notice.py` (F14): la ficha la
   recibe en `customer.customer.detail` (`consent_notice`, en el idioma de quien lee), la tarjeta del asistente la
   enseña con el resumen de `customer.consent.grant` (`services/assistant_cards.consent_words`, justo detrás del

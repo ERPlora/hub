@@ -14,7 +14,8 @@ from apps.table import events
 from apps.table.models import BOX, Hold, Table, TableSession, Zone
 from apps.table.queries.lookups import find_table, find_zone
 from apps.table.queries.floor import live_sessions, table_out
-from apps.table.schemas import DeletedOut, TableBulkIn, TableIn, TableMoveIn, TablePatchIn, TableRefIn
+from apps.table.schemas.fields import DeletedOut
+from apps.table.schemas.tables import TableBulkIn, TableIn, TableMoveIn, TablePatchIn, TableRefIn
 from apps.table.schemas.floor import TableOut, TablesOut
 from apps.table.services.writes import _stamp, settle
 

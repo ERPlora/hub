@@ -31,7 +31,7 @@ from django.db import DatabaseError
 from django.http import Http404, HttpRequest
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope, system_context
-from live.errors import AppInactive, InvalidPayload, NotFound, OperationError, Unauthorized
+from live.errors import AppInactive, InvalidPayload, NotFound, OperationError, PermissionDenied, Unauthorized
 from live.operations import UnknownOperation
 from live.operations import get as get_operation
 
@@ -177,6 +177,15 @@ def call(ctx: OperationContext, name: str, data: dict, *, unavailable: Operation
         if unavailable is not None:
             raise unavailable from None
         raise
+
+
+def answer_if_on(ctx: OperationContext, name: str, data: dict) -> Any:
+    """The answer of the read ``name`` of an app the caller's app does not require (``call``), or ``None`` when that app
+    is absent, off or not the caller's to read: for what only adds to what the caller's app says on its own."""
+    try:
+        return call(ctx, name, data)
+    except (UnknownOperation, AppInactive, PermissionDenied):
+        return None
 
 
 def _host_name(request: HttpRequest) -> str:

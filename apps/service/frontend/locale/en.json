@@ -231,7 +231,7 @@
       "title": "Void this voucher?",
       "message": "The voucher of customer {customer} ({amount}) stops being usable and stays in the list as voided. The money is not given back here: if it was paid, refund the sale from Sales with a return.",
       "reason": "Reason",
-      "reasonHelp": "Required. It stays on the voucher's record, e.g. «sold to the wrong customer».",
+      "reasonHelp": "Required. It stays on the voucher's record, e.g. “sold to the wrong customer”.",
       "confirm": "Void"
     },
     "adjust": {
@@ -246,7 +246,7 @@
       "days": "Days to extend",
       "daysHelp": "Expires {when} now. Up to 366.",
       "reason": "Reason",
-      "reasonHelp": "Required. It stays on the voucher's record, e.g. «we were closed in August».",
+      "reasonHelp": "Required. It stays on the voucher's record, e.g. “we were closed in August”.",
       "preview": "After the adjustment: {count} session left · {expiry} | After the adjustment: {count} sessions left · {expiry}",
       "previewUnlimited": "After the adjustment: no session limit · {expiry}",
       "expiresOn": "expires {when}",
@@ -255,7 +255,7 @@
     },
     "redeem": {
       "title": "Spend a session",
-      "message": "Mark one session of {customer}'s «{package}» voucher as delivered, outside the till.",
+      "message": "Mark one session of {customer}'s “{package}” voucher as delivered, outside the till.",
       "service": "Service",
       "member": "Professional",
       "memberHelp": "Who did it: what the session is worth counts in their production in Sales. Optional.",

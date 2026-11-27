@@ -850,7 +850,29 @@
       "whatsapp_inbox__message__sent": "a WhatsApp message is sent",
       "whatsapp_inbox__message__status_changed": "a WhatsApp message changes status",
       "whatsapp_inbox__note__added": "a note is written on a WhatsApp conversation",
-      "whatsapp_inbox__note__deleted": "a note of a WhatsApp conversation is deleted"
+      "whatsapp_inbox__note__deleted": "a note of a WhatsApp conversation is deleted",
+      "printing__device__registered": "a device is set up to print",
+      "printing__device__updated": "a device that prints changes",
+      "printing__device__retired": "a device is retired and prints no more",
+      "sale__order__relabeled": "a check's title changes",
+      "sale__sale__voucher_line_changed": "a sale line pays for a voucher, or no longer does",
+      "sale__voucher_session__recorded": "a voucher session done outside the checkout is recorded",
+      "service__grant__sale_linked": "a voucher is linked to the sale that charged it",
+      "tip__settings__updated": "the tip settings change",
+      "tip__tip__added": "a tip is left",
+      "tip__tip__adjusted": "a tip is corrected",
+      "tip__tip__voided": "a tip is voided",
+      "website__image__uploaded": "an image is uploaded to the website",
+      "website__site__updated": "the website changes",
+      "website__site__published": "the website is published",
+      "website__site__unpublished": "the website is taken offline",
+      "whatsapp_inbox__channel__connected": "the WhatsApp number is connected",
+      "whatsapp_inbox__channel__disconnected": "the WhatsApp number is disconnected",
+      "whatsapp_inbox__conversation__flagged": "a WhatsApp conversation needs attention",
+      "whatsapp_inbox__template__created": "a WhatsApp template is created",
+      "whatsapp_inbox__template__updated": "a WhatsApp template changes",
+      "whatsapp_inbox__template__deleted": "a WhatsApp template is deleted",
+      "whatsapp_inbox__template_sample__uploaded": "a file is uploaded for a WhatsApp template's header"
     },
     "actions": {
       "combo__option__get": "Read a choice of a set menu",
@@ -1432,7 +1454,9 @@
       "tip__tip__update": "Adjust a tip",
       "tip__tip__void": "Void a tip",
       "tip__tip__get": "Look at a tip",
-      "tip__suggestion__get": "Read the tips a charge suggests"
+      "tip__suggestion__get": "Read the tips a charge suggests",
+      "tip__report__get": "Read the tips report",
+      "tip__report__mine": "Read my tips"
     },
     "facts": {
       "created": "created",
@@ -2814,7 +2838,14 @@
       "adjust_reason": "Reason of the adjustment",
       "tip_id": "Tip",
       "before": "Before",
-      "after": "After"
+      "after": "After",
+      "by": "Grouped by",
+      "card": "By card",
+      "cash": "In cash",
+      "other": "Other ways",
+      "shift_id": "Working day",
+      "week": "This week",
+      "week_from": "Week from"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {

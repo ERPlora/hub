@@ -32,6 +32,14 @@ describe('KdsAllDayTable', () => {
     ]);
   });
 
+  it('says what is left of a dish sold by measure with its unit', async () => {
+    const rows = [row({ name: 'Prawns', unit: 'kg', quantity: '0.350' }), row({ name: 'Burger', quantity: '2.000' })];
+    const cells = async (locale: 'en' | 'es') =>
+      (await setup(rows, false, locale)).find('kitchen-display-allday').findAll('tbody tr').map((tr) => tr.findAll('td').map((td) => td.text()));
+    expect(await cells('en')).toEqual([['Prawns', '0.35 kg'], ['Burger', '2']]);
+    expect(await cells('es')).toEqual([['Prawns', '0,35 kg'], ['Burger', '2']]);
+  });
+
   it('leaves the station out when one is chosen', async () => {
     const s = await setup([row()], false);
     expect(s.find('kitchen-display-allday').findAll('th').map((th) => th.text())).toEqual(['Dish', 'Left']);

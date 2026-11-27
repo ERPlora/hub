@@ -76,6 +76,9 @@ ALL = [
     HEALTH_CONSENT_WITHDRAWN,
     HEALTH_UPDATED,
 ]
+#: Recorded only by the recovery from a separate copy, never by something done in the business: no automation starts on
+#: them.
+SYSTEM_ONLY = [CUSTOMER_RESTORED]
 
 # The Sales app's events (its WORKBOOK fixes their payload).
 SALE_COMPLETED = "sale.sale.completed"

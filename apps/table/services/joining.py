@@ -11,7 +11,7 @@ from apps.table.models import SessionMove, TableSession
 from apps.table.queries.lookups import find_session, find_table
 from apps.table.queries.sessions import order_is_open, session_out
 from apps.table.queries.floor import live_sessions
-from apps.table.schemas import SessionMergeIn, SessionOut, SessionSplitIn, SplitOut
+from apps.table.schemas.sessions import SessionMergeIn, SessionOut, SessionSplitIn, SplitOut
 from apps.table.services.writes import (
     S,
     SESSION_NOT_ACTIVE,

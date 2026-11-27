@@ -84,10 +84,10 @@ Initial setup, step by step:
    (CASH_REGISTER-F18) and, in **Tips**, that they carry the name of whoever served.
 
 ## Screens
-<!-- from WORKBOOK.md sha256:cbfa55a11cc6 -->
+<!-- from WORKBOOK.md sha256:24aa4c2f760b -->
 
-Tips opens from the **Tips** menu and has four entries: **Tips**, **Distribution**, **Report** and
-**Settings**. Whoever cannot manage sees only **My tips**.
+Tips opens from the **Tips** menu. Whoever manages has **Tips**, **Distribution**, **Report**, **Settings** and
+also **My tips**; whoever cannot manage sees only **My tips**.
 
 ### "Tip" step in the Charge
 <!-- from WORKBOOK.md sha256:582768602156 -->
@@ -112,13 +112,19 @@ days and services to approve with "Approve" (TIP-F11) and the approved ones with
 "No distribution: each tip belongs to whoever served.".
 
 ### Report
-<!-- from WORKBOOK.md sha256:4b5061e307bf -->
-By person or by shift (TIP-F13): card, cash and declared tips, what they put into the pool and what
-they received, paid and pending. Export as CSV.
+<!-- from WORKBOOK.md sha256:da04500ef3af -->
+The period ("Today", "7 days", "30 days") and the view, "By person" or "By shift" (TIP-F13). At the top, the
+period's figures: "Total", "By card", "In cash" and "Other ways", with how many tips they are. Below, one line per
+person (or per clocked working day) with "Tips", "By card", "In cash", "Other ways" and "Total", as a table or as
+cards, and "Export", which downloads what is shown as CSV. With the distribution, also what was declared, what was
+put into the pool and received, what is paid and what is pending (TIP-F07, TIP-F11, TIP-F12). Empty: "No tips in
+this period."; loading: "Loading the report…".
 
 ### My tips
-<!-- from WORKBOOK.md sha256:d458d6b48777 -->
-The person's own, today's and this week's (TIP-F14), with what is paid and what is pending.
+<!-- from WORKBOOK.md sha256:d5d00f1d70fc -->
+The person's own, today's and this week's (TIP-F14): for each, "Total", "By card", "In cash" and "Other ways". With
+the distribution, also what they received from it, what is paid and what is pending (TIP-F11, TIP-F12). Empty: "You
+have no tips this week yet.".
 
 ### Settings
 <!-- from WORKBOOK.md sha256:84b2cb16920f -->
@@ -138,7 +144,7 @@ an amount), which one comes marked, "Allow other amount" and "Save".
 | No permission | What they cannot do does not show; if they get there another way, "You do not have permission". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:fe772bcb6b44 -->
+<!-- from WORKBOOK.md sha256:eb05efd97100 -->
 
 | ID | Flow | Vertical | Status |
 |---|---|---|---|
@@ -154,8 +160,8 @@ an amount), which one comes marked, "Allow other amount" and "Save".
 | TIP-F10 | See the distribution preview | restaurant | not done |
 | TIP-F11 | Approve the distribution of a day or service | restaurant | not done |
 | TIP-F12 | Pay out the tips | common | not done |
-| TIP-F13 | See the report by person and by shift | common | not done |
-| TIP-F14 | See my tips | common | not done |
+| TIP-F13 | See the report by person and by shift | common | done |
+| TIP-F14 | See my tips | common | done |
 
 ### TIP-F01 Set up tips
 <!-- from WORKBOOK.md sha256:4fe80a656a28 -->
@@ -348,7 +354,7 @@ If it fails: a day with no tips, "That day has no tips.".
 Involved: TIP-F08
 
 ### TIP-F11 Approve the distribution of a day or service
-<!-- from WORKBOOK.md sha256:64ee343e4e83 -->
+<!-- from WORKBOOK.md sha256:a1f386db8fca -->
 Status: not done — it comes with the distribution (hub#1501)
 Vertical: restaurant
 Actor: manager, administrator, assistant
@@ -357,8 +363,9 @@ Steps:
 1. In **Distribution**, on the day or service to approve, review each person's share and press "Approve".
 2. To correct something of an approved day, press "Reopen", correct it and approve it again.
 In: the day's tips, declarations, sales and clock-ins and the rules in force that day.
-Out: each person's share, fixed (announces: `tip.pool.settled`, `tip.pool.reopened`). Without rules, each tip
-already belongs to whoever served and there is nothing to approve. While the day is approved, its tips are not
+Out: each person's share, fixed (announces: `tip.pool.settled`, `tip.pool.reopened`), which goes into the Report
+(TIP-F13) as put in and received and into My tips (TIP-F14) as received. Without rules, each tip already belongs to
+whoever served and there is nothing to approve. While the day is approved, its tips are not
 recorded, adjusted or voided: "That day is already distributed: reopen it to add tips." and "That day is already
 distributed: reopen it to change its tips.".
 If it fails: with a clock-in of that day open or pending review, "Some working days of that day are not closed or
@@ -367,7 +374,7 @@ already paid out is not reopened: "That day already has tips paid out.".
 Involved: ATTENDANCE-F05, ATTENDANCE-F08
 
 ### TIP-F12 Pay out the tips
-<!-- from WORKBOOK.md sha256:50ccb73e0d0c -->
+<!-- from WORKBOOK.md sha256:6d2d73eef72d -->
 Status: not done — it comes with the distribution (hub#1501)
 Vertical: common
 Actor: manager, administrator, assistant
@@ -377,41 +384,52 @@ Steps:
 2. Choose "In cash, from the cash register" or "Another way" (bank transfer, payroll) and confirm.
 In: that person's pending amount (approved or, without a distribution, their own tips).
 Out: the payout (announces: `tip.payout.paid`). In cash, it leaves the drawer as "Tips paid out" and lowers the
-expected cash (CASH_REGISTER-F18), so that the cash register does not come out unbalanced.
+expected cash (CASH_REGISTER-F18), so that the cash register does not come out unbalanced. What is paid and what is
+pending for each person show in the Report (TIP-F13) and in My tips (TIP-F14).
 If it fails: in cash with the cash register closed, "The cash register is closed: open a cash session to pay in
 cash."; a payout that would leave the cash register negative when that is not allowed, the Cash register notice
 (CASH_REGISTER-F05); paying more than what is pending, "You cannot pay more than what is pending.".
 Involved: CASH_REGISTER-F05, CASH_REGISTER-F18
 
 ### TIP-F13 See the report by person and by shift
-<!-- from WORKBOOK.md sha256:a84ebea0920a -->
-Status: not done — the report and "My tips" are missing (hub#1498)
+<!-- from WORKBOOK.md sha256:78631bd7e106 -->
+Status: done
 Vertical: common
-Actor: manager, administrator
+Actor: manager, administrator, assistant
 Screen: Report
 Steps:
-1. In **Tips → Report**, choose the period and "By person" or "By shift" (the clocked working day).
-2. It shows, per person: card, cash and declared tips, what they put in and received in the distribution,
-   what is paid and what is pending. "Export" downloads it as CSV.
-In: tips, declarations, distributions, payouts and working days.
-Out: nothing; it shows.
-If it fails: the loading error with "Retry".
+1. In **Tips → Report**, choose the period ("Today", "7 days" or "30 days") and "By person" or "By shift" (the
+   working day clocked in Time clock).
+2. At the top show the period's figures: the total, by card, in cash and other ways (bank transfer, Bizum…), with
+   how many tips they are. Active tips count, voided ones do not.
+3. "By person", one line per person with how many tips they have and how much by card, in cash, other ways and in
+   total; those of the pool and those of nobody go together at the end, in "Unassigned".
+4. "By shift", one line per clocked working day (the person, the clock-in and the clock-out, or "still open") with
+   the tips of that person recorded while it lasted, also the working days without tips; those recorded outside any
+   working day go together at the end, in "Outside a clocked working day".
+5. "Export" downloads the lines shown as CSV, with the amounts as numbers.
+In: the tips and the clocked working days.
+Out: nothing; it shows. A tip recorded, adjusted or voided, or a working day clocked or corrected, changes the
+report by itself.
+If it fails: the loading error with "Retry". "By shift" with Time clock off says "Time clock is not active" instead
+of the lines, with the period's figures at the top. Without permission to manage tips, "You do not have
+permission".
 Involved: ATTENDANCE-F01
 
 ### TIP-F14 See my tips
-<!-- from WORKBOOK.md sha256:8472fd231be5 -->
-Status: not done — the report and "My tips" are missing (hub#1498)
+<!-- from WORKBOOK.md sha256:9f02e0dffb66 -->
+Status: done
 Vertical: common
-Actor: employee
+Actor: employee, assistant
 Screen: My tips
 Steps:
 1. Open **Tips** (whoever does not manage sees **My tips** straight away).
-2. They see their own, today's and this week's, by payment method, what they received from the distribution, what
-   is paid and what is pending.
-In: the tips and payouts of their Staff record.
-Out: nothing; it shows.
+2. They see their own, today's and this week's, since Monday: the total, by card, in cash and other ways, with how
+   many tips they are. Only their own and only the active ones.
+In: the tips of their Staff record.
+Out: nothing; it shows. A tip of theirs recorded, adjusted or voided changes it by itself.
 If it fails: without a linked Staff record, "Your user is not linked to any Staff record: ask a manager to link it
-in Staff.".
+in Staff.". Without tips this week, "You have no tips this week yet.". The loading error, with "Retry".
 Involved: STAFF-F03
 
 ## Services: what goes in and what comes out
@@ -422,7 +440,7 @@ rules and the same permissions. A tip is named by its sale ("the tip of 20261114
 name.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:b8a5335b486a -->
+<!-- from WORKBOOK.md sha256:1f0ffde82899 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -432,8 +450,8 @@ name.
 | One tip, by its id or by its sale's number (the active one) | view tips | F06 | `tip.tip.get` |
 | The distribution rules | manage | F08, F09 | `tip.policy.get` |
 | The distribution preview of a day | manage | F10 | `tip.policy.preview` |
-| The report by person and by shift | manage | F13 | `tip.report.by_employee`, `tip.report.by_shift` |
-| The own tips of whoever asks | view tips | F14 | `tip.report.mine` |
+| The report of a period, by person or by shift | manage | F13 | `tip.report.get` |
+| The own tips of whoever asks, of today and of the week | view tips | F14 | `tip.report.mine` |
 
 ### What it offers: actions (they change data)
 <!-- from WORKBOOK.md sha256:d38b06cf1026 -->
@@ -466,22 +484,23 @@ confirming.
 | Tips paid out | Paying | The person, the amount and the way | `tip.payout.paid` |
 
 ### What it reacts to
-<!-- from WORKBOOK.md sha256:d68b27d362b9 -->
+<!-- from WORKBOOK.md sha256:735c149928af -->
 
 - `sale.sale.voided` and `sale.sale.refunded` (full refund): voids that sale's tip (F06).
-- `attendance.record.clocked_out` and `attendance.record.corrected`: the distribution and report screens
-  refresh by themselves.
+- `attendance.record.clocked_in`, `attendance.record.clocked_out` and `attendance.record.corrected`: the report by
+  shift refreshes by itself, and the distribution screen when it arrives.
 
 ### What it needs from other apps
-<!-- from WORKBOOK.md sha256:55c9ec68b856 -->
+<!-- from WORKBOOK.md sha256:6b374bf5e602 -->
 
 - **Sales & POS** (requirement): the tip's sale, who served and its payment methods; the **Charge** sheet paints
   the "Tip" step because Tips declares it (SALE-F39), without Sales knowing about tips.
 - **Cash register** (requirement): records in the open session what comes in and goes out in tips
   (`cash_register.movement.add`, CASH_REGISTER-F18).
 - **Staff** (requirement): the people and their role, to know whose each tip is and to share out by role.
-- **Time clock**: the clocked hours, for the distribution by hours and the report by shift; it is turned on with Tips
-  when the distribution and the report arrive.
+- **Time clock**: the clocked working days, for the report by shift, which reads them if Time clock is on (if not,
+  it says so), and the clocked hours, for the distribution by hours; it is turned on with Tips when the distribution
+  arrives.
 
 ### Who can do what
 <!-- from WORKBOOK.md sha256:307405264216 -->

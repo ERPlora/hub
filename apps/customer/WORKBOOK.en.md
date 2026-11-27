@@ -934,7 +934,7 @@ row of its own.
 Involved: BASE-F119
 
 ### CUSTOMER-F32 Note allergies or the sensitivity test with their permission
-<!-- from WORKBOOK.md sha256:0e310d72620d -->
+<!-- from WORKBOOK.md sha256:7e76caefffb6 -->
 Status: done
 Actor: everyone who manages cards (seeing it: everyone)
 Screen: Customer card
@@ -959,15 +959,16 @@ Out: the permission, as one more fact of the consent book (purpose "health data"
 "Activity" and its notice `customer.health.consent_granted` or `customer.health.consent_withdrawn`), and
 the health data, with "Health data updated" in the activity (without its content) and the
 `customer.health.updated` notice. The notices carry only identifiers. Withdrawing the permission ERASES
-the health data in the same step. The assistant neither reads nor notes health data: asked for an allergy,
-it sends to this block (CUSTOMER-F05).
+the health data in the same step. The assistant neither reads nor notes health data: asked to keep an allergy on
+the card, it sends to this block (CUSTOMER-F05). The allergy of whoever is going to eat a dish is no datum of the
+card: it marks it on that dish's line, without this permission (SALE-F41).
 If it fails: without the permission in force nothing is saved: "Record their permission first to keep
 health data.". A test with a future date: "This date is in the future."; a result without a date: "Enter
 the date of the test.", each under its field: it goes as soon as that field is corrected and comes back if
 the next try is refused too; what is not of a field shows in the block and stays until the next try.
 "This customer is no longer available." if the card is no longer there. Whoever
 does not manage cards sees the block without buttons.
-Involved: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16
+Involved: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16, SALE-F41
 
 ### CUSTOMER-F33 Recover a deleted card
 <!-- from WORKBOOK.md sha256:d22a2a0e055b -->

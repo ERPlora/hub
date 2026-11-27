@@ -35,7 +35,7 @@ describe('GrantVoidModal', () => {
     );
     expect([s.el('service-grant-void-reason').label, s.el('service-grant-void-reason').helperText]).toEqual([
       'Reason',
-      'Required. It stays on the voucher\'s record, e.g. «sold to the wrong customer».',
+      'Required. It stays on the voucher\'s record, e.g. “sold to the wrong customer”.',
     ]);
     expect(s.el('service-grant-void-submit').disabled).toBe(true);
   });

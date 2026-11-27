@@ -180,7 +180,7 @@ describe('CustomerSearch: «+ New customer» (F18)', () => {
     const s = await setup(null, undefined, true);
     await s.results([]);
     await s.type('customer-picker-search', '600 111 222');
-    expect(s.el('customer-search-quick-add')!.textContent?.trim()).toBe('+ New customer «600 111 222»');
+    expect(s.el('customer-search-quick-add')!.textContent?.trim()).toBe('+ New customer “600 111 222”');
     await s.click('customer-search-quick-add');
     expect([s.el('customer-search-quick-name')!.value, s.el('customer-search-quick-phone')!.value]).toEqual(['', '600 111 222']);
     await s.click('customer-search-quick-cancel');

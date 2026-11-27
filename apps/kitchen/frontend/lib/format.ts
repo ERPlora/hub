@@ -3,14 +3,15 @@
 // The money is the business's (`useBusinessMoney`, the platform's: its country's currency and the decimals the server
 // counts it in), written with the platform's `formatMoney`: its thousands grouped from four digits on, as every screen
 // writes them; until it is known an amount is a dash, never the euro by default nor guessed decimals. Its decimals come
-// from the server, never from the browser's Intl (which gives none to the forint). A quantity is written with the
-// platform's `formatQuantity` («2.000» → «2», «1500.000» → «1.500»), as the till that sent it writes it.
+// from the server, never from the browser's Intl (which gives none to the forint). A dish's quantity is written with
+// the platform's `orderTicketQuantity` («2.000» → «2×», «1500.000» → «1.500×», «0.350» kg → «0,35 kg») and what is
+// left of it with `quantityWithUnit`, as the till that sent it writes it.
 import type { Money } from '../../../../base/frontend/lib/home';
 import type { SettingsOut } from '../operations';
 
 export type { Money };
 export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
-export { formatQuantity } from '@erplora/ui/components';
+export { orderTicketQuantity, quantityWithUnit } from '@erplora/ui/components';
 
 export type Semaphore = 'ok' | 'warning' | 'critical' | 'off';
 

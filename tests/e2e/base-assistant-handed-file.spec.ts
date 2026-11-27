@@ -53,7 +53,8 @@ test('BASE-F112 — the menu and the customers asked as a CSV come to download u
   await openPanelAtTheDesk(page);
 
   await ask(page, 'E2E-ASK inventory__product__export {}');
-  await expect(fileUnder(page)).toHaveText('Descargar inventario-productos.csv');
+  await expect(fileUnder(page)).toHaveText('inventario-productos.csv');
+  await expect(fileUnder(page)).toHaveAccessibleName('Descargar inventario-productos.csv');
   const menu = await downloaded(page);
   const products = await api<{ content: string }>(context, A, 'GET', '/inventory/products/export');
   expect(menu).toEqual({ name: 'inventario-productos.csv', text: products.data.content });
@@ -64,7 +65,8 @@ test('BASE-F112 — the menu and the customers asked as a CSV come to download u
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await ask(page, 'E2E-ASK customer__customer__export {}');
-  await expect(fileUnder(page)).toHaveText('Descargar customers.csv');
+  await expect(fileUnder(page)).toHaveText('customers.csv');
+  await expect(fileUnder(page)).toHaveAccessibleName('Descargar customers.csv');
   const customers = await downloaded(page);
   const button = await api<{ csv: string }>(context, A, 'GET', '/customer/customers/export');
   // The Customers button saves its CSV with the mark Excel needs to read it as UTF-8.

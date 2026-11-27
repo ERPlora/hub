@@ -40,7 +40,7 @@
       },
       "delete": {
         "title": "Withdraw this menu?",
-        "message": "«{name}» stops being on sale, together with its courses and choices. Tickets already issued keep reading it.",
+        "message": "“{name}” stops being on sale, together with its courses and choices. Tickets already issued keep reading it.",
         "confirm": "Withdraw"
       },
       "photo": "Photo"
@@ -89,7 +89,7 @@
       "edit": "Edit details",
       "delete": "Withdraw",
       "deleteTitle": "Remove this course?",
-      "deleteMessage": "Remove the course «{name}» and its choices?",
+      "deleteMessage": "Remove the course “{name}” and its choices?",
       "deleteConfirm": "Remove the course"
     },
     "rule": {
@@ -124,13 +124,13 @@
       "add": "Add choice",
       "edit": "Edit this choice",
       "delete": "Remove this choice",
-      "editing": "Editing «{article}». It keeps its position in the course.",
+      "editing": "Editing “{article}”. It keeps its position in the course.",
       "markSoldOut": "Sold out",
       "markAvailable": "Available",
       "noProduct": "Pick a catalogue product first.",
-      "duplicate": "This course already offers that product. To let it be picked twice, switch on «the same option may be picked more than once».",
+      "duplicate": "This course already offers that product. To let it be picked twice, switch on “the same option may be picked more than once”.",
       "deleteTitle": "Remove this choice?",
-      "deleteMessage": "Remove «{name}» from the course «{course}»?",
+      "deleteMessage": "Remove “{name}” from the course “{course}”?",
       "deleteConfirm": "Remove the choice",
       "status": {
         "sold_out": "Sold out",

@@ -25,7 +25,8 @@ reading (``Bundle.dropped``).
   limit, no right to it) loads nothing and its report says why. A load kept, and the part of it that waits for an
   app being set up, is ``loads``'s.
 - :func:`removal.undo` removes exactly the rows a load created; :func:`removal.reset` every row of the apps chosen;
-  both through the apps' own delete (or archive).
+  both through the apps' own delete (or archive). A part that has no way to be removed (a business's own tax
+  categories) stays, like the rest of the business's settings.
 
 No ORM here: every read and write is an operation of its app, called as the person who asked
 (``live.operations.get``), so its permission, its transaction and its events are the operation's own.

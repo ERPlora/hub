@@ -136,7 +136,7 @@ describe('ProductDetailModal', () => {
     s.el('inventory-product-detail-print-label')!.click();
     await flush();
     expect(s.calls('/api/inventory/products/print_label').map((call) => s.body(call))).toEqual([{ id: 'p1' }, { id: 'p1' }]);
-    expect(s.el('inventory-product-detail-label')?.textContent?.trim()).toBe('The label went to the printer «Labels».');
+    expect(s.el('inventory-product-detail-label')?.textContent?.trim()).toBe('The label went to the printer “Labels”.');
     expect(device.printLabel).not.toHaveBeenCalled();
   });
 
@@ -145,7 +145,7 @@ describe('ProductDetailModal', () => {
     s.el('inventory-product-detail-print-label')!.click();
     await flush();
     expect(s.el('inventory-product-detail-label')?.textContent?.trim()).toBe(
-      'The label is waiting in the print queue: no printer has the «Label» function. Give it to one in Printing.',
+      'The label is waiting in the print queue: no printer has the “Label” function. Give it to one in Printing.',
     );
   });
 
