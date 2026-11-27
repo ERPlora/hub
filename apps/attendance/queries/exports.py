@@ -6,28 +6,30 @@ import datetime as dt
 import io
 from typing import Any
 
-from django.utils import timezone
+from django.utils import timezone, translation
+from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.operations import operation
 
+from apps.attendance.models import Record
 from apps.attendance.schemas import ExportOut, RecordExportIn
 from base.business import business_zone
 
 from .days import durations, effective_status, scoped_records
 from .reads import review_hours
 
-#: The CSV of the old module, column for column (WORKBOOK ATTENDANCE-F10).
 CSV_HEADER = (
-    "date",
-    "user",
-    "clock_in",
-    "clock_out",
-    "break_minutes",
-    "worked_minutes",
-    "status",
-    "within_radius_in",
-    "within_radius_out",
+    pgettext_lazy("attendance export", "Date"),
+    pgettext_lazy("attendance export", "Person"),
+    pgettext_lazy("attendance export", "Clock-in"),
+    pgettext_lazy("attendance export", "Clock-out"),
+    pgettext_lazy("attendance export", "Break minutes"),
+    pgettext_lazy("attendance export", "Worked minutes"),
+    pgettext_lazy("attendance export", "Status"),
+    pgettext_lazy("attendance export", "Clock-in within radius"),
+    pgettext_lazy("attendance export", "Clock-out within radius"),
 )
+YES, NO = pgettext_lazy("attendance export", "Yes"), pgettext_lazy("attendance export", "No")
 #: What a spreadsheet runs as a formula when a cell starts with it (OWASP «CSV injection»).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
@@ -56,7 +58,7 @@ def _local(instant: dt.datetime | None) -> str:
 
 
 def _flag(value: bool | None) -> str:
-    return "" if value is None else str(int(value))
+    return "" if value is None else str(YES if value else NO)
 
 
 @operation(
@@ -88,25 +90,26 @@ def export_records(ctx: OperationContext, params: RecordExportIn) -> dict:
     as_of = timezone.now()
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\r\n")
-    writer.writerow(CSV_HEADER)
     count = 0
     hours = review_hours()
-    for record in scoped_records(ctx, params, as_of, hours):
-        breaks, worked = durations(record, as_of, hours)
-        writer.writerow(
-            [
-                record.work_date.isoformat(),
-                _cell(record.member_name),
-                _local(record.clock_in_at),
-                _local(record.clock_out_at),
-                breaks // 60,
-                "" if worked is None else worked // 60,
-                effective_status(record, hours, as_of),
-                _flag(record.in_within_radius),
-                _flag(record.out_within_radius),
-            ]
-        )
-        count += 1
+    with translation.override(ctx.language):
+        writer.writerow([str(title) for title in CSV_HEADER])
+        for record in scoped_records(ctx, params, as_of, hours):
+            breaks, worked = durations(record, as_of, hours)
+            writer.writerow(
+                [
+                    record.work_date.isoformat(),
+                    _cell(record.member_name),
+                    _local(record.clock_in_at),
+                    _local(record.clock_out_at),
+                    breaks // 60,
+                    "" if worked is None else worked // 60,
+                    str(Record.Status(effective_status(record, hours, as_of)).label),
+                    _flag(record.in_within_radius),
+                    _flag(record.out_within_radius),
+                ]
+            )
+            count += 1
     return {
         "filename": export_filename(params.date_from, params.date_to),
         "content_type": "text/csv",
