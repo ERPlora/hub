@@ -1,4 +1,4 @@
-"""Migration 0033 of base: a name kept as an address keeps only what goes before the «@» (BASE-F119).
+"""Migration 0034 of base: a name kept as an address keeps only what goes before the «@» (BASE-F119).
 
 erplora.com names an account without a name by its address, and the Hub copied it as the person's name: on control's
 copy of the account, on the business's person, on «My profile» and on a visit of ERPlora's support. Forward, each bare address keeps what goes before
@@ -17,9 +17,9 @@ from base.tests.hub_migration import database
 
 __all__ = ["database"]
 
-BEFORE = [("base", "0032_approval_by_role")]
-AFTER = [("base", "0033_names_without_address")]
-MIGRATION = import_module("base.migrations.0033_names_without_address")
+BEFORE = [("base", "0033_apps_turned_on_by_a_load_are_chosen")]
+AFTER = [("base", "0034_names_without_address")]
+MIGRATION = import_module("base.migrations.0034_names_without_address")
 
 
 def kept_by(apps, database, number: int, who: str) -> None:
