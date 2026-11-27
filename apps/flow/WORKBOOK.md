@@ -114,9 +114,10 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
   pediste una automatización. No hacen nada hasta que las revises y las actives.», y por cada uno su
   nombre, la etiqueta «Borrador», **Revisar** y una × («Descartar») (FLOW-F18, FLOW-F19).
-- **Tus automatizaciones** — solo si hay alguna. El buscador «Busca por nombre, por lo que la arranca o
-  por lo que hace», los filtros **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa, un
-  horario, una fecha, a mano), el orden (tocadas al final, nombre) y el recuento. Cada fila: casilla
+- **Tus automatizaciones** — solo si hay alguna. Bajo el título, el recuento («Se ven 1 de 3»). En la barra
+  de la lista, como en las demás listas: el buscador «Buscar automatización…», el orden (tocadas al final,
+  nombre) y el botón de filtros, que abre **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa,
+  un horario, una fecha, a mano). Cada fila: casilla
   para elegirla, el nombre, cuándo arranca en palabras («Cuando se cobra una venta», «Todos los días a
   las 09:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
   el interruptor, **Hacer una copia** y **Borrar**. Con varias elegidas, **Encenderlas** y **Ponerlas en
@@ -237,8 +238,10 @@ Pasos:
    cortadas entre palabras, y sale también al dejar el puntero encima; en la tarjeta del teléfono, el
    título acaba en puntos suspensivos pasadas dos líneas y el nombre se lee entero debajo, en «Nombre», y
    al abrirla.
-2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o filtra por
-   **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**.
+2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o, con el botón de
+   filtros, filtra por **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**. En
+   el escritorio el buscador, el orden y el botón de filtros caben en una línea; en el teléfono el buscador
+   va en su propia línea y lo demás debajo.
 3. Sin resultados: «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas**.
 4. Toca una fila para abrirla en el editor.
 Entra: las automatizaciones del negocio, en páginas de hasta 100.

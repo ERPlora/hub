@@ -100,7 +100,7 @@ gallery**, with ready-made automations to start from and the ones other apps bri
 and each row open the editor, and **How does this work?** opens the guide.
 
 #### What it shows, from top to bottom
-<!-- from WORKBOOK.md sha256:ffe93a8a999d -->
+<!-- from WORKBOOK.md sha256:b4b2cd8a2b2c -->
 Menu **Automations**, a single entry. From top to bottom:
 
 - The **New automation** button, top right: only its **+**, with its name on hover.
@@ -113,9 +113,10 @@ Menu **Automations**, a single entry. From top to bottom:
 - **Proposed by the assistant** — only if there are drafts: "The assistant wrote them when you asked it
   for an automation. They do nothing until you review and turn them on.", and for each one its name, the
   "Draft" label, **Review** and an × ("Discard") (FLOW-F18, FLOW-F19).
-- **Your automations** — only if there is some. The search box "Search by name, by what starts it or by
-  what it does", the **Showing** filters (on, paused) and **Starts with** (something that happens, a
-  schedule, a date, by hand), the order (touched last, name) and the count. Each row: a box to pick it,
+- **Your automations** — only if there is some. Under the heading, the count ("Showing 1 of 3"). In the
+  list's bar, as in the other lists: the search box "Search automation…", the order (touched last, name)
+  and the filters button, which opens **Showing** (on, paused) and **Starts with** (something that
+  happens, a schedule, a date, by hand). Each row: a box to pick it,
   the name, when it starts in words ("When a sale is charged", "Every day at 09:00", "Only when you press
   Run"), the last run, the "Active" or "Paused" label, the switch, **Make a copy** and **Delete**. With
   several picked, **Turn them on** and **Pause them** (FLOW-F02, FLOW-F03).
@@ -228,7 +229,7 @@ your answer**, with what an automation asks them.
 Involved: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 See, search and sort the automations
-<!-- from WORKBOOK.md sha256:6fe3e4d161f2 -->
+<!-- from WORKBOOK.md sha256:a5a77530ac5d -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
@@ -238,8 +239,10 @@ Steps:
    tablet and on a desk it takes the lines it needs in its row, broken between words, and it also shows when
    resting the pointer on it; on the phone's card the title ends in an ellipsis past two lines and the name
    is read in full below, under "Name", and when opening it.
-2. Type in the search box (name, the notice that starts it or the actions it does) or filter by
-   **Showing** and **Starts with**; sort by **Last touched** or **Name**.
+2. Type in the search box (name, the notice that starts it or the actions it does) or, with the filters
+   button, filter by **Showing** and **Starts with**; sort by **Last touched** or **Name**. On a desk the
+   search box, the order and the filters button fit on one line; on a phone the search box takes its own
+   line and the rest goes below.
 3. With no results: "Nothing here matches that." and **Show them all again**.
 4. Tap a row to open it in the editor.
 In: the business's automations, in pages of up to 100.
