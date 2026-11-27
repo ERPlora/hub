@@ -134,13 +134,14 @@ async function printReport(): Promise<void> {
           fill="outline"
           data-testid="cash-register-detail-print"
           :disabled="printing.pending.value"
+          :aria-label="$t('cash_register.detail.print')"
+          :title="$t('cash_register.detail.print')"
           @click="printReport"
         >
           <HubIcon
-            slot="start"
+            slot="icon-only"
             name="ion:receipt-outline"
           />
-          {{ $t('cash_register.detail.print') }}
         </ion-button>
       </header>
       <SessionSummary :session="session" />

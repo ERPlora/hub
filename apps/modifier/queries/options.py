@@ -1,6 +1,5 @@
 """The options of the groups (MODIFIER-F04): their list and one option."""
 
-from django.db.models import Q
 from django.db.models.functions import Lower
 from live.context import OperationContext
 from live.operations import operation
@@ -9,6 +8,7 @@ from apps.modifier.models import ModifierOption
 from apps.modifier.schemas.fields import Page
 from apps.modifier.schemas.options import OptionDetailOut, OptionListIn, OptionOut, OptionRefIn
 from base.ordering import list_order
+from base.text_search import contains_text
 
 from .reads import _option_label, _page, find_group, find_option, option_row
 
@@ -53,7 +53,7 @@ def list_options(ctx: OperationContext, params: OptionListIn) -> dict:
         *by_group, *_OPTION_ORDER[params.sort.removeprefix("-")], descending=params.sort.startswith("-")
     )
     if params.search:
-        options = options.filter(Q(name__icontains=params.search) | Q(kitchen_name__icontains=params.search))
+        options = options.filter(contains_text(params.search, "name", "kitchen_name"))
     return _page(options.order_by(*order), params, option_row)
 
 

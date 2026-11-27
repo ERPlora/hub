@@ -243,7 +243,7 @@ class SettingsIn(In):
 
     is_enabled: bool | None = Field(None, description="The public page takes bookings.")
     page_title: _text(120) | None = Field(
-        None, description="The page's title; empty = «Book an appointment»."
+        None, description="The page's title; empty: its usual title, in the visitor's language."
     )
     welcome_message: Text | None = Field(
         None, description="The text at the top of the page."

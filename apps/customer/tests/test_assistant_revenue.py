@@ -31,7 +31,7 @@ def lucia():
         Customer.objects.create(name=name)
 
 
-@pytest.mark.parametrize(("country", "said"), [("ES", "3.60 EUR"), ("JP", "360 JPY")])
+@pytest.mark.parametrize(("country", "said"), [("ES", "3,60\xa0€"), ("JP", "360\xa0JPY")])
 def test_the_customers_revenue_reaches_the_model_as_the_screen_shows_it(lucia, country, said):
     Hub.objects.update_or_create(slug=A.key, defaults={"name": "Bar A", "country": country})
     assert told("customer.customer.stats") == {"total": 4, "active": 4, "vip": 0, "total_revenue": said}
@@ -42,4 +42,4 @@ def test_the_customers_revenue_reaches_the_model_as_the_screen_shows_it(lucia, c
 def test_a_change_the_owner_said_yes_to_tells_the_model_its_amounts_as_the_screen_shows_them(lucia):
     Hub.objects.update_or_create(slug=A.key, defaults={"name": "Bar A", "country": "ES"})
     card = Customer.objects.get(name="Lucía QA")
-    assert told("customer.customer.update", yes=True, id=str(card.id), company_name="QA")["total_spent"] == "3.60 EUR"
+    assert told("customer.customer.update", yes=True, id=str(card.id), company_name="QA")["total_spent"] == "3,60\xa0€"

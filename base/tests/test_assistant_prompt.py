@@ -77,8 +77,8 @@ def test_the_instructions_set_the_language_the_money_and_the_screens():
     # Off-topic questions (films, cinemas) would spend the business's allowance.
     assert "Only help with this business and with using ERPlora" in text
     assert "Spanish" in text
-    # An amount by its mark, not by the words «in cents».
-    assert "EUR" in text and '"money": true' in text and "minor unit" in text
+    # An amount by its mark, not by the words «in cents»; the business's currency as the screens write it.
+    assert "17,00\xa0€" in text and '"money": true' in text and "minor unit" in text
     assert "[Ajustes](/settings)" in text
     assert "Bar Pepe" in text
 
@@ -95,19 +95,24 @@ def test_the_instructions_keep_the_persons_tu_or_usted_to_the_end():
 
 
 @pytest.mark.parametrize(
-    ("currency", "decimals", "example"),
-    [("EUR", 2, "17.00 EUR → 1700"), ("JPY", 0, "17 JPY → 17"), ("KWD", 3, "17.000 KWD → 17000")],
+    ("language", "currency", "decimals", "said"),
+    [
+        ("es", "EUR", 2, "17,00\xa0€"),
+        ("en", "EUR", 2, "€17.00"),
+        ("es", "JPY", 0, "17\xa0JPY"),
+        ("en", "JPY", 0, "¥17"),
+        ("en", "KWD", 3, "KWD\xa017.000"),
+    ],
 )
-def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currency, decimals, example):
-    """A tool's result tells each amount in its own currency, as the screens write it (an invoice keeps the one it was
-    issued in), and the model says it as it comes: a result in cents read as euros said 360 as «360,00 €». What the
-    model sends still goes in the minor unit of its currency (no cents in yen); an amount of its own, in the
-    business's."""
-    text = assistant.prompt.instructions(language="en", currency=currency, decimals=decimals, business="Bar Pepe", screens={})
-    assert example in text
-    said = example.split(" → ")[0]
+def test_the_instructions_write_an_amount_as_the_screens_do_in_the_persons_language(language, currency, decimals, said):
+    """A tool's result tells each amount in its own currency, as the screens write it in the person's language (an
+    invoice keeps the one it was issued in), and the model says it as it comes: told «17.00 EUR» as the screens' way, a
+    bar in Spanish heard «1.50 EUR» for the «1,50 €» on Inventory (hub#2603). What the model sends still goes in the
+    minor unit of its currency (no cents in yen); an amount of its own, in the business's, written the same way."""
+    text = assistant.prompt.instructions(language=language, currency=currency, decimals=decimals, business="Bar Pepe", screens={})
+    assert f"{said} → {17 * 10**decimals}" in text
     assert f'as the screens write it (`"{said}"`): say it as it comes' in text
-    assert f"in {currency} with {decimals} decimals" in text
+    assert f"{17:.{decimals}f} {currency}" not in text and f"in {currency} with {decimals} decimals" not in text
     assert "`currency_decimals`" not in text and "two decimals" not in text
 
 
@@ -220,6 +225,7 @@ def test_a_write_a_manager_approves_is_said_to_ask_for_that_approval():
 
 def test_the_setup_block_carries_what_is_pending_and_who_does_it():
     status = {
+        "title": "Termina de configurar tu negocio",
         "total": 3,
         "pending": 2,
         "unavailable": 0,
