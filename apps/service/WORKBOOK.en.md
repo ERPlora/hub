@@ -148,7 +148,7 @@ its movements, and from there you spend a session outside the checkout, give ses
 mistake. At the top, **Vouchers with no customer** gathers the vouchers whose customer was deleted.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:64a747432988 -->
+<!-- from WORKBOOK.md sha256:aa3393436310 -->
 At the top, **Vouchers with no customer** (manager, owner and administrator only). Table with the search
 box "Search package…", columns **Name, Discount, Closed price, Lines** and **Status** (Active, Archived or
 Deleted). In **Filters**, the Status filter on **Deleted** switches to the view of the vouchers deleted
@@ -172,7 +172,7 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
   **Courtesy**, **Correction**), the service, the date, "Customer: <name>", on a session spent saying who
   did it "Professional: <name>", who and the reason. Empty: "This voucher has not been used yet.".
 - **Sold vouchers**: one row per purchase, with **Active** or **Voided**, the customer, the date, the
-  amount, "{used} used · {remaining} left" (or "· no limit"), "Expires …" or "Never expires" and what
+  amount, "2 used · 3 left" ("1 used · 1 left"; or "· no limit"), "Expires …" or "Never expires" and what
   was given or corrected afterwards; on a voided one, "Voided by {who} on {when}" and the reason.
   **Spend a session** (on a voucher neither voided nor expired and with a session left, or with no limit),
   **Adjust** and **Void** buttons where they apply and for whoever may.

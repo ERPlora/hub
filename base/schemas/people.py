@@ -7,6 +7,7 @@ from django.utils.translation import gettext_noop
 from ninja import Schema
 from pydantic import Field
 
+from base import people as people_rules
 from base.models import Membership
 from base.schemas.assistant import names
 from base.sensitive import TEAM_CONTACT
@@ -69,15 +70,30 @@ class PersonIn(Schema):
 
 
 class PersonMayOut(Schema):
-    """What who asks may change of this person's way in."""
+    """What who asks may change of this person's way in and of their role in this business."""
 
     remove_pin: bool
     set_badge: bool
+    give_role: bool = Field(
+        description="Who asks may give them a role of the business, or return them to their invitation's."
+    )
+
+
+#: Why who asks, managing roles, may not give a person a role (the codes of ``base.role.assign``).
+RoleRefusal = Literal[*people_rules.ROLE_REFUSALS]
 
 
 class PersonDetailOut(PersonOut):
     pin_set_at: dt.datetime | None
     badge_set_at: dt.datetime | None
+    business_role: str | None = Field(
+        description=(
+            "The id of the role of the business that rules what they may do (base.role.list); null: their invitation's."
+        )
+    )
+    role_refusal: RoleRefusal | None = Field(
+        description="Why who asks may not give them a role; null when they may, or when who asks does not manage roles."
+    )
     may: PersonMayOut
 
 

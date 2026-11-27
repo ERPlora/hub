@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// A person's page, for whoever runs the business. Their name, email and role belong to erplora.com and are changed
-// there; here only their PIN and badge. A badge reader's burst fills the field wherever the focus is. What this
+// A person's page, for whoever runs the business. Their name, email and the role of their invitation belong to
+// erplora.com and are changed there; here their role in this business, their PIN and their badge. A badge reader's burst fills the field wherever the focus is. What this
 // administrator may not change (the owner's way in, one's own badge) is said instead of offered. «Open on erplora.com»
 // leaves the Hub by `openExternalLink` (the installed app opens nothing on a `_blank` link) and is never offered in the
 // Google Play copy (`managementOffered`). Whoever the server refuses it gets «No access», as on any screen their role
@@ -12,6 +12,7 @@ import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
+import PersonRoleCard from '../components/PersonRoleCard.vue';
 import { createBadgeReader } from '../lib/access';
 import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
@@ -177,7 +178,7 @@ onBeforeUnmount(() => stopReader?.());
             <dd>{{ person.name }}</dd>
             <dt>{{ t('base.people.columns.email') }}</dt>
             <dd>{{ person.email || '—' }}</dd>
-            <dt>{{ t('base.people.columns.role') }}</dt>
+            <dt>{{ t('base.person.data.invitation') }}</dt>
             <dd>{{ t(roleKey(person.role)) }}</dd>
             <dt>{{ t('base.people.columns.access') }}</dt>
             <dd>{{ access }}</dd>
@@ -201,6 +202,8 @@ onBeforeUnmount(() => stopReader?.());
             @click="openExternalLink(membersUrl, $event)"
           >{{ t('base.person.data.open') }}</a>
         </section>
+
+        <PersonRoleCard :person="person" />
 
         <section
           class="settings-card"

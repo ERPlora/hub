@@ -14,7 +14,7 @@ from base.catalog_groups import every_row
 from base.models.access import Credential
 from base.models import Hub, HubUser, Membership
 from base.models.profile import Profile
-from base.permissions import ADMINISTER_HUB, VIEW_HOME, is_a_person
+from base.permissions import ADMINISTER_HUB, INVITATION_ALONE, MANAGE_ROLES, VIEW_HOME, is_a_person
 from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut
 from base.schemas.sessions import HubUserGetIn, HubUserOut
 
@@ -153,7 +153,8 @@ def signed_in_role(ctx: OperationContext) -> str:
 
 
 def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
-    """A person's page: what the hub keeps of their way in and what who asks may change of it."""
+    """A person's page: what the hub keeps of their way in and of their role in this business, and what who asks may
+    change of them."""
     actor, actor_role = signed_in_username(ctx), signed_in_role(ctx)
     credential = person["credential"]
 
@@ -162,12 +163,26 @@ def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str
             actor=actor, actor_role=actor_role, target=person["id"], target_role=person["role"], badge=badge
         ) is None
 
+    manages = ctx.has(MANAGE_ROLES)
+    refused = manages and people_rules.role_refusal(
+        actor=actor, actor_role=actor_role, target=person["id"], target_role=person["role"]
+    )
     return {
         **person_out(ctx, person),
         "pin_set_at": credential.pin_set_at if credential and credential.pin_hash else None,
         "badge_set_at": credential.badge_set_at if credential and credential.badge_digest else None,
-        "may": {"remove_pin": may(False), "set_badge": may(True)},
+        "business_role": _business_role_of(person),
+        "role_refusal": refused or None,
+        "may": {"remove_pin": may(False), "set_badge": may(True), "give_role": manages and not refused},
     }
+
+
+def _business_role_of(person: dict[str, Any]) -> str | None:
+    """The id of the role of the business that rules what ``person`` may do; ``None`` when their invitation's does."""
+    if person["role"] in INVITATION_ALONE:
+        return None
+    held = HubUser.objects.filter(username=person["id"]).values_list("business_role_id", flat=True).first()
+    return str(held) if held else None
 
 
 @operation(

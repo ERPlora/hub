@@ -219,11 +219,11 @@ class TestOnePerson:
         answer = get(client, "/people/detail", person="saas:3").json()
         assert answer["id"] == "saas:3" and answer["ways"] == {"account": True, "pin": True, "badge": False}
         assert answer["pin_set_at"] is not None and answer["badge_set_at"] is None
-        assert answer["may"] == {"remove_pin": True, "set_badge": True}
+        assert answer["may"] == {"remove_pin": True, "set_badge": True, "give_role": True}
         owner = get(client, "/people/detail", person="saas:1").json()
-        assert owner["may"] == {"remove_pin": False, "set_badge": False}
+        assert owner["may"] == {"remove_pin": False, "set_badge": False, "give_role": False}
         mine = get(client, "/people/detail", person="saas:2").json()
-        assert mine["may"] == {"remove_pin": True, "set_badge": False}
+        assert mine["may"] == {"remove_pin": True, "set_badge": False, "give_role": False}
 
     def test_a_person_of_another_business_or_nobody_is_not_found(self, client, adam, make_user):
         make_user("saas:9", host=B.key, role=Membership.Role.EMPLOYEE)
