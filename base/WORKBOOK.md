@@ -4798,8 +4798,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   puede correrla; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
   el modelo lee de una herramienta sale de `base.assistant.tools.run`, que llama a `run_tool` de `live` con
   `zone=business_zone()` y `money`, así que sus horas van en la zona del negocio y no en UTC, y cada importe marcado
-  como dinero va como lo escriben las pantallas («3.60 EUR»), en la moneda del objeto que la nombra (`currency`, con
-  sus `currency_decimals` si los da) o en la del negocio, nunca en la unidad menor: lo comprueban
+  como dinero va como lo escriben las pantallas en el idioma de la persona («3,60 €» en español, «€3.60» en inglés:
+  lo escribe `base.business.money_text`), en la moneda del objeto que la nombra (`currency`) o en la del negocio,
+  nunca en la unidad menor: lo comprueban
   `base/tests/test_business_facts.py`, también con dos negocios en zonas distintas, y
   `base/tests/test_assistant_result_amounts.py`; el paso del asistente de Automatizaciones lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,

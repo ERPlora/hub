@@ -30,4 +30,4 @@ def test_a_records_total_reaches_the_model_as_the_screen_shows_it(issuer):
     data = {"messages": [{"role": "user", "content": "¿De cuánto es el tique?"}, asked], "pending": [call]}
     plan = turn(ctx_for("hub_owner", language="es"), turn.input.model_validate(data)).model_dump(mode="json")
     [result] = plan["append"]
-    assert json.loads(result["content"])["total_amount"] == "1.21 EUR"
+    assert json.loads(result["content"])["total_amount"] == "1,21\xa0€"
