@@ -970,7 +970,8 @@
       },
       "save": "Guardar",
       "saved": "Rol guardado.",
-      "saveError": "No se pudo guardar el rol"
+      "saveError": "No se pudo guardar el rol",
+      "mine": "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
     },
     "person": {
       "title": "Persona",
@@ -980,9 +981,10 @@
       "retry": "Reintentar",
       "data": {
         "heading": "Sus datos",
-        "managed": "El nombre, el email y el rol se cambian en erplora.com.",
+        "managed": "El nombre, el email y el rol de la invitación se cambian en erplora.com.",
         "open": "Abrir en erplora.com",
-        "notEntered": "Aún no ha entrado en este hub: su PIN y su placa se guardan para cuando entre."
+        "notEntered": "Aún no ha entrado en este hub: su PIN y su placa se guardan para cuando entre.",
+        "invitation": "Rol de la invitación"
       },
       "pin": {
         "heading": "PIN",
@@ -1017,6 +1019,26 @@
       "refused": {
         "ownerOnly": "Solo el propietario cambia el acceso del propietario.",
         "ownBadge": "Nadie da de alta su propia placa: pídeselo a otro administrador."
+      },
+      "role": {
+        "heading": "Rol en este negocio",
+        "intro": "Manda sobre el rol de su invitación: lo que ve y puede hacer aquí cambia al momento, sin volver a entrar.",
+        "label": "Rol",
+        "invitation": "El de la invitación ({role})",
+        "given": "{name} tiene ahora el rol {role}.",
+        "failed": "No se pudo cambiar el rol.",
+        "loading": "Cargando los roles…",
+        "loadError": "No se pudieron cargar los roles.",
+        "retry": "Reintentar",
+        "none": "Este negocio aún no tiene roles propios: se crean en Empleados › Roles, a partir de cualquier rol.",
+        "make": "Crear un rol",
+        "refused": {
+          "owner": "El propietario siempre es el propietario: nadie le da otro rol.",
+          "accountant": "La gestoría solo lee y no ocupa plaza del plan: se queda con el rol de su invitación.",
+          "own": "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.",
+          "above": "Solo puedes dar un rol a quien está por debajo de ti en el negocio.",
+          "beyond": "Un rol no puede permitir más de lo que puedes hacer tú."
+        }
       }
     },
     "apiKeys": {

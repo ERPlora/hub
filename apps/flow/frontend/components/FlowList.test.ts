@@ -95,7 +95,7 @@ describe('FlowList', () => {
     expect(first.text()).toContain('When a sale is charged');
     expect(first.text()).toContain('Never ran');
     expect(first.text()).toContain('Active');
-    expect(second.text()).toContain('Every day at 09:00');
+    expect(second.text()).toContain('Every day at 9:00 AM');
     expect(second.text()).toContain('Stopped by an error');
     expect(second.text()).toContain('Paused');
   });
@@ -161,7 +161,7 @@ describe('FlowList', () => {
 
   it('each switch says which automation it turns on or off', async () => {
     const s = await setup();
-    expect(s.find('flow-list-toggle-f1').attributes('aria-label')).toBe('Turn «Flow f1» on or off');
+    expect(s.find('flow-list-toggle-f1').attributes('aria-label')).toBe('Turn “Flow f1” on or off');
   });
 
   it('the switch turns one on, and warns when it lacks its permissions', async () => {
@@ -214,7 +214,7 @@ describe('FlowList', () => {
     s.table().vm.$emit('action', { actionId: 'delete', row: flow('f1') });
     await settle();
     expect(mocks.confirm).toHaveBeenCalledWith({
-      title: 'Delete «Flow f1»?',
+      title: 'Delete “Flow f1”?',
       message: 'This cannot be undone. Its history stays.',
       tone: 'danger',
       confirmLabel: 'Yes, delete it',

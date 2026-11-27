@@ -6,6 +6,7 @@
     "active": "Active",
     "paused": "Paused",
     "unfinished": "Unfinished",
+    "quoted": "“{text}”",
     "noPermission": "You do not have permission",
     "error": "Something went wrong. Nothing was saved.",
     "live": {
@@ -43,13 +44,13 @@
         "state": "State"
       },
       "neverRan": "Never ran",
-      "enable": "Turn «{name}» on or off",
+      "enable": "Turn “{name}” on or off",
       "duplicate": "Make a copy",
       "delete": "Delete",
       "bulkEnable": "Turn it on | Turn them on",
       "bulkPause": "Pause it | Pause them",
       "copied": "Copied, and the copy is paused. It has none of the original's permissions: allow what it needs before turning it on.",
-      "deleteTitle": "Delete «{name}»?",
+      "deleteTitle": "Delete “{name}”?",
       "deleteMessage": "This cannot be undone. Its history stays.",
       "deleteYes": "Yes, delete it",
       "deleteNo": "Leave it",
@@ -81,10 +82,10 @@
       "restored": "Done: this automation is the factory version again.",
       "newVersion": "New version",
       "newVersionLong": "There is a new version of this automation.",
-      "on": "«{name}» is on.",
-      "off": "«{name}» is paused. Nothing was deleted.",
+      "on": "“{name}” is on.",
+      "off": "“{name}” is paused. Nothing was deleted.",
       "hidden": "Some automations your apps bring are hidden: they need {apps}.",
-      "invalid": "«{name}» cannot be offered: {reason}",
+      "invalid": "“{name}” cannot be offered: {reason}",
       "loadError": "The automations your apps bring could not be read.",
       "setByApp": "Set by {app}: you can change it, not take it off."
     },
@@ -103,7 +104,7 @@
       "decide": "What you decide",
       "nothingToDecide": "There is nothing to fill in. It is ready as it is.",
       "asks": "What it will ask permission to do",
-      "alreadyFires": "Careful: «{name}» already starts with the same thing.",
+      "alreadyFires": "Careful: “{name}” already starts with the same thing.",
       "hidden": "Some automations are hidden: they need {apps}.",
       "apps": {
         "task": "Tasks",
@@ -124,23 +125,23 @@
         "welcome": {
           "name": "Welcome a new customer",
           "summary": "A day after a customer card is created, the task of welcoming them.",
-          "plain": "When a customer card is created, it waits one day and leaves the task «Welcome the new customer».",
+          "plain": "When a customer card is created, it waits one day and leaves the task “Welcome the new customer”.",
           "blank": "How long to wait",
           "blankHint": "One day; change it in the Wait step.",
           "task": "Welcome the new customer"
         },
         "bigSaleNote": {
           "name": "Note the big sales on the card",
-          "summary": "When a sale of 100,00 € or more has a customer, a note on their card.",
-          "plain": "When a sale is charged, only if it has a customer and is 100,00 € or more, it writes «Big sale» on the customer's card.",
+          "summary": "When a sale of {amount} or more has a customer, a note on their card.",
+          "plain": "When a sale is charged, only if it has a customer and is {amount} or more, it writes “Big sale” on the customer's card.",
           "blank": "The amount",
-          "blankHint": "100,00 € is 10000: money is in cents.",
+          "blankHint": "{amount} is 10000: money is in cents.",
           "note": "Big sale"
         },
         "newStaff": {
           "name": "The checklist of someone new in the team",
           "summary": "When somebody joins the team, the task of preparing their first day.",
-          "plain": "When somebody is added in Staff, it leaves the task «Prepare the first day of the new team member».",
+          "plain": "When somebody is added in Staff, it leaves the task “Prepare the first day of the new team member”.",
           "blank": "Whose list it falls on",
           "blankHint": "Nobody's: assign it in Tasks, or add who in the step.",
           "task": "Prepare the first day of the new team member",
@@ -149,7 +150,7 @@
         "cashClose": {
           "name": "Review the till when it closes",
           "summary": "When a till is closed, the task of reviewing the closing.",
-          "plain": "When a till is closed, it leaves the task «Review the till closing».",
+          "plain": "When a till is closed, it leaves the task “Review the till closing”.",
           "blank": "Who reviews it",
           "blankHint": "Nobody in particular: assign it in Tasks.",
           "task": "Review the till closing",
@@ -158,7 +159,7 @@
         "fiscalRejected": {
           "name": "Find out when the tax agency rejects a record",
           "summary": "When VeriFactu marks a record as rejected, an urgent task.",
-          "plain": "When the tax agency rejects a record (or it could not be sent), it leaves the urgent task «An invoice is not registered with the tax agency».",
+          "plain": "When the tax agency rejects a record (or it could not be sent), it leaves the urgent task “An invoice is not registered with the tax agency”.",
           "blank": "Who looks at it",
           "blankHint": "Nobody in particular: assign it in Tasks.",
           "task": "An invoice is not registered with the tax agency",
@@ -166,42 +167,42 @@
         },
         "weekReview": {
           "name": "Review the week on Friday",
-          "summary": "Every Friday at 18:00, the task of reviewing the week.",
-          "plain": "Every Friday at 18:00 it leaves the task «Review the week».",
+          "summary": "Every Friday at {time}, the task of reviewing the week.",
+          "plain": "Every Friday at {time} it leaves the task “Review the week”.",
           "blank": "When",
-          "blankHint": "Fridays at 18:00; change it in the trigger.",
+          "blankHint": "Fridays at {time}; change it in the trigger.",
           "task": "Review the week",
           "description": "Sales, appointments and the tasks still to do this week."
         },
         "morning": {
           "name": "Check the agenda every morning",
-          "summary": "Every day at 09:00, the task of reviewing today's agenda.",
-          "plain": "Every day at 09:00 it leaves the task «Review today's agenda», high priority.",
+          "summary": "Every day at {time}, the task of reviewing today's agenda.",
+          "plain": "Every day at {time} it leaves the task “Review today's agenda”, high priority.",
           "blank": "The time",
-          "blankHint": "09:00; change it in the trigger.",
+          "blankHint": "{time}; change it in the trigger.",
           "task": "Review today's agenda"
         },
         "noShow": {
           "name": "Call whoever did not come",
           "summary": "When an appointment is marked as a no-show, an urgent task to call them.",
-          "plain": "When an appointment is marked as «did not come», it leaves the urgent task «Call the customer who did not come».",
+          "plain": "When an appointment is marked as “did not come”, it leaves the urgent task “Call the customer who did not come”.",
           "task": "Call the customer who did not come"
         },
         "bigParty": {
           "name": "Prepare the tables of big groups",
           "summary": "When a reservation of six or more comes in, the task of preparing it.",
-          "plain": "When a table is reserved, only if they are six or more, it leaves the task «Prepare a table for a big group».",
+          "plain": "When a table is reserved, only if they are six or more, it leaves the task “Prepare a table for a big group”.",
           "blank": "How many people",
-          "blankHint": "Six or more; change it in «Only continue if…».",
+          "blankHint": "Six or more; change it in “Only continue if…”.",
           "task": "Prepare a table for a big group",
           "people": "People"
         },
         "bigSaleTask": {
           "name": "Hear about big sales",
-          "summary": "When a sale over 100,00 € is charged, a task to thank the customer.",
-          "plain": "When a sale is charged, only if it is over 100,00 €, it leaves the task «Thank the customer of a big sale» with the sale's number.",
+          "summary": "When a sale over {amount} is charged, a task to thank the customer.",
+          "plain": "When a sale is charged, only if it is over {amount}, it leaves the task “Thank the customer of a big sale” with the sale's number.",
           "blank": "The amount",
-          "blankHint": "Over 100,00 € (10000 in cents); change it in «Only when…».",
+          "blankHint": "Over {amount} (10000 in cents); change it in “Only when…”.",
           "task": "Thank the customer of a big sale"
         }
       }
@@ -234,8 +235,8 @@
       "limits": {
         "title": "What it cannot do yet",
         "items": [
-          "Branches: an automation is one column; «Only continue if…» ends it when it does not hold. Two outcomes are two automations.",
-          "Counting back from a date of the event («the day before the appointment»): a wait counts from the previous step.",
+          "Branches: an automation is one column; “Only continue if…” ends it when it does not hold. Two outcomes are two automations.",
+          "Counting back from a date of the event (“the day before the appointment”): a wait counts from the previous step.",
           "Messages to a customer go by WhatsApp only, not by email.",
           "The assistant writes drafts: it never turns an automation on nor allows it anything."
         ]
@@ -273,9 +274,9 @@
       "notFound": "That automation does not exist in this business.",
       "ranFailed": "It ran and stopped by an error: {message}",
       "ranWaiting": "It ran and is waiting: see it in History.",
-      "runSaveFirst": "Save it first: «Run now» runs what is saved.",
+      "runSaveFirst": "Save it first: “Run now” runs what is saved.",
       "ranCalling": "It ran and is calling another system: see it in History.",
-      "ranAsking": "It ran and is waiting for an answer in «Waiting for your answer».",
+      "ranAsking": "It ran and is waiting for an answer in “Waiting for your answer”.",
       "ranThinking": "It ran and the assistant is on it: see it in History."
     },
     "trigger": {
@@ -347,7 +348,7 @@
       "keep": "What to keep",
       "keepFirst": "The first row it finds, field by field",
       "keepCount": "Only how many there are",
-      "queryHint": "If it finds nothing, the automation carries on; to stop it, add «Only continue if…» on «Found something» after it.",
+      "queryHint": "If it finds nothing, the automation carries on; to stop it, add “Only continue if…” on “Found something” after it.",
       "guard": "Only continue if",
       "guardHint": "If they do not all hold, the automation ends here without error.",
       "addCondition": "Add a condition",
@@ -419,7 +420,7 @@
       "example": "e.g. {value}",
       "noExample": "no example yet",
       "close": "Close",
-      "secret": "Secret «{name}»",
+      "secret": "Secret “{name}”",
       "idempotencyKey": "No-repeat key",
       "secrets": "Secrets",
       "run": "This call"
@@ -429,25 +430,25 @@
       "with": "With what really happened the last time: {event} ({date}).",
       "noSample": "This has not happened in your business lately, so it walks the steps with nothing in.",
       "noEvent": "It does not start with an event: it walks the steps with nothing in.",
-      "notStart": "It would not even start: «Only when…» does not hold.",
+      "notStart": "It would not even start: “Only when…” does not hold.",
       "outcomes": {
         "would_run": "Would do it",
         "stops_here": "It would stop here, and that is the automation working",
         "cannot_tell": "This cannot be checked here: it depends on a step that has not run",
         "waits": "Would wait {duration}",
         "refused": "They would refuse it",
-        "not_allowed": "They would refuse it: you have not allowed it «{action}» yet",
-        "unavailable": "«{action}» is not available in this business",
+        "not_allowed": "They would refuse it: you have not allowed it “{action}” yet",
+        "unavailable": "“{action}” is not available in this business",
         "not_reached": "Would not get here",
-        "high_risk": "«{action}» needs a person in front: an automation cannot do it",
-        "skipped": "Would be skipped: its «Only if…» does not hold",
+        "high_risk": "“{action}” needs a person in front: an automation cannot do it",
+        "skipped": "Would be skipped: its “Only if…” does not hold",
         "would_call": "Would call {host} with this",
         "would_ask": "Would ask {who} and wait up to {n} hour | Would ask {who} and wait up to {n} hours",
         "would_ask_assistant": "Would ask the assistant: {prompt}"
       },
       "empty": "Would arrive empty: {fields}",
       "unknown": "Comes from an earlier step that has not run: {fields}",
-      "pinnedEmpty": "«{action}» would not be used: {fields}, fixed by this step, would be empty in this run.",
+      "pinnedEmpty": "“{action}” would not be used: {fields}, fixed by this step, would be empty in this run.",
       "loading": "Trying…",
       "again": "Try again"
     },
@@ -492,7 +493,7 @@
         "waited": "Waited {duration}",
         "failed": "{action}: {message}",
         "resumed": "Resumed here, from the step that had failed",
-        "skipped": "Skipped: its «Only if…» did not hold ({clauses})",
+        "skipped": "Skipped: its “Only if…” did not hold ({clauses})",
         "continued": "It carried on with the next steps.",
         "calling": "Calling {host}…",
         "called": "Called {host}: it answered {status}",
@@ -501,11 +502,11 @@
         "answeredNo": "{who} answered no",
         "expired": "Nobody answered in time",
         "thinking": "Asked the assistant; it answers in a moment.",
-        "assistantUsed": "The assistant used «{action}».",
-        "assistantRefused": "The assistant tried «{action}», which did not take it.",
-        "assistantAnswered": "The assistant answered: «{text}»",
-        "assistantProposed": "The assistant wants to «{action}»: it waits for a yes until {date}.",
-        "assistantPinnedEmpty": "The assistant tried «{action}», but {fields}, fixed by this step, was empty: it was not done."
+        "assistantUsed": "The assistant used “{action}”.",
+        "assistantRefused": "The assistant tried “{action}”, which did not take it.",
+        "assistantAnswered": "The assistant answered: “{text}”",
+        "assistantProposed": "The assistant wants to “{action}”: it waits for a yes until {date}.",
+        "assistantPinnedEmpty": "The assistant tried “{action}”, but {fields}, fixed by this step, was empty: it was not done."
       },
       "advice": {
         "flow__not_allowed": "Open Permissions and allow what it needs.",
@@ -2831,7 +2832,7 @@
       "removeHeader": "Remove this header",
       "body": "What it sends",
       "bodyHint": "Text; a datum inserted in JSON is escaped for you.",
-      "keyHint": "Insert «No-repeat key» in a header (as Idempotency-Key) so the other system can tell a retry: it is the same in every attempt of this call.",
+      "keyHint": "Insert “No-repeat key” in a header (as Idempotency-Key) so the other system can tell a retry: it is the same in every attempt of this call.",
       "timeout": "Seconds to wait (1 to 30)"
     },
     "secrets": {
@@ -2873,15 +2874,15 @@
         "manager": "The managers",
         "employee": "The employees"
       },
-      "whoAdmin": "{who} answers it in Automations, under «Waiting for your answer».",
-      "whoRole": "{who} answer it in Automations, under «Waiting for your answer»; whoever runs the business can too.",
+      "whoAdmin": "{who} answers it in Automations, under “Waiting for your answer”.",
+      "whoRole": "{who} answer it in Automations, under “Waiting for your answer”; whoever runs the business can too.",
       "hours": "How long to wait for the answer (hours, up to 720)",
       "onNo": "If they say no",
       "onTimeout": "If nobody answers in time",
       "stop": "Stop the automation here",
       "continue": "Carry on with the next steps",
       "asNo": "Count it as a no",
-      "continueHint": "To act on the answer, add «Only continue if…» on «Approved» (or «Expired») after this step."
+      "continueHint": "To act on the answer, add “Only continue if…” on “Approved” (or “Expired”) after this step."
     },
     "message": {
       "phone": "To (their phone)",
@@ -2894,7 +2895,7 @@
       "templatesLoading": "Reading your WhatsApp templates…",
       "templatesError": "Your WhatsApp templates could not be read.",
       "noTemplates": "You have no approved templates yet: create one in WhatsApp › Settings.",
-      "missing": "«{name}» is not among your approved WhatsApp templates: WhatsApp will not send it.",
+      "missing": "“{name}” is not among your approved WhatsApp templates: WhatsApp will not send it.",
       "variable": "Value {n}",
       "fileKinds": {
         "IMAGE": "Photo",
@@ -2932,7 +2933,7 @@
       "heading": "Waiting for your answer",
       "loading": "Loading what waits for you…",
       "empty": "Nothing is waiting for your answer.",
-      "from": "From «{name}»",
+      "from": "From “{name}”",
       "askedOf": "Asked of {who}. Whoever runs the business can answer too.",
       "askedOfAdmin": "Asked of whoever runs the business.",
       "silenceNo": "If nobody answers before {date}, it counts as a no.",
@@ -2949,30 +2950,30 @@
     "assistant": {
       "prompt": "What to ask it",
       "tools": "What it may use",
-      "toolsHint": "Only reads and actions the assistant can use; each one is a permission you give in «Permissions».",
+      "toolsHint": "Only reads and actions the assistant can use; each one is a permission you give in “Permissions”.",
       "addTool": "Add a read or an action",
       "chooseTool": "Choose one",
       "noTools": "Nothing yet: it can only answer with words.",
-      "removeTool": "Remove «{action}»",
+      "removeTool": "Remove “{action}”",
       "mode": "Changes",
       "modes": {
         "ask": "Ask me first",
         "auto": "On its own"
       },
       "modeHints": {
-        "ask": "A change it wants waits for a yes in Automations, under «Waiting for your answer». What it only looks up never waits.",
+        "ask": "A change it wants waits for a yes in Automations, under “Waiting for your answer”. What it only looks up never waits.",
         "auto": "It makes the changes on its own, as this automation, with the permissions you gave it."
       },
       "rounds": "Most turns",
-      "answerHint": "The steps after it can insert «Text», what it answered.",
+      "answerHint": "The steps after it can insert “Text”, what it answered.",
       "askFirst": "Only after a yes from someone who may do it themselves: {actions}.",
       "pinned": "Fixed data",
       "noPins": "None: the assistant fills in every datum itself.",
       "addPin": "Fix a datum",
       "choosePin": "Choose a datum",
-      "removePin": "Unfix «{datum}»",
+      "removePin": "Unfix “{datum}”",
       "pinnedHint": "The assistant never sees them nor can change them: they are filled in when it is asked, and a tool whose fixed datum is empty is not used.",
-      "toolOff": "«{action}» is from {app}, which is off in this business: turn it on in Apps, or remove it."
+      "toolOff": "“{action}” is from {app}, which is off in this business: turn it on in Apps, or remove it."
     }
   }
 }

@@ -94,7 +94,7 @@ for (const viewport of VIEWPORTS) {
       await pick(page, 'flow-assistant-addtool-s1', 'Cancel an appointment', 'Cancel an appointment');
       await expect(editor.locator('[data-testid="flow-assistant-tool-s1-appointment.appointment.cancel"]')).toHaveText('Cancel an appointment');
       await expect(editor.locator('[data-testid=flow-assistant-askfirst-s1]')).toHaveText(
-        'Only after a yes from someone who may do it themselves: «Cancel an appointment».',
+        'Only after a yes from someone who may do it themselves: “Cancel an appointment”.',
       );
       // FLOW-F12: saved, what it needs is granted, the cancellation included, only because its step asks first.
       const flowId = await saveGrantAndSwitchOn(page);
