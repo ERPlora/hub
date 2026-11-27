@@ -327,6 +327,10 @@ msgstr "%(app)s es obligatoria para los negocios de %(country)s: no se puede des
 msgid "Your team"
 msgstr "Tu equipo"
 
+#: home/setup_steps.py:34
+msgid "Finish setting up your business"
+msgstr "Termina de configurar tu negocio"
+
 #: queries.py:180
 msgid "Add the people who will use the till, each with their own way in."
 msgstr "Añade a las personas que usarán el TPV, cada una con su forma de entrar."

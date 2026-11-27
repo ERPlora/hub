@@ -1,8 +1,10 @@
-// «Import CSV» of the customer list's toolbar (CUSTOMER-F08): it picks a CSV file and hands it up.
+// «Import CSV» of the customer list's toolbar (CUSTOMER-F08): the upload icon alone, named and titled «Import CSV»;
+// it picks a CSV file and hands it up.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mountCustomer } from '../__tests__/mount-customer';
 import CustomerImportButton from './CustomerImportButton.vue';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -13,7 +15,7 @@ describe('CustomerImportButton', () => {
     expect(input.attributes('accept')).toBe('.csv,text/csv');
     const opened = vi.spyOn(input.element as HTMLInputElement, 'click');
     const button = m.wrapper.get('[data-testid="customer-import"]');
-    expect(button.text()).toBe('Import CSV');
+    expect([button.text(), accessibleName(button.element), button.attributes('title')]).toEqual(['', 'Import CSV', 'Import CSV']);
     await button.trigger('click');
     expect(opened).toHaveBeenCalledOnce();
     const file = new File(['name\nAna'], 'c.csv', { type: 'text/csv' });

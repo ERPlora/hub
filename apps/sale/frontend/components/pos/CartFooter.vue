@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // The foot of the check: the «Ticket discount» row when the check has one (its percentage and what it
 // takes off, as the server's preview says), «Total» — the preview's, a dash while it is on its way —,
-// the ticket-discount button (only where discounts are allowed), the printer («Print bill») and
-// «Charge · <total>» — with lines marked, «Charge N lines · <what they come to>» (SALE-F22), while «Total» stays the
-// whole check; while the business has not said its money, every amount is a dash, as while an amount is on its
-// way (hub#936). A valuation refusal is said in the server's words, never left as an unexplained dash.
-// An empty check can do none of it. When something is missing (a required customer), Charge looks
+// the ticket-discount button (only where discounts are allowed), the printer («Print bill») and Charge: the cash icon
+// and what it charges, named «Charge · <total>» — with lines marked, what they come to, named «Charge N lines · <it>»
+// (SALE-F22), while «Total» stays the whole check; while the business has not said its money, every amount is a dash,
+// as while an amount is on its way (hub#936). A valuation refusal is said in the server's words, never left as an
+// unexplained dash. An empty check can do none of it. When something is missing (a required customer), Charge looks
 // blocked and says why, but still takes the tap: the page answers it.
 import { InlineFeedback } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
@@ -43,10 +43,13 @@ const business = useBusinessMoney();
 const hasDiscount = computed(() => Number(props.discountPercent) > 0 || props.discountAmount > 0);
 const money = (cents: number | undefined) => formatMoney(cents, locale.value, business.value);
 const totalText = computed(() => money(props.total));
+/** What Charge charges: the marked lines, or the whole check. */
+const chargeAmount = computed(() => (props.markedLines ? money(props.markedTotal) : totalText.value));
 const chargeLabel = computed(() => {
   const n = props.markedLines ?? 0;
-  if (!n) return t('sale.pos.chargeAmount', { amount: totalText.value });
-  return t('sale.pos.chargeLines', { n, amount: money(props.markedTotal) });
+  const amount = chargeAmount.value;
+  if (!n) return t('sale.pos.chargeAmount', { amount });
+  return t('sale.pos.chargeLines', { n, amount });
 });
 const discountLabel = computed(() => {
   const percent = Number(props.discountPercent) > 0 ? ` −${formatPercent(props.discountPercent, locale.value)}` : '';
@@ -112,14 +115,15 @@ const discountLabel = computed(() => {
         data-testid="pos-charge"
         :disabled="!hasLines"
         :aria-disabled="blockedReason ? 'true' : undefined"
-        :title="blockedReason ?? $t('sale.pos.charge')"
+        :aria-label="chargeLabel"
+        :title="blockedReason ?? chargeLabel"
         @click="emit('charge')"
       >
         <HubIcon
           slot="start"
-          name="ion:card-outline"
+          name="ion:cash-outline"
         />
-        {{ chargeLabel }}
+        {{ chargeAmount }}
       </ion-button>
     </div>
   </div>
