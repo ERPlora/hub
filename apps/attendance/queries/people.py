@@ -15,6 +15,7 @@ from apps.attendance.schemas import MemberRefIn, PersonOut
 from apps.staff.models import Member
 from base.models import HubUser
 from base.queries.people import hub_user_of
+from base.text_search import contains_text
 
 MEMBER_NOT_FOUND = _("That person does not exist in Staff.")
 AMBIGUOUS_MEMBER = _("Several people match “%(name)s”: %(matches)s. Say which one.")
@@ -65,7 +66,7 @@ def find_member(
     elif name:
         text = name.strip()
         matches = list(members.filter(name__iexact=text)[:2]) or list(
-            members.filter(name__icontains=text).order_by(
+            members.filter(contains_text(text, "name")).order_by(
                 "first_name", "last_name", "id"
             )[:6]
         )
