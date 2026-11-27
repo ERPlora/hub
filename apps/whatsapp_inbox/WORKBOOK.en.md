@@ -146,14 +146,14 @@ there or was not accepted) and **Delete**. Empty: "No templates." with "Create o
 it. The ones made in WhatsApp Manager appear here too.".
 
 #### Template (sheet)
-<!-- from WORKBOOK.md sha256:151ca89ff8cf -->
+<!-- from WORKBOOK.md sha256:f1a23b5f10c2 -->
 It opens with **Add template** ("New template") or **Edit** ("Edit template — name"), on top of Settings. Fields:
 **Name** ("Lowercase letters, numbers and underscores. It cannot be changed later."), **Language** and **Category**
 (Utility or Marketing), **Header type** (Text, Photo, Video or Document) with **Header (optional)** if it is text or,
-if it carries a file, **Choose file** ("No file chosen"; once chosen, its name and size with **Change file**, what it
+if it carries a file, **Choose file** (its cloud; "No file chosen"; once chosen, its name and size with **Change file**, the same cloud, what it
 accepts, e.g. "JPEG or PNG, up to 5 MB.", and "Meta reviews the template with this file."), **Text** ("Where a
 variable goes, write its number between double braces, starting with 1."), an **Example for variable n** for each
-variable ("Meta reviews the template with these examples."), **Footer (optional)** and **Buttons** (**Add button**:
+variable ("Meta reviews the template with these examples."), **Footer (optional)** and **Buttons** (**Add button**, its +:
 Quick reply, Link or Call, with its text and its address or its number; **Remove button**). Final button **Send to
 Meta for review** (new) or **Save and send to Meta** (edit). When editing an approved one it warns: "Until Meta
 approves the changes, the approved one keeps being sent."; the category of one Meta has not rejected cannot be

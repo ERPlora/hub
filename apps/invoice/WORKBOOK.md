@@ -178,7 +178,7 @@ La abre el cliente, sin cuenta, con el código de su tique (`/p/<negocio>/invoic
 datos fiscales para obtener la factura completa de este tique.», los mismos campos que en «Factura completa» sin el
 buscador de clientes, y «Solicitar factura completa», en gris hasta que están el nombre, el NIF y el domicilio. Al
 pedirla, «Tu factura está lista.» y «Factura {número}» con «Emisor», «Fecha de emisión», «Cliente» y «NIF
-cliente», las líneas y los totales como en la ficha, e «Imprimir / PDF», que saca la factura en A4 con su QR de
+cliente», las líneas y los totales como en la ficha, y el botón de solo icono «Imprimir / PDF», que saca la factura en A4 con su QR de
 VeriFactu; si ya la había pedido, al abrirla ve esa misma factura con «Ya pediste esta factura. Esta es la misma,
 con los datos que diste entonces.». Un rechazo de un campo sale bajo él, y el del servidor encima del botón.
 Cargando: «Cargando tu tique…». Error: el motivo del servidor (código que no abre nada, caducado, tique aún sin
