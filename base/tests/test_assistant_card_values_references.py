@@ -626,6 +626,16 @@ def card_title(field: dict) -> str:
     return field["label"] if field.get("titled") else KNOWN.get(field["name"], field["label"])
 
 
+def known_sample(prop: dict, defs: dict):
+    """A value the write takes for a datum the screen knows: a record by its id (a list of them where it takes one), a
+    word where it takes a text that names no record — an id there is left out of the card, as any id it cannot name."""
+    prop = shared.resolved(prop, defs)
+    if prop.get("type") == "array":
+        return [TABLE]
+    plain_text = prop.get("type") == "string" and prop.get("format") != "uuid" and REFERS not in prop
+    return "Texto" if plain_text else TABLE
+
+
 def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title(monkeypatch):
     """Every write the assistant may run: a datum the screen knows by its name («Registro» for ``id``) that its app
     titles («Cuenta») is called by that title in Spanish; every other one keeps the screen's word — none goes by its
@@ -633,8 +643,9 @@ def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title
     monkeypatch.setattr(assistant.cards, "_reference", lambda value, prop, words: "5 (Terraza)")
     titles: dict[str, str] = {}
     for op in writes():
-        props = op.input.model_json_schema().get("properties", {})
-        arguments = {name: TABLE for name in props if name in KNOWN}
+        schema = op.input.model_json_schema()
+        props, defs = schema.get("properties", {}), schema.get("$defs", {})
+        arguments = {name: known_sample(prop, defs) for name, prop in props.items() if name in KNOWN}
         for field in assistant.cards.card(op, arguments, "es")["fields"]:
             if card_title(field) != KNOWN[field["name"]]:
                 titles[f"{op.name}:{field['name']}"] = card_title(field)

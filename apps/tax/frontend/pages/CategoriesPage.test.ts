@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { CategoryRowOut } from '../operations';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountTax } from '../__tests__/mount-tax';
 import CategoryCreateModal from '../components/CategoryCreateModal.vue';
 import SetupNotice from '../components/SetupNotice.vue';
@@ -334,7 +335,7 @@ describe('CategoriesPage: the rest', () => {
     // The rate as a Spanish reader writes it, not «10.00%».
     expect(s.rows()[0].findAll('[role="cell"]').at(-1)?.text().replace(/[\u00a0\u202f]/g, ' ')).toBe('10,00 %');
     expect(s.prop('searchPlaceholder')).toBe('Buscar clave o nombre…');
-    expect(s.find('tax-categories-add').text()).toBe('Añadir');
+    expect([s.find('tax-categories-add').text(), accessibleName(s.find('tax-categories-add').element), s.find('tax-categories-add').attributes('title')]).toEqual(['', 'Añadir', 'Añadir']);
   });
 });
 

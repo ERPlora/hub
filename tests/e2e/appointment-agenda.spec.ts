@@ -163,10 +163,11 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     await expect(block).toContainText(who.customer.name);
     await page.screenshot({ path: shot('appointment-grid-desktop'), animations: 'disabled' });
     const box = (await block.boundingBox())!;
+    const hour = (await view.locator('[data-testid=appointment-grid-hour]').first().boundingBox())!.width;
     await page.mouse.move(box.x + 10, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box.x + 60, box.y + box.height / 2, { steps: 5 });
-    await page.mouse.move(box.x + 106, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.move(box.x + 10 + hour / 2, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.move(box.x + 10 + hour, box.y + box.height / 2, { steps: 5 });
     await page.mouse.up();
     await expect
       .poll(() => psql(`select to_char(start at time zone 'Europe/Madrid', 'HH24:MI') from appointment_appointment where id = '${appointment.id}'`))

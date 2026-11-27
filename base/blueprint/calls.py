@@ -54,16 +54,25 @@ class Dataset:
     key: str
     label: Promise
     rows: Callable[[OperationContext], list[dict]]
-    ids: Callable[[OperationContext], list[str]]
     count: Callable[[OperationContext], int]
     load: Callable[[OperationContext, list[dict], Loaded], None]
-    remove: Callable[[OperationContext, str], None]
+    #: Every row's id and how one is removed, to undo a load and to reset the app. Without them what it brings stays,
+    #: like the rest of the business's settings: undoing a load neither counts nor removes it, and resetting does not
+    #: offer it.
+    ids: Callable[[OperationContext], list[str]] | None = None
+    remove: Callable[[OperationContext, str], None] | None = None
     #: Personal data (a person's name, phone, email): it travels in a backup only, never in a template.
     personal: bool = False
+    #: For rows that show an image: the operations that set one of the library and upload a photo of their own.
+    images: tuple[str, str] | None = None
 
     @property
     def app(self) -> str:
         return self.key.split(".", 1)[0]
+
+    @property
+    def removable(self) -> bool:
+        return self.remove is not None
 
 
 def call(ctx: OperationContext, operation: str, /, **data: Any) -> Any:
@@ -105,6 +114,27 @@ def text_of(row: dict, key: str) -> str:
 
 def natural_key(text: str) -> str:
     return text.strip().casefold()
+
+
+def listed(row: dict, key: str, kind: type) -> list:
+    """The items of ``kind`` in the list ``row`` keeps at ``key``; none when it keeps no list there."""
+    value = row.get(key)
+    return [item for item in value if isinstance(item, kind)] if isinstance(value, list) else []
+
+
+def given(row: dict, fields: tuple[str, ...]) -> dict:
+    """The ``fields`` of ``row`` that have a value."""
+    return {name: row[name] for name in fields if row.get(name) not in (None, "")}
+
+
+def attempt(ctx: OperationContext, loaded: Loaded, label: str, operation: str, /, **data: Any) -> Any:
+    """``operation`` on a part of a row just made; one it refuses leaves the row without it, is told, and gives
+    ``None``."""
+    try:
+        return call(ctx, operation, **data)
+    except (OperationError, pydantic.ValidationError) as exc:
+        loaded.warn(str(ROW_REFUSED) % {"row": label, "reason": reason(exc)})
+        return None
 
 
 def _money(cents: Any) -> str:
@@ -160,9 +190,9 @@ def ids_of(name: str, **params: Any) -> Callable[[OperationContext], list[str]]:
     return lambda ctx: [str(row.id) for row in pages(ctx, name, **params)]
 
 
-def count_of(name: str) -> Callable[[OperationContext], int]:
+def count_of(name: str, **params: Any) -> Callable[[OperationContext], int]:
     """A dataset's ``count``: how many rows the list ``name`` has."""
-    return lambda ctx: total(ctx, name)
+    return lambda ctx: total(ctx, name, **params)
 
 
 def remover(name: str) -> Callable[[OperationContext, str], None]:

@@ -24,6 +24,7 @@ from pydantic import (
 )
 
 from apps.appointment.schemas.fields import A_MEMBER, A_SERVICE, AN_APPOINTMENT, OF_STATUS
+from apps.appointment.schemas.settings import AdvanceDays
 from apps.customer.schemas.contact import EMAIL, PHONE
 from apps.customer.schemas.fields import Email
 from apps.online_booking.logo import LogoFieldsOut, LogoName
@@ -281,10 +282,8 @@ class SettingsIn(In):
         title=gettext_noop("Minimum booking notice (minutes)"),
         description="Diary rule: minutes ahead the customer must book.",
     )
-    max_advance_booking: int | None = Field(
+    max_advance_booking: AdvanceDays | None = Field(
         None,
-        ge=0,
-        le=365,
         title=gettext_noop("Book at most this far ahead (days)"),
         description="Diary rule: days ahead one may book; 0 = no limit.",
     )

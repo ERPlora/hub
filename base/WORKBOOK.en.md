@@ -272,7 +272,7 @@ which starts at "Files" (the very top), with the open folder highlighted; on a n
 folder" and "Upload file" (its cloud alone). Below, what the open folder holds: tapping a file opens it.
 
 #### The open folder
-<!-- from WORKBOOK.md sha256:3e9218268628 -->
+<!-- from WORKBOOK.md sha256:8ce6d0f48f6d -->
 On top, the folder's path, with ⋮ beside it to rename, move or delete that folder; "Space", with what is used and the
 plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder holds: the folders first and then
 the files, each with its icon, its name, its size (in the list, also when it changed) and its ⋮: "Open", "Download",
@@ -313,9 +313,9 @@ The read-only record of the actions that can need a manager's approval: who did 
 somebody whose role allows it did it by themselves.
 
 ### A person's page
-<!-- from WORKBOOK.md sha256:b88b0da10ded -->
+<!-- from WORKBOOK.md sha256:8e28c650c128 -->
 From a row of **Employees › Staff**, for whoever runs the business, with the back button: "Their details" (with
-"Open on erplora.com"), "PIN" and "Badge".
+"Open on erplora.com"), "Role in this business", "PIN" and "Badge".
 
 ### An approval is needed
 <!-- from WORKBOOK.md sha256:df4d17e11e2b -->
@@ -398,7 +398,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:e111b10f2051 -->
+<!-- from WORKBOOK.md sha256:a117d9d393f8 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -525,7 +525,7 @@ On the Employees screens and the API documentation:
 | BASE-F127 | Make a role of your own from another | done |
 | BASE-F128 | Adjust what a role of your own allows | done |
 | BASE-F129 | Delete a role of your own | done |
-| BASE-F130 | Give a person a role of your own | partial |
+| BASE-F130 | Give a person a role of your own | done |
 | BASE-F131 | See in the bell the roles to review | done |
 | BASE-F132 | Open the Hub on a phone with the side menu's code | done |
 
@@ -1353,7 +1353,7 @@ If it fails: "The retry failed:" with the reason and the report stays in sight.
 Involved: BASE-F32
 
 ### BASE-F34 Undo an import
-<!-- from WORKBOOK.md sha256:63445c3e5c16 -->
+<!-- from WORKBOOK.md sha256:09fbceedeb5f -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Reset)
@@ -1368,13 +1368,14 @@ Steps:
      (something another app still uses) shows apart with its reason. What each section has gets up to date.
 In: the import chosen.
 Out: exactly the rows it brought removed, also what came in later because it waited for an app, and what it still
-waited for no longer comes in; what was created afterwards stays (`base.import.undone`).
+waited for no longer comes in; what was created afterwards stays (`base.import.undone`). The own tax categories and
+rates it brought stay, like the rest of the business's settings: they do not count among the rows to remove.
 If it fails: the reason shows in the dialog itself, which does not close; an
 import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:94ff4453084e -->
+<!-- from WORKBOOK.md sha256:2a92cefa684f -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1394,7 +1395,10 @@ In: the name, the language, what it is for and what is ticked.
 Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows: of Inventory, the categories
 and the products, and of Services, the categories and the services, with their own photos inside (INVENTORY-F33); of
 Tables, the zones and the tables; of Modifiers, the groups, each with its options and the products (by their code) and
-categories it applies to; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
+categories it applies to; of Menus and combos, the menus, each with its closed price, its courses, the products to
+choose in each course (by their code) with their supplement, and its own photo inside; of Taxes, the business's own
+tax categories, each with its rates and its surcharges, never the factory ones, which every business already has and
+no file touches; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
 into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
 the business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
@@ -1423,7 +1427,7 @@ be exported.
 Involved: none
 
 ### BASE-F37 Reset the business by sections
-<!-- from WORKBOOK.md sha256:36c8b38f7f57 -->
+<!-- from WORKBOOK.md sha256:a605cd01b7fc -->
 Status: done
 Actor: owner
 Screen: Settings · Data and backups (Reset)
@@ -1433,7 +1437,8 @@ Steps:
   2. It says what is never removed: "Only what each section lists here is removed. Sales, invoices, fiscal
      records, people and their access, files and the business's settings always stay.", and "Before emptying, a
      full copy of the business's data is made and kept for 90 days, in «Copies» below.".
-  3. One row per section (an app) that has something, with what it has (each part and its rows) and its total.
+  3. One row per section (an app) that has something, with what it has (each part and its rows) and its total. Taxes
+     is no section: its tax categories and rates are the business's settings.
   4. Tick the sections and tap "Reset the business": "This cannot be undone", with "120 rows will be removed for
      good:" and the breakdown. Type the business's name ("Type «Casa Ramón» to confirm") and tap "Remove for good" (or
      "Cancel").
@@ -2233,7 +2238,7 @@ If it fails: "Could not remove the unused devices. Check the connection and try 
 Involved: BASE-F70, BASE-F98
 
 ### BASE-F72 See the business's files
-<!-- from WORKBOOK.md sha256:efc654bc9574 -->
+<!-- from WORKBOOK.md sha256:a490fba06472 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Files
@@ -2456,7 +2461,7 @@ If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79, BASE-F119
 
 ### BASE-F82 See the business's roles and what each one allows
-<!-- from WORKBOOK.md sha256:3e9bff34693d -->
+<!-- from WORKBOOK.md sha256:0c583dda8c26 -->
 Status: done
 Actor: owner, administrator, manager, employee, accountancy firm
 Screen: Employees · Roles; Employees · Roles · What it allows
@@ -2472,7 +2477,8 @@ Steps:
   3. "Accountant" is the role of the firm that keeps the business's books, and it only reads: everyone's sales, with
      the business's totals, and the invoices issued, which it opens, prints and downloads, each with its taxes and
      its VeriFactu record. Its menu has Sales and Invoicing. It does not sell, charge, issue or rectify invoices nor
-     change any setting, and it takes no place of the plan.
+     change any setting, and it takes no place of the plan. That is why it is given no role of your own: with one, a
+     free place could do more than read.
   4. Tapping a role opens "What it allows", with the role's name at the top, "What this role lets a person do in this
      business, app by app. It is given on erplora.com and is not changed here." and "People with this role: 2".
      Below, a panel per app: "The business" first, then each app that is on by its name and "Sensitive data" last.
@@ -2481,7 +2487,8 @@ Steps:
      & POS" "Void a sale" with "With approval". An app that is off does not show. It is read only: nothing is
      changed here. A role of the business's own says "What this role lets a person do in this business, app by app."
      and shows what the business saved; what no role of the business can give, owning the business, does not show.
-     Whoever manages the roles adjusts it right there.
+     Whoever manages the roles adjusts it right there, save the role they have themselves, which they see the same, read
+     only, with "Nobody changes their own role: ask somebody above you.".
   5. Whoever manages the roles (the owner and the administrator, or whoever has it in a role of the business's own)
      makes one with "New role" or "Duplicate" and, in "⋮", edits or deletes the business's own.
   6. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
@@ -2511,7 +2518,7 @@ If it fails: whatever erplora.com says.
 Involved: BASE-F82, BASE-F13, BASE-F130
 
 ### BASE-F127 Make a role of your own from another
-<!-- from WORKBOOK.md sha256:3de28f523a3f -->
+<!-- from WORKBOOK.md sha256:46b2a5c91b8f -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles; Assistant
@@ -2522,8 +2529,9 @@ Steps:
      the same as that role. Then adjust what it allows.".
   3. "Create role": the role is made with the same the other one allows, app by app, save owning the business, which no
      role of your own gives. "Role Cashier created" shows and it opens to adjust it.
-  4. It shows at once in **Employees › Roles**, with "Custom" and nobody in it; it is given to a person by asking the
-     assistant. From then on it does not change with the role it came from.
+  4. It shows at once in **Employees › Roles**, with "Custom" and nobody in it; it is given to a person on their page,
+     in "Role in this business", or by asking the assistant. From then on it does not change with the role it came
+     from.
   5. It is also asked of the assistant: "create the role Cashier from Employee", with a description if wanted. The card
      says "Based on: Employee" and "Name: Cashier", and once accepted it is made the same way.
 In: the role it comes from, the name (up to 80 letters) and, if wanted, the description.
@@ -2538,13 +2546,14 @@ it is not made. What is refused is said in the window itself, which stays open. 
 Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Adjust what a role of your own allows
-<!-- from WORKBOOK.md sha256:d9e5d0c77ecb -->
+<!-- from WORKBOOK.md sha256:39a1ffa3cfe7 -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles · What it allows; Assistant
 Steps:
-  1. In **Employees › Roles**, tap a role of your own, or "Edit" in its "⋮". At the top, "What this role lets a person do
-     in this business, app by app. Whoever has it notices as soon as it is saved.", how many people have it and its
+  1. In **Employees › Roles**, tap a role of your own, or "Edit" in its "⋮" (the role one has oneself has no "Edit"). At
+     the top, "What this role lets a person do in this business, app by app. Whoever has it notices as soon as it is
+     saved.", how many people have it and its
      "Name" and "Description", changed right there. Below, the same panels of "What it allows": each permission
      with its phrase and a switch or, for what a manager can approve with their PIN, "Allowed", "With approval" or "No".
   2. They change what they want and press "Save" at the end: "Role saved.". With nothing changed, "Save" cannot be pressed.
@@ -2570,8 +2579,10 @@ given to nobody: "That is only the owner's of the business: no role gives it.". 
 is on, "That permission is not of any app that is on in this business."; "With approval" for something a manager cannot
 approve with their PIN, "That cannot be approved with a PIN: choose allowed or no.". The name, as when making it. What
 the screen refuses is said next to "Save", with "The role could not be saved", or under the name, and what was being
-changed stays. Whoever does not manage the roles sees it read only.
-Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
+changed stays. Whoever does not manage the roles sees it read only. Nobody changes the role they have themselves, not
+even to take something from it: they see it read only, with "Nobody changes their own role: ask somebody above you.", and
+the assistant and the API answer the same and change nothing; another person who manages the roles changes it for them.
+Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F130, BASE-F131
 
 ### BASE-F129 Delete a role of your own
 <!-- from WORKBOOK.md sha256:b4f8224d9655 -->
@@ -2592,34 +2603,44 @@ answered "This is one of erplora.com's roles. Duplicate it and change the copy."
 Involved: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
 
 ### BASE-F130 Give a person a role of your own
-<!-- from WORKBOOK.md sha256:16b78f396cff -->
-Status: partial — it is given by asking the assistant or through the Hub's API; its place in the person's page is missing
+<!-- from WORKBOOK.md sha256:c2abac7a3d15 -->
+Status: done
 Actor: owner, administrator
-Screen: Assistant
+Screen: A person's page; Assistant
 Steps:
-  1. Ask the assistant "give Luis the Cashier role" or "take the Cashier role away from Luis".
-  2. The card says the person and the role by their names and, under "What will happen", how many people have that role.
-     It asks to type CONFIRM (BASE-F98).
-  3. Once accepted, the person has that role, which rules over the one of their invitation: what they see and what they
-     may do change at once on their devices, without ending their session (BASE-F13), and whoever may now do something
-     with that role approves it with their PIN too (BASE-F84). Each person has a single role.
-  4. To return them to the one of their invitation, ask for that role ("Employee"): it is the one they have from then on.
-  5. That person's assistant knows the role it talks to: the role of your own, by the name the business gave it
-     (BASE-F100).
+  1. In **Employees › Staff**, tap a person. On their page, under "Their details", is "Role in this business": "It rules
+     over the role of their invitation: what they see and may do here changes at once, without signing in again.".
+  2. "Role" shows the one they have: one of the business's own, by its name, or "From the invitation (Employee)". Choose
+     another of your own, or "From the invitation (Employee)" to return them to the one of their invitation, and it is
+     given as soon as it is chosen: "Eva Gil now has the role Cashier.".
+  3. From then on that role rules over the one of their invitation: what they see and what they may do change on their
+     devices without ending their session, and what that role lets them do they also approve with their PIN when
+     somebody else asks for it. Each person has a single role.
+  4. If the business has no roles of its own yet, the page says "This business has no roles of its own yet: they are made
+     in Employees › Roles, from any role.", and "Make a role" leads to **Employees › Roles**.
+  5. If that person cannot be given a role, their page shows the one they have and why, with nothing to choose. Whoever
+     does not manage the roles only sees the one they have.
+  6. It is also asked of the assistant: "give Luis the Cashier role" or "take the Cashier role away from Luis". The card
+     says the person and the role by their names and, under "What will happen", how many people have that role, and it
+     asks to type CONFIRM.
+  7. That person's assistant knows the role it talks to: the role of your own, by the name the business gave it.
 In: the person and the role, one of the business's own or the one of their invitation.
 Out: the person with that role. Event `base.role.assigned`. erplora.com does not know: there they keep the one of their
 invitation.
-If it fails: nobody gives the owner another role, "The owner is always the owner: nobody gives them another role.";
-nobody changes their own, "Nobody changes their own role: ask somebody above you."; nor the one of somebody who is not
-below them by their invitation, "You may only give a role to people below you in the business.". Nobody gives a role that
-allows more than they may do themselves, the one of the invitation when returning a person to it, what an app that is
-off would give and, "With approval", what their own role refuses them included: "A role may not allow more than you may
-do yourself.". Another basic role, "That role is given
-on erplora.com. Here you give one of the business's own."; a role that is not there, "This role does not exist in this
-business."; a person who is not of the business, "That person is not in this business.". If somebody deletes the role at
-the same time, it is either deleted or given, never both: one hears "This role does not exist in this business." or "2
-people have this role. Give them another before deleting it.".
-Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
+If it fails: nobody gives the owner another role, "The owner is always the owner: nobody gives them another role."; nor
+the accountancy firm, because it only reads and takes no place of the plan, "The accountancy firm only reads and takes no
+place of the plan: it keeps the role of its invitation.", and a role of your own it was given before erplora.com made it
+the accountancy firm stops ruling; nobody changes their own, "Nobody changes their own role: ask somebody above you.";
+nor the one of somebody who is not below them by their invitation, "You may only give a role to people below you in the
+business.". Nobody gives a role that allows more than they may do themselves, the one of the invitation when returning a
+person to it, what an app that is off would give and, "With approval", what their own role refuses them included: "A
+role may not allow more than you may do yourself.". Another basic role, "That role is given on erplora.com. Here you give
+one of the business's own."; a role that is not there, "This role does not exist in this business."; a person who is not
+of the business, "That person is not in this business.". If somebody deletes the role at the same time, it is either
+deleted or given, never both: one hears "This role does not exist in this business." or "2 people have this role. Give
+them another before deleting it.". On the page, what is refused on choosing is said under "Role", which goes back to the
+role they had; if the roles cannot be loaded, "The roles could not be loaded." with "Retry".
+Involved: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F128, BASE-F129
 
 ### BASE-F131 See in the bell the roles to review
 <!-- from WORKBOOK.md sha256:a1822b65cbe1 -->
@@ -2991,7 +3012,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:4aed3219f25d -->
+<!-- from WORKBOOK.md sha256:c292b3532729 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3010,7 +3031,14 @@ Steps:
      never a bare "110%" or "50 m", which do not say what changes; "Create in Sales & POS: Misc · Tax category: Product — generic · 21% · Position: 0"; "Open in Tables: Table: 4 ·
      Guests: 3". An amount, every datum its app declares as money, shows
      in the business's currency (never in cents), also inside a datum that groups others, and the assistant
-     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
+     understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". The
+     card shows each datum as the action takes it, not as the assistant wrote it: a supplement the assistant sends as
+     the text "300" shows "Supplement: €3.00", never "300", and the allergens show in the order they are saved in, the
+     Regulation's. What its screen says in words, the card says too: a maximum that in its app means no limit shows
+     "Maximum choices: No limit", never "0" (the same with the days ahead of a booking and the biggest discount without
+     a manager, whose 100% is no limit); a price that is not per unit says which unit it is for, as the till writes it:
+     "Price per kg: €45.00", "Price per 100 g: €2.50" (and the cost, per the product's unit). A text that is the
+     internal code of a record never shows: if the card cannot name it, it leaves it out. If
      the action names its own currency, the amount shows in it and with its decimals, as in Stripe or Square: a
      payment in dollars says "$15.00", and in yen, without decimals; a currency that does not exist is not made up:
      if the action no longer takes it in its data, no card shows (see "If it fails"); otherwise the amount shows as
@@ -3092,7 +3120,10 @@ Steps:
      on its screen. "Cancel" or Esc do nothing: the assistant knows the person said no and says it was not done
      because they cancelled it, without asking them to confirm it, since that card is already closed. After "Run it",
      the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
-     offer to undo it unless asked to.
+     offer to undo it unless asked to. In a change (a setting, like the till's, or the data of a record), it also knows
+     how the data it sent were, so it never guesses: after "Run it" it says what changed and what was already so ("Done:
+     now the cash has to be counted at closing (it did not before); the opening float was already asked for"), and after
+     "Cancel", how they stay ("I have not changed it: the week still starts on Monday").
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn that was put to the person, with the action named
@@ -3158,7 +3189,7 @@ allowed: …". If it can no longer be read after "Run it" is tapped, the receipt
 Involved: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Check what the assistant says against what it really did
-<!-- from WORKBOOK.md sha256:adbd1b0cc182 -->
+<!-- from WORKBOOK.md sha256:94943fbdee7f -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3182,7 +3213,8 @@ Steps:
 In: what was done in the turn, with its result, what its lookups returned and the web addresses erplora.com's tools
 looked up.
 Out: the notices and the receipts, kept with the conversation.
-If it fails: "Done" means the action of its app ended without an error: if an app answers fine without having changed
+If it fails: "Done" means the action of its app ended without an error. In a change, the assistant knows which data
+changed and which were already so, and says it (BASE-F97); in another action that answers fine without having changed
 anything, it is that action that has to say so. If the turn ends in an error, the bubble carries its failure
 (BASE-F106), the notices of what it got to say and the receipts of what was indeed done.
 Involved: BASE-F96, BASE-F97, BASE-F106

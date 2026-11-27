@@ -92,3 +92,10 @@ class TaxConfig(LiveAppConfig):
             "TAX-F14": {"es": ["E5-4AOlKnyM"], "en": ["obkc8TRqkf4"]},
         },
     )
+
+    def blueprint_datasets(self) -> list:
+        """What of Taxes travels in an export of the business (BASE-F35): its own tax categories with their rules, never
+        the factory catalogue."""
+        from apps.tax import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS

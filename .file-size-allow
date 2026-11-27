@@ -19,7 +19,7 @@
 462 apps/invoice/frontend/operations.d.ts ERPlora/erplora-next#74
 355 apps/kitchen/frontend/operations.d.ts ERPlora/erplora-next#74
 506 apps/kitchen/models.py ERPlora/erplora-next#74
-515 apps/online_booking/schemas.py ERPlora/erplora-next#74
+514 apps/online_booking/schemas.py ERPlora/erplora-next#74
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -41,7 +41,6 @@
 401 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
 742 apps/verifactu/models.py ERPlora/erplora-next#74
 1956 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
-529 apps/website/queries.py ERPlora/erplora-next#74
 558 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
 655 base/frontend/components/SystemUsage.test.ts ERPlora/erplora-next#74

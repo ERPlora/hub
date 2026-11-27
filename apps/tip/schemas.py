@@ -27,6 +27,7 @@ NOTHING_TO_CHANGE = _("Say what changes: the amount or the person.")
 T_TIP = gettext_noop("Tip")
 T_SALE = gettext_noop("Sale")
 T_FOR = gettext_noop("For")
+T_POOL = gettext_noop("To the pool")
 A_MEMBER = names("staff.member.detail", name=("full_name",))
 # The card names a tip by its sale's number, as the person does («the tip of 20261114-0007»).
 A_TIP = names("tip.tip.get", name=("sale_number",))
@@ -130,7 +131,7 @@ class TipAddIn(Closed):
 
     sale_id: UUID | None = Field(None, title=T_SALE, json_schema_extra=A_SALE)
     sale: SaleNumber | None = Field(None, title=T_SALE, description="The sale's number, when its id is not known.")
-    pool: bool = Field(False, description="Cash to the pool, of no sale nor person (counted from the jar).")
+    pool: bool = Field(False, title=T_POOL, description="Cash to the pool, of no sale nor person (counted from the jar).")
     method_id: UUID | None = Field(None, description="Sales' payment method of the tip.", json_schema_extra=A_METHOD)
     method: Said | None = Field(None, description="Its name or its type (cash, card…), when its id is not known.")
     amount: PositiveCents = Field(description="The tip, in cents.")

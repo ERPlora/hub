@@ -6,7 +6,7 @@ import uuid
 import pytest
 
 from apps.website.catalog_items import product_item, service_item
-from apps.website.queries import read_catalog
+from apps.website.queries.catalog import read_catalog
 from apps.website.render import catalog_view
 from apps.website.schemas import CatalogSection
 from apps.website.tests.conftest import HOST, HUB_DB, A, ctx_for, full_content, with_language

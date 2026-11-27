@@ -6,16 +6,13 @@ Every test runs against the real apps (Modifiers, Inventory, Taxes), in business
 """
 
 import pytest
-from django.contrib.auth import get_user_model
-from live.context import OperationContext
-from live.operations import get
 
 from apps.modifier.tests.conftest import FOOD, GENERIC, HUB_DB, in_business_a
 from base import blueprint
-from base.models import Membership
-from base.permissions import access_for
 from base.tenancy.context import use_hub
 from base.tenancy.tests.business import A, B
+from base.tests.blueprint_round_trip import app_report, call, owner_of
+from base.tests.blueprint_round_trip import exported as exported_apps
 
 __all__ = ["in_business_a"]
 pytestmark = HUB_DB
@@ -31,20 +28,9 @@ DONENESS = {
 EXTRAS = {"name": "Extras", "kitchen_name": "", "min_choices": 0, "max_choices": 3, "allow_repeat": True, "sort_order": 2}
 
 
-def owner_of(scope, username):
-    user = get_user_model().objects.create_user(username=username, password="pw")
-    Membership.objects.create(user=user, host=scope.key, role=Membership.Role.OWNER)
-    return OperationContext(scope=scope, actor=user, permissions=access_for(user, scope), language="en")
-
-
 @pytest.fixture
 def ctx():
     return owner_of(A, "olga")
-
-
-def call(ctx, operation, /, **data):
-    op = get(operation)
-    return op(ctx, op.input(**data))
 
 
 def a_menu(ctx):
@@ -79,12 +65,7 @@ def the_groups(ctx) -> dict:
 
 def exported(ctx, *, purpose="backup") -> str:
     """The file Settings › Data › Export gives with Inventory and Modifiers marked with their data, in base64."""
-    return call(ctx, "base.blueprint.export", name="Bar Olga", language="en", purpose=purpose,
-                apps=["inventory", "modifier"], data=["inventory", "modifier"]).content_base64
-
-
-def report_of(report: dict, app: str) -> dict:
-    return next(row for row in report["apps"] if row["id"] == app)
+    return exported_apps(ctx, ["inventory", "modifier"], purpose=purpose)
 
 
 def test_a_backup_brings_the_groups_back_with_their_options_and_what_they_apply_to(ctx):
@@ -97,7 +78,7 @@ def test_a_backup_brings_the_groups_back_with_their_options_and_what_they_apply_
     load = call(ctx, "base.blueprint.import", file_base64=file)
 
     assert the_groups(ctx) == before
-    modifiers = report_of(load.model_dump()["report"], "modifier")
+    modifiers = app_report(load.model_dump()["report"], "modifier")
     assert modifiers["status"] == "applied"
     assert [(part["key"], part["created"]) for part in modifiers["datasets"]] == [("modifier.group", 2)]
 
@@ -131,7 +112,7 @@ def test_loading_the_backup_again_duplicates_nothing_and_says_it_was_already_the
     load = call(ctx, "base.blueprint.import", file_base64=exported(ctx))
 
     assert the_groups(ctx) == before
-    [groups] = report_of(load.model_dump()["report"], "modifier")["datasets"]
+    [groups] = app_report(load.model_dump()["report"], "modifier")["datasets"]
     assert (groups["status"], groups["already"], groups["created"]) == ("already", 2, 0)
 
 
@@ -147,7 +128,7 @@ def test_a_group_whose_product_is_not_in_the_business_loads_without_it_and_says_
 
     assert list(the_groups(ctx)) == ["Extras"]
     assert the_groups(ctx)["Extras"]["applies_to"] == []
-    [groups] = report_of(result.report, "modifier")["datasets"]
+    [groups] = app_report(result.report, "modifier")["datasets"]
     assert groups["status"] == "partial"
     assert any("GONE-1" in problem for problem in groups["problems"])
 

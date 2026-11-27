@@ -221,6 +221,36 @@ class TestWhom:
         assert not HubUser.objects.filter(username="saas:3").exists()
 
 
+class TestTheAccountancyFirm:
+    """It only reads and takes no place of the plan: a role of the business would let a free place do more."""
+
+    @pytest.fixture
+    def gema(self, make_user):
+        return make_user("saas:7", host=A.key, role=ACCOUNTANT, first_name="Gema")
+
+    def test_it_is_given_no_role_of_the_business(self, client, olga, gema, cashier):
+        client.force_login(olga)
+
+        response = assign(client, "saas:7", cashier)
+
+        assert refusal(response) == (403, "base.role_of_accountant")
+        assert "person" in response.json()["error"]["fields"]
+        assert not HubUser.objects.filter(username="saas:7", business_role__isnull=False).exists()
+        assert facts() == []
+
+    def test_one_it_holds_from_before_does_not_rule(self, client, olga, gema):
+        """Given while erplora.com had it as an employee: once its invitation is the accountancy firm's, that one rules."""
+        till = a_role("Till", sale__view_sale=ON, sale__take_payment=ON)
+        held_by(gema, till)
+        client.force_login(olga)
+
+        roles = client.get("/api/roles", HTTP_HOST=HOST).json()["roles"]
+
+        assert access_for(gema, A) == permissions_of_role(ACCOUNTANT)
+        members = {role["key"]: role["members"] for role in roles}
+        assert (members[str(till.pk)], members["hub_accountant"]) == (0, 1)
+
+
 def all_off(*but: str) -> dict[str, str]:
     """Every permission of the deployment off but those ``but`` names, for a role that gives nothing of any app."""
     return {

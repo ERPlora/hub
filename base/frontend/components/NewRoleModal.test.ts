@@ -13,6 +13,7 @@ const row = (key: string, label: string, origin: 'basic' | 'own' = 'basic'): Hub
   origin,
   members: 0,
   to_review: false,
+  mine: false,
   permissions: 10,
 });
 const ROLES = [row('hub_manager', 'Manager'), row('hub_employee', 'Employee'), row(OWN, 'Cajero', 'own')];

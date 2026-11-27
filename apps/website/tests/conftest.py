@@ -210,3 +210,49 @@ def google_reviews(place_ref: str = PLACE_ID, **overrides) -> dict:
     }
     payload.update(overrides)
     return payload
+
+
+@pytest.fixture
+def services_catalog(db):
+    from apps.service.models.catalog import Category, Service
+
+    hair, nails = Category.objects.create(name="Hair", sort_order=2), Category.objects.create(name="Nails", sort_order=1)
+    Service.objects.create(name="Cut", price=1500, duration_minutes=30, category=hair)
+    Service.objects.create(name="Manicure", price=2000, pricing_type="hourly", duration_minutes=45, category=nails)
+    Service.objects.create(name="Advice", pricing_type="variable", duration_minutes=10, category=nails)
+    return {"hair": hair, "nails": nails}
+
+
+@pytest.fixture
+def products_catalog(db):
+    from apps.inventory.models import Category, Product, ProductCategory
+
+    drinks = Category.objects.create(name="Drinks", slug="drinks", order=1)
+    food = Category.objects.create(name="Food", slug="food", order=0)
+    cola = Product.objects.create(name="Cola", sku="COLA", price=250)
+    bocata = Product.objects.create(name="Bocata", sku="BOC", price=550)
+    Product.objects.create(name="Gone", sku="GONE", price=100, is_sold_out=True)
+    Product.objects.create(name="Loose", sku="LOOSE", price=0)
+    ProductCategory.objects.create(product=cola, category=drinks)
+    ProductCategory.objects.create(product=bocata, category=food)
+    return {"drinks": drinks, "food": food}
+
+
+def source_off(monkeypatch, label: str) -> None:
+    """``label`` off in every hub (``base.apps_on.active_apps``), the website and the rest still on."""
+    from apps.website.queries import catalog, public
+
+    real = catalog.active_apps
+    monkeypatch.setattr(catalog, "active_apps", lambda scope: real(scope) - {label})
+    monkeypatch.setattr(public, "active_apps", lambda scope: real(scope) - {label})
+
+
+@pytest.fixture
+def no_google(monkeypatch):
+    """Any attempt to ask Google fails the test."""
+    from apps.website import reviews
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("a read must never ask Google")
+
+    monkeypatch.setattr(reviews, "load", refuse)

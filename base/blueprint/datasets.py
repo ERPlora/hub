@@ -33,10 +33,12 @@ from base.blueprint.calls import (
     remover,
     text_of,
 )
-from base.blueprint.photos import _load_image
+from base.blueprint.photos import load_image
 
 #: What a spreadsheet runs as a formula; the customers' export quotes a cell that starts with one (CUSTOMER-F09).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+PRODUCT_IMAGES = ("inventory.product.set_image", "inventory.product.upload_image")
+SERVICE_IMAGES = ("service.service.set_image", "service.service.upload_image")
 CATEGORY_MISSING = _("«%(row)s»: the category «%(category)s» is not there, so it was left without it.")
 
 
@@ -169,7 +171,7 @@ def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loa
         except (OperationError, pydantic.ValidationError) as exc:
             loaded.warn(str(ROW_REFUSED) % {"row": text_of(row, "sku"), "reason": reason(exc)})
     for pk, row in made:
-        _load_image(ctx, loaded, "inventory.product", pk, row, text_of(row, "name") or text_of(row, "sku"))
+        load_image(ctx, loaded, PRODUCT_IMAGES, pk, row, text_of(row, "name") or text_of(row, "sku"))
 
 
 # service: categories and services
@@ -233,7 +235,7 @@ def _service_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> No
 
     create_each(ctx, rows, loaded, name="service.service.create", key=lambda row: natural_key(text_of(row, "name")),
                  existing=existing, build=build, label=lambda row: text_of(row, "name"),
-                 after=lambda row, pk: _load_image(ctx, loaded, "service.service", pk, row, text_of(row, "name")))
+                 after=lambda row, pk: load_image(ctx, loaded, SERVICE_IMAGES, pk, row, text_of(row, "name")))
 
 
 # table: zones and tables
@@ -353,6 +355,7 @@ PLATFORM_DATASETS: tuple[Dataset, ...] = (
         count=count_of("inventory.product.list"),
         load=_inventory_product_load,
         remove=remover("inventory.product.delete"),
+        images=PRODUCT_IMAGES,
     ),
     Dataset(
         key="service.category",
@@ -371,6 +374,7 @@ PLATFORM_DATASETS: tuple[Dataset, ...] = (
         count=count_of("service.service.list"),
         load=_service_load,
         remove=remover("service.service.archive"),
+        images=SERVICE_IMAGES,
     ),
     Dataset(
         key="table.zone",

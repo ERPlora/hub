@@ -259,7 +259,7 @@ un archivo lo abre.
 
 #### La carpeta abierta
 Arriba, la ruta de la carpeta, con ⋮ al lado para renombrar, mover o eliminar esa carpeta; «Espacio», con lo usado y
-el límite del plan («{used} de {limit}») o «{used} usados · Sin límite»; y lo que hay en la carpeta: primero las
+el límite del plan («{used} de {limit}») o «{used} en uso · Sin límite»; y lo que hay en la carpeta: primero las
 carpetas y luego los archivos, cada uno con su icono, su nombre, su tamaño (en la lista, también cuándo cambió) y su ⋮:
 «Abrir», «Descargar», «Renombrar», «Mover a…» y «Eliminar». En la lista, cada nombre ocupa una línea: lo que no cabe se
 corta con «…» y la extensión se ve siempre entera; en el móvil, el tamaño y la fecha van debajo del nombre, en gris.
@@ -294,7 +294,7 @@ quién se la aprobó, o que la hizo por su cuenta alguien a quien su rol se lo p
 
 ### Ficha de una persona
 Desde una fila de **Empleados › Personal**, para quien administra, con el botón de volver: «Sus datos» (con «Abrir
-en erplora.com»), «PIN» y «Placa».
+en erplora.com»), «Rol en este negocio», «PIN» y «Placa».
 
 ### Hace falta una aprobación
 Sobre la pantalla en la que se intentó la acción: qué se aprueba, «¿Quién lo aprueba?» con las caras y el teclado
@@ -489,7 +489,7 @@ En la pantalla Archivos:
 | BASE-F127 | Crear un rol propio a partir de otro | hecho |
 | BASE-F128 | Ajustar lo que permite un rol propio | hecho |
 | BASE-F129 | Borrar un rol propio | hecho |
-| BASE-F130 | Dar un rol propio a una persona | parcial |
+| BASE-F130 | Dar un rol propio a una persona | hecho |
 | BASE-F131 | Ver en la campana los roles por revisar | hecho |
 | BASE-F132 | Abrir el Hub en el móvil con el código del menú lateral | hecho |
 
@@ -1298,7 +1298,8 @@ Pasos:
      día.
 Entra: la importación elegida.
 Sale: borradas exactamente las filas que trajo, también lo que entró después porque esperaba a una app, y lo que aún
-esperaba ya no entra; lo creado después se queda (`base.import.undone`).
+esperaba ya no entra; lo creado después se queda (`base.import.undone`). Las categorías fiscales propias y sus tipos
+que trajo se quedan, como el resto de los ajustes del negocio: no cuentan entre las filas que se van a borrar.
 Si falla: el motivo sale en la propia ventana, que no se cierra; una
 importación ya deshecha, «Esta importación ya se deshizo.».
 Implicados: BASE-F32
@@ -1323,7 +1324,10 @@ Entra: el nombre, el idioma, para qué es y lo marcado.
 Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas: de Inventario, las categorías y los
 productos, y de Servicios, las categorías y los servicios, con sus fotos propias dentro (INVENTORY-F33); de Mesas, las
 zonas y las mesas; de Suplementos, los grupos, cada uno con sus opciones y con los productos (por su código) y las
-categorías a los que se aplica; y, solo en una copia de seguridad, los clientes. Nunca las ventas, las personas, los PIN
+categorías a los que se aplica; de Menús y combos, los menús, cada uno con su precio cerrado, sus platos, los productos
+a elegir en cada plato (por su código) con su suplemento, y su foto propia dentro; de Impuestos, las categorías fiscales
+propias del negocio, cada una con sus tipos y sus recargos, nunca las de fábrica, que ya trae todo negocio y que un
+archivo no toca; y, solo en una copia de seguridad, los clientes. Nunca las ventas, las personas, los PIN
 ni los datos fiscales. Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
 negocio no se guarda nada.
 Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un nombre para el archivo.» y no se puede
@@ -1364,7 +1368,8 @@ Pasos:
      los registros fiscales, las personas y sus accesos, los archivos y los ajustes del negocio se quedan
      siempre.», y «Antes de vaciar se hace una copia completa de los datos del negocio y se guarda 90 días, en
      «Copias», aquí debajo.».
-  3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total.
+  3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total. Impuestos
+     no sale como sección: sus categorías fiscales y sus tipos son ajustes del negocio.
   4. Marca las secciones y pulsa «Restablecer el negocio»: «Esto no se puede deshacer», con «Se borrarán
      definitivamente 120 filas:» y el desglose. Escribe el nombre del negocio («Escribe «Casa Ramón» para confirmar») y
      pulsa «Borrar definitivamente» (o «Cancelar»).
@@ -2140,7 +2145,7 @@ Pasos:
   2. Ve el árbol de carpetas a la izquierda (en una pantalla estrecha, el selector «Carpetas»), la ruta de la
      carpeta abierta, lo que hay en ella en «Cuadrícula» (lo primero que sale) o en «Lista», y «Espacio»: lo que
      ocupan los archivos del negocio y los de sus apps, contra el límite del plan («1,2 GB de 5 GB») o, si no tiene,
-     «1,2 GB usados · Sin límite».
+     «1,2 GB en uso · Sin límite».
   3. Entra en una carpeta pulsándola en el árbol, en la cuadrícula o en el selector, y vuelve por la ruta. La carpeta
      abierta queda en el enlace, así que se puede compartir con el equipo.
   4. Busca por el nombre en «Buscar archivos…», solo dentro de la carpeta abierta; sin resultados, «Ningún archivo
@@ -2363,7 +2368,8 @@ Pasos:
   3. «Gestoría» es el de la asesoría que lleva las cuentas del negocio, y solo lee: las ventas de todos, con los
      totales del negocio, y las facturas emitidas, que abre, imprime y descarga, cada una con sus impuestos y su
      registro de VeriFactu. En el menú le salen Ventas y Facturación. No vende, no cobra, no emite ni rectifica
-     facturas y no cambia ningún ajuste, y no ocupa plaza del plan.
+     facturas y no cambia ningún ajuste, y no ocupa plaza del plan. Por eso no se le da un rol propio: con él, una
+     plaza gratis podría hacer más que leer.
   4. Al tocar un rol se abre «Qué permite», con el nombre del rol arriba, «Lo que este rol deja hacer en este negocio,
      app por app. Se da en erplora.com y aquí no se cambia.» y «Personas con este rol: 2». Debajo, un panel por app: «El
      negocio» primero, después cada app encendida por su nombre y «Datos sensibles» al final. En cada panel, la frase de
@@ -2371,7 +2377,8 @@ Pasos:
      momento) o «No». Por ejemplo, el empleado ve en «Ventas / TPV» «Anular una venta» con «Con aprobación». Una app
      apagada no sale. Es solo lectura: aquí no se cambia nada. En un rol propio pone «Lo que este rol deja hacer en este
      negocio, app por app.» y sale lo que el negocio guardó; lo que no se puede dar en un rol propio, ser el propietario
-     del negocio, no sale. Quien gestiona los roles lo ajusta ahí mismo.
+     del negocio, no sale. Quien gestiona los roles lo ajusta ahí mismo, salvo el rol que tiene él, que ve igual,
+     de solo lectura, con «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.».
   5. Quien gestiona los roles (el propietario y el administrador, o quien lo tenga en su rol propio) crea uno con
      «Nuevo rol» o «Duplicar» y, en «⋮», edita o borra los propios.
   6. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
@@ -2409,8 +2416,8 @@ Pasos:
      mismo que ese rol. Después ajustas lo que permite.».
   3. «Crear rol»: el rol queda creado con lo mismo que permite el otro, app por app, menos ser el propietario del
      negocio, que ningún rol propio da. Sale «Rol Cajero creado» y se abre para ajustarlo.
-  4. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él; se da a una persona pidiéndoselo al asistente.
-     Desde entonces no cambia con el rol del que salió.
+  4. Sale al momento en **Empleados › Roles**, con «Propio» y nadie en él; se da a una persona en su ficha, en «Rol en
+     este negocio», o pidiéndoselo al asistente. Desde entonces no cambia con el rol del que salió.
   5. También se pide al asistente: «crea el rol Cajero a partir de Empleado», con una descripción si se quiere. La
      tarjeta dice «A partir de: Empleado» y «Nombre: Cajero», y al aceptarla queda creado igual.
 Entra: el rol del que parte, el nombre (hasta 80 letras) y, si se quiere, la descripción.
@@ -2428,8 +2435,9 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · Roles · Qué permite; Asistente
 Pasos:
-  1. En **Empleados › Roles**, toca un rol propio, o «Editar» en su «⋮». Arriba, «Lo que este rol deja hacer en este
-     negocio, app por app. Al guardar, quien lo tiene lo nota al momento.», cuántas personas lo tienen y su «Nombre» y
+  1. En **Empleados › Roles**, toca un rol propio, o «Editar» en su «⋮» (el rol que tiene uno mismo no tiene «Editar»).
+     Arriba, «Lo que este rol deja hacer en este negocio, app por app. Al guardar, quien lo tiene lo nota al momento.»,
+     cuántas personas lo tienen y su «Nombre» y
      «Descripción», que se cambian ahí. Debajo, los mismos paneles de «Qué permite»: cada permiso con su frase
      y un interruptor o, en lo que un responsable puede aprobar con su PIN, «Permitido», «Con aprobación» o «No».
   2. Cambia lo que quiera y pulsa «Guardar» al final: «Rol guardado.». Sin nada cambiado, «Guardar» no se puede pulsar.
@@ -2454,8 +2462,11 @@ tú.»; y ser el propietario no se da a nadie: «Eso es solo del propietario del
 no es de una app encendida, «Ese permiso no es de ninguna app encendida de este negocio.»; «Con aprobación» en algo que
 un responsable no puede aprobar con su PIN, «Eso no se puede aprobar con un PIN: elige permitido o no.». El nombre, como
 al crearlo. Lo que se rechaza en la pantalla se dice junto a «Guardar», con «No se pudo guardar el rol», o bajo el
-nombre, y lo que se estaba cambiando sigue puesto. Quien no gestiona los roles lo ve de solo lectura.
-Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F131
+nombre, y lo que se estaba cambiando sigue puesto. Quien no gestiona los roles lo ve de solo lectura. Nadie cambia el
+rol que tiene él, ni para quitarle algo: lo ve de solo lectura, con «Nadie se cambia su propio rol: pídeselo a alguien
+por encima de ti.», y el asistente y la API contestan lo mismo y no cambian nada; se lo cambia otra persona que gestione
+los roles.
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F127, BASE-F130, BASE-F131
 
 ### BASE-F129 Borrar un rol propio
 Estado: hecho
@@ -2475,30 +2486,41 @@ es de erplora.com. Duplícalo y cambia la copia.».
 Implicados: BASE-F82, BASE-F97, BASE-F98, BASE-F127, BASE-F130
 
 ### BASE-F130 Dar un rol propio a una persona
-Estado: parcial — se da pidiéndoselo al asistente o por la API del Hub; falta su sitio en la ficha de la persona
+Estado: hecho
 Actor: propietario, administrador
-Pantalla: Asistente
+Pantalla: Ficha de una persona; Asistente
 Pasos:
-  1. Pide al asistente «dale a Luis el rol Cajero» o «quítale a Luis el rol Cajero».
-  2. La tarjeta dice la persona y el rol por sus nombres y, bajo «Lo que va a pasar», cuántas personas tienen ese rol.
-     Pide escribir CONFIRMAR (BASE-F98).
-  3. Al aceptarla, la persona queda con ese rol, que manda sobre el de su invitación: lo que ve y lo que puede hacer
-     cambian al momento en sus dispositivos, sin cerrar su sesión (BASE-F13), y quien ahora puede hacer algo con ese rol
-     lo aprueba también con su PIN (BASE-F84). Cada persona tiene un solo rol.
-  4. Para devolverla al de su invitación se le pide ese rol («Empleado»): es el que tiene desde entonces.
-  5. El asistente de esa persona sabe con qué rol habla: el propio, por el nombre que le puso el negocio (BASE-F100).
+  1. En **Empleados › Personal**, toca a una persona. En su ficha, bajo «Sus datos», está «Rol en este negocio»: «Manda
+     sobre el rol de su invitación: lo que ve y puede hacer aquí cambia al momento, sin volver a entrar.».
+  2. En «Rol» sale el que tiene: uno propio del negocio, por su nombre, o «El de la invitación (Empleado)». Elige otro de
+     los propios, o «El de la invitación (Empleado)» para devolverla al de su invitación, y se da al elegirlo: «Eva Gil
+     tiene ahora el rol Cajero.».
+  3. Desde ese momento ese rol manda sobre el de su invitación: lo que ve y lo que puede hacer cambian en sus
+     dispositivos sin cerrar su sesión, y lo que ese rol le deja hacer también lo aprueba con su PIN cuando otro lo pide.
+     Cada persona tiene un solo rol.
+  4. Si el negocio aún no tiene roles propios, la ficha dice «Este negocio aún no tiene roles propios: se crean en
+     Empleados › Roles, a partir de cualquier rol.», y «Crear un rol» lleva a **Empleados › Roles**.
+  5. Si a esa persona no se le puede dar un rol, su ficha enseña el que tiene y por qué, sin nada que elegir. Quien no
+     gestiona los roles solo ve el que tiene.
+  6. También se pide al asistente: «dale a Luis el rol Cajero» o «quítale a Luis el rol Cajero». La tarjeta dice la
+     persona y el rol por sus nombres y, bajo «Lo que va a pasar», cuántas personas tienen ese rol, y pide escribir
+     CONFIRMAR.
+  7. El asistente de esa persona sabe con qué rol habla: el propio, por el nombre que le puso el negocio.
 Entra: la persona y el rol, uno propio del negocio o el de su invitación.
 Sale: la persona con ese rol. Evento `base.role.assigned`. erplora.com no lo sabe: allí sigue con el de su invitación.
-Si falla: al propietario nadie le da otro rol, «El propietario siempre es el propietario: nadie le da otro rol.»; nadie
-se lo cambia a sí mismo, «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.»; ni a quien no está por
-debajo en su invitación, «Solo puedes dar un rol a quien está por debajo de ti en el negocio.». Nadie da un rol que
+Si falla: al propietario nadie le da otro rol, «El propietario siempre es el propietario: nadie le da otro rol.»; a la
+gestoría tampoco, porque solo lee y no ocupa plaza del plan, «La gestoría solo lee y no ocupa plaza del plan: se queda
+con el rol de su invitación.», y un rol propio que le dieran antes de pasar a gestoría en erplora.com deja de mandar;
+nadie se lo cambia a sí mismo, «Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.»; ni a quien no está
+por debajo en su invitación, «Solo puedes dar un rol a quien está por debajo de ti en el negocio.». Nadie da un rol que
 permite más de lo que puede hacer él, tampoco el de la invitación al devolverla, ni lo que daría una app apagada, ni
 «Con aprobación» lo que su propio rol le niega: «Un rol no puede permitir más de lo que puedes hacer tú.». Otro rol
 básico, «Ese rol se da en erplora.com. Aquí se da uno propio del negocio.»; un rol que no está, «Este rol no existe en
 este negocio.»; una persona que no es del negocio, «Esa persona no está en este negocio.». Si alguien borra el rol a la
 vez, o se borra o se da, nunca las dos cosas: se oye el «Este rol no existe en este negocio.» o el «2 personas tienen
-este rol. Dales otro antes de borrarlo.».
-Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F129
+este rol. Dales otro antes de borrarlo.». En la ficha, lo que se rechaza al elegir se dice bajo «Rol», que vuelve al
+rol que tenía; si no se pueden cargar los roles, «No se pudieron cargar los roles.» con «Reintentar».
+Implicados: BASE-F13, BASE-F82, BASE-F84, BASE-F97, BASE-F98, BASE-F100, BASE-F127, BASE-F128, BASE-F129
 
 ### BASE-F131 Ver en la campana los roles por revisar
 Estado: hecho
@@ -2887,7 +2909,15 @@ Pasos:
      Ventas / TPV: Varios · Categoría fiscal: Producto — general · 21 % · Posición: 0»; «Abrir en Mesas: Mesa: 4 · Comensales:
      3». Un importe, todo dato que su app declara como
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
-     asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
+     asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». La
+     tarjeta enseña cada dato tal como lo toma la acción, no como lo escribió el asistente: un suplemento que el
+     asistente manda como el texto «300» sale «Suplemento: 3,00 €», nunca «300», y los alérgenos salen en el orden en
+     que se guardan, el del Reglamento. Lo que su pantalla dice con palabras, la tarjeta también: un máximo que en su
+     app quiere decir sin límite sale «Máximo de elecciones: Sin límite», nunca «0» (igual los días de antelación de
+     una reserva y el descuento máximo sin un responsable, cuyo 100 % es sin límite); un precio que no es por unidad
+     dice para qué unidad es, como lo escribe el TPV: «Precio por kg: 45,00 €», «Precio por 100 g: 2,50 €» (y el
+     coste, por la unidad del producto). Un texto que es un código interno de un registro nunca sale: si la tarjeta no
+     puede nombrarlo, lo deja fuera. Si la
      acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
      «15,00 $», y en yenes, sin decimales; una moneda que no existe no se inventa: si la acción ya no la acepta en sus
      datos, no sale tarjeta (ver «Si falla»); si no, el importe sale tal como se escribió y la acción la rechaza al
@@ -2973,7 +3003,10 @@ Pasos:
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que la persona dijo que no y dice que no
      se hizo porque lo canceló, sin pedirle que lo confirme, porque esa tarjeta ya está cerrada. Tras «Ejecutar», el
      asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó hecho y no propone
-     deshacerlo salvo que se lo pidan.
+     deshacerlo salvo que se lo pidan. En un cambio (un ajuste, como los de la caja, o los datos de un registro), sabe
+     además cómo estaban los datos que mandó, así que nunca lo supone: tras «Ejecutar» dice lo que cambió y lo que ya
+     estaba así («Hecho: ahora hay que contar el dinero al cerrar (antes no); el fondo al abrir ya se pedía»), y tras
+     «Cancelar», cómo siguen («No lo he cambiado: la semana sigue empezando en lunes»).
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno que se le propuso a la persona, con la acción nombrada
      como en su tarjeta: «Hecho: Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se
@@ -3059,8 +3092,9 @@ Pasos:
 Entra: lo que se hizo en el turno, con su resultado, lo que devolvieron sus consultas y las direcciones web que
 consultaron las herramientas de erplora.com.
 Sale: los avisos y los recibos, guardados con la conversación.
-Si falla: «Hecho» quiere decir que la acción de su app acabó sin error: si una app responde bien sin haber cambiado
-nada, es esa acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F106), los
+Si falla: «Hecho» quiere decir que la acción de su app acabó sin error. En un cambio, el asistente sabe qué datos
+cambiaron y cuáles ya estaban así, y lo dice (BASE-F97); en otra acción que responde bien sin haber cambiado nada, es esa
+acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F106), los
 avisos de lo que llegó a decir y los recibos de lo que sí se hizo.
 Implicados: BASE-F96, BASE-F97, BASE-F106
 

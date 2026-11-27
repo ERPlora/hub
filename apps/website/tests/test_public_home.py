@@ -18,7 +18,7 @@ from live.operations import get
 
 from apps.website import public_home
 from apps.website.models import Site
-from apps.website.queries import page_cache_key
+from apps.website.queries.public import page_cache_key
 from apps.website.render import local_day
 from apps.website import reviews
 from apps.website.tests.conftest import (
@@ -272,8 +272,9 @@ def test_with_the_module_off_in_the_hub_neither_the_root_nor_the_public_api_show
     publish()
     from apps.website import queries
 
-    on = queries.active_apps
-    monkeypatch.setattr(queries, "active_apps", lambda scope: on(scope) - {"website"})
+    on = queries.public.active_apps
+    monkeypatch.setattr(queries.public, "active_apps", lambda scope: on(scope) - {"website"})
+    monkeypatch.setattr(queries.catalog, "active_apps", lambda scope: on(scope) - {"website"})
     assert jumps_to_the_login(visit(client))
     assert public_home.is_published(Hub.objects.get(slug=A.key)) is False
     for path in ("/api/website/public/site", "/api/website/public/catalog"):

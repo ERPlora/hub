@@ -43,7 +43,7 @@ const actions = computed<DataTableAction<HubRoleRow>[]>(() =>
   manages.value
     ? [
         { id: 'duplicate', label: t('base.roles.duplicate'), icon: 'ion:copy-outline', pinned: true },
-        { id: 'edit', label: t('base.roles.edit'), icon: 'ion:create-outline', menuOnly: true, hidden: basic },
+        { id: 'edit', label: t('base.roles.edit'), icon: 'ion:create-outline', menuOnly: true, hidden: (row) => basic(row) || row.mine },
         { id: 'delete', label: t('base.roles.delete'), icon: 'ion:trash-outline', color: 'danger', menuOnly: true, hidden: basic },
       ]
     : [],
