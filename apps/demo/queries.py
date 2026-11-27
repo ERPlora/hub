@@ -32,7 +32,7 @@ MAX_CANDIDATES = 5
     output=ItemPage,
     expose_api=True,
     ai={
-        "description": "Lists the demo items, most recently changed first, with their status («open» or «done») "
+        "description": "Lists the demo items, most recently changed first, with their status (`open` or `done`) "
         "and how many lines each has; searches by a piece of the name and filters by status, a page at a time.",
         "asks": {
             "en": (

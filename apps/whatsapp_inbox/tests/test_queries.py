@@ -8,7 +8,7 @@ from django.db import connections
 from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
-from apps.whatsapp_inbox.models import Conversation
+from apps.whatsapp_inbox.models.conversations import Conversation
 from base.tenancy.context import current_alias
 from base.tests.ordering import assert_reads_backwards, listed_with
 

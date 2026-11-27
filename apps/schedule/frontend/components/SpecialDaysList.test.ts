@@ -209,6 +209,8 @@ describe('SpecialDaysList', () => {
       'Ver días especiales como lista',
       'Ver días especiales como tarjetas',
     ]);
+    await s.filter({ name: 'eve' });
+    expect(name('filters-toggle')).toBe('Filtros de días especiales (1 activo)');
     await s.filter({ name: 'eve', is_closed: 'true' });
     expect(name('filters-toggle')).toBe('Filtros de días especiales (2 activos)');
   });

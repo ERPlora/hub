@@ -153,11 +153,11 @@
     },
     "gallery": {
       "label": "Gallery photos",
-      "count": "{n} of {max} photos",
+      "count": "{shown} of {count} photo | {shown} of {count} photos",
       "empty": "No photos yet: add the first one. They show in this order.",
       "photo": "Photo {n}",
       "add": "Add a photo",
-      "full": "The gallery is full ({max} photos): remove one to add another.",
+      "full": "The gallery is full ({count} photo): remove one to add another. | The gallery is full ({count} photos): remove one to add another.",
       "up": "Move up",
       "down": "Move down"
     },

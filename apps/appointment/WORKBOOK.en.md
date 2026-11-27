@@ -599,7 +599,7 @@ does not exist in this business.".
 Involved: none
 
 ### APPOINTMENT-F17 Charge the appointment at the till
-<!-- from WORKBOOK.md sha256:7f41050ab344 -->
+<!-- from WORKBOOK.md sha256:934422bb5ece -->
 Status: done
 Actor: manager, employee (their own appointments), with the right to sell in Sales
 Screen: Agenda
@@ -621,7 +621,8 @@ Steps:
    not cancelled, nor marked as no-show, nor deleted: first the check is charged or voided.
 5. When it is charged, the appointment is **charged** and, if it was not already, **Completed**; **Charge**
    is greyed out. If the sale is voided, the appointment stops being charged and **Charge** is active
-   again.
+   again. In its history, «Charged», the «Completed» the charge brings and «Sale voided» say who charged
+   or voided the sale at the till, like every other change.
 In: a pending, confirmed, in progress or completed appointment that is not charged.
 Out: the check open in Sales (`sale.order.opened`) and here `appointment.appointment.check_opened`; on
 charging, the Sales event `sale.sale.created_from_appointment` and here `appointment.appointment.charged`;
@@ -661,7 +662,7 @@ taken (`appointment.slot_taken`); the automation offers another time.
 Involved: CUSTOMER-F26, ONLINE_BOOKING-F01
 
 ### APPOINTMENT-F19 Adjust the booking rules
-<!-- from WORKBOOK.md sha256:87aa339390c4 -->
+<!-- from WORKBOOK.md sha256:48525661663a -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Settings
@@ -671,8 +672,9 @@ Steps:
    What is changed while it is saving is not lost: it stays on screen, still to save.
 In: the current Appointments settings.
 Out: `appointment.settings.updated`.
-If it fails: "The settings could not be saved." with each reason under its field, without losing what was
-written; a calendar that ends before it starts, "The calendar has to end after it starts.". As in the form
+If it fails: each reason under its field, once, without losing what was written: the notice "The
+settings could not be saved." above "Save" does not repeat it; a calendar that ends before it starts, "The
+calendar has to end after it starts.". As in the form
 windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
 corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
 try.
