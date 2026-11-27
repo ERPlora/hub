@@ -2,9 +2,11 @@
 // Destination and Notes (optional) and its dishes — a product of the catalogue, or the dish written by
 // hand, its quantity and a note — with «Add dish» and «Remove dish»; «Create ticket» only with a dish.
 import { Combo } from '@erplora/ui/components';
+import { DOMWrapper } from '@vue/test-utils';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
+import { iconOnly, iconOnlyNamed } from '../../../../base/frontend/__tests__/icon-only';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { ticket } from '../__tests__/kitchen';
 import { click, ionValue, mountKitchen, settle } from '../__tests__/mount-kitchen';
@@ -57,6 +59,15 @@ describe('TicketFormModal', () => {
     ]);
     expect(f.wrapper.emitted('saved')?.[0]?.[0]).toEqual(made);
     expect(f.closed()).toBe(true);
+  });
+
+  it('«Add dish» and «Remove dish» are their icons alone, named and titled by their labels', async () => {
+    const f = await form();
+    await click(f.field('add-dish'));
+    expect([iconOnly(new DOMWrapper(f.field('add-dish'))), iconOnly(new DOMWrapper(f.field('dish-1-remove')))]).toEqual([
+      iconOnlyNamed('Add dish'),
+      iconOnlyNamed('Remove dish'),
+    ]);
   });
 
   it('removes a dish', async () => {
@@ -215,7 +226,7 @@ describe('TicketFormModal', () => {
     const f = await form({}, {}, 'es');
     expect(f.inDoc('kitchen-ticket-form')?.getAttribute('aria-label')).toBe('Nueva comanda');
     expect(f.field('submit').textContent?.trim()).toBe('Crear comanda');
-    expect(f.field('add-dish').textContent?.trim()).toBe('Añadir plato');
+    expect(f.field('add-dish').getAttribute('aria-label')).toBe('Añadir plato');
   });
 });
 
