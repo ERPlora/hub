@@ -4,14 +4,9 @@
 // English cards read «100,00 €», «18:00» and «Big sale» between Spanish quotes. Seen in the three sizes the fleet checks.
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, login, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
+import { A, capture, login, saveSessionForTheSweep, shown, signedInSpanish, THREE_SIZES } from './helpers';
 
 const KEY = 'fix-flow-gallery-language-format';
-const VIEWPORTS = [
-  { label: '1440x900', width: 1440, height: 900 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '375x667', width: 375, height: 667 },
-];
 
 async function signedInEnglish(browser: Browser, viewport: { width: number; height: number }) {
   const context = await browser.newContext({ baseURL: A, viewport, locale: 'en-US' });
@@ -24,7 +19,7 @@ async function signedInEnglish(browser: Browser, viewport: { width: number; heig
 const card = (page: Page, id: string) => shown(page).locator(`[data-testid=flow-card-open-${id}]`);
 const panel = (page: Page, id: string) => shown(page).locator(`[data-testid=flow-card-panel-${id}]`);
 
-for (const viewport of VIEWPORTS) {
+for (const viewport of THREE_SIZES) {
   test(`FLOW-F04 the gallery in English says €100.00 and 6:00 PM, with English quotes, at ${viewport.label}`, async ({ browser }) => {
     const { context, page } = await signedInEnglish(browser, viewport);
     try {
