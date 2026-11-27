@@ -7,6 +7,7 @@ Every test with the database runs as production does: inside business A's own da
 ``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
 of B asks for ``hub_b`` and enters it."""
 
+import json
 import threading
 import time
 from collections.abc import Callable
@@ -14,6 +15,7 @@ from datetime import UTC, datetime
 
 import pytest
 from django.utils import translation
+from live.assistant import tool_name
 from live.context import OperationContext, Scope, system_context
 from live.models import OutboxEvent
 from live.operations import atomic, get
@@ -67,6 +69,29 @@ def run(
 ):
     """Run the operation ``name`` as ``role`` on ``scope``."""
     return get(name)(ctx_for(role, scope, actor), data)
+
+
+def told_in_a_turn(operation: str, arguments: dict, *, ask: str, role: str = "hub_owner", yes: bool = False) -> dict:
+    """What the model reads of the tool ``operation`` run with ``arguments`` in a turn of ``role`` in Spanish who asked
+    ``ask``, as the chat runs it; a write, once the person says yes to its card (``yes``)."""
+    call = {"call_id": "c1", "name": tool_name(operation), "arguments": json.dumps(arguments)}
+    asked = {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [{"id": "c1", "type": "function", "function": {"name": call["name"], "arguments": call["arguments"]}}],
+    }
+    messages = [{"role": "user", "content": ask}, asked]
+    turn = get("base.assistant.turn")
+
+    def answer(pending: list, decision: dict | None) -> dict:
+        data = turn.input.model_validate({"messages": messages, "pending": pending, "decision": decision})
+        return turn(ctx_for(role, language="es"), data).model_dump(mode="json")
+
+    plan = answer([call], None)
+    if yes:
+        plan = answer(plan["pending"], {"call_id": "c1", "accepted": True})
+    [result] = plan["append"]
+    return json.loads(result["content"])
 
 
 #: The moment the facts of the read tests happen at.

@@ -2827,7 +2827,7 @@ shows over whatever screen is there (BASE-F97).
 Involved: BASE-F93, BASE-F97, BASE-F103, BASE-F104
 
 ### BASE-F93 Ask the assistant and read how it writes
-<!-- from WORKBOOK.md sha256:c35b194fa2da -->
+<!-- from WORKBOOK.md sha256:59c89f4cdd0b -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2869,7 +2869,8 @@ Steps:
      does not have to look them up for each question. Every date and time it says is in the business's time, the one the
      screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18. Every
      amount it says is in the currency and with the decimals the screens show: what a customer's card says is «€3.60»
-     it tells as €3.60, never as €360.00.
+     it tells as €3.60, never as €360.00. An option of a closed list it says by the name the screens give it in the
+     person's language, never by its code: of a customer just added it says she came "Walk-in", not "walk_in".
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
