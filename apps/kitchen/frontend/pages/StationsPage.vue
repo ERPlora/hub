@@ -58,7 +58,7 @@ const stationActions = computed<DataTableAction<StationOut>[]>(() =>
   canManage.value
     ? [
         { id: 'edit', label: t('kitchen.stations.actions.edit'), icon: 'create-outline' },
-        { id: 'route', label: t('kitchen.routing.route'), icon: 'swap-horizontal-outline' },
+        { id: 'route', label: t('kitchen.routing.route'), icon: 'swap-horizontal-outline', showLabel: true },
         { id: 'delete', label: t('kitchen.stations.actions.delete'), icon: 'trash-outline', color: 'danger', menuOnly: true },
       ]
     : [],

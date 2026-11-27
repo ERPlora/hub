@@ -16,6 +16,7 @@ import { NO_CLOCK } from '../../vitest.load';
 const PAINTED_LABELS: Readonly<Record<string, string>> = {
   'apps/kitchen/frontend/pages/StationsPage.vue#kitchen.routing.route':
     '«Route» sends a product or a category to a station: the swap arrows do not say it',
+  'apps/kitchen/frontend/pages/StationsPage.vue#route': '«Route» of a station, the same action and icon as the list’s main one',
   'apps/payment/frontend/pages/PaymentsPage.vue#advance':
     'the next step changes with the payment (Approve, Mark as sent, Mark as completed): one icon cannot say which',
   'apps/printing/frontend/pages/JobsPage.vue#retry': '«Try again» has no icon of its own (a refresh arrow reloads)',

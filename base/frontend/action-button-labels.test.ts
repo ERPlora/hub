@@ -135,13 +135,19 @@ export interface IconButton {
   slotted: boolean;
 }
 
+/** Whether `prop` gives the attribute `name`: written, bound, or a key of an object bound in place
+ *  (`v-bind="{ 'aria-label': x, title: x }"`). */
+function gives(prop: TemplateProp, name: string): boolean {
+  if (prop.type === ATTRIBUTE) return prop.name === name;
+  if (prop.type !== DIRECTIVE || prop.name !== 'bind') return false;
+  return prop.arg ? prop.arg.content === name : new RegExp(`[{,]\\s*['"]?${name}['"]?\\s*:`).test(prop.exp?.content ?? '');
+}
+
 /** The static value of the attribute `name` of `node`, or the source of its binding. */
 function propOf(node: TemplateNode, name: string): string | undefined {
-  for (const prop of node.props ?? []) {
-    if (prop.type === ATTRIBUTE && prop.name === name) return prop.value?.content ?? '';
-    if (prop.type === DIRECTIVE && prop.name === 'bind' && prop.arg?.content === name) return prop.exp?.content ?? '';
-  }
-  return undefined;
+  const prop = (node.props ?? []).find((candidate) => gives(candidate, name));
+  if (!prop) return undefined;
+  return prop.type === ATTRIBUTE ? (prop.value?.content ?? '') : (prop.exp?.content ?? '');
 }
 
 /** The elements under `node` (itself included), depth first. */
@@ -215,6 +221,8 @@ describe('guardrail: an action button whose icon says it alone shows the icon al
     '    <ion-button data-testid="x-save">{{ $t(\'x.save\') }}</ion-button>',
     '    <ion-button data-testid="x-pay"><HubIcon slot="start" icon="card-outline" /><span>{{ amount }}</span></ion-button>',
     '    <ion-button><ion-spinner v-if="busy" /><HubIcon v-else slot="start" icon="send-outline" />{{ t(\'x.send\') }}</ion-button>',
+    '    <ion-button v-bind="{ \'aria-label\': $t(\'x.up\'), title: $t(\'x.up\') }"><HubIcon slot="icon-only" icon="chevron-up-outline" /></ion-button>',
+    '    <ion-button v-bind="{ \'aria-label\': $t(\'x.down\') }"><HubIcon slot="icon-only" icon="chevron-down-outline" /></ion-button>',
     '  </div>',
     '</template>',
   ].join('\n');
@@ -222,15 +230,15 @@ describe('guardrail: an action button whose icon says it alone shows the icon al
 
   it('finds every button that paints text beside its icon, and lets the exceptions be', () => {
     expect(labelledButtons(planted, file, { 'apps/demo/frontend/Planted.vue#x-pay': 'planted' })).toEqual([6, 7, 15]);
-    expect(iconButtons(planted, file).map(({ id }) => id)).toEqual(['x-add', '?', 'x.delete', '?', '?', 'x-pay', 'x.send']);
+    expect(iconButtons(planted, file).map(({ id }) => id)).toEqual(['x-add', '?', 'x.delete', '?', '?', 'x-pay', 'x.send', 'x.up', 'x.down']);
     expect(labelledButtons(planted, file.replace('.vue', '.ts'))).toEqual([]);
   });
 
   it('finds every button that is only its icon without its name, its title or the icon-only slot', () => {
-    expect(unnamedIconButtons(planted, file)).toEqual([11, 12]);
+    expect(unnamedIconButtons(planted, file)).toEqual([11, 12, 17]);
     expect(unnamedIconButtons(planted.replace(':aria-label="label"', 'data-testid="x-close" :aria-label="label"'), file, {
       'apps/demo/frontend/Planted.vue#x-close': 'planted',
-    })).toEqual([11]);
+    })).toEqual([11, 17]);
   });
 
   it('no button of base or of an app paints text beside its icon unless it is an exception', async () => {
