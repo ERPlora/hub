@@ -84,12 +84,13 @@ def _pin_pad_line(name: str, label, value) -> dict:
     output=AccessSettingsOut,
     ai={
         "description": (
-            "Changes how the business asks who is at the till, as the «PIN pad» card of Settings › General: «Show "
-            "PIN pad» on or off (off is pin_policy never) and «Ask again after inactivity»: 1, 5, 10, 15 or 30 min "
-            "(pin_policy always with those pin_inactivity_minutes) or «Until signing out» (pin_policy per_shift); and "
-            "PINs of 4 or 6 digits. With the PIN pad on, each person enters with their own PIN and every sale carries "
-            "their name. Read access.settings first and say how it is now by those names; to ask again after "
-            "inactivity, ask the person how many minutes when they have not said it."
+            "Changes how the business asks who is at the till, as the PIN pad card of Settings › General does: "
+            "showing the PIN pad on or off (off is pin_policy never) and asking again after inactivity: 1, 5, 10, 15 "
+            "or 30 min (pin_policy always with those pin_inactivity_minutes) or until signing out (pin_policy "
+            "per_shift); and PINs of 4 or 6 digits. With the PIN pad on, each person enters with their own PIN and "
+            "every sale carries their name. Read access.settings first and say how it is now as that card does, in "
+            "the person's language; to ask again after inactivity, ask the person how many minutes when they have not "
+            "said it."
         ),
         "risk": "high",
         "summary": _pin_pad_summary,

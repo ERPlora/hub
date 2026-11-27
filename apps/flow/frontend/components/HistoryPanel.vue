@@ -10,13 +10,14 @@ import { InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { HubIcon, toastSuccess } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { useLiveList } from '../composables/useLiveList';
 import { usePhrasing } from '../composables/usePhrasing';
+import { advice } from '../lib/advice';
 import { wording } from '../lib/refusal';
-import { describeLog, runStatusPill } from '../lib/phrasing';
-import type { CatalogOut, RunOut, RunPageOut, Step } from '../operations';
+import { describeLog, runStatusPill, waitsForAssistant } from '../lib/phrasing';
+import type { CatalogOut, RunOut, RunPageOut, RunStatus, Step } from '../operations';
 import LoadingNote from './LoadingNote.vue';
 
 const props = defineProps<{ flowId: string; steps: readonly Step[]; catalog: CatalogOut | null }>();
@@ -25,6 +26,18 @@ const { confirm } = useConfirm();
 const retrying = useCommand('flow.run.retry');
 /** What went wrong resuming a run, by its id. */
 const retryProblem = ref<Record<string, string>>({});
+/** What «Resume» says of the run as it is right after, as «Run now» does; one stopped again is said next to it. */
+const RETRIED_NOTICE: Partial<Record<RunStatus, string>> = {
+  succeeded: 'flow.history.retried',
+  stopped: 'flow.history.retriedStopped',
+  waiting: 'flow.history.retriedWaiting',
+  calling: 'flow.history.retriedCalling',
+  asking: 'flow.history.retriedAsking',
+};
+/** A run that goes on by itself: a wait, a call to another system, a question, the assistant. */
+const GOING_ON: ReadonlySet<RunStatus> = new Set(['running', 'waiting', 'calling', 'asking']);
+/** The runs resumed here that were still going on: if one stops by an error again, it is said next to it. */
+const following = new Set<string>();
 
 const PAGE = 20;
 const MAX_WINDOW = 100;
@@ -62,11 +75,6 @@ function when(run: RunOut): string {
   return new Intl.DateTimeFormat(phrasing.value.locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(run.started_at));
 }
 
-function advice(code: string): string {
-  const key = `flow.history.advice.${code.replaceAll('.', '__')}`;
-  return phrasing.value.te(key) ? phrasing.value.t(key) : '';
-}
-
 function technical(run: RunOut): string {
   const last = run.log.at(-1)?.error;
   return [run.error_code, last?.technical, last?.fields ? JSON.stringify(last.fields) : ''].filter(Boolean).join(' · ');
@@ -85,17 +93,28 @@ async function retry(run: RunOut): Promise<void> {
   retryProblem.value = { ...retryProblem.value, [run.id]: '' };
   try {
     const resumed = await retrying.run({ id: run.id });
-    if (resumed.status === 'failed') retryProblem.value = { ...retryProblem.value, [run.id]: t('flow.history.retriedFailed', { message: resumed.error_message }) };
-    else toastSuccess(t(resumed.status === 'waiting' ? 'flow.history.retriedWaiting' : 'flow.history.retried'));
+    if (resumed.status === 'failed') stoppedAgain(resumed);
+    const notice = waitsForAssistant(resumed.status, resumed.log) ? 'flow.history.retriedThinking' : RETRIED_NOTICE[resumed.status];
+    if (notice) toastSuccess(t(notice));
+    if (GOING_ON.has(resumed.status)) following.add(run.id);
   } catch (failure) {
     retryProblem.value = { ...retryProblem.value, [run.id]: wording(failure, t('flow.errors.action')) };
   }
 }
 
-const attentionText = computed(() => {
-  const n = page.value?.failed ?? 0;
-  return phrasing.value.t(n === 1 ? 'flow.history.attentionOne' : 'flow.history.attentionMany', { n });
+function stoppedAgain(run: RunOut): void {
+  retryProblem.value = { ...retryProblem.value, [run.id]: phrasing.value.t('flow.history.retriedFailed', { message: run.error_message }) };
+}
+
+watch(runs, (rows) => {
+  for (const row of rows) {
+    if (!following.has(row.id) || GOING_ON.has(row.status)) continue;
+    following.delete(row.id);
+    if (row.status === 'failed') stoppedAgain(row);
+  }
 });
+
+const attentionText = computed(() => phrasing.value.t('flow.history.stopped', { n: page.value?.failed ?? 0 }));
 </script>
 
 <template>
@@ -170,9 +189,9 @@ const attentionText = computed(() => {
       >
         <span class="flow-history__why">{{ run.error_message }}</span>
         <span
-          v-if="advice(run.error_code)"
+          v-if="advice(run.error_code, phrasing)"
           class="flow-history__do"
-        >{{ advice(run.error_code) }}</span>
+        >{{ advice(run.error_code, phrasing) }}</span>
         <details v-if="technical(run)">
           <summary>{{ $t('flow.history.technical') }}</summary>
           <code>{{ technical(run) }}</code>

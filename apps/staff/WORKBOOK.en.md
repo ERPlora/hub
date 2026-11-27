@@ -221,7 +221,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 The services each professional performs are in the Services app (SERVICE-F31, F32 and F33).
 
 ### STAFF-F01 Add a professional
-<!-- from WORKBOOK.md sha256:641e2339816b -->
+<!-- from WORKBOOK.md sha256:aa8620ba991d -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Staff
@@ -243,8 +243,9 @@ available: it does not exist in this business, or it has been deleted or retired
 access to this business." or the account already linked to another record. Whoever cannot see
 the pay cannot send it: the notice says which permission they lack. Two records with the same name, email or
 employee ID are accepted. From the assistant, a role the business does not have (or that has been retired)
-is checked before the confirmation card: no card shows, the assistant says that role is not available and
-which ones there are, and nothing is created. Save (also when editing) is grey while the business has not yet said its
+and an account without access to this business are checked before the confirmation card: no card shows, the
+assistant says that role is not available and which ones there are, or that that account has no access, and
+nothing is created. Save (also when editing) is grey while the business has not yet said its
 currency, because the hourly rate is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
 reason) and offers "Retry", which asks for it again; as soon as it arrives, Save lights up.
 Involved: BASE-F97, BASE-F119
@@ -274,22 +275,26 @@ first.".
 Involved: BASE-F119
 
 ### STAFF-F03 Link the record to an account of the business
-<!-- from WORKBOOK.md sha256:cc6a704c4d8b -->
+<!-- from WORKBOOK.md sha256:ebc987170d2f -->
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Staff
 Steps:
 1. In the form, open "Hub user": "No Hub access" and the accounts with access to this business show.
 2. Choose that person's account, or "No Hub access" to unlink, and save.
 In: the active accounts with access to this business, only their identifier and their name
-(`staff.account.list`; whoever can add or edit records reads them).
+(`staff.account.list`; whoever can add or edit records reads them). The assistant ("Link Ana's record to her user")
+uses the same ones: it looks the account up in that list, and its confirmation card says the record and the name of
+the account being linked. An account without access to this business is checked before the card: no card shows,
+the assistant says that account has no access and nothing changes.
 Out: the link. With it, the person sees their own record (STAFF-F08) and asks for their time off
-(STAFF-F24). It changes no permission nor the commission: a sale counts for whoever was chosen when it was
+(STAFF-F24), and if they have no name in their profile, the faces of the till and the card of the user menu call
+them by the record's (BASE-F55). It changes no permission nor the commission: a sale counts for whoever was chosen when it was
 charged (STAFF-F21). Terminating the record frees the account.
 If it fails: "That Hub user is already linked to Ana García. A Hub user can belong to only one staff member:
 unlink it there first, or pick another user.", also if two people link it
 at the same time; "That Hub user has no access to this business.".
-Involved: ATTENDANCE-F01, TASK-F03
+Involved: ATTENDANCE-F01, TASK-F03, BASE-F55
 
 ### STAFF-F04 Create, edit and retire a role
 <!-- from WORKBOOK.md sha256:98ba31251444 -->
@@ -347,15 +352,18 @@ If it fails: "That staff member does not exist in this business." if it was alre
 Involved: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Add several professionals at once
-<!-- from WORKBOOK.md sha256:34b070c0893f -->
+<!-- from WORKBOOK.md sha256:20a850cbfb07 -->
 Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
 Steps:
 1. Whoever can add asks the assistant to add several people (up to 100 at once) with their name and, if
    they want, email, phone, role, hire date, rate, bookable, bio and specialties.
-2. An **Active** record is created for each valid row.
-3. The answer says which records were created and which rows were skipped with their reason.
+2. Before creating them, the confirmation card says each person by their first name and last name ("Create in Staff:
+   Carla Ruiz, Diego Martín, Elena Sanz"; with more than four, the first three and how many more). A row without a
+   first name or a last name counts among the "more".
+3. An **Active** record is created for each valid row.
+4. The answer says which records were created and which rows were skipped with their reason.
 In: the rows of the batch; the business's active roles.
 Out: one record per valid row and one `staff.member.created` notice for each (none if none goes in).
 If it fails: a row with a blank name, an email that is not one, a badly written date, a negative rate or a
@@ -660,7 +668,7 @@ whose it is and what it is called ("Ana López · Regular schedule") and a time-
 its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the person asking cannot see is left out.
 
 ### What it offers: queries (they read and change nothing; all but the accounts and the session's record can be followed live)
-<!-- from WORKBOOK.md sha256:ccc5c3cbea76 -->
+<!-- from WORKBOOK.md sha256:6b4bba69cb5b -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -683,7 +691,8 @@ its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the per
 | Who is away today, with the type of each time off in the language of whoever asks | see time off | F20 | `staff.time_off.today` |
 | My time off, with its reason and its notes | see time off | F08 | `staff.time_off.mine` |
 | The settings | see | F22 | `staff.settings.get` |
-| The active accounts with access to the business, for "Hub user" (id and name, with search or by user: the account of a record that no longer has access does not show and the screen says "No access to this business") | add or edit | F03 | `staff.account.list` |
+| The active accounts with access to the business, for "Hub user" and for the assistant (id and name, with search or by user: the account of a record that no longer has access does not show and the screen says "No access to this business") | see the team and add or edit | F03 | `staff.account.list` |
+| The account the assistant is about to link to a record, checked before its card as the record checks it when saved (not an assistant tool) | add or edit | F01, F03 | `staff.account.check` |
 
 ### What it offers: actions (they change data)
 <!-- from WORKBOOK.md sha256:d63e8740eb72 -->

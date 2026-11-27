@@ -7,7 +7,7 @@ Every test with the database runs as production does: inside business A's own da
 of B asks for ``hub_b`` and enters it.
 
 The builders import the models lazily, so that the tests of apps.py and engine.py still collect while
-models.py does not exist.
+the models do not exist.
 """
 
 import datetime as dt
@@ -15,11 +15,11 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.db import connections
+from django.db import IntegrityError, connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
-from live.operations import get
+from live.operations import atomic, get
 from psycopg.conninfo import make_conninfo
 
 from apps.flow.tests.test_relay import worker_loop
@@ -237,7 +237,7 @@ def make_service(
     tax=None,
     **fields,
 ):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     return Service.objects.create(
         name=name, price=price, duration_minutes=duration, tax_category=tax, **fields
@@ -254,7 +254,7 @@ def assign(
     service, member, *, duration: int | None = None, price: int | None = None, **fields
 ):
     """``member`` performs ``service`` (with their own minutes and price, if given)."""
-    from apps.service.models import Assignment
+    from apps.service.models.catalog import Assignment
 
     return Assignment.objects.create(
         service=service,
@@ -316,7 +316,7 @@ def make_customer(name: str = "Lucía Pérez", **fields):
 
 
 def make_settings(**fields):
-    from apps.appointment.models import Settings
+    from apps.appointment.models.settings import Settings
 
     Settings.objects.all().delete()
     return Settings.objects.create(**fields)
@@ -334,7 +334,7 @@ def make_appointment(
     **fields,
 ):
     """An appointment straight in the table (no rules applied), its service lines frozen from the catalog."""
-    from apps.appointment.models import Appointment, AppointmentService
+    from apps.appointment.models.appointments import Appointment, AppointmentService
 
     services = list(services)
     minutes = duration or sum(service.duration_minutes for service in services)
@@ -366,7 +366,7 @@ def make_appointment(
 
 def make_series(salon, **fields):
     """A weekly series of a cut with Ana (or ``staff``) for Lucía, straight in the table (nothing booked yet)."""
-    from apps.appointment.models import Recurring, RecurringService
+    from apps.appointment.models.series import Recurring, RecurringService
 
     staff = fields.pop("staff", salon.ana)
     series = Recurring.objects.create(
@@ -393,7 +393,7 @@ def make_block(
     title: str = "Closed",
     **fields,
 ):
-    from apps.appointment.models import BlockedTime
+    from apps.appointment.models.blocked_times import BlockedTime
 
     return BlockedTime.objects.create(
         title=title, start=start, end=end, staff=member, **fields
@@ -426,3 +426,8 @@ def make_salon():
 def salon(db):
     """The usual cast (``make_salon``)."""
     return make_salon()
+
+
+def refused(make):
+    with pytest.raises(IntegrityError), atomic():
+        make()

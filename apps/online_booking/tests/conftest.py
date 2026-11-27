@@ -10,6 +10,7 @@ Every test with the database runs as production does: inside business A's own da
 """
 
 import datetime as dt
+import json
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -17,6 +18,7 @@ from django.test import RequestFactory
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
 
 from apps.flow.tests.test_relay import listen, worker_loop
@@ -162,7 +164,7 @@ def make_day(weekday: int, *intervals: tuple[str, str], closed: bool = False):
 def make_service(
     name: str = "Haircut", *, price: int = 2000, duration: int = 30, **fields
 ):
-    from apps.service.models import Service
+    from apps.service.models.catalog import Service
 
     return Service.objects.create(
         name=name, price=price, duration_minutes=duration, **fields
@@ -176,7 +178,7 @@ def make_member(first_name: str = "Ana", last_name: str = "López", **fields):
 
 
 def assign(service, member, **fields):
-    from apps.service.models import Assignment
+    from apps.service.models.catalog import Assignment
 
     return Assignment.objects.create(service=service, member=member, **fields)
 
@@ -190,7 +192,7 @@ def make_customer(name: str = "Lucía Pérez", **fields):
 
 def make_rules(**fields):
     """The booking rules of Citas (its settings row)."""
-    from apps.appointment.models import Settings
+    from apps.appointment.models.settings import Settings
 
     Settings.objects.all().delete()
     return Settings.objects.create(**fields)
@@ -215,7 +217,7 @@ def make_appointment(
     **fields,
 ):
     """An appointment straight in the table (no rules applied), its service lines frozen from the catalog."""
-    from apps.appointment.models import Appointment, AppointmentService
+    from apps.appointment.models.appointments import Appointment, AppointmentService
 
     services = list(services)
     minutes = sum(service.duration_minutes for service in services)
@@ -284,3 +286,23 @@ def booking_data(
     }
     data.update(fields)
     return data
+
+
+def events(name: str) -> list[dict]:
+    return [
+        event.payload for event in OutboxEvent.objects.filter(name=name).order_by("id")
+    ]
+
+
+WAIT = 1.0
+QUIET = 0.3
+
+
+def received(session, timeout=WAIT):
+    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout)]
+
+
+def noted_for() -> set[tuple[str, str]]:
+    """The businesses the events of the outbox at hand are noted down for: the channel of a notice is the command's,
+    so only the rows tell an event written down for another business."""
+    return set(OutboxEvent.objects.values_list("scope_kind", "scope_key"))

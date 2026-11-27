@@ -8,11 +8,12 @@ from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.service.models import Category
+from apps.service.models.catalog import Category
 from apps.service.queries.reads import _page, _resolve
 from apps.service.schemas.categories import CategoryListIn, CategoryOut, CategoryPage
 from apps.service.schemas.fields import CategoryRefIn
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 CATEGORY_NOT_FOUND = _("That category does not exist in this business.")
 # Its own context: said as its siblings are («vale para varios»), not as Inventory says it (hub#662).
@@ -103,7 +104,7 @@ def load_category(category_id: UUID) -> dict:
 def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     categories = _categories()
     if params.search:
-        categories = categories.filter(name__icontains=params.search)
+        categories = categories.filter(contains_text(params.search, "name"))
     if params.parent_id:
         categories = categories.filter(parent_id=params.parent_id)
     return _page(

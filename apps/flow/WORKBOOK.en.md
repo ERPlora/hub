@@ -100,11 +100,10 @@ gallery**, with ready-made automations to start from and the ones other apps bri
 and each row open the editor, and **How does this work?** opens the guide.
 
 #### What it shows, from top to bottom
-<!-- from WORKBOOK.md sha256:2a6d9b6c391c -->
+<!-- from WORKBOOK.md sha256:ffe93a8a999d -->
 Menu **Automations**, a single entry. From top to bottom:
 
-- The **New automation** button, top right; on a phone it is only its **+**, so that the title can be read
-  in full.
+- The **New automation** button, top right: only its **+**, with its name on hover.
 - **Waiting for your answer** — only if there is some question you can answer: each card, which automation
   it comes from, the question and its details (in a change by the assistant, also, right below the
   question, what it wants to do —"Cancel a reservation"— and each piece of data it would send, in words),
@@ -229,15 +228,16 @@ your answer**, with what an automation asks them.
 Involved: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 See, search and sort the automations
-<!-- from WORKBOOK.md sha256:f1ee30a2384a -->
+<!-- from WORKBOOK.md sha256:6fe3e4d161f2 -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
 Steps:
 1. In **Your automations** each row says the name, when it starts in words, when it last ran and how it
-   ended, and whether it is "Active" or "Paused". A name that does not fit in its row ends in an ellipsis,
-   never split mid-word: it can be read in full by resting the pointer on it, on the phone's card and when
-   opening it.
+   ended, and whether it is "Active" or "Paused". A long name is read in full, never split mid-word: on a
+   tablet and on a desk it takes the lines it needs in its row, broken between words, and it also shows when
+   resting the pointer on it; on the phone's card the title ends in an ellipsis past two lines and the name
+   is read in full below, under "Name", and when opening it.
 2. Type in the search box (name, the notice that starts it or the actions it does) or filter by
    **Showing** and **Starts with**; sort by **Last touched** or **Name**.
 3. With no results: "Nothing here matches that." and **Show them all again**.
@@ -391,7 +391,7 @@ saved.
 Involved: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F10 Choose when it starts
-<!-- from WORKBOOK.md sha256:2e4a8b622098 -->
+<!-- from WORKBOOK.md sha256:4d29160723e9 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -399,9 +399,10 @@ Steps:
 1. Tap the "When this happens…" card and choose:
    - **Something happens**: in "Choose what happens", the notices of the business's active apps, said in
      words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…), with
-     the word of the app they belong to ("an opening hours override is created", as in Schedule) and with a
-     search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
-     10000"); without them it starts on its own with every notice.
+     the word of the app they belong to ("an opening hours override is created", as in Schedule), with the
+     name of that app under each one and never its code, and with a search box. Below, **Only when…**:
+     conditions on the notice's data ("the total is greater than 10000"); without them it starts on its own
+     with every notice.
    - **On a schedule**: "How often" (every day, every week, every month), the day of the week or of the
      month when it applies, and the time, in the business's time. A day of the month that does not exist
      (the 31st in April) is skipped that month.
@@ -420,7 +421,7 @@ that same reason, never with "does not exist".
 Involved: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Add, order and fill in the steps
-<!-- from WORKBOOK.md sha256:7f7588b6c2e4 -->
+<!-- from WORKBOOK.md sha256:f167335140a6 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -429,9 +430,11 @@ Steps:
    it.
 2. Fill in its form:
    - **Do something**: "What to do" (an action of the active apps, chosen from a list with a search box:
-     "Create a task", "Write a note on a customer"…) and "With this information": a field for each piece of
-     data the action asks for (the required ones marked) and **Add information** for the optional ones.
-   - **Look something up**: "What to look up" (a query of the active apps), its data and "What to keep"
+     "Create a task", "Write a note on a customer"…, with the name of its app under each one and never its
+     code) and "With this information": a field for each piece of data the action asks for (the required
+     ones marked) and **Add information** for the optional ones.
+   - **Look something up**: "What to look up" (a query of the active apps, chosen the same way: "Look for
+     WhatsApp conversations", with "WhatsApp inbox" under it), its data and "What to keep"
      ("The first row it finds, field by field" or "Only how many there are"). If it finds nothing, the
      automation carries on; to stop it, an "Only continue if…" on "Found something" is added after it.
    - **Only continue if…**: one or several rows "Data", "Is" ("equal to", "not equal to", "one of",
@@ -584,7 +587,7 @@ with unsaved changes it is disabled: "Save it first: "Run now" runs what is save
 Involved: FLOW-F14, FLOW-F16, FLOW-F21
 
 ### FLOW-F16 See what it did and why it failed
-<!-- from WORKBOOK.md sha256:7060399034ec -->
+<!-- from WORKBOOK.md sha256:19e90f35d472 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -597,9 +600,10 @@ Steps:
    "Waiting", "Cancelled"), the day and the time, **Copy the reference** and ▾ to see its steps in words
    ("Did: Create a task", "Found 3", "Found nothing, and carried on", "Waited 1 hour", "It stopped here
    because this was not met: Total greater than 10000").
-4. One stopped by an error says what happened and what to do, in your language even if the automation was
-   saved in another ("It tried to do something you have not allowed it to do ("…"), so it stopped. Open
-   Permissions and allow what it needs."); if the error is from the app that did the action, its sentence
+4. One stopped by an error says what happened and, under it and only once, what to do, in your language even
+   if the automation was saved in another ("It tried to do something you have not allowed it to do ("Create
+   a task"), so it stopped." and "Open Permissions and allow what it needs."), with the action named as in
+   Permissions and in Try it; if the error is from the app that did the action, its sentence
    comes out as it is, in the automation's language, with the technical text folded.
 In: that automation's runs of the last 90 days, and all those still waiting.
 Out: nothing. The history keeps each finished run **90 days** and then forgets it; one that is waiting or
@@ -754,7 +758,7 @@ texts). The other customers' runs carry on.
 Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Resume a run from the step that failed
-<!-- from WORKBOOK.md sha256:3917331922d1 -->
+<!-- from WORKBOOK.md sha256:9843e8426ee8 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -764,9 +768,12 @@ Steps:
    system to answer.
 2. Press the button and confirm: "Resume it from the step that failed?" with **Yes, resume it** or
    **Cancel**.
-3. "Resumed: it finished well." appears (or "…it is waiting"); if it fails again, "It was resumed and stopped
-   by an error again: …" next to the run, which can be resumed again. Its steps keep "Resumed here, from the
-   step that had failed".
+3. The notice says what the run is doing at that moment, as the one of **Run now** does: "Resumed: it finished
+   well.", "…it finished, the condition was not met.", "…it is waiting", "…it is calling another system", "…it is
+   waiting for an answer in “Waiting for your answer”." or "…the assistant is on it"; never "finished well" of
+   one that is still going on. If it fails again, at once or when the other system does not answer, "It was
+   resumed and stopped by an error again: …" next to the run, which can be resumed again. Its steps keep
+   "Resumed here, from the step that had failed".
 In: the run stopped by an error (by voice, by its reference: "resume the welcome one that failed"). The
 assistant's card names it "Automation run: Welcome · 15 Oct 2026, 21:00", as History does and with its
 automation in front, never by its code.

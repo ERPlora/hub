@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from apps.sale.models import Sale, SaleLine, VoucherSession
 from apps.sale.tests.conftest import by_staff, charged_open, ctx_for, professional, redeem, run
-from apps.service.models import Grant, Redemption
+from apps.service.models.grants import Grant, Redemption
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 

@@ -232,16 +232,6 @@
     ]
   },
   {
-    "path": "apps/printing/services/queueing.py",
-    "file_name": "queueing.py",
-    "functions": [
-      {
-        "name": "create_job",
-        "complexity": 24
-      }
-    ]
-  },
-  {
     "path": "apps/reservation/engine.py",
     "file_name": "engine.py",
     "functions": [
@@ -766,16 +756,6 @@
       {
         "name": "app_activation_settle",
         "complexity": 16
-      }
-    ]
-  },
-  {
-    "path": "base/services/apps.py",
-    "file_name": "apps.py",
-    "functions": [
-      {
-        "name": "_enable",
-        "complexity": 18
       }
     ]
   },

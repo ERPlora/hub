@@ -19,7 +19,8 @@ from django.apps import apps
 from django.db import connections
 from django.utils import timezone
 
-from apps.appointment.models import Appointment, Recurring, RecurringService
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring, RecurringService
 from apps.appointment.queries.recovery import (
     appointments_deleted_in_business,
     appointments_in_copy,
@@ -32,7 +33,7 @@ from apps.appointment.schemas.booking import AppointmentCreateIn
 from apps.appointment.schemas.series import RecurringCreateIn
 from apps.appointment.tests.conftest import MONDAY, at, make_appointment, make_customer, make_series, make_service
 from apps.service import queries as service_queries
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias, use_hub
 from base.tenancy.tests.test_recovery import ANA, Recoveries, fresh, run, run_in

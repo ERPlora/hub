@@ -1,7 +1,7 @@
 """What a customer may pick on the public page: the services booked online, who does them and their free times; and the
 same choice checked when she books."""
 
-from django.db.models import F, Q, QuerySet
+from django.db.models import F, QuerySet
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload
@@ -11,10 +11,11 @@ from apps.appointment.queries.booking import bookable_members, check_member
 from apps.appointment.schemas.availability import SlotsIn
 from apps.online_booking.models import Settings
 from apps.online_booking.schemas import PublicServicePage, PublicServicesIn, PublicSlotsIn, PublicSlotsOut
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from apps.service.queries.settings import current_settings as service_settings
 from apps.staff.models import Member
 from apps.staff.queries.reads import resolve_member
+from base.text_search import contains_text
 
 from .settings import page_settings
 from .visitors import PUBLIC, delegated
@@ -96,10 +97,7 @@ def public_services(ctx: OperationContext, params: PublicServicesIn) -> dict:
     shown = service_settings()
     rows = online_services()
     if params.search:
-        rows = rows.filter(
-            Q(name__icontains=params.search)
-            | Q(category__name__icontains=params.search)
-        )
+        rows = rows.filter(contains_text(params.search, "name", "category__name"))
     rows = rows.order_by(
         F("category__sort_order").asc(nulls_last=True),
         "category__name",

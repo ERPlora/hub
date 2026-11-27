@@ -148,13 +148,16 @@ alta aquí imprimen la cola, con la sesión de cualquiera: da de alta el que est
 dispositivo.». Debajo, una nota sobre el dispositivo en el que se mira: «Este dispositivo imprime para: Caja,
 Cocina.» (en verde); si no está dado de alta, a quien gestiona las impresoras «Este dispositivo todavía no imprime:
 «Imprimir desde este dispositivo» lo da de alta con las impresoras a las que llega.» y al resto «Este dispositivo no
-imprime aquí: quien gestiona las impresoras lo da de alta desde él.».
+imprime aquí: quien gestiona las impresoras lo da de alta desde él.». En un navegador, a todos y en ámbar: «Un
+navegador no imprime: el papel lo saca la app de ERPlora. Instálala en el dispositivo que está junto a las impresoras
+y dalo de alta desde la app, en Impresión → Dispositivos.», con un botón por sistema para descargarla debajo, como en
+PRINTING-F21.
 
 La tabla (o tarjetas en el móvil), por nombre: Nombre (con «Este dispositivo» en el suyo), Impresoras (una
 inactiva, «Cocina (inactiva)»), Visto por última vez («hace 3 min» o «Nunca») y Dado de alta por. Quien gestiona
-las impresoras ve arriba «Imprimir desde este dispositivo» (solo si este no está dado de alta) y en cada fila
-«Editar» y «Retirar». Vacía: «Todavía no imprime ningún dispositivo. Da de alta el que está junto a las impresoras
-desde ese dispositivo.». Error al cargar: «No se pudieron cargar los dispositivos.» con «Reintentar».
+las impresoras ve arriba «Imprimir desde este dispositivo» (solo dentro de la app y si este no está dado de alta) y en
+cada fila «Editar» y «Retirar». Vacía: «Todavía no imprime ningún dispositivo. Da de alta el que está junto a las
+impresoras desde ese dispositivo.». Error al cargar: «No se pudieron cargar los dispositivos.» con «Reintentar».
 
 La ventana **Imprimir desde este dispositivo / Editar dispositivo** explica «Solo imprimen los dispositivos dados
 de alta aquí, con la sesión de cualquiera. Elige las impresoras a las que llega este dispositivo: en su red, por
@@ -386,8 +389,8 @@ Entra: las decisiones del negocio.
 Sale: los ajustes de impresión, una sola fila (avisa: `printing.settings.updated`). Sin guardar
 nunca valen los de fábrica: tique al cobrar encendido, cajón apagado, una copia, sin impresora elegida.
 Si falla: «No se pudieron guardar los ajustes.» con el motivo; si nombra la impresora de una función
-(desactivada, borrada o pasada a otra función mientras se elegía), el motivo sale también debajo de esa
-función. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de
+(desactivada, borrada o pasada a otra función mientras se elegía), el motivo sale solo debajo de esa
+función, una vez: el aviso de encima de «Guardar ajustes» no lo repite. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de
 una función en cuanto se elige otra impresora para ella; los dos vuelven si el siguiente intento también
 se rechaza. Un rechazo sin campo se queda hasta el siguiente intento. Si la lectura falla, la
 pantalla no enseña valores y ofrece «Reintentar». Sin permiso, «Sin acceso».
@@ -534,7 +537,7 @@ Pasos:
 2. «Reintentar» lo devuelve a la cola con los intentos a cero, hacia la impresora que toque ahora:
    «Devuelto a la cola: lo imprimirá el próximo dispositivo que se conecte.».
 3. «Cancelar» pide un motivo (opcional) y lo retira: «Trabajo cancelado. No se imprimirá.». Queda en
-   la cola con quién (por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el
+   la cola con quién (por su nombre o, si no tiene ninguno, por lo que va antes de la @ de su correo, nunca el
    correo entero), cuándo y por qué.
 Entra: el trabajo y, al cancelar, el motivo.
 Sale: el trabajo en cola otra vez o cancelado (avisa: `printing.job.retried`, `printing.job.cancelled`); nadie
@@ -572,6 +575,9 @@ Pasos:
    impresora y el dispositivo por su nombre, el trabajo como lo titula la cola (su documento y su número) y
    el documento de un trabajo nuevo con la palabra de la cola, nunca por un identificador; lo que quien
    pregunta no puede ver, o lo que ya no está (un dispositivo retirado), no sale en la tarjeta.
+3. Lo que deja en una cola que ningún dispositivo encendido imprime (ninguno dado de alta con esa impresora,
+   o el que la tiene, apagado) no lo da por impreso: dice que queda en la cola de esa impresora y que saldrá
+   cuando un dispositivo dado de alta la imprima.
 Entra: la petición.
 Sale: lo mismo que la pantalla.
 Si falla: lo mismo que la pantalla, con las palabras del servidor.
@@ -603,7 +609,9 @@ Pasos:
    impresoras a las que llega. Desde ese momento ese dispositivo imprime con la sesión de cualquiera: la lista lo
    marca «Este dispositivo» y la nota dice «Este dispositivo imprime para: …». Si quien gestiona las impresoras
    imprime desde un dispositivo nuevo en alguna impresora activa, también queda dado de alta, como «Dispositivo 1»,
-   con las impresoras activas que usa.
+   con las impresoras activas que usa. Solo se da de alta dentro de la app de ERPlora: en un navegador no se ofrece
+   «Imprimir desde este dispositivo», porque desde él no se llega a ninguna impresora, y la nota dice qué hacer y
+   ofrece descargar la app.
 2. Con la app de ERPlora abierta en ese dispositivo —en cualquier pantalla y con la sesión de cualquiera—, la app
    se conecta a Impresión para imprimir: dice qué dispositivo es y cuáles son las impresoras de su alta, y desde ahí
    saca sola el papel de sus impresoras activas en cuanto llega a la cola, sin que nadie toque nada. En un navegador
@@ -648,9 +656,11 @@ copias pasa de los 90 s y el trabajo ya había vuelto a la cola) se acepta: el p
 vez. Una confirmación o un fallo de otro dispositivo, o de una entrega que no es la suya, se rechaza y no cambia
 nada. Dar de alta sin nombre o sin impresoras activas avisa en su campo, y el aviso se quita en cuanto se cambia
 ese campo (se escribe el nombre, se marca una impresora), sin volver a pulsar «Guardar»; el del otro se queda hasta
-que se cambia el suyo. Solo se da de alta desde el propio dispositivo. La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
+que se cambia el suyo. Solo se da de alta desde el propio dispositivo, y en un navegador no: no sale «Imprimir desde
+este dispositivo», así que la cola sigue diciendo que ningún dispositivo dado de alta lo imprime y el Inicio sigue
+con «Configura la impresora». La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
 cualquiera se haría pasar por la caja.
-Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F22
+Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F21, PRINTING-F22
 
 ### PRINTING-F19 Ver el estado de una impresora
 Estado: hecho

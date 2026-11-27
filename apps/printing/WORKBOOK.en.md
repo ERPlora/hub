@@ -139,17 +139,20 @@ the devices on this list print, with anybody's session. From that device, "Print
 the printers it reaches; the list says when each one was last seen, and on each row you can change it or retire it.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:f7e1351a88f5 -->
+<!-- from WORKBOOK.md sha256:4d7505a7b23e -->
 Menu **Printing → Devices**. Title "Devices that print" and the sentence "Only the devices set up here
 print the queue, with anybody’s session: set up the one next to the printers from that
 device.". Underneath, a note about the device it is being looked at on: "This device prints for: Till,
 Kitchen." (in green); if it is not set up, to whoever manages the printers "This device does not print yet:
 «Print from this device» sets it up with the printers it reaches." and to everybody else "This device does not
-print here: someone who manages the printers sets it up from it.".
+print here: someone who manages the printers sets it up from it.". In a browser, to everybody and in amber: "A
+browser cannot print: the paper comes out of the ERPlora app. Install it on the device next to the printers and set
+that device up from the app, in Printing → Devices.", with one button per system to download it underneath, as in
+PRINTING-F21.
 
 The table (or cards on the phone), by name: Name (with "This device" on its own), Printers (an
 inactive one, "Kitchen (inactive)"), Last seen ("3 min ago" or "Never") and Set up by. Whoever manages
-the printers sees "Print from this device" at the top (only if this one is not set up) and on each row
+the printers sees "Print from this device" at the top (only inside the app and if this one is not set up) and on each row
 "Edit" and "Retire". Empty: "No device prints yet. Set up the one next to the printers
 from that device.". Error when loading: "Could not load the devices." with "Retry".
 
@@ -380,7 +383,7 @@ off: "The printer does not answer. Check that it is on and connected.") and, aft
 Involved: PRINTING-F18
 
 ### PRINTING-F06 Choose how the business prints
-<!-- from WORKBOOK.md sha256:fe9be6185920 -->
+<!-- from WORKBOOK.md sha256:9b04cd94978a -->
 Status: done
 Actor: administrator, manager
 Screen: Settings
@@ -395,7 +398,8 @@ In: the business's decisions.
 Out: the print settings, a single row (announces: `printing.settings.updated`). Without saving,
 the factory ones always hold: receipt on checkout on, drawer off, one copy, no printer chosen.
 If it fails: "Could not save the settings." with the reason; if it names a role's printer (deactivated,
-deleted or moved to another role while it was being chosen), the reason also shows below that role. As
+deleted or moved to another role while it was being chosen), the reason shows only below that role, once:
+the notice above "Save settings" does not repeat it. As
 in the form windows, the notice goes as soon as something is changed and a role's reason as soon as
 another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
 field stays until the next try. If the read fails, the screen does not
@@ -541,7 +545,7 @@ the device's error.
 Involved: PRINTING-F06, PRINTING-F07, PRINTING-F22
 
 ### PRINTING-F14 Get a print job unstuck
-<!-- from WORKBOOK.md sha256:e5ac51e3dc4e -->
+<!-- from WORKBOOK.md sha256:b74db612c271 -->
 Status: done
 Actor: owner, administrator
 Screen: Queue
@@ -551,7 +555,7 @@ Steps:
 2. "Try again" sends it back to the queue with the attempts at zero, towards whichever printer fits now:
    "Sent back to the queue: the next device to connect will print it.".
 3. "Cancel" asks for a reason (optional) and withdraws it: "Job cancelled. It will not be printed.". It stays in
-   the queue with who (by their name or, if their account has none, by what goes before the @ of their email,
+   the queue with who (by their name or, if they have none, by what goes before the @ of their email,
    never the whole email), when and why.
 In: the job and, when cancelling, the reason.
 Out: the job waiting again or cancelled (announces: `printing.job.retried`, `printing.job.cancelled`); nobody
@@ -578,7 +582,7 @@ If it fails: with Sales switched off, the note shows without the link.
 Involved: SALE-F02
 
 ### PRINTING-F16 Send to print from the assistant
-<!-- from WORKBOOK.md sha256:0a85995d9466 -->
+<!-- from WORKBOOK.md sha256:7ac6cc0d2fe6 -->
 Status: done
 Actor: administrator, manager, employee
 Screen: Assistant
@@ -591,6 +595,9 @@ Steps:
    printer and the device by their name, the job as the queue titles it (its document and its number) and
    the document of a new job with the queue's word, never by an identifier; what whoever
    asks cannot see, or what is no longer there (a retired device), does not show on the card.
+3. What it leaves in a queue no device that is on prints (none set up with that printer, or the one
+   that has it, off) it does not call printed: it says it waits in that printer's queue and will come
+   out when a device set up to print it does.
 In: the request.
 Out: the same as the screen.
 If it fails: the same as the screen, with the server's words.
@@ -613,7 +620,7 @@ If it fails: as in F07.
 Involved: CASH_REGISTER-F16, PRINTING-F22
 
 ### PRINTING-F18 Take the paper out: the device picks up and confirms the jobs
-<!-- from WORKBOOK.md sha256:1fb7664a2a38 -->
+<!-- from WORKBOOK.md sha256:42aeb864026b -->
 Status: done
 Actor: the owner, the administrator or the manager (they set up the device) and the device's app
 (it picks up)
@@ -624,7 +631,9 @@ Steps:
    printers it reaches. From that moment that device prints with anybody's session: the list
    marks it "This device" and the note says "This device prints for: …". If whoever manages the printers
    prints from a new device on some active printer, it is also set up, as "Device 1",
-   with the active printers it uses.
+   with the active printers it uses. It is only set up inside the ERPlora app: in a browser "Print from this device"
+   is not offered, because no printer can be reached from it, and the note says what to do and offers to download the
+   app.
 2. With the ERPlora app open on that device —on any screen and with anybody's session—, the app
    connects to Printing to print: it says which device it is and which are the printers of its setup, and from there on
    it takes out on its own the paper of its active printers as soon as it reaches the queue, without anybody touching anything. In a browser
@@ -669,9 +678,10 @@ copies goes past the 90 s and the job had already gone back to the queue) is acc
 again. A confirmation or a failure from another device, or from a hand-out that is not its own, is refused and changes
 nothing. Setting up without a name or without active printers warns in its field, and the notice goes as soon as
 that field changes (the name is typed, a printer is ticked), without tapping "Save" again; the other's stays until
-its own changes. It is only set up from the device itself. The queue and the list name each device by its name, never by its identifier: with it
+its own changes. It is only set up from the device itself, and not in a browser: "Print from this device" is not
+there, so the queue keeps saying that no device set up here prints it and the Home keeps "Set up your printer". The queue and the list name each device by its name, never by its identifier: with it
 anybody could pretend to be the till.
-Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F22
+Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F21, PRINTING-F22
 
 ### PRINTING-F19 See the state of a printer
 <!-- from WORKBOOK.md sha256:4c410470a0af -->

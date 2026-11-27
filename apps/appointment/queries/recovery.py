@@ -6,7 +6,8 @@ from django.db.models import Exists, OuterRef
 from django.utils import timezone
 from psycopg import sql
 
-from apps.appointment.models import Appointment, AppointmentService, Recurring, RecurringService
+from apps.appointment.models.appointments import Appointment, AppointmentService
+from apps.appointment.models.series import Recurring, RecurringService
 from apps.customer.queries.recovery import card_in_business, cards_in_copy
 from apps.service.queries import recovery
 

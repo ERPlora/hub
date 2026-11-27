@@ -19,7 +19,7 @@ from apps.customer.schemas.orders import OrderCustomerOut, OrderLinkIn
     input=OrderLinkIn,
     output=OrderCustomerOut,
     ai=AI(
-        "Links a customer to an open order, such as a table's check, as the till's «Assign customer» does: the order "
+        "Links a customer to an open order, such as a table's check, as assigning one on the till does: the order "
         "is then in the customer's name (at most one per order; a new one replaces the old). With no customer given it "
         "takes the customer off.",
         asks={

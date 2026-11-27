@@ -109,8 +109,7 @@ const methods = computed<PaymentMethodOut[]>(() => chargeableMethods(methodPage.
 const partialText = computed(() => {
   const wholeTotal = whole.data.value?.total;
   if (!partial.value || wholeTotal === undefined || whole.status.value === 'loading') return '';
-  const n = lineIds.value.length;
-  return n === 1 ? t('sale.checkout.payingPartOne', { total: money(wholeTotal) }) : t('sale.checkout.payingPart', { n, total: money(wholeTotal) });
+  return t('sale.checkout.payingPart', { n: lineIds.value.length, total: money(wholeTotal) });
 });
 
 // ── What the steps of other apps add (SALE-F39) ───────────────────────────────────────────────
@@ -279,6 +278,7 @@ function goToDrawer(): void {
         class="sheet-h__close"
         data-testid="sale-checkout-close"
         :aria-label="$t('sale.checkout.close')"
+        :title="$t('sale.checkout.close')"
         :disabled="busy"
         @click="emit('close')"
       >

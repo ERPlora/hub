@@ -11,7 +11,9 @@ from live.outbox import record_event
 
 from apps.appointment import assistant_cards
 from apps.appointment import engine, events
-from apps.appointment.models import Appointment, Recurring, RecurringService, Settings
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring, RecurringService
+from apps.appointment.models.settings import Settings
 from apps.appointment.queries.access import ADD_OWN, may_book_for
 from apps.appointment.queries.agenda import load_agenda, verdict_message
 from apps.appointment.queries.booking import lines_for, resolve_services
@@ -26,7 +28,7 @@ from apps.appointment.services.writes import (
     _locked_card,
     _member_for_booking,
 )
-from apps.service.models import Service
+from apps.service.models.catalog import Service
 from base.business import business_zone
 
 #: The most a series books in one run (the current product's 50).

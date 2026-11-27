@@ -116,7 +116,7 @@ max-statements = 50
 "apps/verifactu/schemas/fields.py" = ["E731"]
 "apps/verifactu/tests/conftest.py" = ["F401"]
 "apps/verifactu/tests/test_concurrency.py" = ["B905"]
-"apps/whatsapp_inbox/models.py" = ["DJ001"]
+"apps/whatsapp_inbox/models/conversations.py" = ["DJ001"]
 "apps/whatsapp_inbox/schemas/templates.py" = ["B905"]
 "base/access.py" = ["B905"]
 "base/auth.py" = ["F401"]
@@ -165,7 +165,7 @@ ancestors = [
     "base", "base.api", "base.blueprint", "base.catalog", "base.files", "base.home", "base.models", "base.tenancy",
     "base.tenancy.migrator", "base.tenancy.move", "base.services", "base.queries", "base.schemas", "base.ws_print",
     "control", "control.models", "control.services", "control.queries", "apps.*", "apps.*.services", "apps.*.queries",
-    "apps.*.schemas",
+    "apps.*.schemas", "apps.*.models",
 ]
 depth = 0
 ignore_imports = [

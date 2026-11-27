@@ -96,6 +96,7 @@ async function queued(saleId: string): Promise<boolean> {
         fill="clear"
         color="medium"
         :aria-label="$t('sale.document.close')"
+        :title="$t('sale.document.close')"
         data-testid="sale-document-close"
         @click="open = false"
       >
@@ -120,6 +121,7 @@ async function queued(saleId: string): Promise<boolean> {
           expand="block"
           :disabled="!paper || sending"
           :aria-label="$t('sale.document.print')"
+          :title="$t('sale.document.print')"
           data-testid="sale-document-print"
           @click="print"
         >
@@ -135,10 +137,11 @@ async function queued(saleId: string): Promise<boolean> {
 
 <style>
 /* Not scoped: Ionic moves the modal to the app root. Every rule hangs from `ion-modal.sale-doc-modal`.
-   The old document window: 440 × 720 at most, radius 14, the paper on the light background. */
+   The old document window: 440 × 720 at most, radius 14, the paper on the light background. Its height is capped by
+   the page, not by `100vh`: in Chrome on a tablet or a phone, `100vh` also counts the screen under the address bar. */
 ion-modal.sale-doc-modal {
   --width: min(440px, 100vw);
-  --height: min(720px, 100vh);
+  --height: min(720px, 100%);
   --border-radius: 14px;
 }
 ion-modal.sale-doc-modal .sale-doc-modal__body {

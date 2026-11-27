@@ -14,6 +14,7 @@ from apps.reservation.queries.naming import _named, _said_day, _said_time, _who
 from apps.reservation.queries.reads import MAX_CANDIDATES, _guest_matches, _page, _phone_matches, _when
 from apps.reservation.schemas.waitlist import WaitlistDetailOut, WaitlistListIn, WaitlistPage, WaitlistRefIn
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 ENTRY_NOT_FOUND = _("That waitlist entry does not exist in this business.")
 ENTRY_AMBIGUOUS = _(
@@ -128,7 +129,7 @@ def list_waitlist(ctx: OperationContext, params: WaitlistListIn) -> dict:
     if params.is_converted is not None:
         rows = rows.filter(reservation__isnull=not params.is_converted)
     if params.guest_name:
-        rows = rows.filter(guest_name__icontains=params.guest_name)
+        rows = rows.filter(contains_text(params.guest_name, "guest_name"))
     if params.guest_phone:
         rows = rows.filter(_phone_matches(params.guest_phone))
     return _page(
