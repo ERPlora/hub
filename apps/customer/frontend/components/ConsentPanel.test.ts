@@ -1,7 +1,8 @@
 // «Marketing consent» on the card (CUSTOMER-F14, F15): a line for Email, WhatsApp and SMS (and for
 // any other channel with something recorded) with its state — «Never asked», «Given», «Withdrawn» —,
-// its date and address. «Record consent» shows the exact sentence to read out and «They said yes»
-// stores THAT sentence; «Withdraw» is one tap, no dialog. Below, everything that was decided.
+// its date and address. «Record consent» shows the business's sentence the card's read sends, to read
+// out, and «They said yes» sends no words: the server stores that same sentence. «Withdraw» is one
+// tap, no dialog. Below, everything that was decided.
 import { formatDateTime } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
@@ -41,10 +42,11 @@ const FACT: ConsentRow = {
   occurred_at: '2026-10-01T10:00:00Z',
   created_at: '2026-10-01T10:00:00Z',
 };
-const NOTICE = 'I want to receive offers and news from this business through this channel. I can unsubscribe whenever I want.';
+/** The sentence the card's read sends (`consent_notice`), already in the person's language. */
+const NOTICE = 'The words the server says are read out.';
 
 async function setup(props: Record<string, unknown> = {}, options: MountOptions = {}) {
-  const m = await mountCustomer(ConsentPanel, { props: { customerId: 'c1', consent: STATE, editable: true, ...props }, ...options });
+  const m = await mountCustomer(ConsentPanel, { props: { customerId: 'c1', consent: STATE, notice: NOTICE, editable: true, ...props }, ...options });
   const call = await m.live();
   const line = (channel: string) => m.wrapper.find(`[data-testid="customer-consent-${channel}"]`);
   const click = async (id: string) => {
@@ -80,7 +82,7 @@ describe('ConsentPanel: the state per channel', () => {
 });
 
 describe('ConsentPanel: recording and withdrawing', () => {
-  it('«Record consent» shows the exact sentence and how to ask; «They said yes» stores that sentence', async () => {
+  it('«Record consent» shows the sentence it is given and how to ask; «They said yes» sends no words of its own', async () => {
     const s = await setup();
     await s.click('customer-consent-whatsapp-grant');
     const ask = s.wrapper.get('[data-testid="customer-consent-whatsapp-ask"]');
@@ -88,10 +90,8 @@ describe('ConsentPanel: recording and withdrawing', () => {
     expect(ask.text()).toContain('Read it out loud and only press if they say yes.');
     s.net.onApi(() => json(FACT, 201));
     await s.click('customer-consent-whatsapp-confirm');
-    expect(sent(s.net.api[0])).toMatchObject({
-      path: '/api/customer/consents/grant',
-      body: { customer_id: 'c1', channel: 'whatsapp', notice_text: NOTICE, notice_version: 'counter-v1', source: 'counter' },
-    });
+    expect(sent(s.net.api[0]).path).toBe('/api/customer/consents/grant');
+    expect(sent(s.net.api[0]).body).toEqual({ customer_id: 'c1', channel: 'whatsapp', purpose: 'marketing', source: 'counter' });
     expect(toastSuccess).toHaveBeenCalledWith('Consent recorded.');
     expect(s.wrapper.find('[data-testid="customer-consent-whatsapp-ask"]').exists()).toBe(false);
   });
@@ -148,15 +148,15 @@ describe('ConsentPanel: everything that was decided', () => {
     expect(s.wrapper.get('[data-testid="customer-consent-history-error"]').text()).toContain('The consent could not be loaded');
   });
 
-  it('speaks Spanish, and stores the sentence the person read, in Spanish', async () => {
-    const s = await setup({}, { locale: 'es' });
+  it('speaks Spanish and shows the sentence as the server says it, in Spanish', async () => {
+    const sentence = 'Quiero recibir ofertas y novedades de este negocio por este canal. Puedo darme de baja cuando quiera.';
+    const s = await setup({ notice: sentence }, { locale: 'es' });
     expect(s.wrapper.get('h3').text()).toBe('Consentimiento de marketing');
     expect(s.line('whatsapp').get('.customer-consent__state').text()).toBe('Nunca se le ha preguntado');
     await s.click('customer-consent-whatsapp-grant');
+    expect(s.wrapper.get('[data-testid="customer-consent-whatsapp-ask"] .customer-consent__notice').text()).toBe(sentence);
     s.net.onApi(() => json(FACT, 201));
     await s.click('customer-consent-whatsapp-confirm');
-    expect((sent(s.net.api[0]).body as { notice_text: string }).notice_text).toBe(
-      'Quiero recibir ofertas y novedades de este negocio por este canal. Puedo darme de baja cuando quiera.',
-    );
+    expect(sent(s.net.api[0]).body).not.toHaveProperty('notice_text');
   });
 });

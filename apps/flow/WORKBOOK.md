@@ -114,9 +114,10 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
   pediste una automatización. No hacen nada hasta que las revises y las actives.», y por cada uno su
   nombre, la etiqueta «Borrador», **Revisar** y una × («Descartar») (FLOW-F18, FLOW-F19).
-- **Tus automatizaciones** — solo si hay alguna. El buscador «Busca por nombre, por lo que la arranca o
-  por lo que hace», los filtros **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa, un
-  horario, una fecha, a mano), el orden (tocadas al final, nombre) y el recuento. Cada fila: casilla
+- **Tus automatizaciones** — solo si hay alguna. Bajo el título, el recuento («Se ven 1 de 3»). En la barra
+  de la lista, como en las demás listas: el buscador «Buscar automatización…», el orden (tocadas al final,
+  nombre) y el botón de filtros, que abre **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa,
+  un horario, una fecha, a mano). Cada fila: casilla
   para elegirla, el nombre, cuándo arranca en palabras («Cuando se cobra una venta», «Todos los días a
   las 09:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
   el interruptor, **Hacer una copia** y **Borrar**. Con varias elegidas, **Encenderlas** y **Ponerlas en
@@ -232,11 +233,15 @@ Actor: propietario, administrador, asistente
 Pantalla: Automatizaciones
 Pasos:
 1. En **Tus automatizaciones** cada fila dice el nombre, cuándo arranca en palabras, cuándo se ejecutó
-   por última vez y cómo acabó, y si está «Activa» o «En pausa». Un nombre que no cabe en su fila acaba
-   en puntos suspensivos, nunca partido a media palabra: se lee entero al dejar el puntero encima, en la
-   tarjeta del teléfono y al abrirla.
-2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o filtra por
-   **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**.
+   por última vez y cómo acabó, y si está «Activa» o «En pausa». Un nombre largo se lee entero, nunca
+   partido a media palabra: en la tableta y en el escritorio ocupa en su fila las líneas que necesita,
+   cortadas entre palabras, y sale también al dejar el puntero encima; en la tarjeta del teléfono, el
+   título acaba en puntos suspensivos pasadas dos líneas y el nombre se lee entero debajo, en «Nombre», y
+   al abrirla.
+2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o, con el botón de
+   filtros, filtra por **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**. En
+   el escritorio el buscador, el orden y el botón de filtros caben en una línea; en el teléfono el buscador
+   va en su propia línea y lo demás debajo.
 3. Sin resultados: «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas**.
 4. Toca una fila para abrirla en el editor.
 Entra: las automatizaciones del negocio, en páginas de hasta 100.
@@ -1273,7 +1278,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26, F27 | `flow.secret.list` |
 | Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente su acción y sus datos en palabras, leídos como esa persona y en su idioma (en vivo) | contestar | F01, F29, F38 | `flow.question.list` |
 | Una pregunta que espera respuesta, como sale en «Esperan tu respuesta», solo para quien puede contestarla | contestar (su rol) | F29 | `flow.question.get` |
-| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F01, F33–F36 | `flow.recipe.list` |
+| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo; el asistente sigue leyendo con `offset` donde se cortó una respuesta que no le cabía de una vez) | ver | F01, F33–F36 | `flow.recipe.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
 

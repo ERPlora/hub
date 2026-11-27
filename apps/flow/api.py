@@ -15,7 +15,7 @@ from apps.flow.schemas.drafts import DraftListIn, DraftProposeIn, DraftRefIn
 from apps.flow.schemas.dry_run import SampleIn, TestIn
 from apps.flow.schemas.flows import CreateIn, EnabledIn, FlowListIn, FlowRefIn, GrantIn, StatusIn, UpdateIn
 from apps.flow.schemas.questions import AnswerIn, QuestionRefIn
-from apps.flow.schemas.recipe_flows import RecipeRefIn
+from apps.flow.schemas.recipe_flows import RecipeListIn, RecipeRefIn
 from apps.flow.schemas.runs import RunIn, RunListIn, RunRefIn
 from apps.flow.schemas.stored_secrets import SecretRefIn, SecretSetIn
 
@@ -171,8 +171,8 @@ async def question_answer(request, data: AnswerIn):
 
 
 @bind(router, "flow.recipe.list", "/flow/recipes")
-async def recipe_list(request):
-    return await run_operation(request, queries.recipe_flows.list_recipes)
+async def recipe_list(request, params: Query[RecipeListIn]):
+    return await run_operation(request, queries.recipe_flows.list_recipes, params)
 
 
 @bind(router, "flow.recipe.enable", "/flow/recipes/enable")

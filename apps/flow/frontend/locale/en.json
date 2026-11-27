@@ -16,7 +16,7 @@
     "list": {
       "new": "New automation",
       "heading": "Your automations",
-      "search": "Search by name, by what starts it or by what it does",
+      "search": "Search automation…",
       "count": "Showing {shown} of {total}",
       "noMatch": "Nothing here matches that.",
       "clear": "Show them all again",
@@ -54,9 +54,7 @@
       "deleteYes": "Yes, delete it",
       "deleteNo": "Leave it",
       "deleted": "Deleted.",
-      "enabledMissing": "On, but it still lacks the permissions it asks for: it will do nothing until you allow them in its Permissions tab.",
-      "stateAll": "Running and paused",
-      "triggerAny": "Anything"
+      "enabledMissing": "On, but it still lacks the permissions it asks for: it will do nothing until you allow them in its Permissions tab."
     },
     "drafts": {
       "heading": "Proposed by the assistant",
@@ -1719,6 +1717,7 @@
       "consent_at": "Consent at",
       "consent_by": "Consent by",
       "consent_date": "Consent date",
+      "consent_notice": "Consent sentence",
       "contact_name": "Contact name",
       "contact_point": "Contact point",
       "contacted_at": "Contacted at",

@@ -1,8 +1,9 @@
-// flow: BASE-F64 (the language asked of the assistant)
+// flow: BASE-F64 (the language and the appearance asked of the assistant)
 // The language the person asks the assistant for applies as «My profile»'s selector does: once its card is confirmed,
 // the open app speaks it, «My apps» included, without reloading, and it still does after reloading. In both
-// directions. The card says the language alone, by its name, and the appearance the person has stays theirs. At the
-// end the owner of `a` gets back the preferences they had, since other specs sign in as them.
+// directions. The card says the language alone, by its name, and the appearance the person has stays theirs. A mode
+// asked for is painted at once too, dark and then light, without reloading. At the end the owner of `a` gets back the
+// preferences they had, since other specs sign in as them.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { askForACard, card, decide, openPanelAtTheDesk, shots } from './assistant-panel';
@@ -86,6 +87,46 @@ test('BASE-F64 — the language asked of the assistant applies at once and after
     await shots(page, `${KEY}-ES`);
     await page.reload();
     await inLanguage(page, 'es');
+  } finally {
+    expect((await api(context, A, 'POST', '/me/preferences', before)).status).toBe(200);
+    await context.close();
+  }
+});
+
+/** Asks the assistant, speaking Spanish, for the mode `to` and says yes to its card. */
+async function askedForMode(page: Page, to: 'dark' | 'light'): Promise<void> {
+  await askForACard(page, `E2E-ASK base__profile__preferences_set ${JSON.stringify({ theme_mode: to })}`);
+  await expect(card(page)).toContainText(WORDS.es.run);
+  await shots(page, `${KEY}-CARD-${to.toUpperCase()}`);
+  await decide(page, 'submit');
+}
+
+test('BASE-F64 — the mode asked of the assistant is painted at once, dark and then light', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const before = await kept(context);
+  const dark = page.locator('html.ion-palette-dark');
+  try {
+    expect((await api(context, A, 'POST', '/me/preferences', { theme_mode: 'light' })).status).toBe(200);
+    await speaking(context, 'es');
+    await openPanelAtTheDesk(page);
+    await expect(dark).toHaveCount(0);
+    await page.evaluate(() => {
+      document.documentElement.dataset.sameDocument = 'yes';
+    });
+
+    await askedForMode(page, 'dark');
+    await expect(dark).toHaveCount(1);
+    expect((await kept(context)).theme_mode).toBe('dark');
+    await expect(page.locator('html')).toHaveAttribute('data-same-document', 'yes');
+    await shots(page, `${KEY}-DARK`);
+
+    await askedForMode(page, 'light');
+    await expect(dark).toHaveCount(0);
+    expect((await kept(context)).theme_mode).toBe('light');
+    await expect(page.locator('html')).toHaveAttribute('data-same-document', 'yes');
+    await shots(page, `${KEY}-LIGHT`);
   } finally {
     expect((await api(context, A, 'POST', '/me/preferences', before)).status).toBe(200);
     await context.close();

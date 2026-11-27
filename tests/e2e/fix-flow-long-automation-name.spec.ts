@@ -1,17 +1,16 @@
 // flow: FLOW-F02
-// On a tablet (834 px), «Your automations» must not cut a long name in the middle of a word with no «…» («Tell the
-// customer by WhatsApp when thei»): the cell gives its own span one line with «…», but the name's span stacks the name
-// over «when it starts», so the name inside it must end in «…» itself instead of running on to the edge. The owner of hub `a`
-// finds an automation with a long name (made for this run, through the API) at 390, 834 and 1440 px: in the table it
-// is one line ending in «…», the whole name in its `title`; on a phone (cards) its title wraps and, past two lines,
-// ends in «…». Never a word cut at the edge with no sign. No sideways scroll. Each width leaves its capture.
-// The automation is deleted after it.
+// In «Your automations» a long automation name is read whole. The owner of hub `a` finds an automation with a long name
+// (made for this run, through the API) at 390, 834 and 1440 px. In the table it wraps over several lines of its row,
+// breaking only between words, with nothing of it hidden, and its `title` carries it too. On a phone (cards) the card's
+// title ends in «…» past two lines and its «Name» is read whole. Never a word cut at the edge with no sign. No sideways
+// scroll. Each width leaves its capture. The automation is deleted after it.
 import { expect, type Locator, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, shown, untilStill } from './helpers';
+import { A, api, capture, horizontalOverflow, saveSessionForTheSweep, shown, untilStill } from './helpers';
 import { signedIn } from './task-helpers';
+import { linesOf, splitWords } from './words';
 
-const KEY = 'FIX-HUB-FLOW-LONG-AUTOMATION-NAME-CUT-MID-WORD-ON-TABLET';
+const KEY = 'FIX-HUB-FLOW-LONG-AUTOMATION-NAME-READ-WHOLE';
 const SIZES = [
   { label: '390', width: 390, height: 844, cards: true },
   { label: '834', width: 834, height: 1112, cards: false },
@@ -19,12 +18,12 @@ const SIZES = [
 ];
 
 /**
- * How the text of `name` is cut on screen: '' when it is read whole, or when the box that cuts it is its own and ends
- * it in «…» (one line, `text-overflow: ellipsis`, or lines, `line-clamp`). Otherwise what cuts it and where: a box
- * around it that clips it (`overflow` other than visible) with no «…» of its own cuts a word at the edge.
+ * Where the text of `name` is cut on screen, by itself or by a box around it that clips it (`overflow` other than
+ * visible): '' when nothing cuts it. With `ellipsis: 'allowed'`, a cut by its own box that ends in «…» (one line,
+ * `text-overflow: ellipsis`, or lines, `line-clamp`) does not count.
  */
-function cutWithoutEllipsis(name: Locator): Promise<string> {
-  return name.evaluate((el: HTMLElement) => {
+function cutOf(name: Locator, ellipsis: 'allowed' | 'not allowed'): Promise<string> {
+  return name.evaluate((el: HTMLElement, allowed: boolean) => {
     const range = document.createRange();
     range.selectNodeContents(el);
     const text = range.getBoundingClientRect();
@@ -38,20 +37,17 @@ function cutWithoutEllipsis(name: Locator): Promise<string> {
     }
     const own = getComputedStyle(el);
     const ownEdges = el.getBoundingClientRect();
-    const clipsItself = own.overflowX !== 'visible';
-    if (text.right > right + 1) {
-      if (own.textOverflow !== 'ellipsis' || !clipsItself || ownEdges.right > right + 1) {
-        return `cut on the right at ${Math.round(right)}px with no «…» (its text runs to ${Math.round(text.right)}px; text-overflow: ${own.textOverflow})`;
-      }
+    const ownLine = own.overflowX !== 'visible' && own.textOverflow === 'ellipsis' && ownEdges.right <= right + 1;
+    const clamp = own.webkitLineClamp;
+    const ownLines = !!clamp && clamp !== 'none' && ownEdges.bottom <= bottom + 1;
+    if (text.right > right + 1 && !(allowed && ownLine)) {
+      return `cut on the right at ${Math.round(right)}px (its text runs to ${Math.round(text.right)}px; text-overflow: ${own.textOverflow})`;
     }
-    if (text.bottom > bottom + 1) {
-      const clamp = own.webkitLineClamp;
-      if (!clamp || clamp === 'none' || ownEdges.bottom > bottom + 1) {
-        return `cut below at ${Math.round(bottom)}px with no «…» (its text runs to ${Math.round(text.bottom)}px)`;
-      }
+    if (text.bottom > bottom + 1 && !(allowed && ownLines)) {
+      return `cut below at ${Math.round(bottom)}px (its text runs to ${Math.round(text.bottom)}px; line-clamp: ${clamp})`;
     }
     return '';
-  });
+  }, ellipsis === 'allowed');
 }
 
 /** Whether the text of `name` runs past what is shown of it (cut, with «…» or not). */
@@ -59,8 +55,27 @@ function longerThanShown(name: Locator): Promise<boolean> {
   return name.evaluate((el: HTMLElement) => el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1);
 }
 
+/** The table: the whole name, over several lines that break only between words, and in its tooltip. */
+async function expectReadWholeInTheRow(shownName: Locator, name: string, label: string): Promise<void> {
+  expect(await cutOf(shownName, 'not allowed'), `the long name at ${label} px`).toBe('');
+  expect(await linesOf(shownName), `the long name takes several lines at ${label} px`).toBeGreaterThan(1);
+  expect(await splitWords(shownName), `words split over two lines at ${label} px`).toEqual([]);
+  await expect(shownName).toHaveAttribute('title', name);
+}
+
+/** A card: its title ends in «…» past two lines; its «Name» is read whole. */
+async function expectTitleClampedAndNameWhole(shownNames: Locator[], label: string): Promise<void> {
+  const longer: boolean[] = [];
+  for (const shownName of shownNames) {
+    expect(await cutOf(shownName, 'allowed'), `the long name at ${label} px`).toBe('');
+    longer.push(await longerThanShown(shownName));
+  }
+  expect(longer, `the card's title ends in «…» at ${label} px`).toContain(true);
+  expect(longer, `the whole name is read on its card at ${label} px`).toContain(false);
+}
+
 for (const size of SIZES) {
-  test(`FLOW-F02 at ${size.label}: a long automation name ends in «…», never cut mid-word`, async ({ browser }) => {
+  test(`FLOW-F02 at ${size.label}: a long automation name is read whole, never cut mid-word`, async ({ browser }) => {
     const stamp = Date.now().toString(36);
     const name = `E2E Flow ${stamp} Tell the customer by WhatsApp when their reservation changes and remind them the day before`;
     const { context, page } = await signedIn(browser, '/flow/automations', undefined, { width: size.width, height: size.height });
@@ -83,26 +98,15 @@ for (const size of SIZES) {
       const shownNames = row.getByText(name, { exact: true });
       await expect(shownNames).toHaveCount(size.cards ? 2 : 1);
       await untilStill(page);
+      await shownNames.first().scrollIntoViewIfNeeded();
 
-      const longer: boolean[] = [];
-      for (const shownName of await shownNames.all()) {
-        await shownName.scrollIntoViewIfNeeded();
-        expect(await cutWithoutEllipsis(shownName), `the long name at ${size.label} px`).toBe('');
-        longer.push(await longerThanShown(shownName));
-      }
-      // The premise: the name does not fit, so this width really shows how it is cut.
-      expect(longer, `the name is longer than what ${size.label} px shows of it`).toContain(true);
-      if (size.cards) {
-        // A card's title ends in «…» past two lines; its «Name» is read whole.
-        expect(longer, `the whole name is read on its card at ${size.label} px`).toContain(false);
-      } else {
-        // The table: the whole name in its tooltip (and for whoever reads it aloud).
-        await expect(shownNames).toHaveAttribute('title', name);
-      }
+      if (size.cards) await expectTitleClampedAndNameWhole(await shownNames.all(), size.label);
+      else await expectReadWholeInTheRow(shownNames, name, size.label);
 
       const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await capture(page, `${KEY}-${size.label}`);
+      await saveSessionForTheSweep(context);
     } finally {
       if (flowId) await api(context, A, 'POST', '/flow/flows/delete', { id: flowId });
       await context.close();
