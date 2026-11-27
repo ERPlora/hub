@@ -31,36 +31,27 @@ const text = (value: unknown): string => (value === null || value === undefined 
 </script>
 
 <template>
-  <div class="booking-notes">
-    <FoldedSection
-      v-for="entry in entries"
-      :key="entry.key"
-      v-model:open="opened[entry.key]"
-      :title="$t(entry.label)"
-      :hint="$t('appointment.form.optional')"
-      :testid="`appointment-form-${entry.key}-fold`"
-    >
-      <ion-textarea
-        :data-testid="`appointment-form-${entry.key}`"
-        :value="entry.model.value"
-        :label="$t(entry.label)"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        :auto-grow="true"
-        :maxlength="2000"
-        :name="entry.key"
-        :error-text="entry.error"
-        :class="{ 'ion-invalid': !!entry.error, 'ion-touched': !!entry.error }"
-        @ion-input="entry.model.value = text($event.detail.value)"
-      />
-    </FoldedSection>
-  </div>
+  <FoldedSection
+    v-for="entry in entries"
+    :key="entry.key"
+    v-model:open="opened[entry.key]"
+    :title="$t(entry.label)"
+    :hint="$t('appointment.form.optional')"
+    :testid="`appointment-form-${entry.key}-fold`"
+  >
+    <ion-textarea
+      :data-testid="`appointment-form-${entry.key}`"
+      :value="entry.model.value"
+      :label="$t(entry.label)"
+      label-placement="floating"
+      fill="outline"
+      mode="md"
+      :auto-grow="true"
+      :maxlength="2000"
+      :name="entry.key"
+      :error-text="entry.error"
+      :class="{ 'ion-invalid': !!entry.error, 'ion-touched': !!entry.error }"
+      @ion-input="entry.model.value = text($event.detail.value)"
+    />
+  </FoldedSection>
 </template>
-
-<style scoped>
-.booking-notes {
-  display: grid;
-  gap: 10px;
-}
-</style>
