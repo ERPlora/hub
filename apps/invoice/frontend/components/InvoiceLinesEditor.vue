@@ -125,6 +125,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         fill="clear"
         color="danger"
         :aria-label="$t('invoice.create.removeLine')"
+        :title="$t('invoice.create.removeLine')"
         :data-testid="`invoice-line-${line.uid}-remove`"
         @click="remove(line.uid)"
       >

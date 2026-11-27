@@ -231,13 +231,14 @@ function mediaFailed(): void {
           size="small"
           fill="outline"
           data-testid="file-preview-download"
+          :aria-label="t('base.files.preview.download')"
+          :title="t('base.files.preview.download')"
           @click="emit('download')"
         >
           <HubIcon
-            slot="start"
+            slot="icon-only"
             name="ion:download-outline"
           />
-          {{ t('base.files.preview.download') }}
         </ion-button>
         <ion-button
           size="small"
@@ -375,9 +376,10 @@ function mediaFailed(): void {
 </template>
 
 <style scoped>
+/* Capped by the page, not by `vh`: in Chrome on a tablet or a phone, `vh` also counts the screen under the address bar. */
 .file-preview {
   --width: min(1100px, 94vw);
-  --height: min(860px, 92vh);
+  --height: min(860px, 92%);
 }
 
 .file-preview-head {
@@ -439,7 +441,7 @@ function mediaFailed(): void {
 
 .file-preview-video {
   max-width: 100%;
-  max-height: 75vh;
+  max-height: calc(100cqh - 32px);
 }
 
 .file-preview-pdf {

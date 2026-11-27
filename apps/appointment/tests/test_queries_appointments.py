@@ -5,7 +5,7 @@ import datetime as dt
 import pytest
 from django.utils import timezone
 
-from apps.appointment.models import History
+from apps.appointment.models.appointments import History
 from apps.appointment.queries.appointments import APPOINTMENT_ORDER
 from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with

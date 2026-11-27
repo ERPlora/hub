@@ -10,12 +10,13 @@ from django.db import IntegrityError
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, PermissionDenied
+from live.errors import Conflict, PermissionDenied
 from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.staff import events
 from apps.staff.models import Member
+from apps.staff.queries.accounts import account
 from apps.staff.queries.reads import business_today, load_member, resolve_member
 from apps.staff.queries.roles import active_role, role_for
 from apps.staff.queries.time_off_reads import LIVE_TIME_OFF
@@ -29,9 +30,8 @@ from apps.staff.schemas.members import (
     TerminatedOut,
     TerminateIn,
 )
-from base.models import HubUser, Membership
+from base.assistant import file_rows
 
-USER_NOT_IN_BUSINESS = _("That Hub user has no access to this business.")
 USER_ALREADY_LINKED = _(
     "That Hub user is already linked to %(name)s. A Hub user can belong to only one staff member: unlink it "
     "there first, or pick another user."
@@ -74,8 +74,9 @@ USER_UNIQUE = "staff_member_hub_user_unique"
         "business's active roles: read them with staff.role.list first. A role it does not have is refused at once "
         "and nothing is created: say which roles it has instead.",
         "risk": "normal",
-        # hub#538: a role the business does not have is told to the model before the card, not after the yes.
-        "check": "staff.role.resolve",
+        # A role the business does not have, or an account without access to it, is told to the model before the
+        # card, not after the yes.
+        "check": ("staff.role.resolve", "staff.account.check"),
     },
 )
 def create_member(ctx: OperationContext, data: MemberIn) -> Member | None:
@@ -113,6 +114,7 @@ def create_member(ctx: OperationContext, data: MemberIn) -> Member | None:
         "description": "Adds several staff members at once (up to 100); a row with a problem is skipped "
         "with its reason and the rest go in.",
         "risk": "normal",
+        "summary": file_rows.rows_named_by("members", "first_name", "last_name"),
     },
 )
 def bulk_create_members(ctx: OperationContext, data: BulkCreateIn) -> dict:
@@ -171,16 +173,20 @@ def _bulk_row(row: Any) -> tuple[str | None, dict]:
                 "raise Lucía to 14 € an hour",
                 "change Pablo's role to manager",
                 "update Ana's phone number",
+                "link Marta's record to her user account",
             ),
             "es": (
                 "sube a Lucía a 14 € la hora",
                 "cambia el rol de Pablo a encargado",
                 "actualiza el teléfono de Ana",
+                "vincula la ficha de Marta a su usuario",
             ),
         },
         "description": "Changes the details of a staff member, named by id or by name (only what is sent; "
         "it can change their pay, role and linked user).",
         "risk": "high",
+        # An account without access to the business is told to the model before the card, which could not name it.
+        "check": "staff.account.check",
     },
 )
 def update_member(ctx: OperationContext, data: MemberPatchIn) -> Member | None:
@@ -316,15 +322,11 @@ def _role_for(role_id: UUID | None, name: str | None) -> UUID | None:
 def _check_user(
     ctx: OperationContext, user_id: UUID | None, exclude: UUID | None = None
 ) -> None:
-    """A person of the business's database (``base.HubUser``) may hang a record when they are still in the business,
-    have access to it (a ``Membership`` on the scope's host, control's) and no other live record."""
+    """An account of the business (``queries.accounts.account``, the list the record's form offers) may hang a record
+    when no other live record hangs from it."""
     if user_id is None:
         return
-    person = HubUser.objects.filter(pk=user_id, is_active=True).first()
-    if person is None or not Membership.objects.filter(user__username=person.username, host=ctx.scope.key).exists():
-        raise InvalidPayload(
-            str(USER_NOT_IN_BUSINESS), fields={"user_id": str(USER_NOT_IN_BUSINESS)}
-        )
+    account(ctx, user_id)
     holder = _holder_of(user_id, exclude=exclude)
     if holder is not None:
         raise _already_linked(holder.full_name)

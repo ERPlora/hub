@@ -192,6 +192,11 @@ def test_book_list_move_and_cancel_over_http(admin_client, salon):
         staff="Ana",
     )
     assert slots.status_code == 200 and slots.json()["slots"]
+    # The spans travel as the free times do: the business's wall clock with its offset.
+    offset = slots.json()["slots"][0]["start"][-6:]
+    assert slots.json()["windows"] == [
+        {"start": f"{MONDAY.isoformat()}T08:00:00{offset}", "end": f"{MONDAY.isoformat()}T20:00:00{offset}"}
+    ]
     moved = post(
         admin_client,
         "/appointment/appointments/reschedule",

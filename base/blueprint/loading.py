@@ -12,8 +12,8 @@ from live.meta import module_configs
 from base import activation
 from base.apps_on import active_apps
 from base.blueprint.archive import PURPOSE_BACKUP, Bundle
-from base.blueprint.calls import Loaded
-from base.blueprint.datasets import DATASETS, Dataset, app_label, datasets_of
+from base.blueprint.calls import Dataset, Loaded
+from base.blueprint.datasets import app_label, datasets_of, every_dataset
 
 # Its lines keep the name they always had, whichever module of the package writes them.
 logger = logging.getLogger("base.blueprint")
@@ -64,7 +64,7 @@ def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None, refus
         known = {config.label for config in module_configs()}
         loads: dict[str, dict] = {}
         created: dict[str, list[str]] = {}
-        for dataset in DATASETS:
+        for dataset in every_dataset():
             rows = bundle.data.get(dataset.key)
             if rows is None or (apps is not None and dataset.app not in apps) or dataset.app not in on:
                 continue

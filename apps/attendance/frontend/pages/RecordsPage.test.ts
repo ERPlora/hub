@@ -14,6 +14,7 @@ import PresenceCard from '../components/PresenceCard.vue';
 import type { RecordOut } from '../operations';
 import RecordsPage from './RecordsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 const download = vi.hoisted(() => ({ saveCsv: vi.fn() }));
 vi.mock('../lib/download', () => ({ saveCsv: download.saveCsv }));
@@ -258,7 +259,9 @@ describe('RecordsPage for an employee (ATTENDANCE-F06)', () => {
     const s = await setup({ session: { ...EMPLOYEE, language: 'es' }, locale: 'es' });
     await s.show(page([ROWS[1]]));
     expect(s.cells(0).slice(0, 6)).toEqual(['lun, 5 oct', '09:02', '17:05', '30', '7:32', 'Cerrada']);
-    expect(s.find('attendance-export-csv').text()).toContain('Exportar CSV');
+    const exportButton = s.find('attendance-export-csv');
+    // The download icon alone: «Exportar CSV» is its name and its tooltip.
+    expect([exportButton.text(), accessibleName(exportButton.element), exportButton.attributes('title')]).toEqual(['', 'Exportar CSV', 'Exportar CSV']);
   });
 });
 

@@ -444,7 +444,7 @@
         "high_risk": "«{action}» necesita a una persona delante: una automatización no puede hacerlo",
         "skipped": "Se saltaría: no se cumple su «Solo si…»",
         "would_call": "Llamaría a {host} con esto",
-        "would_ask": "Preguntaría a {who} y esperaría hasta {hours} horas",
+        "would_ask": "Preguntaría a {who} y esperaría hasta {n} hora | Preguntaría a {who} y esperaría hasta {n} horas",
         "would_ask_assistant": "Se lo pediría al asistente: {prompt}"
       },
       "empty": "Saldría vacío: {fields}",
@@ -525,8 +525,7 @@
         "flow__secret_unreadable": "Vuelve a guardar el secreto en el paso: se selló con otra clave.",
         "flow__secrets_key_missing": "Este servidor todavía no tiene la clave de cifrado de los secretos; mándanos la referencia."
       },
-      "attentionOne": "{n} ejecución se paró por un problema",
-      "attentionMany": "{n} ejecuciones se pararon por un problema",
+      "stopped": "{n} ejecución se paró por un problema | {n} ejecuciones se pararon por un problema",
       "retry": "Reanudar desde el paso que falló",
       "retryTitle": "¿Reanudarla desde el paso que falló?",
       "retryMessage": "Los pasos que ya hizo no se repiten: sigue con los pasos con los que empezó. Hará de verdad lo que dicen.",
@@ -534,6 +533,10 @@
       "retryNo": "Cancelar",
       "retried": "Reanudada: terminó bien.",
       "retriedWaiting": "Reanudada: está esperando. Mira aquí cómo sigue.",
+      "retriedStopped": "Reanudada: terminó, no se cumplía la condición.",
+      "retriedCalling": "Reanudada: está llamando a otro sistema. Mira aquí cómo sigue.",
+      "retriedAsking": "Reanudada: espera una respuesta en «Esperan tu respuesta».",
+      "retriedThinking": "Reanudada: el asistente está en ello. Mira aquí cómo sigue.",
       "retriedFailed": "Se reanudó y volvió a pararse por un error: {message}"
     },
     "events": {
@@ -1306,6 +1309,7 @@
       "service__session__get": "Leer una sesión de un bono",
       "service__settings__get": "Leer los ajustes de los servicios",
       "service__record__get": "Leer el nombre de un registro al que se refiere un bono",
+      "staff__account__list": "Buscar las cuentas a las que se puede vincular una ficha del equipo",
       "staff__availability__for_member": "Leer cuándo está disponible alguien",
       "staff__commission__summary": "Leer las comisiones",
       "staff__commission__report": "Leer la producción y la comisión de cada profesional",
@@ -2652,6 +2656,7 @@
       "width": "Ancho",
       "window_expires_at": "La ventana caduca el",
       "window_open": "Ventana abierta",
+      "windows": "Tramos del día",
       "withholding_amount": "Retención de IRPF",
       "withholding_rate": "Retención de IRPF (%)",
       "work_date": "Día de trabajo",
@@ -2688,6 +2693,7 @@
       "carts": "Carritos",
       "orders": "Pedidos",
       "queued": "En la cola de impresión",
+      "waits_for_device": "Esperando a un dispositivo que lo imprima",
       "report": "Informe",
       "printers": "Impresoras",
       "this_device": "Este dispositivo",

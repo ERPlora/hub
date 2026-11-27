@@ -4,6 +4,8 @@
 // place the app turns them into text (`Intl`). An amount typed in a filter is read by the platform, as every amount
 // filter of the Hub (`filterCents`, `amountFilterErrors`). No screen of the app writes a quantity: where
 // one is shown, it is the platform's `formatQuantity` of `@erplora/ui/components` (hub#974).
+import type { TransmitOut } from '../operations';
+
 export type { Money } from '../../../../base/frontend/lib/home';
 export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
@@ -85,4 +87,17 @@ export function formatDate(value: string | null | undefined, locale: string): st
 /** The text with Intl's no-break spaces as plain ones (what a test or a search compares). */
 export function plain(text: string): string {
   return text.replace(/[  ]/g, ' ');
+}
+
+/** What a sending to the AEAT came to, each figure with its word in the singular or the plural. */
+export function answerCounts(
+  answer: TransmitOut,
+  t: (key: string, named: Record<string, unknown>) => string,
+): Record<'sent' | 'accepted' | 'rejected' | 'waiting', string> {
+  return {
+    sent: t('verifactu.answers.sent', { count: answer.sent }),
+    accepted: t('verifactu.answers.accepted', { count: answer.accepted + answer.accepted_with_errors }),
+    rejected: t('verifactu.answers.rejected', { count: answer.rejected }),
+    waiting: t('verifactu.answers.waiting', { count: answer.waiting }),
+  };
 }

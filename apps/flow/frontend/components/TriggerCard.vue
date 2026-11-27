@@ -9,6 +9,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
+import { catalogOptions } from '../lib/catalogOptions';
 import type { DataChoice } from '../lib/document';
 import { describeTrigger, eventLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FixedByAppOut, Step, Trigger, TriggerKind } from '../operations';
@@ -35,10 +36,7 @@ const KINDS: readonly TriggerKind[] = ['event', 'schedule', 'at', 'manual'];
 const trigger = computed(() => props.modelValue);
 
 const events = computed<ComboOption[]>(() =>
-  [...(props.catalog?.events ?? [])]
-    .map((event) => ({ id: event.name, label: eventLabel(event.name, props.catalog, phrasing.value), hint: `${event.app_name} · ${event.name}`, app: event.app_name }))
-    .sort((a, b) => a.app.localeCompare(b.app, phrasing.value.locale) || a.label.localeCompare(b.label, phrasing.value.locale))
-    .map(({ id, label, hint }) => ({ id, label, hint })),
+  catalogOptions(props.catalog?.events ?? [], (name) => eventLabel(name, props.catalog, phrasing.value), phrasing.value.locale),
 );
 
 /** The app, off in this business, of the event a saved trigger names: it is missing from the list for that (hub#1054). */

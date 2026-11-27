@@ -43,7 +43,7 @@ def test_a_read_tells_the_step_its_amounts_in_the_business_currency(gateway, clo
     clock(NOON)
     lucia()
     asking(worker, gateway, wants("customer__customer__stats", {}), said("3.60 €"))
-    assert told(gateway.sent(CHAT)[1])["total_revenue"] == "3.60 EUR"
+    assert told(gateway.sent(CHAT)[1])["total_revenue"] == "€3.60"
 
 
 def test_after_the_yes_a_change_tells_the_step_its_amounts_in_the_business_currency(gateway, clock, worker):
@@ -54,4 +54,4 @@ def test_after_the_yes_a_change_tells_the_step_its_amounts_in_the_business_curre
     assert question.status == Question.Status.PENDING
     worker.request("flow.question.answer", {"id": str(question.id), "approve": True})
     worker()
-    assert told(gateway.sent(CHAT)[1])["total_spent"] == "3.60 EUR"
+    assert told(gateway.sent(CHAT)[1])["total_spent"] == "€3.60"

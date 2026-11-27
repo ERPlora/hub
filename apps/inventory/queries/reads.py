@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict, NotFound
 
 from apps.inventory.models import Category, Product
+from base.text_search import contains_text
 
 PRODUCT_NOT_FOUND = _("This product does not exist in this hub.")
 CATEGORY_NOT_FOUND = _("This category no longer exists.")
@@ -32,7 +33,7 @@ def find_product(
     if product_id is None:
         candidates = _first_match(
             products,
-            (Q(sku__iexact=said), Q(name__iexact=said), Q(name__icontains=said)),
+            (Q(sku__iexact=said), Q(name__iexact=said), contains_text(said, "name")),
         )
         if len(candidates) > 1:
             names = ", ".join(
@@ -65,7 +66,7 @@ def find_category(
     if category_id is None:
         candidates = _first_match(
             categories,
-            (Q(slug__iexact=said) | Q(name__iexact=said), Q(name__icontains=said)),
+            (Q(slug__iexact=said) | Q(name__iexact=said), contains_text(said, "name")),
         )
         if len(candidates) > 1:
             names = ", ".join(category.name for category in candidates[:5])

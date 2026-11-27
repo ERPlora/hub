@@ -14,7 +14,7 @@ HealthTestResult = Literal["", "negative", "positive"]
 #: notes, a custom field or an entry of its activity is where it would put an allergy, out of the block and of the
 #: permission it needs.
 NOT_FOR_HEALTH_DATA = (
-    "Never for allergies, sensitivity tests or other health data: those go only in the «Health and allergies» block of "
+    "Never for allergies, sensitivity tests or other health data: those go only in the health and allergies block of "
     "the customer's card in Customers (/customer/customers), with the customer's own explicit permission, which only "
     "that screen records. You have no tool for them: tell the person to do it there."
 )

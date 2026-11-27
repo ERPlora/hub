@@ -195,11 +195,11 @@ describe('StockModal: stock count', () => {
   it('says what is missing, then the difference against the current stock', async () => {
     const s = await setup('count');
     expect(s.el('inventory-stock-form')?.getAttribute('aria-label')).toBe('Stock count — Coffee');
-    expect(s.el('inventory-stock-needs')?.textContent?.trim()).toBe('Enter the counted stock to continue.');
+    expect(s.el('inventory-stock-form-hint')?.textContent?.trim()).toBe('Enter the counted stock to continue.');
     expect(s.el('inventory-stock-diff')).toBeNull();
     await s.type('inventory-stock-qty', '7');
     expect(s.el('inventory-stock-diff')?.textContent).toMatch(/Difference\s*\+2/);
-    expect(s.el('inventory-stock-needs')?.textContent?.trim()).toBe('A reason is required to apply the count.');
+    expect(s.el('inventory-stock-form-hint')?.textContent?.trim()).toBe('A reason is required to apply the count.');
     expect(s.el('inventory-stock-form-submit')?.disabled).toBe(true);
     await s.type('inventory-stock-qty', '4,5');
     expect(s.el('inventory-stock-diff')?.textContent).toMatch(/Difference\s*-0\.5/);
@@ -210,7 +210,7 @@ describe('StockModal: stock count', () => {
     s.net.onApi(() => ok(product({ stock: '7.000' })));
     await s.type('inventory-stock-qty', '7');
     await s.type('inventory-stock-reason', ' Monthly count ');
-    expect(s.el('inventory-stock-needs')).toBeNull();
+    expect(s.el('inventory-stock-form-hint')).toBeNull();
     await s.submit();
     expect(s.sent('/api/inventory/stock/count')).toEqual({ product_id: 'p1', stock: '7', reason: 'Monthly count' });
     expect(s.wrapper.emitted('update:open')).toEqual([[false]]);
@@ -233,8 +233,11 @@ describe('StockModal: write-off', () => {
     expect(s.el('inventory-stock-form-submit')?.textContent?.trim()).toBe('Write off');
     const message = 'There is not enough stock to complete the operation.';
     s.net.onApi(() => refusal(409, 'inventory.insufficient_stock', message, { qty: message }));
+    expect(s.el('inventory-stock-form-hint')?.textContent?.trim()).toBe('Enter the quantity written off to continue.');
     await s.type('inventory-stock-qty', '9');
+    expect(s.el('inventory-stock-form-hint')?.textContent?.trim()).toBe('A reason is required to write off stock.');
     await s.type('inventory-stock-reason', 'Broken bottle');
+    expect(s.el('inventory-stock-form-hint')).toBeNull();
     await s.submit();
     expect(s.sent('/api/inventory/stock/write_off')).toEqual({ product_id: 'p1', qty: '9', reason: 'Broken bottle' });
     expect(s.el('inventory-stock-qty')?.errorText).toBe(message);
@@ -242,7 +245,7 @@ describe('StockModal: write-off', () => {
 });
 
 describe('StockModal: a write-off the server refuses', () => {
-  it('an article without stock control: the reason under the quantity, the dialog open', async () => {
+  it('an article without stock control: the reason once, under the quantity, the dialog open', async () => {
     const s = await setup('write_off');
     const message = 'This article does not track its stock: there is nothing to write off.';
     s.net.onApi(() => refusal(409, 'inventory.stock_not_tracked', message, { qty: message }));
@@ -250,7 +253,7 @@ describe('StockModal: a write-off the server refuses', () => {
     await s.type('inventory-stock-reason', 'Broken bottle');
     await s.submit();
     expect(s.el('inventory-stock-qty')?.errorText).toBe(message);
-    expect(s.el('inventory-stock-form-error')?.textContent).toContain(message);
+    expect(s.el('inventory-stock-form-error')).toBeNull();
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 });

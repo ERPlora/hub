@@ -105,8 +105,7 @@ y cada fila abren el editor, y **¿Cómo funciona esto?** abre la guía.
 #### Lo que enseña, de arriba abajo
 Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 
-- El botón **Nueva automatización**, arriba a la derecha; en el móvil es solo su **+**, para que el título
-  se lea entero.
+- El botón **Nueva automatización**, arriba a la derecha: solo su **+**, con su nombre al pasar el ratón.
 - **Esperan tu respuesta** — solo si hay alguna pregunta que puedas contestar: cada tarjeta, de qué
   automatización viene, la pregunta y sus detalles (en un cambio del asistente, además, justo debajo de la
   pregunta, lo que quiere hacer —«Anular una reserva»— y cada dato que mandaría, en palabras), a quién se le hizo, qué pasa si nadie contesta y qué hace un no, **Añadir una nota
@@ -392,11 +391,11 @@ Pasos:
 1. Toca la tarjeta «Cuando pase esto…» y elige:
    - **Pasa algo**: en «Elige qué pasa», los avisos de las apps activas del negocio, dichos en palabras
      («se cobra una venta», «se crea una ficha de cliente», «una cita se marca como no vino»…), con la
-     palabra de la app que los tiene («se crea un cambio temporal», como en Horarios) y con
-     buscador. No salen los que solo anota la plataforma, que no arrancan nada: la limpieza de las
-     impresiones antiguas y lo que devuelve una recuperación desde una copia aparte («se recupera una
-     cita»). Debajo, **Solo cuando…**: condiciones sobre los datos del aviso («el total es mayor que
-     10000»); sin ellas arranca sola con cada aviso.
+     palabra de la app que los tiene («se crea un cambio temporal», como en Horarios), con el nombre de
+     esa app debajo de cada uno y nunca su código, y con buscador. No salen los que solo anota la
+     plataforma, que no arrancan nada: la limpieza de las impresiones antiguas y lo que devuelve una
+     recuperación desde una copia aparte («se recupera una cita»). Debajo, **Solo cuando…**: condiciones
+     sobre los datos del aviso («el total es mayor que 10000»); sin ellas arranca sola con cada aviso.
    - **Según un horario**: «Cada cuánto» (todos los días, todas las semanas, todos los meses), el día de
      la semana o del mes si toca, y la hora, en la hora del negocio. Un día del mes que no existe (el 31
      en abril) se salta ese mes.
@@ -423,9 +422,11 @@ Pasos:
    lo quita.
 2. Rellena su formulario:
    - **Hacer algo**: «Qué hacer» (una acción de las apps activas, elegida de una lista con buscador:
-     «Crear una tarea», «Apuntar una nota en un cliente»…) y «Con esta información»: un campo por cada
-     dato que la acción pide (los obligatorios marcados) y **Añadir información** para los opcionales.
-   - **Consultar algo**: «Qué consultar» (una consulta de las apps activas), sus datos y «Qué guardar»
+     «Crear una tarea», «Apuntar una nota en un cliente»…, con el nombre de su app debajo de cada una y
+     nunca su código) y «Con esta información»: un campo por cada dato que la acción pide (los
+     obligatorios marcados) y **Añadir información** para los opcionales.
+   - **Consultar algo**: «Qué consultar» (una consulta de las apps activas, elegida igual: «Buscar
+     conversaciones de WhatsApp», con «Bandeja de WhatsApp» debajo), sus datos y «Qué guardar»
      («La primera fila que encuentre, campo a campo» o «Solo cuántas hay»). Si no encuentra nada, la
      automatización sigue; para pararla, se añade después un «Solo sigue si…» sobre «Encontró algo».
    - **Solo sigue si…**: una o varias filas «Dato», «Es» («igual a», «distinto de», «uno de», «está
@@ -754,7 +755,10 @@ Pasos:
    paso que falló**. Antes, arregla la causa: concede el permiso que faltaba, vuelve a encender la app o
    espera a que el otro sistema responda.
 2. Pulsa el botón y confirma: «¿Reanudarla desde el paso que falló?» con **Sí, reanúdala** o **Cancelar**.
-3. Sale «Reanudada: terminó bien.» (o «…está esperando»); si vuelve a fallar, «Se reanudó y volvió a
+3. El aviso dice lo que hace la ejecución en ese momento, como el de **Ejecutar ahora**: «Reanudada: terminó
+   bien.», «…terminó, no se cumplía la condición.», «…está esperando», «…está llamando a otro sistema», «…espera
+   una respuesta en «Esperan tu respuesta».» o «…el asistente está en ello»; nunca «terminó bien» de una que
+   sigue en marcha. Si vuelve a fallar, en el acto o cuando el otro sistema no responde, «Se reanudó y volvió a
    pararse por un error: …» junto a la ejecución, que se puede reanudar otra vez. En sus pasos queda
    «Reanudada aquí, desde el paso que había fallado».
 Entra: la ejecución parada por un error (por voz, por su referencia: «reanuda la de bienvenida que falló»). La

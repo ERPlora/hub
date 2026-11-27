@@ -10,7 +10,8 @@ Over HTTP, as the screens, the assistant and the API ask.
 import pytest
 from django.test import Client
 
-from apps.appointment.models import Appointment, Recurring
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring
 from apps.flow.tests.test_api import get, post
 
 from .conftest import HUB_DB, MONDAY, A, at, make_appointment, make_series, make_settings, run, wall
