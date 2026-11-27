@@ -16,7 +16,6 @@ class FlowConfig(LiveAppConfig):
     name = "apps.flow"
     label = "flow"
     blueprint_stays = {
-        "Flow": "pending",
         "FlowRun": "history",
         "Draft": "internal",
         "Secret": "outside",
@@ -148,3 +147,10 @@ class FlowConfig(LiveAppConfig):
             "catch_up": "collapse",
         },
     ]
+
+    def blueprint_datasets(self) -> list:
+        """What of Automations travels in an export of the business (BASE-F35): its automations, paused and with no
+        permission given."""
+        from apps.flow import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS
