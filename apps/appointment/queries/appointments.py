@@ -1,6 +1,6 @@
 """The appointments: the agenda's list, one of them, its history, a customer's, and the counters."""
 
-from django.db.models import Exists, OuterRef, Q
+from django.db.models import Exists, OuterRef
 from live.context import OperationContext
 from live.operations import INTERNAL, operation
 
@@ -23,6 +23,7 @@ from apps.staff.queries.reads import resolve_member
 from base.business import business_zone, zone_name
 from base.ordering import list_order_for
 from base.relay import by_platform
+from base.text_search import contains_text
 
 from .access import VIEW_OWN, for_caller
 from .business import day_bounds, now
@@ -73,12 +74,8 @@ def list_appointments(ctx: OperationContext, params: AppointmentListIn) -> dict:
         rows = rows.filter(status=params.status)
     if params.search:
         text = params.search
-        named = AppointmentService.objects.filter(
-            appointment=OuterRef("pk"), name__icontains=text
-        )
-        rows = rows.filter(
-            Q(number__icontains=text) | Q(customer_name__icontains=text) | Exists(named)
-        )
+        named = AppointmentService.objects.filter(contains_text(text, "name"), appointment=OuterRef("pk"))
+        rows = rows.filter(contains_text(text, "number", "customer_name") | Exists(named))
     page = _page(
         rows.order_by(*list_order_for(params.sort, columns=APPOINTMENT_ORDER)),
         params.limit,

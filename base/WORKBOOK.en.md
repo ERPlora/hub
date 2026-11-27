@@ -264,11 +264,11 @@ end, the card of the API's documentation.
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
 
 ### Files
-<!-- from WORKBOOK.md sha256:fc8ee636158c -->
+<!-- from WORKBOOK.md sha256:317b019d4995 -->
 From "Files" in the side menu; the whole team sees it. On the left, "Folders": the tree of the business's folders,
 which starts at "Files" (the very top), with the open folder highlighted; on a narrow screen, the tree folds into the
 "Folders" selector. On the right, "Search files…", "List" and "Grid" and, for whoever administers the business, "New
-folder" and "Upload file". Below, what the open folder holds: tapping a file opens it.
+folder" and "Upload file" (its cloud alone). Below, what the open folder holds: tapping a file opens it.
 
 #### The open folder
 <!-- from WORKBOOK.md sha256:3e9218268628 -->
@@ -821,14 +821,16 @@ In ERPlora's own business, which has no plan and buys nothing, its owner has nei
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
-<!-- from WORKBOOK.md sha256:c95a59546413 -->
+<!-- from WORKBOOK.md sha256:89d11e47cb24 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
-  1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
+  1. In "Finish setting up your business", they tap "Ask the assistant", its sparkles (or ask it from its
+     panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
-     missing and where it is done; each step keeps its "Set up" in the list.
+     missing and where it is done; each step keeps its "Set up" in the list. If it names the list, it calls it as
+     the Home shows it, in that person's language: "You have 4 steps left in Finish setting up your business".
   3. Of a step that is done it says it is done, without taking a figure, a name or a setting from its text, which
      says what the step asks for and not what the business has: "Your catalog" is done because there are already
      products, never "you have one". Asked how many or which, it reads it in the step's app (the active products, in
@@ -947,7 +949,7 @@ If it fails: without the list, as in "My apps".
 Involved: APPS-F01, APPS-F07, BASE-F14, BASE-F20
 
 ### BASE-F18 Turn on an app
-<!-- from WORKBOOK.md sha256:cdbe0b45b120 -->
+<!-- from WORKBOOK.md sha256:8e30f1c5b8b2 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -964,9 +966,10 @@ In: the chosen app, the ones it needs and what the business has subscribed to on
 Out: the app running in this business, chosen by it: it counts towards its plan's limit of apps.
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have reached the
 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for the owner in the browser (not in
-the installed app). A paid app not subscribed to offers no "Turn on". Neither does an app this business cannot use: it
-shows "Not available" and, for whoever runs the business, the reason below it ("VeriFactu is only for businesses in
-Spain."). Any other failure shows in a notice with the app's name and the reason, which stays until it is closed.
+the installed app). The limit never stops an app the business's country requires (VeriFactu in Spain): it turns on
+even with the plan at its limit. A paid app not subscribed to offers no "Turn on". Neither does an app this business
+cannot use: it shows "Not available" and, for whoever runs the business, the reason below it ("VeriFactu is only for
+businesses in Spain."). Any other failure shows in a notice with the app's name and the reason, which stays until it is closed.
 Involved: APPS-F07, VERIFACTU-F01, BASE-F19, BASE-F20
 
 ### BASE-F19 Know what else comes with an app
@@ -1233,7 +1236,7 @@ damaged, a newer version of ERPlora made it or it is larger than 20 MB) and it s
 Involved: BASE-F31
 
 ### BASE-F31 Review and load what the file brings
-<!-- from WORKBOOK.md sha256:ac59a05a4943 -->
+<!-- from WORKBOOK.md sha256:3188f27a81a3 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Import)
@@ -1255,10 +1258,13 @@ Steps:
      duplicated nor overwritten. If an app of the template is still being set up, its part comes in by
      itself as soon as it is ready, with no coming back and nothing to tap.
 In: the template or the file and the apps ticked.
-Out: the apps ticked that were off, turned on before loading, with the ones they need and within the plan's
-limit of apps, as if they were turned on in Apps (`base.app.enabled`); in each app ticked, what it brings and
-was missing, added as if it were added by hand in that app (its categories, products, services, areas,
-tables and, from a backup, customers), and the report kept (`base.blueprint.imported`).
+Out: the apps ticked that were off, turned on before loading and within the plan's limit of apps, each one
+chosen by the business as if it were turned on in Apps (`base.app.enabled`): they count towards the plan's limit
+of apps and turning another one off does not take them along; the ones they need that were not ticked come along
+with them, and Taxes, which the country requires, comes along with the ones that need it without counting towards
+the plan, as at the sign-up. In each app ticked, what it brings and was missing, added as if it were added by hand in
+that app (its categories, products, services, areas, tables and, from a backup, customers), and the report kept
+(`base.blueprint.imported`).
 If it fails: "The import failed:" with the reason and it stays on the review; with no app ticked, "Choose at least
 one app." and it cannot be imported; if none of its apps can be turned on here, "Nothing of this file can
 load in your business: none of its apps can be turned on here.". An app that could not be turned on (the
@@ -1268,7 +1274,7 @@ this business. Upload the file again in a minute to bring its data.".
 Involved: BASE-F22, INVENTORY-F01, INVENTORY-F12, INVENTORY-F26, INVENTORY-F36, VERIFACTU-F01, BASE-F32
 
 ### BASE-F32 Read the import report
-<!-- from WORKBOOK.md sha256:d556b3ffc787 -->
+<!-- from WORKBOOK.md sha256:4a07e015da34 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Import)
@@ -1279,8 +1285,9 @@ Steps:
   2. One row per app with its label: "Applied", "You had it already", "Applied in part", "Failed", "Nothing
      to copy", "Left out", "App off", "Not in this business", "Not chosen", "Being set up" or "Could not be set up".
      "You had it already" shows only when everything the app brings was already in the business; an app it brings
-     nothing of, like the ones the template only turns on, says "Nothing to copy". Below, for each part, "12 created
-     · 3 already there · 2 failed" and, of what failed, its name and the reason.
+     nothing of, like the ones the template only turns on, says "Nothing to copy". Below, for each part, "12 new rows
+     · 3 were already there · 2 failed" and, of what failed, its name and the reason; each figure goes in the singular
+     with a single row ("1 new row · 1 was already there · 1 failed").
   3. What was left out on purpose shows in "Left out on purpose".
   4. "See the templates" goes back to the catalogue; "Go to Home" leads to the Home.
   5. When the app is ready, its part loads by itself and the report gets up to date without reloading, whether this
@@ -2219,12 +2226,12 @@ moment." or "Check the connection and try again.") and "Retry"; a failure never 
 Involved: BASE-F40
 
 ### BASE-F73 Upload files and make folders
-<!-- from WORKBOOK.md sha256:66add13d9bb6 -->
+<!-- from WORKBOOK.md sha256:a56840ce257f -->
 Status: done
 Actor: owner, administrator
 Screen: Files
 Steps:
-  1. In the open folder, tap "Upload file" and choose one or several, or drag them onto the manager ("Drop the files
+  1. In the open folder, tap "Upload file" (the cloud) and choose one or several, or drag them onto the manager ("Drop the files
      to upload them here"). While they upload: "Uploading 2 of 5…".
   2. "Files uploaded." shows and they appear in the folder. If there was already one with the same name, it is not
      overwritten: the new one is kept as "menu (1).pdf" and "Uploaded as “menu (1).pdf”: there was already one with that
@@ -2948,7 +2955,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:d2fdb23a0674 -->
+<!-- from WORKBOOK.md sha256:792ca300704b -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -2991,7 +2998,10 @@ Steps:
      combos and 17 more"); the rows of a file being imported (products, categories or customers), by the name of each,
      as the import keeps it ("File rows: Spoons, Stews"; a row without a name counts among the "more", never by
      another of its cells) and, in Inventory, the tax categories they take, once each, by their name and today's rate ("Tax
-     category: Restaurant — food · 10%"); a list of lines that carry only their record, such as the services of an appointment, the same
+     category: Restaurant — food · 10%"); the rows of a batch the person dictates, the same way, by the name of each:
+     each person of Staff by their first name and last name ("Create in Staff: Carla Ruiz, Diego Martín, Elena Sanz"; one
+     without a first name or a last name counts among the "more") and each service by its name ("Services: Cut,
+     Colour"), with the categories and the tax categories they take apart, once each; a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of what the person wrote,
@@ -3221,12 +3231,13 @@ conversation that is too long says "This conversation is too long: start a new o
 Involved: BASE-F59, BASE-F60, BASE-F61
 
 ### BASE-F103 The assistant in the setup
-<!-- from WORKBOOK.md sha256:6bedff7bf9d6 -->
+<!-- from WORKBOOK.md sha256:506f16361b91 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
-  1. On the Home, while something is left, "Finish setting up your business" carries "Ask the assistant". It opens
+  1. On the Home, while something is left, "Finish setting up your business" carries "Ask the assistant", its
+     sparkles. It opens
      the panel with "Review your business's setup. Choose an option or write your question.".
   2. Opened from the bar, the empty conversation offers the same shortcuts: "What is left to set up?" and, for each
      pending step this person can do (up to four, in the list's order), "How do I set up “Your team”?", with the
@@ -3814,7 +3825,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 See the help of the screen in view
-<!-- from WORKBOOK.md sha256:c36cfdd53265 -->
+<!-- from WORKBOOK.md sha256:f68e5101166a -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: the top bar of a module whose help is ready or of a screen of the Hub ("?" button, "Help") and the help window
@@ -3843,7 +3854,7 @@ Steps:
      capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again.
   6. "Other screens" brings the other tabs of the module, or the other screens of the Hub the person can see, folded,
      each with its short summary. A link of the help to a screen of the Hub goes there and closes the help.
-  7. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: "How
+  7. "Ask the assistant", the sparkles at the foot, closes the help and opens the assistant with the question written, without sending it: "How
      do I do this: <task>?" about the last task opened or, if none was opened, "How do I use <module> on <screen>?";
      if something was already written, the question goes below it. "Close" closes the help.
 In: the module, or the screen of the Hub, and the tab the person is on.

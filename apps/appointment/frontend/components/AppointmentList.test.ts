@@ -76,6 +76,13 @@ describe('AppointmentList', () => {
     expect(charge.label(row('4', { order_id: 'o1' }))).toBe('Go to the check');
   });
 
+  it('«Charge» goes first, as its cash icon alone: the label is its name and tooltip', async () => {
+    const s = await setup();
+    const charge = s.actions().find((a) => a.id === 'charge');
+    expect(charge).toMatchObject({ icon: 'cash-outline', pinned: true });
+    expect(charge).not.toHaveProperty('showLabel');
+  });
+
   it('passes the row actions and «Add appointment» on', async () => {
     const s = await setup();
     s.table().vm.$emit('action', { actionId: 'confirm', row: s.rows[0] });

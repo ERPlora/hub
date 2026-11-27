@@ -149,7 +149,7 @@ recall it, serve it, reprint it or cancel it; tapping it shows its detail. "New 
 does not go through the till.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:788a53080e5a -->
+<!-- from WORKBOOK.md sha256:0850c369b629 -->
 Menu **Kitchen → Tickets**. Table of all the tickets, newest first, 50 per page (another size is chosen
 at the bottom):
 Ticket (full number `YYYYMMDD-NNNN`), Destination (the label), Type, Priority, Status, Dishes (in words:
@@ -161,7 +161,7 @@ row, icon only: "Fire", "Ready", "Served", "Recall" and "Cancel" (in the "⋮" m
 optional reason); only the ones the profile can do show up, and the ones the state does not allow are
 hidden. Tapping a row opens its detail: the dishes with the customer's allergy, their menu, their modifiers, their
 station and their state. "New ticket" opens the panel (full screen on the phone) with Type, Destination, Notes and
-its dishes (product of the catalogue, quantity and note; "Add dish"), and "Create ticket". Empty: "No
+its dishes (product of the catalogue, quantity and note; "Add dish", its +), and "Create ticket". Empty: "No
 tickets.". Loading: the table skeleton. Load error: the table's, with retry; a rejection of an action
 shows in its dialog or above the table, and one of the creation, inside the panel.
 
@@ -621,15 +621,15 @@ If it fails: the display shows "The pass could not be printed. Check the printer
 Involved: KITCHEN-F11, KITCHEN-F26, PRINTING-F10
 
 ### KITCHEN-F18 Send the round from the till, normal or rush
-<!-- from WORKBOOK.md sha256:734b3309ebcd -->
+<!-- from WORKBOOK.md sha256:f6958f9a44b3 -->
 Status: done
 Actor: employee
 Screen: Sales: Sell
 Steps:
 1. In **Sales → Sell**, with the check open, open the "Current order" tab: what is left to send. On adding
    the first product, which opens the check, the till stays on that tab.
-2. If the round is in a hurry, tap the flame: the button becomes "Send RUSH (N)". Each tap arms it or
-   disarms it.
+2. If the round is in a hurry, tap the flame: the button turns red and is called "Send RUSH (N)". Each tap
+   arms it or disarms it.
 3. Press "Send order (N)" (or "Send RUSH (N)"): "Order N sent to the kitchen." shows and the flame is
    disarmed.
 4. Sales marks the pending lines with a new round (SALE-F20) and Kitchen opens the ticket (KITCHEN-F05),

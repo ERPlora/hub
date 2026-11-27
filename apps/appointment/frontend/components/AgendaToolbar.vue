@@ -69,6 +69,7 @@ function jump(value: string): void {
         class="agenda-toolbar__prev"
         data-testid="appointment-toolbar-prev"
         :aria-label="span === 'week' ? $t('appointment.toolbar.prevWeek') : $t('appointment.toolbar.prevDay')"
+        :title="span === 'week' ? $t('appointment.toolbar.prevWeek') : $t('appointment.toolbar.prevDay')"
         @click="day = addDays(day, -step)"
       >
         <HubIcon
@@ -85,6 +86,7 @@ function jump(value: string): void {
         class="agenda-toolbar__next"
         data-testid="appointment-toolbar-next"
         :aria-label="span === 'week' ? $t('appointment.toolbar.nextWeek') : $t('appointment.toolbar.nextDay')"
+        :title="span === 'week' ? $t('appointment.toolbar.nextWeek') : $t('appointment.toolbar.nextDay')"
         @click="day = addDays(day, step)"
       >
         <HubIcon

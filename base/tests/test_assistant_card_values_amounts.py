@@ -163,7 +163,7 @@ def test_the_model_is_told_an_amount_by_its_mark_whatever_its_description_says()
     assert defs["PricedLineIn"]["properties"]["unit_price"]["money"] is True
     assert "money" not in shared.resolved(parameters["properties"]["quantity"], defs)
     text = assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={})
-    assert '`"money": true`' in text and "17.00 EUR → 1700" in text
+    assert '`"money": true`' in text and "17,00\xa0€ → 1700" in text
     assert "«in cents»" not in text
 
 

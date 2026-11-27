@@ -14,6 +14,7 @@ import { IonInput, IonReorder, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
+import { catalogOptions } from '../lib/catalogOptions';
 import { type DataChoice, delayParts, type DelayUnit, NOTIFY_OPERATION, secondsOf } from '../lib/document';
 import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FieldOut, FixedByAppOut, Step } from '../operations';
@@ -66,11 +67,8 @@ function setCondition(when: Condition): void {
 const actions = computed<ComboOption[]>(() => {
   const step = props.step;
   if (step.kind !== 'command' && step.kind !== 'query') return [];
-  return (props.catalog?.actions ?? [])
-    .filter((action) => action.kind === step.kind && !action.ask_first)
-    .map((action) => ({ id: action.name, label: actionLabel(action.name, props.catalog, phrasing.value), hint: `${action.app_name} · ${action.name}`, app: action.app_name }))
-    .sort((a, b) => a.app.localeCompare(b.app, phrasing.value.locale) || a.label.localeCompare(b.label, phrasing.value.locale))
-    .map(({ id: name, label, hint }) => ({ id: name, label, hint }));
+  const offered = (props.catalog?.actions ?? []).filter((action) => action.kind === step.kind && !action.ask_first);
+  return catalogOptions(offered, (name) => actionLabel(name, props.catalog, phrasing.value), phrasing.value.locale);
 });
 
 const action = computed(() => {

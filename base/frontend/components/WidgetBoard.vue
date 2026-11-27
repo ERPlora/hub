@@ -104,10 +104,9 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
         @click="picking = true"
       >
         <HubIcon
-          slot="start"
+          slot="icon-only"
           name="ion:ellipsis-vertical"
         />
-        <span class="widget-board-customize-label">{{ $t('base.widgets.customize') }}</span>
       </ion-button>
     </header>
 
@@ -231,6 +230,7 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
                   fill="clear"
                   color="medium"
                   :aria-label="t('base.widgets.remove', { widget: widget.title })"
+                  :title="t('base.widgets.remove', { widget: widget.title })"
                   :data-testid="`widgets-remove-${widget.key}`"
                   @click="remove(widget.key)"
                 >
@@ -262,6 +262,7 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
                 slot="end"
                 fill="clear"
                 :aria-label="t('base.widgets.add', { widget: widget.title })"
+                :title="t('base.widgets.add', { widget: widget.title })"
                 :data-testid="`widgets-add-${widget.key}`"
                 @click="add(widget.key)"
               >
@@ -290,20 +291,6 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
   --background: var(--ep-primary-tint);
   --border-radius: 10px;
   margin: 0;
-}
-
-.widget-board-customize-label {
-  font-size: 0.8125rem;
-  font-weight: 650;
-}
-
-@media (max-width: 575px) {
-  .widget-board-customize-label {
-    max-width: 9rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 }
 
 .widget-board-empty {

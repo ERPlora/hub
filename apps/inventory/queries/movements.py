@@ -10,6 +10,7 @@ from apps.inventory.models import SaleStock, StockMovement
 from apps.inventory.queries.reads import _bounds, _page
 from apps.inventory.schemas.movements import MovementListIn, MovementPage
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 
 @operation(
@@ -40,8 +41,7 @@ def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
     movements = StockMovement.objects.select_related("product").annotate(reference_label=_REFERENCE_LABEL)
     if params.search:
         movements = movements.filter(
-            Q(product__name__icontains=params.search)
-            | Q(product__sku__icontains=params.search)
+            contains_text(params.search, "product__name", "product__sku")
             | _reference_matches(params.search)
         )
     if params.reference:
@@ -90,8 +90,8 @@ _REFERENCE_LABEL = Case(
 def _reference_matches(text: str) -> Q:
     """The reference holds ``text``, or it is a sale whose ticket, invoice or own number does."""
     text = text.strip()
-    numbered = SaleStock.objects.filter(Q(sale_number__icontains=text) | Q(document_number__icontains=text))
-    return Q(reference__icontains=text) | Q(
+    numbered = SaleStock.objects.filter(contains_text(text, "sale_number", "document_number"))
+    return contains_text(text, "reference") | Q(
         movement_type__in=SALE_MOVEMENTS,
         reference__in=numbered.annotate(key=Cast("sale_id", CharField())).values("key"),
     )
