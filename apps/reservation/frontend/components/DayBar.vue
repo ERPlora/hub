@@ -60,6 +60,7 @@ function go(day: string): void {
         fill="clear"
         data-testid="reservation-day-prev"
         :aria-label="$t('reservation.day.previous')"
+        :title="$t('reservation.day.previous')"
         @click="go(addDays(day, -1))"
       >
         <ion-icon
@@ -81,6 +82,7 @@ function go(day: string): void {
         fill="clear"
         data-testid="reservation-day-next"
         :aria-label="$t('reservation.day.next')"
+        :title="$t('reservation.day.next')"
         @click="go(addDays(day, 1))"
       >
         <ion-icon
