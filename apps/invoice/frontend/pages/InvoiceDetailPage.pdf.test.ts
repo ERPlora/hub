@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { INVOICE, setup } from '../__tests__/invoice-detail';
 import { ACCOUNTANT, EMPLOYEE, flush } from '../__tests__/mount-invoice';
 import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 const FILE = { filename: 'FACT-2026-000001.pdf', content_type: 'application/pdf', content_base64: btoa('%PDF-1.7 x') };
 
@@ -37,7 +38,7 @@ describe('InvoiceDetailPage: «Download PDF»', () => {
   it('asks the server for the invoice’s PDF and saves it under its name', async () => {
     const s = await opened();
     const saved = browserDownloads();
-    expect(s.button().text()).toBe('Download PDF');
+    expect(accessibleName(s.button().element)).toBe('Download PDF');
     await s.press();
     const [url] = s.asked;
     expect(s.asked).toHaveLength(1);
@@ -65,7 +66,8 @@ describe('InvoiceDetailPage: «Download PDF»', () => {
     const s = await opened({}, {}, () => new Promise<Response>((resolve) => (answer = resolve)));
     browserDownloads();
     await s.press();
-    expect(s.button().text()).toBe('Preparing…');
+    await flush();
+    expect(accessibleName(s.button().element)).toBe('Preparing…');
     expect(s.disabled()).toBe(true);
     await s.press();
     expect(s.asked).toHaveLength(1);
@@ -73,7 +75,7 @@ describe('InvoiceDetailPage: «Download PDF»', () => {
     answer(Response.json(FILE));
     await flush();
     await flush();
-    expect(s.button().text()).toBe('Download PDF');
+    expect(accessibleName(s.button().element)).toBe('Download PDF');
     expect(s.disabled()).toBe(false);
   });
 
@@ -103,7 +105,7 @@ describe('InvoiceDetailPage: «Download PDF»', () => {
 
   it('speaks Spanish', async () => {
     const s = await opened({}, { locale: 'es' }, () => Response.json({ error: { code: 'x', message: 'Motivo.' } }, { status: 503 }));
-    expect(s.button().text()).toBe('Descargar PDF');
+    expect(accessibleName(s.button().element)).toBe('Descargar PDF');
     await s.press();
     expect(toastError).toHaveBeenCalledWith('No se ha podido descargar el PDF: Motivo.');
   });

@@ -45,6 +45,21 @@ describe('VoucherChooser', () => {
     expect(s.find('voucher-l1-option-g2').attributes('aria-checked')).toBe('false');
   });
 
+  it('says the sessions left in the singular or the plural', async () => {
+    const rows = [
+      option('g1', { remaining_before: 1, remaining_after: 0, candidate_count: 2 }),
+      option('g2', { remaining_before: 2, remaining_after: 1, candidate_count: 2 }),
+    ];
+    const es = await setup();
+    await es.result(OP, page(rows));
+    expect(es.text('voucher-l1-option-g1')).toContain('Queda 1 sesión · 0 después de esta');
+    expect(es.text('voucher-l1-option-g2')).toContain('Quedan 2 sesiones · 1 después de esta');
+    const en = await setup('en');
+    await en.result(OP, page(rows));
+    expect(en.text('voucher-l1-option-g1')).toContain('1 session left · 0 after this one');
+    expect(en.text('voucher-l1-option-g2')).toContain('2 sessions left · 1 after this one');
+  });
+
   it('«Spend one session» pays the line with the chosen voucher; another one can be chosen first', async () => {
     const s = await setup();
     await s.result(OP, page(TWO));

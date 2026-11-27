@@ -2,7 +2,7 @@
 out.
 """
 
-from django.db.models import F, Q, Window
+from django.db.models import F, Window
 from django.db.models.functions import Lag
 from live.context import OperationContext
 from live.operations import operation
@@ -18,6 +18,7 @@ from apps.invoice.schemas.numbering import (
     NumberingStatusIn,
     NumberingStatusOut,
 )
+from base.text_search import contains_text
 from apps.tax.queries.jurisdiction import business_today
 
 
@@ -162,9 +163,7 @@ def allocations(ctx: OperationContext, params: AllocationsIn) -> dict:
     documents = Invoice.objects.all()
     if params.search:
         text = params.search.strip()
-        documents = documents.filter(
-            Q(number__icontains=text) | Q(series_code__icontains=text)
-        )
+        documents = documents.filter(contains_text(text, "number", "series_code"))
     if params.code:
         documents = documents.filter(series_code=params.code.strip().upper())
     if params.year:

@@ -219,7 +219,7 @@ test('SALE-F20: «Current order» says what waits and sends it to the kitchen as
   await expect(shown(page).locator('[data-testid=pos-cart-round-hint]')).toBeVisible();
   await shown(page).locator('[data-testid=pos-kitchen-rush]').click();
   const send = shown(page).locator('[data-testid=pos-kitchen-send]');
-  await expect(send).toContainText('Send RUSH (1)');
+  await expect(send.locator('button')).toHaveAccessibleName('Send RUSH (1)');
   await shots(page, 'SALE-F20', async () => {
     // The phone keeps the check in a drawer: its button opens it.
     await openTillCart(page);

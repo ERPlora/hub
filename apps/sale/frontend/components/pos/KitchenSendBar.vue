@@ -1,17 +1,23 @@
 <script setup lang="ts">
 // The send bar of the check, on «Check» and «Current order» while something waits (SALE-F20, hub#1017; Kitchen's
-// KITCHEN-F18): «Send order (N)» and, beside it, the rush
-// flame. Armed, the button says «Send RUSH (N)» and the round goes urgent; a send disarms it. The page sends
+// KITCHEN-F18): the send icon with how many items go, named «Send order (N)», and, beside it, the rush flame. Armed,
+// the button turns red, named «Send RUSH (N)», and the round goes urgent; a send disarms it. The page sends
 // (`send`, with whether it is a rush) through Kitchen. It stays pinned at the bottom of what scrolls in the check
 // (PosCart's `pos-cart-middle`) while that leaves room for the tabs and a line; lower, it scrolls with them (hub#787).
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
-import { shallowRef } from 'vue';
+import { computed, shallowRef } from 'vue';
 
-defineProps<{ pending: number; busy: boolean }>();
+import { useT } from '../../composables/useT';
+
+const props = defineProps<{ pending: number; busy: boolean }>();
 const emit = defineEmits<{ send: [rush: boolean] }>();
 
+const t = useT();
 const rush = shallowRef(false);
+const name = computed(() =>
+  rush.value ? t('sale.pos.kitchen.sendRush', { count: props.pending }) : t('sale.pos.kitchen.send', { count: props.pending }),
+);
 
 function send(): void {
   emit('send', rush.value);
@@ -38,13 +44,15 @@ function send(): void {
       :color="rush ? 'danger' : 'primary'"
       :disabled="busy"
       data-testid="pos-kitchen-send"
+      :aria-label="name"
+      :title="name"
       @click="send"
     >
       <HubIcon
         slot="start"
         name="lucide:send"
       />
-      {{ rush ? $t('sale.pos.kitchen.sendRush', { count: pending }) : $t('sale.pos.kitchen.send', { count: pending }) }}
+      {{ pending }}
     </ion-button>
   </div>
 </template>

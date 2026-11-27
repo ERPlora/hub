@@ -1,9 +1,12 @@
 // How the VeriFactu screens paint numbers and days (WORKBOOK «Para quien lo mantiene»: money travels in
 // signed cents, quantities and rates as decimal strings, days as `YYYY-MM-DD`). One place turns them into
 // text in the page's language with `Intl`: no page formats by hand.
+import { createShellI18n } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
-import { formatDate, formatMoney, formatPercent, formatUnitPrice, plain } from './format';
+import en from '../locale/en.json';
+import es from '../locale/es.json';
+import { answerCounts, formatDate, formatMoney, formatPercent, formatUnitPrice, plain } from './format';
 
 /** Intl puts a narrow no-break space before «€» and «%» in Spanish: compared as a plain space. */
 const spaced = (text: string) => plain(text);
@@ -68,5 +71,20 @@ describe('formatDate', () => {
     expect(formatDate('', 'es')).toBe('—');
     expect(formatDate(null, 'es')).toBe('—');
     expect(formatDate('yesterday', 'es')).toBe('yesterday');
+  });
+});
+
+describe('answerCounts', () => {
+  const answer = { chains: 1, sent: 1, accepted: 1, accepted_with_errors: 0, rejected: 1, waiting: 1, reason: '', message: '' };
+  const translator = (locale: 'en' | 'es') => {
+    const i18n = createShellI18n({ locale, messages: { en, es } });
+    return (key: string, named: Record<string, unknown>) => i18n.global.t(key, named);
+  };
+
+  it('says what the AEAT answered, each figure with its word in the singular or the plural', () => {
+    const several = { ...answer, sent: 2, accepted_with_errors: 1, rejected: 2, waiting: 2 };
+    expect(answerCounts(answer, translator('es'))).toEqual({ sent: '1 enviado', accepted: '1 aceptado', rejected: '1 rechazado', waiting: '1 en espera' });
+    expect(answerCounts(several, translator('es'))).toEqual({ sent: '2 enviados', accepted: '2 aceptados', rejected: '2 rechazados', waiting: '2 en espera' });
+    expect(answerCounts(several, translator('en'))).toEqual({ sent: '2 sent', accepted: '2 accepted', rejected: '2 rejected', waiting: '2 waiting' });
   });
 });

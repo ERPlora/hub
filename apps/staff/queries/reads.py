@@ -15,6 +15,7 @@ from apps.staff.models import Member
 from apps.staff.schemas.fields import PageIn
 from base.business import business_zone
 from base.queries.people import hub_user_of
+from base.text_search import contains_text
 
 MEMBER_NOT_FOUND = _("That staff member does not exist in this business.")
 AMBIGUOUS_MEMBER = _(
@@ -55,7 +56,7 @@ def resolve_member(
         ordered = members.order_by("first_name", "last_name", "id")
         matches = list(
             ordered.filter(search_name__iexact=name)[: MAX_CANDIDATES + 1]
-        ) or list(ordered.filter(search_name__icontains=name)[: MAX_CANDIDATES + 1])
+        ) or list(ordered.filter(contains_text(name, "search_name"))[: MAX_CANDIDATES + 1])
         if len(matches) > 1:
             names = ", ".join(match.full_name for match in matches[:MAX_CANDIDATES])
             raise Conflict(

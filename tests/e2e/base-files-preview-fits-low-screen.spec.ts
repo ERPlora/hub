@@ -1,8 +1,8 @@
 // flow: BASE-F74 — the viewer of Files on a low screen. In Chrome on an Android tablet in landscape the address bar
-// takes part of the screen: the page has 665 px of height while `100vh` still counts the 761 px it would have without
-// the bar (a viewer sized `92vh` measured 700 px there, hub#2616). The viewer fits the space the page really has, with
-// «Download» and «Close» on view, and a video fits its body without scrolling; the same at the fleet's sizes, in
-// English and in Spanish, with a screenshot at each.
+// takes part of the screen: the page has 665 px of height while `100vh` counts more (a viewer sized `92vh` measured
+// 700 px there, hub#2616). The viewer fits the space the page really has, with «Download» and «Close» on view, and a
+// video fits its body without scrolling; the same at the fleet's sizes, in English and in Spanish, with a screenshot
+// at each.
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,70 +10,40 @@ import { fileURLToPath } from 'node:url';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, settled, shown, testid } from './helpers';
-import { atEachFitSize, CHROME_LANDSCAPE, underAddressBar } from './screen';
+import { CHROME_LANDSCAPE, expectWindowFitsAt, expectWindowOnScreen, FIT_SIZES, underAddressBar, type WindowFit, windowFit } from './screen';
 import { dismissToasts } from './toast-helpers';
 
+/** The QA tablet the viewer was measured on: there `100vh` counts 761 px over the page's 665, more than
+ *  `CHROME_LANDSCAPE.withoutBar` (at 721 px a viewer of `92vh` still fit). */
+const TABLET_WITHOUT_BAR = { width: CHROME_LANDSCAPE.width, height: 761 };
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES' },
 ] as const;
+/** What always shows inside the viewer. */
+const ON_VIEW = ['«Download»', '«Close»', 'body'] as const;
 /** A one-second 1280×720 WebM: wider than the viewer, so its height is what has to fit. */
 const VIDEO = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'base', 'frontend', '__tests__', 'files', 'sample.webm'));
 const NOTE = 'Pay the supplier on Friday.\n';
 
-interface Box {
-  top: number;
-  bottom: number;
-}
-
-interface PreviewFit {
-  screen: number;
-  window: Box;
-  download: Box;
-  close: Box;
-  body: Box;
-  /** How far the viewer's body scrolls: 0 when what it shows fits. */
-  bodyScroll: number;
-  video: Box | null;
-}
-
-/** Where the window (Ionic's wrapper, in the modal's shadow root), «Download», «Close», the body and the video sit,
- *  and the height the page has (the modal's own box, which covers it). */
-function fitOf(preview: Locator): Promise<PreviewFit> {
-  return preview.evaluate((el) => {
-    const box = (part: Element | null | undefined): Box => {
-      if (!part) throw new Error('the viewer lost one of its parts');
-      const { top, bottom } = part.getBoundingClientRect();
-      return { top, bottom };
-    };
-    const body = el.querySelector('.file-preview-body');
-    const video = el.querySelector('[data-testid=file-preview-video]');
-    return {
-      screen: el.getBoundingClientRect().height,
-      window: box(el.shadowRoot?.querySelector('.modal-wrapper')),
-      download: box(el.querySelector('[data-testid=file-preview-download]')),
-      close: box(el.querySelector('[data-testid=file-preview-close]')),
-      body: box(body),
-      bodyScroll: body ? body.scrollHeight - body.clientHeight : 0,
-      video: video ? box(video) : null,
-    };
+function fitOf(preview: Locator): Promise<WindowFit> {
+  return windowFit(preview, {
+    '«Download»': '[data-testid=file-preview-download]',
+    '«Close»': '[data-testid=file-preview-close]',
+    body: '.file-preview-body',
   });
 }
 
-function expectInside(fit: PreviewFit, where: string): void {
-  expect(fit.window.top, `the viewer starts on the screen ${where}`).toBeGreaterThanOrEqual(-0.5);
-  expect(fit.window.bottom, `the viewer ends on the screen ${where}`).toBeLessThanOrEqual(fit.screen + 0.5);
-  for (const [name, part] of [
-    ['«Download»', fit.download],
-    ['«Close»', fit.close],
-    ['body', fit.body],
-  ] as const) {
-    expect(part.top, `the ${name} starts inside the viewer ${where}`).toBeGreaterThanOrEqual(fit.window.top - 0.5);
-    expect(part.bottom, `the ${name} ends inside the viewer ${where}`).toBeLessThanOrEqual(fit.window.bottom + 0.5);
-  }
-  if (!fit.video) return;
-  expect(fit.video.bottom, `the video ends inside the viewer's body ${where}`).toBeLessThanOrEqual(fit.body.bottom + 0.5);
-  expect(fit.bodyScroll, `the video fits the viewer's body without scrolling ${where}`).toBeLessThanOrEqual(1);
+/** The video ends inside the viewer's body, which shows it whole without scrolling. */
+async function expectVideoFits(preview: Locator, where: string): Promise<void> {
+  const fit = await preview.evaluate((el) => {
+    const body = el.querySelector('.file-preview-body');
+    const video = el.querySelector('[data-testid=file-preview-video]');
+    if (!body || !video) throw new Error('the viewer shows no video');
+    return { video: video.getBoundingClientRect().bottom, body: body.getBoundingClientRect().bottom, scroll: body.scrollHeight - body.clientHeight };
+  });
+  expect(fit.video, `the video ends inside the viewer's body ${where}`).toBeLessThanOrEqual(fit.body + 0.5);
+  expect(fit.scroll, `the video fits the viewer's body without scrolling ${where}`).toBeLessThanOrEqual(1);
 }
 
 /** Files on screen in `lang` (the Hub's language cookie, which the sign-in has just set from the account). */
@@ -112,39 +82,31 @@ for (const language of LANGUAGES) {
   }) => {
     const note = `fit-${language.lang}.txt`;
     const video = `fit-${language.lang}.webm`;
-    const context = await browser.newContext({
-      baseURL: A,
-      locale: language.locale,
-      viewport: { width: CHROME_LANDSCAPE.width, height: CHROME_LANDSCAPE.withoutBar },
-    });
+    const context = await browser.newContext({ baseURL: A, locale: language.locale, viewport: TABLET_WITHOUT_BAR });
     const page = await context.newPage();
     try {
       await filesIn(page, context, language.lang);
       await upload(page, note, 'text/plain', Buffer.from(NOTE));
       await upload(page, video, 'video/webm', VIDEO);
       await dismissToasts(page);
-      const liftBar = await underAddressBar(page);
+      const bar = await underAddressBar(page);
 
       let preview = await open(page, note);
       const fit = await fitOf(preview);
       expect(fit.screen, 'the page is as tall as the screen under the address bar').toBe(CHROME_LANDSCAPE.page);
-      expectInside(fit, 'under the address bar');
+      expectWindowOnScreen(fit, ON_VIEW, 'under the address bar');
       await capture(page, `BASE-FILE-PREVIEW-FIT-${language.lang}-1280x665-chrome`);
       await preview.locator('[data-testid="file-preview-close"]').click();
       await expect(preview).toBeHidden();
 
       preview = await open(page, video);
       await videoReady(page, preview);
-      expectInside(await fitOf(preview), 'showing a video under the address bar');
+      expectWindowOnScreen(await fitOf(preview), ON_VIEW, 'showing a video under the address bar');
+      await expectVideoFits(preview, 'under the address bar');
       await capture(page, `BASE-FILE-PREVIEW-FIT-${language.lang}-1280x665-chrome-video`);
 
-      await liftBar();
-      await atEachFitSize(page, async (label, height) => {
-        const at = await fitOf(preview);
-        expect(at.screen, `the page fills the window at ${label}`).toBe(height);
-        expectInside(at, `at ${label}`);
-        await capture(page, `BASE-FILE-PREVIEW-FIT-${language.lang}-${label}`);
-      });
+      await bar.evaluate((style) => (style as Element).remove());
+      await expectWindowFitsAt(page, { sizes: FIT_SIZES, measure: () => fitOf(preview), onView: ON_VIEW, name: `BASE-FILE-PREVIEW-FIT-${language.lang}` });
     } finally {
       for (const path of [note, video]) await api(context, A, 'POST', '/files/delete', { path });
       await context.close();

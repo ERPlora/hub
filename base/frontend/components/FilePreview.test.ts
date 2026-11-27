@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchFile } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { flush, mountBase } from '../__tests__/mount-base';
+import { accessibleName, flush, mountBase } from '../__tests__/mount-base';
 import { OFFICE_PREVIEW_MAX_BYTES } from '../lib/files';
 import type { FileItem } from '../operations/files';
 import FilePreview from './FilePreview.vue';
@@ -80,6 +80,9 @@ describe('FilePreview', () => {
   it('titles the viewer with the file’s name, with «Download» and «Close»', async () => {
     const m = await show(item('foto.png', 'image', 'image/png'));
     expect(inDoc('file-preview-title')?.textContent).toBe('foto.png');
+    const download = inDoc('file-preview-download')!;
+    // The download icon alone: «Download» is its name and its tooltip.
+    expect([download.textContent?.trim(), accessibleName(download), download.getAttribute('title')]).toEqual(['', 'Download', 'Download']);
     inDoc('file-preview-download')?.click();
     inDoc('file-preview-close')?.click();
     expect(m.wrapper.emitted('download')).toHaveLength(1);
