@@ -209,6 +209,7 @@ async function useMatch(match: { id: string; name: string }): Promise<void> {
           <ion-button
             data-testid="customer-search-modal-close"
             :aria-label="$t('customer.common.close')"
+            :title="$t('customer.common.close')"
             @click="close"
           >
             <HubIcon

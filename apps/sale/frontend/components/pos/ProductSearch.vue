@@ -76,6 +76,7 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
       <ion-button
         fill="clear"
         :aria-label="$t('sale.pos.searchClose')"
+        :title="$t('sale.pos.searchClose')"
         data-testid="pos-search-close"
         @click="emit('close')"
       >
