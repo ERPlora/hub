@@ -271,14 +271,14 @@ Actor: todos
 Pantalla: Ficha de cliente
 Pasos:
 1. Desde **Clientes**, toca la fila.
-2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos
-   personalizados; un cumpleaños sin año, como «12 de marzo»), sus grupos y etiquetas, su
-   consentimiento por canal, la actividad (más reciente primero, 50 por página; cada entrada dice
-   cuándo y quién: la persona por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su
-   correo, nunca el correo entero; la API key por el suyo, o «Lo hizo la plataforma» cuando no la hizo
-   nadie en persona, como la compra que apunta una venta cobrada, una automatización o una recuperación
-   desde una copia aparte), sus compras y los bloques de otras apps. El email, el teléfono y la dirección para la
-   que se dio cada consentimiento, solo a quien ve el contacto de los clientes.
+2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos personalizados; un
+   cumpleaños sin año, como «12 de marzo»), sus grupos y etiquetas, su consentimiento por canal, la actividad (más
+   reciente primero, 50 por página; cada entrada dice cuándo y quién: la persona por su nombre (el de Mi perfil o,
+   sin él, el de su cuenta) o, si no tiene ninguno, por lo que va antes de la @ de su correo, nunca el correo
+   entero; la API key por el suyo, o «Lo hizo la plataforma» cuando no la hizo nadie en persona, como la compra
+   que apunta una venta cobrada, una automatización o una recuperación desde una copia aparte), sus compras y los
+   bloques de otras apps. El email, el teléfono y la dirección para la que se dio cada consentimiento, solo a
+   quien ve el contacto de los clientes.
 3. **← Volver** regresa a la lista.
 Entra: la ficha y, aparte, su actividad, sus compras y su historial de consentimientos.
 Sale: nada; solo lectura. Si otra persona la cambia mientras está abierta, se ve el cambio sin

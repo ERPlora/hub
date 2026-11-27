@@ -216,6 +216,13 @@ describe('turning one on (F14, F15)', () => {
     );
   });
 
+  it('asks in the colour of a normal action, not the red of deleting', async () => {
+    mocks.confirm.mockResolvedValue(false);
+    const page = await mount({ recipes: shelf(), api: api() });
+    await click(page.find('whatsapp-inbox-autoreply-appointments-on').element);
+    expect(mocks.confirm.mock.calls[0][0].tone).toBe('primary');
+  });
+
   it('«Not now» turns nothing on', async () => {
     mocks.confirm.mockResolvedValue(false);
     const page = await mount({ recipes: shelf(), api: api() });
@@ -296,6 +303,14 @@ describe('updating to the improved version (F18)', () => {
     expect(page.find('whatsapp-inbox-autoreply-appointments-updated').text()).toBe(
       'Done: this automatic answer already works with the latest version.',
     );
+  });
+
+  it('asks in the colour of a normal action, not the red of deleting', async () => {
+    mocks.confirm.mockResolvedValue(false);
+    const page = await mount({ recipes: shelf({ [BOOKING]: { enabled: true, outdated: true } }), api: api() });
+    await click(page.find('whatsapp-inbox-autoreply-appointments-update').element);
+    expect(mocks.confirm.mock.calls[0][0].tone).toBe('primary');
+    expect(commands(page)).toEqual([]);
   });
 
   it('says it no longer exists when it was deleted meanwhile', async () => {

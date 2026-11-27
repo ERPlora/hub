@@ -8,7 +8,7 @@ from live.errors import Conflict
 from live.models import OutboxEvent
 
 from apps.appointment import events
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 
 from .conftest import A, HUB_DB, MONDAY, at, make_customer, make_service, make_tax, run, wall
 

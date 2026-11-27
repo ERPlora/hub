@@ -11,6 +11,7 @@ from live.operations import AI, operation
 from apps.sale.models import Order, OrderLine
 from apps.sale.schemas.orders import OrderListIn, OrderOut, OrderPage, OrderRefIn
 from base.allergens import found_in
+from base.text_search import contains_text
 
 ORDER_NOT_FOUND = _("That check does not exist.")
 ORDER_CHANGED = _(
@@ -185,7 +186,7 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     if params.status:
         orders = orders.filter(status=params.status)
     if params.search:
-        orders = orders.filter(label__icontains=params.search.strip())
+        orders = orders.filter(contains_text(params.search.strip(), "label"))
     page = orders.order_by("-created_at", "-id")[
         params.offset : params.offset + params.limit
     ]

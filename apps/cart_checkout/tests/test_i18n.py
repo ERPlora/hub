@@ -143,16 +143,16 @@ def test_spanish_texts_of_the_workbook():
         assert [str(nav.label) for nav in config.navigation] == ["Carritos", "Pedidos"]
         assert [str(label) for label in Cart.Status.labels] == ["Activo", "Abandonado", "Convertido", "Expirado"]
         assert [str(label) for label in Order.Status.labels] == ["Iniciado", "Pagado", "Fallido", "Completado"]
-        assert str(services.SESSION_TAKEN) == "Ya hay un carrito con esa sesión."
-        assert str(services.CART_NOT_ACTIVE) % {"status": "Abandonado"} == (
+        assert str(services.carts.SESSION_TAKEN) == "Ya hay un carrito con esa sesión."
+        assert str(services.carts.CART_NOT_ACTIVE) % {"status": "Abandonado"} == (
             "Este carrito ya no admite cambios: está Abandonado."
         )
-        assert str(services.CART_EMPTY) == (
+        assert str(services.orders.CART_EMPTY) == (
             "Este carrito no tiene líneas: añade un producto antes de iniciar el pedido."
         )
         assert str(queries.CART_NOT_FOUND) == "Ese carrito no existe en este negocio."
         assert str(cart_admin.ERASE) == "Borrar los datos personales de sus clientes"
-        assert str(services.LINE_TOO_LARGE) == (
+        assert str(services.items.LINE_TOO_LARGE) == (
             "El total de esta línea (cantidad × precio) supera lo que cabe en un carrito."
         )
         assert str(queries.CART_AMBIGUOUS) % {"said": "Ana", "codes": "s1, s2"} == (

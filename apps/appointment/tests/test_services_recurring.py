@@ -13,7 +13,8 @@ import pytest
 from live.errors import Conflict
 from live.models import OutboxEvent
 
-from apps.appointment.models import Appointment, History, Recurring
+from apps.appointment.models.appointments import Appointment, History
+from apps.appointment.models.series import Recurring
 
 from .conftest import (
     HUB_DB,

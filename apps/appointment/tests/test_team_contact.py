@@ -8,7 +8,7 @@ with an address before are cleaned once by the app's migration (``test_migration
 import pytest
 from django.contrib.auth import get_user_model
 
-from apps.appointment.models import History
+from apps.appointment.models.appointments import History
 from apps.flow.tests.test_api import get, post
 from base.services.sessions import ensure_hub_user
 from base.tests.colleagues import ADDRESS, NAMELESS, SHOWN, signed_in

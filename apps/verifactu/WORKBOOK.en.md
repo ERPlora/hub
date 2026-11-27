@@ -7,7 +7,7 @@ order. What cannot go out at that moment waits in the queue and goes out by itse
 in Spain, and it starts in the AEAT's test environment until you go live.
 
 ### In detail
-<!-- from WORKBOOK.md sha256:70cf81e8ddb4 -->
+<!-- from WORKBOOK.md sha256:f7442ee765b5 -->
 
 VeriFactu is the end of the fiscal chain: every invoice or ticket that Invoicing issues becomes here a chained
 **billing record** (each record carries the fingerprint of the previous one), with its verification **QR**,
@@ -20,9 +20,12 @@ with the app on: its invoices and tickets go out without a VeriFactu record or Q
 
 Who uses it:
 
-- The **employee** does not open its screens (by its address, "No access" (BASE-F118)); their sales reach the AEAT all the same.
-- The **manager**, besides, sends a given record, processes and retries the queue, looks up what the AEAT has
-  and tests the connection.
+- The **employee** and the **manager** see everything the business sends to the AEAT, not only what comes from
+  their own sales: the records, the queue, the events and the chain. They send again what has not gone out: they
+  send a given record, process and retry the queue, ask the AEAT whether it already holds a record and look up what
+  it has; from the assistant, they also test the connection. They change nothing: they neither correct nor cancel
+  records, and Configuration and Settings, which belong to whoever configures VeriFactu, do not open for them (by
+  their address, "No access" (BASE-F118)).
 - The **owner** and the **administrator**, besides, upload or remove the business's certificate, go
   live or go back to testing, correct or cancel a record, recover the chain and create the test invoice.
 - The **system**, with nobody in front, records every invoice in the same operation that issues it and sends
@@ -598,9 +601,9 @@ business already has records in production." and the button does not show.
 Involved: VERIFACTU-F08
 
 ### VERIFACTU-F10 Test the connection with the AEAT
-<!-- from WORKBOOK.md sha256:de35956141cb -->
+<!-- from WORKBOOK.md sha256:4d74d99e7fc2 -->
 Status: done — with the SaaS gateway's probe (`/internal/verifactu/probe`)
-Actor: manager, administrator
+Actor: administrator; the employee and the manager, from the assistant
 Screen: Settings
 Steps:
 1. In **Settings**, "Live test", tap "Test the connection" (the buttons wait while it tests).
@@ -642,9 +645,9 @@ If it fails: Invoicing's refusal (no issuer, no permission to issue).
 Involved: INVOICE-F03, BASE-F97
 
 ### VERIFACTU-F12 Look up the responsible declaration
-<!-- from WORKBOOK.md sha256:037e8abd0974 -->
+<!-- from WORKBOOK.md sha256:c9cea0f25c34 -->
 Status: done
-Actor: employee, manager, administrator
+Actor: administrator; the employee and the manager, from the assistant
 Screen: Settings
 Steps:
 1. In **Settings**, card "Responsible declaration", "Read the signed declaration" opens the one
@@ -831,9 +834,9 @@ out. The pass presents each record as the business it belongs to, never as ERPlo
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F21 Process the queue by hand
-<!-- from WORKBOOK.md sha256:90850ab726f9 -->
+<!-- from WORKBOOK.md sha256:3fc320123965 -->
 Status: done
-Actor: manager, administrator
+Actor: employee, manager, administrator
 Screen: Contingency
 Steps:
 1. In **Contingency**, tap "Process queue" ("Processing…").
@@ -846,9 +849,9 @@ stay in the queue and go out as soon as it is.
 Involved: VERIFACTU-F20
 
 ### VERIFACTU-F22 Retry a queue entry
-<!-- from WORKBOOK.md sha256:534e842e849b -->
+<!-- from WORKBOOK.md sha256:17461ce2e16c -->
 Status: done
-Actor: manager, administrator
+Actor: employee, manager, administrator
 Screen: Contingency
 Steps:
 1. In **Contingency**, tap "Retry" on the row.
@@ -887,9 +890,9 @@ with errors can.".
 Involved: INVOICE-F08
 
 ### VERIFACTU-F25 Resend a given record
-<!-- from WORKBOOK.md sha256:93b7600fd2b7 -->
+<!-- from WORKBOOK.md sha256:d1ac231356c1 -->
 Status: done — through the SaaS gateway
-Actor: manager, administrator, assistant
+Actor: employee, manager, administrator, assistant
 Screen: Record detail
 Steps:
 1. In the detail of a pending record or of one sent with no answer, tap "Send now".
@@ -924,9 +927,9 @@ If it fails: with no records of that tax ID, "There are no records of that issue
 Involved: VERIFACTU-F28
 
 ### VERIFACTU-F27 Look up what the AEAT has
-<!-- from WORKBOOK.md sha256:8a4ceb95f378 -->
+<!-- from WORKBOOK.md sha256:1d3ec9e3ea32 -->
 Status: done — through the SaaS gateway (`/internal/verifactu/query`)
-Actor: manager, administrator
+Actor: employee, manager, administrator
 Screen: Recovery
 Steps:
 1. In **Recovery**, tap "Query AEAT" ("Working…").
@@ -1064,9 +1067,9 @@ upload it again".
 Involved: VERIFACTU-F02
 
 ### VERIFACTU-F35 Ask the AEAT whether it already has a queue record
-<!-- from WORKBOOK.md sha256:d6c657291263 -->
+<!-- from WORKBOOK.md sha256:eb9743ae82af -->
 Status: done — in the record's detail, in the Hub's Django admin (support) and through the API
-Actor: manager, administrator (send); ERPlora's staff from the admin
+Actor: employee, manager, administrator (send); ERPlora's staff from the admin
 Screen: Record detail ("Ask the AEAT"); for the staff, the Django admin (Records → "Ask the AEAT (out of the queue if
 it already has it)")
 Steps:
@@ -1201,13 +1204,13 @@ delivered).
 | Platform (`base.app.enable`) | Not turn VeriFactu on outside Spain | `can_enable` of `VerifactuConfig` |
 
 ### Who can do what
-<!-- from WORKBOOK.md sha256:42a087e16a08 -->
+<!-- from WORKBOOK.md sha256:92721a17a6a0 -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
 | View records, queue, events, chain and configuration; verify the chain | yes | yes | yes | yes | `verifactu.view_record` |
 | Record an issued invoice (Invoicing asks for it with the session of whoever issues) | yes | yes | yes | yes | `verifactu.add_record` |
-| Send, process and retry the queue, query the AEAT, test the connection | yes | yes | yes | no | `verifactu.transmit_record` |
+| Send, process and retry the queue, query the AEAT, test the connection | yes | yes | yes | yes | `verifactu.transmit_record` |
 | Correct and cancel records | yes | yes | no | no | `verifactu.correct_record` |
 | Upload and remove the own certificate, go live and back, recover the chain, test invoice | yes | yes | no | no | `verifactu.configure` |
 

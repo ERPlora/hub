@@ -5,10 +5,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addDays,
+  addMinutes,
   dayOf,
   deviceZoneDiffers,
   formatDay,
+  formatDayMonth,
   formatShortDate,
+  formatShortDayMonth,
   formatShortDay,
   formatTime,
   minutesOf,
@@ -74,6 +77,19 @@ describe('the business clock', () => {
     // A hub in Spanish never paints «p. m.».
     expect(formatTime('21:05', 'es')).toBe('21:05');
     expect(formatTime('21:05', 'en')).toBe('9:05 PM');
+  });
+
+  it('names a day of this year without its year, long in a sentence and short in a summary', () => {
+    expect(formatDayMonth('2026-11-26', 'en')).toBe('Thursday, November 26');
+    expect(formatDayMonth('2026-11-26', 'es')).toBe('jueves, 26 de noviembre');
+    expect(formatShortDayMonth('2026-11-25', 'en')).toBe('Wed, Nov 25');
+    expect(formatShortDayMonth('2026-11-25', 'es')).toBe('mié, 25 nov');
+  });
+
+  it('adds minutes to a wall-clock time, round the clock past midnight', () => {
+    expect(addMinutes('12:00', 30)).toBe('12:30');
+    expect(addMinutes('9:45', 90)).toBe('11:15');
+    expect(addMinutes('23:30', 45)).toBe('00:15');
   });
 
   it('sends a day and a time as the business’s wall clock', () => {

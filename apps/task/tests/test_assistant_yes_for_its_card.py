@@ -10,7 +10,6 @@ card, and a yes after another one fits the name better runs nothing and shows th
 """
 
 import dataclasses
-import json
 
 import pytest
 from live.operations import get, registry
@@ -20,7 +19,13 @@ from apps.task.tests.conftest import HUB_DB, ctx_for, make_member, make_project,
 from apps.task.tests.test_integration_assistant import SCREENS, SCREENS_EN, task_writes
 from base import assistant
 from base.schemas.assistant import names
-from base.tests.test_assistant_yes_for_its_card import read_as, turn_as, unless_of, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import (
+    no_card_but_the_model_hears,
+    read_as,
+    turn_as,
+    unless_of,
+    yes_to_its_card,
+)
 from base.tests.test_services_assistant import call
 
 pytestmark = HUB_DB
@@ -179,9 +184,7 @@ def test_a_name_two_records_fit_draws_no_card_and_the_model_hears_it(write):
 
     plan = turn_as(as_admin(), call(write, by_its_name(said(write))[write]))
 
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
-    assert json.loads(plan["append"][0]["content"])["error"]["code"] == code
+    no_card_but_the_model_hears(plan, code)
 
 
 @pytest.mark.parametrize("write", sorted(CHECKS))
@@ -190,7 +193,7 @@ def test_a_name_none_has_draws_no_card(write):
     make(found)
     before = state()
     plan = turn_as(as_admin(), call(write, by_its_name("postres")[write]))
-    assert (plan["confirm"], [row["code"] for row in plan["executed"]]) == (None, ["not_found"])
+    no_card_but_the_model_hears(plan, "not_found")
     assert state() == before
 
 

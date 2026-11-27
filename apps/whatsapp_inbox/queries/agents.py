@@ -1,12 +1,13 @@
 """The people of the business a conversation can be assigned to."""
 
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from live.context import OperationContext
 from live.operations import operation
 
 from apps.whatsapp_inbox.queries.reads import page, person_name
 from apps.whatsapp_inbox.schemas.agents import AgentListIn, AgentPage
 from base.models import HubUser, Membership
+from base.text_search import contains_text
 
 
 def team_roles(ctx: OperationContext) -> dict[str, str]:
@@ -47,7 +48,7 @@ def list_agents(ctx: OperationContext, params: AgentListIn) -> dict:
     rows = team(ctx, roles)
     if params.search:
         text = params.search.strip()
-        rows = rows.filter(Q(name__icontains=text) | Q(username__icontains=text) | Q(email__icontains=text))
+        rows = rows.filter(contains_text(text, "name", "username", "email"))
     rows = rows.order_by("name", "username", "id")
     return page(
         rows,

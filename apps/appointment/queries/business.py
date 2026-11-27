@@ -7,7 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import InvalidPayload
 
 from apps.appointment import engine
-from apps.appointment.models import Settings
+from apps.appointment.models.settings import Settings
 from base.business import business_zone
 
 INVALID_LOCAL_TIME = _(

@@ -76,7 +76,7 @@ def test_spanish_texts_of_the_workbook():
         assert str(services.imports.ROW_OFF_GRID) == "La cantidad no respeta el incremento permitido para esta unidad"
         assert str(services.imports.ROW_TAX_CATEGORY_MISSING) == "Falta la categoría fiscal"
         assert str(services.imports.ROW_NAME_MISSING) == "Falta el nombre"
-        assert [str(label) for label in StockMovement.Type.labels] == ["Inicial", "Recepción", "Venta", "Anulación", "Recuento", "Descuento", "Devolución"]
+        assert [str(label) for label in StockMovement.Type.labels] == ["Inicial", "Recepción", "Venta", "Anulación", "Recuento", "Baja", "Devolución"]
         assert str(Unit.HOUR.label) == "Hora (h)"
         assert str(AppCategory.CATALOG.label)  # the apps page's group comes from live, not from here
 
