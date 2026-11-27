@@ -2992,7 +2992,10 @@ Pasos:
      botón de su pantalla. «Cancelar» o Esc no hacen nada: el asistente sabe que la persona dijo que no y dice que no
      se hizo porque lo canceló, sin pedirle que lo confirme, porque esa tarjeta ya está cerrada. Tras «Ejecutar», el
      asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó hecho y no propone
-     deshacerlo salvo que se lo pidan.
+     deshacerlo salvo que se lo pidan. En un cambio (un ajuste, como los de la caja, o los datos de un registro), sabe
+     además cómo estaban los datos que mandó, así que nunca lo supone: tras «Ejecutar» dice lo que cambió y lo que ya
+     estaba así («Hecho: ahora hay que contar el dinero al cerrar (antes no); el fondo al abrir ya se pedía»), y tras
+     «Cancelar», cómo siguen («No lo he cambiado: la semana sigue empezando en lunes»).
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
   5. Bajo la respuesta queda el recibo de cada acción del turno que se le propuso a la persona, con la acción nombrada
      como en su tarjeta: «Hecho: Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se
@@ -3078,8 +3081,9 @@ Pasos:
 Entra: lo que se hizo en el turno, con su resultado, lo que devolvieron sus consultas y las direcciones web que
 consultaron las herramientas de erplora.com.
 Sale: los avisos y los recibos, guardados con la conversación.
-Si falla: «Hecho» quiere decir que la acción de su app acabó sin error: si una app responde bien sin haber cambiado
-nada, es esa acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F106), los
+Si falla: «Hecho» quiere decir que la acción de su app acabó sin error. En un cambio, el asistente sabe qué datos
+cambiaron y cuáles ya estaban así, y lo dice (BASE-F97); en otra acción que responde bien sin haber cambiado nada, es esa
+acción la que tiene que decirlo. Si el turno acaba en error, la burbuja lleva su fallo (BASE-F106), los
 avisos de lo que llegó a decir y los recibos de lo que sí se hizo.
 Implicados: BASE-F96, BASE-F97, BASE-F106
 

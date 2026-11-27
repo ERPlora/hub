@@ -3009,7 +3009,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:4aed3219f25d -->
+<!-- from WORKBOOK.md sha256:967ca2900bfb -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3110,7 +3110,10 @@ Steps:
      on its screen. "Cancel" or Esc do nothing: the assistant knows the person said no and says it was not done
      because they cancelled it, without asking them to confirm it, since that card is already closed. After "Run it",
      the assistant knows the person confirmed it: it takes it as done just as asked, says what was done and does not
-     offer to undo it unless asked to.
+     offer to undo it unless asked to. In a change (a setting, like the till's, or the data of a record), it also knows
+     how the data it sent were, so it never guesses: after "Run it" it says what changed and what was already so ("Done:
+     now the cash has to be counted at closing (it did not before); the opening float was already asked for"), and after
+     "Cancel", how they stay ("I have not changed it: the week still starts on Monday").
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
   5. Under the answer stays the receipt of each action of the turn that was put to the person, with the action named
@@ -3176,7 +3179,7 @@ allowed: …". If it can no longer be read after "Run it" is tapped, the receipt
 Involved: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Check what the assistant says against what it really did
-<!-- from WORKBOOK.md sha256:adbd1b0cc182 -->
+<!-- from WORKBOOK.md sha256:94943fbdee7f -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3200,7 +3203,8 @@ Steps:
 In: what was done in the turn, with its result, what its lookups returned and the web addresses erplora.com's tools
 looked up.
 Out: the notices and the receipts, kept with the conversation.
-If it fails: "Done" means the action of its app ended without an error: if an app answers fine without having changed
+If it fails: "Done" means the action of its app ended without an error. In a change, the assistant knows which data
+changed and which were already so, and says it (BASE-F97); in another action that answers fine without having changed
 anything, it is that action that has to say so. If the turn ends in an error, the bubble carries its failure
 (BASE-F106), the notices of what it got to say and the receipts of what was indeed done.
 Involved: BASE-F96, BASE-F97, BASE-F106
