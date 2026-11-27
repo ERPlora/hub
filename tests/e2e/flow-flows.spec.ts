@@ -3,7 +3,7 @@
 // and against the real Tasks app, with one screenshot per flow and size. The guide (F08) and a link to a card (F05, an
 // unknown one opens nothing) come first; a card of the gallery is used (F04), back by the same link lands on it again,
 // and it is allowed and withdrawn (F12). One automation is built from scratch (F09): «Something happens» (which the
-// worker's relay starts on its own, F21) finds an event by its technical name, then a weekly schedule keeps its day
+// worker's relay starts on its own, F21) finds an event by its words, then a weekly schedule keeps its day
 // when the time changes (F10); a task, a condition that compares two data and a wait that is removed (F11); tried
 // (F13), allowed, turned on and saved (F14), run by hand (F15) and read in its history (F16). The list searches,
 // filters, sorts, switches by its named switch and in bulk (F02, F03), copies and deletes (F06, F07). Two drafts of the
@@ -12,7 +12,7 @@
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { pickTime } from './date-time-fields';
-import { choose } from './flow-helpers';
+import { choose, filterList } from './flow-helpers';
 import { A, api, capture, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { rowAction } from './service-helpers';
@@ -140,7 +140,7 @@ for (const viewport of VIEWPORTS) {
       await snap('FLOW-F12');
 
       // FLOW-F09, F10: from scratch. «Something happens» (no «not on its own yet» notice: FLOW-F21) finds an
-      // event by its technical name; a weekly schedule keeps its day when the time changes.
+      // event by its words, with its app under it; a weekly schedule keeps its day when the time changes.
       await page.goto(`${A}/flow/automations/new`);
       const editor = shown(page);
       await expect(editor.locator('[data-testid=flow-editor-nosteps]')).toBeVisible();
@@ -151,8 +151,8 @@ for (const viewport of VIEWPORTS) {
       await expect(editor.locator('[data-testid=flow-trigger-event-notice]')).toHaveCount(0);
       const eventInput = editor.locator('[data-testid=flow-trigger-event] input');
       await eventInput.click();
-      await eventInput.fill('task.task.completed');
-      await page.locator('[data-testid^=flow-trigger-event-option-]').first().click();
+      await eventInput.fill('a task is completed');
+      await page.locator('[data-testid="flow-trigger-event-option-task.task.completed"]').click();
       await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('When');
       await choose(page, 'flow-trigger-kind', 'On a schedule');
       await choose(page, 'flow-trigger-every', 'Every week');
@@ -280,7 +280,7 @@ for (const viewport of VIEWPORTS) {
       await expect(row).toContainText('Every Friday at 6:00 PM');
       await expect(row).toContainText('Finished well');
       await choose(page, 'flow-list-sort', 'Name');
-      await choose(page, 'flow-list-state', 'Only the paused ones');
+      await filterList(page, 'flow-list', 'state', 'Only the paused ones');
       await expect(shown(page).locator('[data-testid=flow-list-nomatch]')).toContainText('Nothing here matches that.');
       await shown(page).locator('[data-testid=flow-list-clear]').click();
       await expect(row).toBeVisible();

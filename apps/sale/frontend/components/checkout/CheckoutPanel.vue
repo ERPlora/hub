@@ -278,6 +278,7 @@ function goToDrawer(): void {
         class="sheet-h__close"
         data-testid="sale-checkout-close"
         :aria-label="$t('sale.checkout.close')"
+        :title="$t('sale.checkout.close')"
         :disabled="busy"
         @click="emit('close')"
       >

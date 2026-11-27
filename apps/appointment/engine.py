@@ -13,6 +13,8 @@
 - **Free times** (``slots``) step through the calendar window by the slot interval and keep the
   starts that pass ``verdict`` whole. The front desk never sees the past but does see the times inside
   the notice (marked); with overlaps allowed it also sees a taken time. The customer sees neither.
+- **The spans a professional works** (``windows``) are the same hours, inside the same window, without the
+  blocks and the appointments: when they work, not when they are free.
 - **The clock** is the business's: an instant is shown on it (``wall``) and a wall time read on it
   (``aware``); a wall time the change of time skips does not exist, a repeated one is its first time.
   What lasts counts real time (``ends_at``): the nights the clock changes, 60 minutes are 60 minutes and
@@ -162,13 +164,24 @@ def overlapping(agenda: Agenda, start: dt.datetime, end: dt.datetime) -> list[Pe
     return [period for period in agenda.busy if _touches(start, end, period)]
 
 
+def _opening_spans(agenda: Agenda, day: dt.date) -> list[Span] | None:
+    """The spans of ``day`` and of its eve (its overnight tail); ``None`` when no rule governs ``day``."""
+    today = agenda.business.get(day)
+    if today is None or not today.restricted:
+        return None
+    eve = agenda.business.get(day - dt.timedelta(days=1))
+    return list(today.spans) + list(eve.spans if eve else ())
+
+
+def _absence_span(day: dt.date, start: dt.time | None, end: dt.time | None) -> Span:
+    if start is None or end is None:
+        return dt.datetime.combine(day, dt.time()), dt.datetime.combine(day + dt.timedelta(days=1), dt.time())
+    return dt.datetime.combine(day, start), dt.datetime.combine(day, end)
+
+
 def _fits_business(agenda: Agenda, begin: dt.datetime, finish: dt.datetime) -> bool:
-    day = agenda.business.get(begin.date())
-    if day is None or not day.restricted:
-        return True
-    eve = agenda.business.get(begin.date() - dt.timedelta(days=1))
-    spans = list(day.spans) + list(eve.spans if eve else ())
-    return any(opens <= begin and finish <= closes for opens, closes in spans)
+    spans = _opening_spans(agenda, begin.date())
+    return spans is None or any(opens <= begin and finish <= closes for opens, closes in spans)
 
 
 def _fits_staff(agenda: Agenda, begin: dt.datetime, finish: dt.datetime) -> bool:
@@ -183,15 +196,11 @@ def _fits_staff(agenda: Agenda, begin: dt.datetime, finish: dt.datetime) -> bool
             start <= begin.time() and finish.time() <= end
             for start, end in day.available
         )
-    for start, end in day.absences:
-        if start is None or end is None:
-            return False
-        # Without a schedule a booking may cross midnight: compare it with the absence's own day.
-        absence_start = dt.datetime.combine(day.date, start)
-        absence_end = dt.datetime.combine(day.date, end)
-        if absence_start < finish and begin < absence_end:
-            return False
-    return True
+    # Without a schedule a booking may cross midnight: compare it with the absence's own day.
+    return not any(
+        absence_start < finish and begin < absence_end
+        for absence_start, absence_end in (_absence_span(day.date, *absence) for absence in day.absences)
+    )
 
 
 def verdict(  # noqa: PLR0911
@@ -261,6 +270,75 @@ def slots(
         if verdict(agenda, start, end, now=now, customer=customer) is None:
             out.append(Slot(start, end.astimezone(agenda.zone), within_notice=start < notice))
     return out
+
+
+# ── The spans of a day the professional works ──────────────────────────────────────────────────
+
+
+def _clipped(spans: Sequence[Span], bounds: Sequence[Span]) -> list[Span]:
+    """Where ``spans`` and ``bounds`` overlap."""
+    return [
+        (max(start, low), min(end, high))
+        for start, end in spans
+        for low, high in bounds
+        if max(start, low) < min(end, high)
+    ]
+
+
+def _without(spans: list[Span], cuts: Sequence[Span]) -> list[Span]:
+    for cut_start, cut_end in cuts:
+        spans = [
+            piece
+            for start, end in spans
+            for piece in ((start, min(end, cut_start)), (max(start, cut_end), end))
+            if piece[0] < piece[1]
+        ]
+    return spans
+
+
+def _merged(spans: list[Span]) -> list[Span]:
+    out: list[Span] = []
+    for start, end in sorted(spans):
+        if out and start <= out[-1][1]:
+            out[-1] = (out[-1][0], max(out[-1][1], end))
+        else:
+            out.append((start, end))
+    return out
+
+
+def _staff_spans(agenda: Agenda, day: dt.date, window: Span) -> list[Span]:
+    staff_day = agenda.staff.get(day) if agenda.staff is not None else None
+    if staff_day is None:
+        return [window]
+    if staff_day.has_schedule:
+        return [
+            (dt.datetime.combine(day, start), dt.datetime.combine(day, end))
+            for start, end in staff_day.available
+        ]
+    return _without([window], [_absence_span(day, *absence) for absence in staff_day.absences])
+
+
+def windows(agenda: Agenda, day: dt.date) -> list[Span]:
+    """The spans of ``day`` the professional works, inside the calendar window the free times step through.
+
+    The business's hours, crossed with what is left of the shift (or, without a schedule, the day minus the
+    absences); without a professional, the business's hours alone. Blocks and appointments do not cut them, and
+    spans that touch are one. Instants on the business's clock, as the free times.
+    """
+    midnight_wall = dt.datetime.combine(day, dt.time())
+    window = (
+        midnight_wall + dt.timedelta(hours=agenda.rules.calendar_start_hour),
+        midnight_wall + dt.timedelta(hours=agenda.rules.calendar_end_hour),
+    )
+    opening = _opening_spans(agenda, day)
+    spans = _clipped([window] if opening is None else opening, [window])
+    spans = _clipped(spans, _staff_spans(agenda, day, window))
+    return [(_instant(start, agenda.zone), _instant(end, agenda.zone)) for start, end in _merged(spans)]
+
+
+def _instant(moment: dt.datetime, zone: ZoneInfo) -> dt.datetime:
+    # Unlike ``aware``, a wall time the change of time skips is read with the offset before it: 02:00 is 03:00.
+    return moment.replace(tzinfo=zone).astimezone(dt.UTC).astimezone(zone)
 
 
 # ── Series ─────────────────────────────────────────────────────────────────────────────────────

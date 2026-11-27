@@ -2,6 +2,7 @@
 which language and money, and what it is told of the person who asks."""
 
 import pytest
+from live import assistant as shared
 
 from base import assistant
 from base.models import Membership
@@ -33,6 +34,13 @@ def test_the_instructions_keep_ids_out_of_the_answer():
         "Name a record to the person by its name, as the screens do: never write an id (a code such as "
         "0190a3b4-…) in the answer, not in a table either."
     ) in text
+
+
+def test_the_instructions_say_a_value_by_the_name_its_result_gives_it():
+    """hub#2675: a customer created in Spanish was told «con la etapa «lead» y origen «walk-in»», codes no screen shows.
+    A result names each value of a closed list it holds as the screens do (``screen_names``): the model says that."""
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert f"`{shared.SCREEN_NAMES}`" in text
 
 
 def test_the_instructions_ask_for_a_missing_datum_and_leave_the_yes_to_the_card():
@@ -69,8 +77,8 @@ def test_the_instructions_set_the_language_the_money_and_the_screens():
     # Off-topic questions (films, cinemas) would spend the business's allowance.
     assert "Only help with this business and with using ERPlora" in text
     assert "Spanish" in text
-    # An amount by its mark, not by the words «in cents».
-    assert "EUR" in text and '"money": true' in text and "minor unit" in text
+    # An amount by its mark, not by the words «in cents»; the business's currency as the screens write it.
+    assert "17,00\xa0€" in text and '"money": true' in text and "minor unit" in text
     assert "[Ajustes](/settings)" in text
     assert "Bar Pepe" in text
 
@@ -87,19 +95,24 @@ def test_the_instructions_keep_the_persons_tu_or_usted_to_the_end():
 
 
 @pytest.mark.parametrize(
-    ("currency", "decimals", "example"),
-    [("EUR", 2, "17.00 EUR → 1700"), ("JPY", 0, "17 JPY → 17"), ("KWD", 3, "17.000 KWD → 17000")],
+    ("language", "currency", "decimals", "said"),
+    [
+        ("es", "EUR", 2, "17,00\xa0€"),
+        ("en", "EUR", 2, "€17.00"),
+        ("es", "JPY", 0, "17\xa0JPY"),
+        ("en", "JPY", 0, "¥17"),
+        ("en", "KWD", 3, "KWD\xa017.000"),
+    ],
 )
-def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currency, decimals, example):
-    """A tool's result tells each amount in its own currency, as the screens write it (an invoice keeps the one it was
-    issued in), and the model says it as it comes: a result in cents read as euros said 360 as «360,00 €». What the
-    model sends still goes in the minor unit of its currency (no cents in yen); an amount of its own, in the
-    business's."""
-    text = assistant.prompt.instructions(language="en", currency=currency, decimals=decimals, business="Bar Pepe", screens={})
-    assert example in text
-    said = example.split(" → ")[0]
+def test_the_instructions_write_an_amount_as_the_screens_do_in_the_persons_language(language, currency, decimals, said):
+    """A tool's result tells each amount in its own currency, as the screens write it in the person's language (an
+    invoice keeps the one it was issued in), and the model says it as it comes: told «17.00 EUR» as the screens' way, a
+    bar in Spanish heard «1.50 EUR» for the «1,50 €» on Inventory (hub#2603). What the model sends still goes in the
+    minor unit of its currency (no cents in yen); an amount of its own, in the business's, written the same way."""
+    text = assistant.prompt.instructions(language=language, currency=currency, decimals=decimals, business="Bar Pepe", screens={})
+    assert f"{said} → {17 * 10**decimals}" in text
     assert f'as the screens write it (`"{said}"`): say it as it comes' in text
-    assert f"in {currency} with {decimals} decimals" in text
+    assert f"{17:.{decimals}f} {currency}" not in text and f"in {currency} with {decimals} decimals" not in text
     assert "`currency_decimals`" not in text and "two decimals" not in text
 
 

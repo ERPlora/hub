@@ -8,7 +8,7 @@ in-process from base. The platform's reaction has no route.
 import pytest
 from live.ninja import ensure_api_parity
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.flow.tests.test_api import get, post
 from apps.online_booking.api import router
 from base.tests.routes import published_routes, spa_routes

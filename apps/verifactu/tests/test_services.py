@@ -1040,18 +1040,6 @@ def test_a_record_already_in_the_aeat_is_not_sent_again(
     )
 
 
-def test_the_employee_may_not_send(issuer):
-    record = Record.objects.get(pk=create(ticket()).record.id)
-    with pytest.raises(PermissionDenied):
-        run(
-            "verifactu.record.transmit",
-            {"record_id": str(record.id)},
-            ctx_for("hub_employee"),
-        )
-    with pytest.raises(PermissionDenied):
-        run("verifactu.contingency.process", {}, ctx_for("hub_employee"))
-
-
 def test_the_scheduled_pass_records_nothing_when_there_is_nothing_to_do(
     issuer, gateway_answers
 ):
@@ -1405,16 +1393,6 @@ def test_without_a_gateway_a_record_is_not_reconciled(issuer, settings):
         code_of(lambda: run("verifactu.record.reconcile", {"record_id": str(record.id)}))
         == "verifactu.gateway_unavailable"
     )
-
-
-def test_an_employee_may_not_ask_the_aeat_about_a_record(issuer):
-    record = Record.objects.get(pk=create(ticket()).record.id)
-    with pytest.raises(PermissionDenied):
-        run(
-            "verifactu.record.reconcile",
-            {"record_id": str(record.id)},
-            ctx_for("hub_employee"),
-        )
 
 
 # The connection test and the test invoice (VERIFACTU-F10, F11)

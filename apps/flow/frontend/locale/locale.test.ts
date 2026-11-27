@@ -69,7 +69,7 @@ describe('flow catalogues (en source + es)', () => {
       ['flow.title', 'Automations', 'Automatizaciones'],
       ['flow.list.new', 'New automation', 'Nueva automatización'],
       ['flow.list.heading', 'Your automations', 'Tus automatizaciones'],
-      ['flow.list.search', 'Search by name, by what starts it or by what it does', 'Busca por nombre, por lo que la arranca o por lo que hace'],
+      ['flow.list.search', 'Search automation…', 'Buscar automatización…'],
       ['flow.list.count', 'Showing {shown} of {total}', 'Se ven {shown} de {total}'],
       ['flow.list.noMatch', 'Nothing here matches that.', 'Aquí no hay nada que encaje con eso.'],
       ['flow.list.clear', 'Show them all again', 'Volver a verlas todas'],

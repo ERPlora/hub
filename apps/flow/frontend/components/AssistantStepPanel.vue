@@ -11,6 +11,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, nextTick, ref } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
+import { catalogOptions } from '../lib/catalogOptions';
 import { asCallText } from '../lib/document';
 import { actionLabel, fieldLabel, quoted } from '../lib/phrasing';
 import type { AssistantStep, CatalogOut, FixedByAppOut, Step } from '../operations';
@@ -43,14 +44,12 @@ const label = (name: string): string => actionLabel(name, props.catalog, phrasin
 const askFirst = (name: string): boolean => !!props.catalog?.actions.find((action) => action.name === name)?.ask_first;
 
 /** What it may still be given: the assistant's reads and actions of the active apps, by app and name. */
-const addable = computed<ComboOption[]>(() =>
-  (props.catalog?.actions ?? [])
+const addable = computed<ComboOption[]>(() => {
+  const offered = (props.catalog?.actions ?? [])
     .filter((action) => action.assistant && !props.step.tools.includes(action.name))
-    .filter((action) => props.step.mode === 'ask' || !action.ask_first)
-    .map((action) => ({ id: action.name, label: label(action.name), hint: action.app_name, app: action.app_name }))
-    .sort((a, b) => a.app.localeCompare(b.app, phrasing.value.locale) || a.label.localeCompare(b.label, phrasing.value.locale))
-    .map(({ id: name, label: text, hint }) => ({ id: name, label: text, hint })),
-);
+    .filter((action) => props.step.mode === 'ask' || !action.ask_first);
+  return catalogOptions(offered, label, phrasing.value.locale);
+});
 
 /** The chosen ones whose app is off in this business, with that app: missing from the catalog for that (hub#1054). */
 const offTools = computed(() =>

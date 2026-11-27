@@ -127,8 +127,9 @@ grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API�
 permiso con el que se abre su pantalla, como en Square o Toast: «Sistema», a quien administra el negocio; «API», además,
 mientras la documentación de la API está mostrada (BASE-F91), y aparece o se va al cambiar el interruptor, sin
 recargar. Un empleado ve «Inicio», «Empleados», «Archivos», «Apps» y «Ajustes». Una entrada que la persona no tiene,
-abierta por su dirección, dice «Sin acceso» (BASE-F118). Abajo, el código QR, «Mejorar plan»
-(solo el propietario) y «Gestionar en erplora.com».
+abierta por su dirección, dice «Sin acceso» (BASE-F118). Abajo, el código QR para abrirlo en el móvil (BASE-F132),
+«Mejorar plan» (solo el propietario) y «Gestionar en erplora.com». Las entradas van antes que el pie: si el menú no tiene
+alto para las dos cosas, el código se pliega a una fila que lo enseña al tocarla.
 
 ### «Mejorar plan»
 Al pie del menú lateral, entre el código QR y «Gestionar en erplora.com». Abre la página del plan de este negocio en
@@ -253,7 +254,7 @@ La página que sale en la dirección de un negocio que erplora.com aún está pr
 Desde «Archivos» en el menú lateral; la ve todo el equipo. A la izquierda, «Carpetas»: el árbol de carpetas del
 negocio, que empieza en «Archivos» (lo de arriba del todo), con la carpeta abierta resaltada; en una pantalla
 estrecha, el árbol se pliega en el selector «Carpetas». A la derecha, «Buscar archivos…», «Lista» y «Cuadrícula» y,
-para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, lo que hay en la carpeta abierta: pulsar
+para quien administra el negocio, «Nueva carpeta» y «Subir archivo» (solo su nube). Debajo, lo que hay en la carpeta abierta: pulsar
 un archivo lo abre.
 
 #### La carpeta abierta
@@ -490,6 +491,7 @@ En la pantalla Archivos:
 | BASE-F129 | Borrar un rol propio | hecho |
 | BASE-F130 | Dar un rol propio a una persona | parcial |
 | BASE-F131 | Ver en la campana los roles por revisar | hecho |
+| BASE-F132 | Abrir el Hub en el móvil con el código del menú lateral | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -596,9 +598,9 @@ Pasos:
   1. En «Mis apps», una baldosa por app que esta persona puede abrir, con su icono y su nombre (si no
      cabe, el nombre entero sale al pasar por encima). Una app sale si su rol le deja abrir al menos una de sus
      pantallas. Un empleado tiene las de su trabajo diario: Ventas / TPV, Caja, Mesas, Cocina, Reservas, Reservas
-     online, Citas, Clientes, Inventario, Facturación, Servicios, Personal, Control horario, Tareas, Carrito y pago y
-     la Bandeja de WhatsApp, y Automatizaciones para contestar lo que le pregunta una automatización. Las que
-     configuran el negocio (Impuestos, Tarifas, Suplementos, Menús y combos, Pagos, Horarios, VeriFactu, Impresión y
+     online, Citas, Clientes, Inventario, Facturación, VeriFactu, Servicios, Personal, Control horario, Tareas,
+     Carrito y pago y la Bandeja de WhatsApp, y Automatizaciones para contestar lo que le pregunta una automatización.
+     Las que configuran el negocio (Impuestos, Tarifas, Suplementos, Menús y combos, Pagos, Horarios, Impresión y
      Página web) son de quien las gestiona: el empleado no las tiene, aunque el TPV y el asistente sigan usando lo que
      leen de ellas.
   2. Las más abiertas en este navegador van primero.
@@ -772,14 +774,37 @@ que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, u
 y la app de Google Play no tienen «Gestionar en erplora.com». Quien no es el propietario no tiene «Mejorar plan» en
 ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran. En el negocio
 propio de ERPlora, que no tiene plan ni compra nada, tampoco los tiene su propietario; «Gestionar en erplora.com», sí.
-Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
+Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29, BASE-F132
+
+### BASE-F132 Abrir el Hub en el móvil con el código del menú lateral
+Estado: hecho
+Actor: cualquiera que haya entrado en el negocio
+Pantalla: El menú lateral, «Ábrelo en el móvil»
+Operaciones: ninguna
+Pasos:
+  1. Al pie del menú lateral, encima de «Mejorar plan» y «Gestionar en erplora.com», está el código QR de la dirección
+     de este negocio, con «Ábrelo en el móvil» y cómo dejarlo en la pantalla de inicio del móvil. Sale a todo el mundo,
+     sin permiso ni plan.
+  2. Si el menú no tiene alto para sus entradas y el código a la vez (una tableta en horizontal, un portátil, un
+     teléfono o la interfaz a un tamaño mayor en Mi perfil), las entradas se ven enteras y el código se pliega a una
+     fila, «Ábrelo en el móvil», con el icono del QR. Al tocarla, el código sale encima de la página, sobre la fila; se
+     cierra con Esc o tocando fuera, y el foco vuelve a la fila.
+  3. Con el menú plegado a sus iconos (escritorio), queda solo el icono del QR, que dice «Ábrelo en el móvil» al pasar
+     por encima; al pulsarlo, el menú se despliega.
+  4. Escanea el código con la cámara del móvil y se abre la dirección de este negocio en su navegador.
+Entra: la dirección del negocio.
+Sale: nada guardado.
+Si falla: si el código no se puede dibujar, en su lugar sale la dirección para escribirla en el móvil, también encima de
+la página al tocar la fila.
+Implicados: BASE-F11
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
 Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
-  1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente» (o pregúntaselo desde su panel).
+  1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente», sus destellos (o pregúntaselo desde su
+     panel).
   2. El asistente lee la misma lista del Inicio, con lo que esa persona puede ver, y le dice qué falta y
      dónde se hace; cada paso sigue teniendo su «Configurar» en la lista. Si nombra la lista, la llama como sale
      en el Inicio, en el idioma de esa persona: «Te faltan 4 pasos de Termina de configurar tu negocio».
@@ -1295,8 +1320,11 @@ Pasos:
      en Ajustes › Datos y copias › Exportar, con «Plantilla para compartir» o «Copia de seguridad de este negocio», y
      qué lleva: los productos y los servicios van con sus fotos propias dentro. El archivo no lo saca él.
 Entra: el nombre, el idioma, para qué es y lo marcado.
-Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas, con las fotos propias de los
-productos y los servicios dentro (INVENTORY-F33); nunca las ventas, las personas, los PIN ni los datos fiscales. En el
+Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas: de Inventario, las categorías y los
+productos, y de Servicios, las categorías y los servicios, con sus fotos propias dentro (INVENTORY-F33); de Mesas, las
+zonas y las mesas; de Suplementos, los grupos, cada uno con sus opciones y con los productos (por su código) y las
+categorías a los que se aplica; y, solo en una copia de seguridad, los clientes. Nunca las ventas, las personas, los PIN
+ni los datos fiscales. Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
 negocio no se guarda nada.
 Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un nombre para el archivo.» y no se puede
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
@@ -1930,6 +1958,8 @@ Pasos:
      preferencias personales en este negocio.» y su rol.
   2. En «Datos de la cuenta» cambia «Nombre», «Apellidos» o «Correo electrónico» («Solo para contactarte: no es el
      correo con el que entras.») y pulsa «Guardar mis datos»: «Perfil guardado», y el menú lateral ya dice el nombre nuevo, sin recargar.
+     Si su cuenta de erplora.com no tiene nombre, «Nombre» trae lo que va antes de la @ de su correo, nunca el correo
+     entero.
   3. «Elegir imagen» sube una foto JPG, PNG o WebP de hasta 2 MB («Foto actualizada»); «Quitar» la borra («Foto
      quitada»).
   4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» («Paleta de
@@ -2130,7 +2160,7 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Archivos
 Pasos:
-  1. En la carpeta abierta pulsa «Subir archivo» y elige uno o varios, o los arrastra al gestor («Suelta los
+  1. En la carpeta abierta pulsa «Subir archivo» (la nube) y elige uno o varios, o los arrastra al gestor («Suelta los
      archivos para subirlos aquí»). Mientras suben: «Subiendo 2 de 5…».
   2. Sale «Archivos subidos.» y aparecen en la carpeta. Si ya había uno con el mismo nombre, no se pisa: el nuevo se
      guarda como «carta (1).pdf» y sale «Se ha subido como «carta (1).pdf»: ya había uno con ese nombre.».
@@ -2743,7 +2773,9 @@ Pasos:
      cobra, cómo se abre y se cierra la caja, si cada reserva pide teléfono); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
      pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18. Todo
      importe que dice va en la moneda y con los decimales que enseñan las pantallas: lo que la ficha de un cliente dice
-     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €.
+     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €. Una opción de una lista cerrada la dice con el nombre
+     que le dan las pantallas en su idioma, nunca con su código: de una clienta recién dada de alta dice que ha quedado en
+     la etapa «Contacto» y con origen «En el local», no «lead» ni «walk_in».
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -2817,9 +2849,12 @@ Pasos:
   1. Si la respuesta nombra una pantalla de este negocio, bajo la burbuja sale «Ir a …» con su nombre (hasta cuatro,
      sin repetir) y la propia mención se puede pulsar.
   2. Puede llevar al Inicio, a Empleados, a Apps, a Ajustes, a Mi perfil, a Archivos (a quien los ve), a Sistema (a
-     quien administra) y a las pantallas del menú de cada app encendida.
+     quien administra), a cada pestaña de esas pantallas que la persona puede abrir (Empleados › Roles, Ajustes ›
+     Negocio…) y a las pantallas del menú de cada app encendida. Los roles del negocio los manda a Empleados › Roles,
+     no a los puestos de la app Personal.
   3. El botón usa el nombre que la persona ve en el menú («Ir a Ajustes», «Ir a Inicio» y, para una app, su nombre y
-     el de la pantalla), nunca la dirección.
+     el de la pantalla), nunca la dirección; el de una pestaña dice su pantalla («Ir a Empleados») y la abre en esa
+     pestaña.
   4. Al pulsarlo se abre esa pantalla y el panel se cierra para que se vea.
 Entra: las pantallas que nombra la respuesta; las de este negocio y las de sus apps encendidas.
 Sale: la pantalla abierta; no se pide nada.
@@ -2936,14 +2971,18 @@ Pasos:
      asistente sabe que la persona lo confirmó: lo da por hecho tal como se pidió, dice lo que quedó hecho y no propone
      deshacerlo salvo que se lo pidan.
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
-  5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
-     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». El de
-     un fallo dice el motivo en una frase: si su app la rechaza, la misma que daría su pantalla («No se hizo, falló:
-     Quitar en Empleados. Esa persona no está en este negocio.»); si lo que no valía eran los datos que envió el
-     asistente, cuáles, con el nombre que les da la tarjeta («El asistente envió datos que no valen: Productos.»), y si
-     pidió un cambio sin decir qué cambiar, eso («El asistente no dijo qué cambiar.»). Si
-     la persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app; el
-     motivo, que se dijo en el otro idioma, ya no sale.
+  5. Bajo la respuesta queda el recibo de cada acción del turno que se le propuso a la persona, con la acción nombrada
+     como en su tarjeta: «Hecho: Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se
+     hizo, sin permiso: …». El de un fallo dice el motivo en una frase: si su app la rechaza, la misma que daría su
+     pantalla («No se hizo, falló: Imprimir en Ventas / TPV. Ninguna impresora de tiques recibe el papel de esta
+     venta: abre la venta para imprimirlo en este dispositivo.»); si lo que no valía eran los datos que envió el
+     asistente (un fichero adjunto que pesa más de lo que admite la acción), cuáles, con el nombre que les da la
+     tarjeta («El asistente envió datos que no valen: Archivo.»). Lo que el Hub rechaza antes de enseñar la tarjeta
+     (datos que no valen, un cambio sin nada que cambiar, un registro que no encuentra) no deja recibo, como en los
+     asistentes de Shopify o Intercom: a la persona no se le preguntó nada, y el asistente oye el motivo y lo corrige o
+     se lo cuenta. Así, «Quita la paella de la carta» deja solo «Hecho: Cambiar en Inventario», aunque antes el
+     asistente probara otra acción con datos que no valían. Si la persona cambia de idioma, los recibos de antes salen
+     enteros en el nuevo, también el nombre de la app; el motivo, que se dijo en el otro idioma, ya no sale.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio, la del registro sobre el
 que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio; y,
 si su app la declara, la comprobación que hace antes de la tarjeta, como la persona: si rechaza los datos (dar de alta a
@@ -2951,7 +2990,7 @@ alguien con un rol que el negocio no tiene, STAFF-F01), no sale tarjeta y el asi
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Unos datos que la acción no acepta (un país o una moneda que no existe, un valor fuera de su lista) no
-llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Tampoco llega un
+llegan a la tarjeta ni dejan recibo: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Tampoco llega un
 cambio que solo nombra su registro, sin ningún dato que cambiar (nunca «Cambiar en Clientes: Lucía QA» a secas): el
 asistente oye que no hay nada que cambiar y sigue con lo que se le pidió, con la acción que lo hace, o pregunta qué
 quiere cambiar; si el registro no está, oye eso. «Ejecutar» vale solo
@@ -2987,8 +3026,9 @@ Entra: el riesgo que la app declara en cada acción y sus datos; si la declara, 
 Sale: si se acepta, como BASE-F97.
 Si falla: lo escrito que no coincide no deja ejecutar; cancelar no hace nada y el asistente lo cuenta como cancelado.
 Si la vista previa no se puede leer (el registro ya no está, o la persona no puede verlo), no sale la tarjeta ni se
-hace nada: nada se confirma a ciegas. El recibo dice «No se hizo, falló: …» o «No se hizo, sin permiso: …» y el
-asistente cuenta por qué.
+hace nada: nada se confirma a ciegas, y el asistente cuenta por qué. Si el registro no está, no queda recibo, porque a
+la persona no se le preguntó nada (BASE-F97); si no puede verlo, el recibo dice «No se hizo, sin permiso: …». Si deja
+de poderse leer después de pulsar «Ejecutar», el recibo dice «No se hizo, falló: …».
 Implicados: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Comprobar lo que dice el asistente contra lo que de verdad hizo
@@ -3088,8 +3128,8 @@ Pasos:
      cortó.», con «Reintentar».
   3. «Nueva conversación», arriba del panel, la vacía y empieza de cero.
   4. Al cerrar sesión (también cuando la caja se cierra sola por inactividad) se borra, y se corta la respuesta que
-     estuviera llegando. Al cambiar de usuario con PIN, la de quien se fue se borra con lo que hubiera escrito sin
-     enviar y sus adjuntos, y quien llega encuentra el panel cerrado y vacío.
+     estuviera llegando. Al cambiar de usuario, con PIN o con placa, la de quien se fue se borra con lo que hubiera
+     escrito sin enviar y sus adjuntos. En los dos casos, quien entra después encuentra el panel cerrado y vacío.
   5. Se guarda lo que escribió la persona (de sus adjuntos, solo el nombre), lo que respondió el asistente, sus avisos
      y sus recibos.
 Entra: los mensajes del panel; los cierres de sesión y los cambios de usuario.
@@ -3105,7 +3145,8 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
-  1. En el Inicio, mientras falta algo, «Termina de configurar tu negocio» lleva «Pedírselo al asistente». Abre el
+  1. En el Inicio, mientras falta algo, «Termina de configurar tu negocio» lleva «Pedírselo al asistente», sus
+     destellos. Abre el
      panel con «Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.».
   2. Abierto desde la barra, la conversación vacía ofrece los mismos atajos: «¿Qué falta por configurar?» y, por cada
      paso pendiente que esta persona puede hacer (hasta cuatro, en el orden de la lista), «¿Cómo configuro «Tu
@@ -3711,7 +3752,7 @@ Pasos:
   6. «Otras pantallas» trae las demás pestañas del módulo, o las demás pantallas del Hub que la persona puede ver,
      plegadas, cada una con su resumen corto. Un enlace de la ayuda a una pantalla del Hub lleva a ella y cierra la
      ayuda.
-  7. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
+  7. «Pregúntale al asistente», los destellos del pie, cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
      esto: <tarea>?» sobre la última tarea que se abrió o, si no se abrió ninguna, «¿Cómo uso <módulo> en
      <pantalla>?»; si ya había algo escrito, la pregunta va debajo. «Cerrar» cierra la ayuda.
 Entra: el módulo, o la pantalla del Hub, y la pestaña en la que se está.
@@ -3882,7 +3923,8 @@ Pasos:
      durar varios días.
   3. Cualquiera del negocio ve en la tarjeta si está encendido, quién lo cambió por última vez y cuándo («Último
      cambio: Ana, 24/11/2026, 10:30.») y, en «Últimas entradas de soporte», las 10 últimas entradas de soporte (quién y
-     cuándo), la más reciente primero; lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
+     cuándo; una cuenta de soporte sin nombre, por lo que va antes de la @ de su correo), la más reciente primero;
+     lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
      soporte de ERPlora ha entrado todavía.». A quien no administra el negocio el interruptor le sale desactivado, con
      «Solo quien administra el negocio puede cambiarlo.».
   4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio con «Entrar como soporte», en el
@@ -4787,7 +4829,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`; si su rol propio
   dice «No», la herramienta no está en su catálogo y no corre ni con pase), y arma las
-  instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
+  instrucciones con las pantallas que puede enlazar (las de la plataforma, cada pestaña que la persona puede abrir con
+  el nombre que le da `base/platform_screens.py`, y las del menú de cada app encendida;
+  `base/tests/test_assistant_screen_links.py`), lo que sabe del negocio (`base/assistant/business_facts.py`: país,
   zona y hora de allí, el idioma del negocio y el de «Mi perfil» de la persona (`base.profile.get`), sector, apps
   encendidas, con `base.administer_hub` el plan de la foto con las apps que cuenta, `activation.chosen_on` contra
   `plan.max_apps`, y los ajustes de cada app encendida que los declara en `assistant_settings` de su `LiveAppConfig`
@@ -4795,10 +4839,19 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   puede correrla; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
   el modelo lee de una herramienta sale de `base.assistant.tools.run`, que llama a `run_tool` de `live` con
   `zone=business_zone()` y `money`, así que sus horas van en la zona del negocio y no en UTC, y cada importe marcado
-  como dinero va como lo escriben las pantallas («3.60 EUR»), en la moneda del objeto que la nombra (`currency`, con
-  sus `currency_decimals` si los da) o en la del negocio, nunca en la unidad menor: lo comprueban
+  como dinero va como lo escriben las pantallas en el idioma de la persona («3,60 €» en español, «€3.60» en inglés:
+  lo escribe `base.business.money_text`), en la moneda del objeto que la nombra (`currency`) o en la del negocio,
+  nunca en la unidad menor: lo comprueban
   `base/tests/test_business_facts.py`, también con dos negocios en zonas distintas, y
-  `base/tests/test_assistant_result_amounts.py`; el paso del asistente de Automatizaciones lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
+  `base/tests/test_assistant_result_amounts.py`; cada valor de una lista cerrada que nombran las pantallas lleva
+  además ese nombre en el idioma de la persona, una vez por dato y valor, bajo `screen_names` (`live.assistant`, con
+  la etiqueta de las opciones del modelo que usa la tarjeta, `choice_label`): lo comprueban
+  `base/tests/test_assistant_screen_names.py` (toda lista cerrada que devuelve una herramienta, la que declara su
+  esquema y la que solo tiene opciones en el modelo, como los días de la semana; las que aún no nombra ninguna app o
+  que el esquema no declara van por herramienta en `assistant_closed_lists_known.json`, que solo encoge),
+  `apps/customer/tests/test_assistant_screen_names.py` y `apps/staff/tests/test_assistant_schedule_days.py`; los
+  catorce alérgenos los nombra la plataforma (`base.allergens.NAMED`); el paso del asistente de Automatizaciones lo
+  lee igual), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,
@@ -4905,8 +4958,10 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   los de las apps; en `base.assistant` quedan solo los del Hub (`empty`, `setupIntro`, `shortcuts`, `setup`,
   `card.actions`, `card.operations` y `screens`). Estado por pestaña en `state.ts` del paquete; la conversación, en
   `sessionStorage` (`erplora.assistant.history`, de una persona: otra empieza vacía) y el abierto o cerrado en
-  `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida antes de
-  `logout` (también el bloqueo por inactividad). Comprobaciones de la respuesta en `grounding.ts`, formato en
+  `localStorage` (`erplora.assistant.open`); sin IndexedDB. Quien deja la caja se lleva su conversación y deja el
+  panel cerrado (`handOverAssistant()` de `lib/sign-out.ts`): `signOut()` de `frontend/main.ts` lo hace antes de
+  `logout` (también el bloqueo por inactividad) y «Cambiar de usuario» antes de recargar la pantalla para quien entra,
+  con PIN y con placa. El abierto o cerrado es del dispositivo y, sin eso, pasaría a la persona siguiente. Comprobaciones de la respuesta en `grounding.ts`, formato en
   `markdown.ts` (nunca `v-html`), adjuntos y voz en `input.ts` (`MediaRecorder`, dos minutos), el dictado en
   `dictation.ts` (`useDictation`: una grabación por pulsación, 2 MB, el texto al cuadro y el panel abierto; el mismo
   para el cuadro y para la app que abre el asistente dictando), fallos y cupo en `guide.ts`, todos en

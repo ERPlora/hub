@@ -196,10 +196,14 @@ export function runStatusPill(status: RunStatus, p: Phrasing, log: readonly LogE
     failed: 'danger',
     cancelled: 'neutral',
   };
-  // A run parked on «Ask the assistant» waits for the assistant, not for another system (FLOW-F38): also between
-  // two of its turns, when its last line is what the assistant used.
-  if (status === 'calling' && log.at(-1)?.kind === 'assistant') return { tone: tones.calling, label: p.t('flow.history.statuses.thinking') };
+  if (waitsForAssistant(status, log)) return { tone: tones.calling, label: p.t('flow.history.statuses.thinking') };
   return { tone: tones[status], label: p.t(`flow.history.statuses.${status}`) };
+}
+
+/** A run parked on «Ask the assistant» waits for the assistant, not for another system (FLOW-F38): also between two
+ *  of its turns, when its last line is what the assistant used. */
+export function waitsForAssistant(status: RunStatus, log: readonly LogEntry[]): boolean {
+  return status === 'calling' && log.at(-1)?.kind === 'assistant';
 }
 
 /** Active, paused, or on without the permissions it asks for («Unfinished»). */

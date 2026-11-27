@@ -82,16 +82,16 @@ def test_the_summary_runs_by_itself_and_tells_the_model_the_session_the_count_th
     told = json.loads(plan["append"][0]["content"])
     assert (told["number"], told["closing_balance"], told["expected_balance"], told["difference"]) == (
         session.number,
-        "250.00 EUR",
-        "101.50 EUR",
-        "148.50 EUR",
+        "250,00\xa0€",
+        "101,50\xa0€",
+        "148,50\xa0€",
     )
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
 
 #: What a blind count keeps from a cashier here: a 100.00 € float and a 1.50 € coffee expect 101.50 €, and 250.00 €
-#: counted are 148.50 € over; in cents and as the model is told an amount.
-BLIND_FIGURES = ("10150", "14850", "101.50", "148.50")
+#: counted are 148.50 € over; in cents and as the model is told an amount, in English or in Spanish.
+BLIND_FIGURES = ("10150", "14850", "101.50", "148.50", "101,50", "148,50")
 #: A moment as a result writes it, down to its microseconds.
 A_MOMENT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?")
 
@@ -108,7 +108,8 @@ def test_a_blind_figure_is_still_found_beside_an_id_and_a_moment_that_spell_it()
     assert blind_figures_in(json.dumps(told)) == []
     assert blind_figures_in(json.dumps({**told, "expected_balance": 10150})) == ["10150"]
     assert blind_figures_in(json.dumps({**told, "note": "over by 14850"})) == ["14850"]
-    assert blind_figures_in(json.dumps({**told, "expected_balance": "101.50 EUR"})) == ["101.50"]
+    assert blind_figures_in(json.dumps({**told, "expected_balance": "€101.50"})) == ["101.50"]
+    assert blind_figures_in(json.dumps({**told, "expected_balance": "101,50\xa0€"})) == ["101,50"]
 
 
 def test_a_blind_count_keeps_the_expected_from_the_model_when_a_cashier_asks(coffee):
@@ -385,10 +386,8 @@ def test_with_the_count_required_a_close_without_a_count_gets_no_card_and_hears_
     failure, preview = close_preview({})
     assert (failure.outcome, failure.code, preview) == ("error", "cash_register.closing_balance_required", None)
     plan = turn(call("cash_register.session.close", {}))
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [
-        ("error", "cash_register.closing_balance_required")
-    ]
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    assert json.loads(plan["append"][0]["content"])["error"]["code"] == "cash_register.closing_balance_required"
     assert Session.objects.get().status == Session.Status.OPEN
 
 

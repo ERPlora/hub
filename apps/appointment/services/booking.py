@@ -9,7 +9,7 @@ from live.operations import operation
 
 from apps.appointment import assistant_cards
 from apps.appointment import engine
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.queries.access import ADD_OWN
 from apps.appointment.queries.agenda import load_agenda
 from apps.appointment.queries.business import current_settings, read_moment

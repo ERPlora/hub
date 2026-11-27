@@ -129,6 +129,7 @@ function remove(id: string): void {
           size="small"
           :disabled="disabled"
           :aria-label="t('inventory.form.removeCategory', { name: category.label })"
+          :title="t('inventory.form.removeCategory', { name: category.label })"
           :data-testid="`${testid}-remove-${category.id}`"
           @click="remove(category.id)"
         >

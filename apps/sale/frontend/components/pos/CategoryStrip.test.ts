@@ -50,6 +50,29 @@ describe('CategoryStrip', () => {
     expect(none.find('pos-category-more').exists()).toBe(false);
   });
 
+  it('fades the end it hides once the categories arrive after the strip was painted, with no scroll or resize', async () => {
+    const m = await setup({ categories: [] });
+    const strip = m.wrapper.find('ion-segment').element;
+    Object.defineProperty(strip, 'clientWidth', { configurable: true, value: 300 });
+    Object.defineProperty(strip, 'scrollWidth', { configurable: true, value: 300 });
+    Object.defineProperty(strip, 'scrollLeft', { configurable: true, writable: true, value: 0 });
+    strip.dispatchEvent(new Event('scroll'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(strip.getAttribute('data-overflow')).toBe('none');
+    Object.defineProperty(strip, 'scrollWidth', { configurable: true, value: 700 });
+    await m.wrapper.setProps({ categories: CATEGORIES });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(strip.getAttribute('data-overflow')).toBe('end');
+    strip.scrollLeft = 200;
+    strip.dispatchEvent(new Event('scroll'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(strip.getAttribute('data-overflow')).toBe('both');
+    strip.scrollLeft = 400;
+    strip.dispatchEvent(new Event('scroll'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(strip.getAttribute('data-overflow')).toBe('start');
+  });
+
   it('without a count yet, «All» shows no number', async () => {
     const m = await setup({ allCount: undefined });
     expect(m.find('pos-category-all').find('.pos-cat__count').exists()).toBe(false);
