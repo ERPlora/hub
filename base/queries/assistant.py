@@ -33,7 +33,7 @@ from base.schemas.assistant import (
     ai=AI(
         description=(
             "Reads this month's messages of the assistant (yours) of this business, as erplora.com counts them and "
-            "«Usage and plan» in System shows them: how many are used, how many the plan includes a month and when "
+            "System's usage and plan shows them: how many are used, how many the plan includes a month and when "
             "they come back. Nothing else of the plan: that is base.plan.usage."
         ),
         asks={
