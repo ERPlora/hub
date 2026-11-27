@@ -383,7 +383,7 @@ off: "The printer does not answer. Check that it is on and connected.") and, aft
 Involved: PRINTING-F18
 
 ### PRINTING-F06 Choose how the business prints
-<!-- from WORKBOOK.md sha256:fe9be6185920 -->
+<!-- from WORKBOOK.md sha256:9b04cd94978a -->
 Status: done
 Actor: administrator, manager
 Screen: Settings
@@ -398,7 +398,8 @@ In: the business's decisions.
 Out: the print settings, a single row (announces: `printing.settings.updated`). Without saving,
 the factory ones always hold: receipt on checkout on, drawer off, one copy, no printer chosen.
 If it fails: "Could not save the settings." with the reason; if it names a role's printer (deactivated,
-deleted or moved to another role while it was being chosen), the reason also shows below that role. As
+deleted or moved to another role while it was being chosen), the reason shows only below that role, once:
+the notice above "Save settings" does not repeat it. As
 in the form windows, the notice goes as soon as something is changed and a role's reason as soon as
 another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
 field stays until the next try. If the read fails, the screen does not
@@ -581,7 +582,7 @@ If it fails: with Sales switched off, the note shows without the link.
 Involved: SALE-F02
 
 ### PRINTING-F16 Send to print from the assistant
-<!-- from WORKBOOK.md sha256:0a85995d9466 -->
+<!-- from WORKBOOK.md sha256:7ac6cc0d2fe6 -->
 Status: done
 Actor: administrator, manager, employee
 Screen: Assistant
@@ -594,6 +595,9 @@ Steps:
    printer and the device by their name, the job as the queue titles it (its document and its number) and
    the document of a new job with the queue's word, never by an identifier; what whoever
    asks cannot see, or what is no longer there (a retired device), does not show on the card.
+3. What it leaves in a queue no device that is on prints (none set up with that printer, or the one
+   that has it, off) it does not call printed: it says it waits in that printer's queue and will come
+   out when a device set up to print it does.
 In: the request.
 Out: the same as the screen.
 If it fails: the same as the screen, with the server's words.

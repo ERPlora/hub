@@ -42,7 +42,7 @@ def test_creating_a_station_tells_the_model_it_gets_nothing_until_something_is_r
     told = told_of("kitchen.station.create")["description"]
 
     assert "A new station gets nothing until products or categories are routed to it" in told
-    assert f"whatever has no route goes to «{screen('en', 'display.stationNone')}»" in told
+    assert f"whatever has no route goes to {screen('en', 'display.stationNone').lower()}." in told
 
 
 def test_creating_a_station_tells_the_model_to_offer_the_routing_rather_than_send_to_a_screen():

@@ -97,7 +97,6 @@
       "discountTicket": "Ticket discount",
       "total": "Total",
       "printPrebill": "Print bill",
-      "charge": "Charge",
       "chargeAmount": "Charge · {amount}",
       "chargeLines": "Charge {n} line · {amount} | Charge {n} lines · {amount}",
       "openCart": "Open cart",

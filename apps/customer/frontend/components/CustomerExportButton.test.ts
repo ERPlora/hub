@@ -1,12 +1,13 @@
 // «Export CSV» of the customer list's toolbar (CUSTOMER-F09): downloads `customers.csv` with EVERY
 // card matching the search and filters, not just the page shown; the server builds the file and
-// checks the permission.
+// checks the permission. The button is the download icon alone, named and titled «Export CSV».
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerExportButton from './CustomerExportButton.vue';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 afterEach(() => {
   outOfTheApp();
@@ -23,7 +24,7 @@ describe('CustomerExportButton', () => {
       expect([this.download, this.href]).toEqual(['customers.csv', 'blob:x']);
     });
     const button = m.wrapper.get('[data-testid="customer-export"]');
-    expect(button.text()).toBe('Export CSV');
+    expect([button.text(), accessibleName(button.element), button.attributes('title')]).toEqual(['', 'Export CSV', 'Export CSV']);
     await button.trigger('click');
     await flush();
     const call = sent(m.net.api[0]);
@@ -61,6 +62,6 @@ describe('CustomerExportButton', () => {
 
   it('speaks Spanish', async () => {
     const m = await mountCustomer(CustomerExportButton, { props: { filters: {} }, locale: 'es' });
-    expect(m.wrapper.get('[data-testid="customer-export"]').text()).toBe('Exportar CSV');
+    expect(accessibleName(m.wrapper.get('[data-testid="customer-export"]').element)).toBe('Exportar CSV');
   });
 });

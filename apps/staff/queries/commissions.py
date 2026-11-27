@@ -18,6 +18,7 @@ from live.operations import UnknownOperation, get, operation
 from apps.staff.models import Member
 from apps.staff.schemas.commissions import CommissionPage, CommissionReportIn, CommissionReportOut, CommissionSummaryIn
 from base.queries.ownership import Owned
+from base.text_search import contains_text
 
 from .reads import _page, business_today, live_members
 
@@ -58,7 +59,7 @@ def commission_summary(ctx: OperationContext, params: CommissionSummaryIn) -> di
     if params.search:
         members = members.annotate(
             search_name=Concat("first_name", Value(" "), "last_name")
-        ).filter(search_name__icontains=params.search)
+        ).filter(contains_text(params.search, "search_name"))
     return _page(members.order_by("first_name", "last_name", "id"), params)
 
 

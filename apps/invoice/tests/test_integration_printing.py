@@ -16,6 +16,7 @@ from live.operations import registry
 
 from apps.invoice.tests.conftest import HUB_DB, ctx_for, run
 from apps.printing.models import PrintJob
+from apps.printing.tests.conftest import reaches
 from base.tests.test_services_assistant import answered, asked, call
 
 pytestmark = HUB_DB
@@ -59,7 +60,7 @@ def jobs() -> list[PrintJob]:
 def test_the_page_goes_to_the_system_printer(invoice, office, till):
     out = print_invoice(invoice)
     (job,) = jobs()
-    assert out.model_dump() == {"job_id": job.id, "printer": "Office"}
+    assert out.model_dump() == {"job_id": job.id, "printer": "Office", "waits_for_device": True}
     assert (job.format, job.document_type, job.source_app, job.reference, job.printer.name, job.copies) == (
         "a4",
         "invoice",
@@ -70,6 +71,13 @@ def test_the_page_goes_to_the_system_printer(invoice, office, till):
     )
     assert job.job_key.startswith(f"invoice-{invoice.id}-print-")
     assert invoice.number in job.html and "Talleres Pérez SL" in job.html
+
+
+def test_a_page_no_device_prints_waits_in_the_queue_and_one_a_device_on_prints_does_not(invoice, office):
+    """hub#2563: the assistant said it printed a page that only waited in the queue of a printer nobody prints."""
+    assert (print_invoice(invoice).printer, print_invoice(invoice).waits_for_device) == ("Office", True)
+    reaches(office)
+    assert print_invoice(invoice).waits_for_device is False
 
 
 def test_the_page_carries_the_verifactu_qr(invoice, office):
