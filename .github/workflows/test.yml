@@ -1,7 +1,7 @@
 name: test
 
-# The tests of every push (ci.yml on any branch but main and pre; deploy.yml on main and pre before
-# it deploys), in four jobs that run side by side: python (pytest over Postgres, in a matrix of shards,
+# The tests of every push (ci.yml on any branch but main and pre, and on each entry of the merge queue;
+# deploy.yml on main and pre before it deploys), in four jobs that run side by side: python (pytest over Postgres, in a matrix of shards,
 # each spread over its runner's CPUs with pytest-xdist, on the tests the job select chose), frontend (the SPA's lint, typecheck, Vitest and build),
 # scripts (workflow and script lints and the script tests) and smoke (the browser smoke). The job `test` waits for the
 # four: called as the job `test`, its check is "test / test", the one main and pre require.
@@ -12,7 +12,8 @@ on:
       affected-base:
         description: >-
           The ref a working branch is compared with, so that pytest runs only the tests of the apps it changes and of
-          the apps that depend on them (scripts/affected_tests.py). Empty runs the whole suite, as main and pre do.
+          the apps that depend on them (scripts/affected_tests.py). Empty runs the whole suite, as main, pre and the
+          merge queue do.
         type: string
         default: ""
 
@@ -20,9 +21,10 @@ permissions:
   contents: read
 
 jobs:
-  # Which tests python runs and in how many shards: the whole suite, or for a branch whose changes all sit inside
-  # apps/<id>/, the tests of those apps and of the apps that depend on them, in as few shards as they need. Anything it
-  # cannot work out runs the whole suite, with a warning in the log.
+  # Which tests python runs and in how many shards: the whole suite, or for a branch whose changes stay inside the apps'
+  # folders, its own test modules and the few files only some tests read (the size allow list, the e2e specs, the
+  # WORKBOOKs), the tests of those apps and of the apps that depend on them, those test modules and the tests that read
+  # those files, in as few shards as they need. Anything it cannot work out runs the whole suite, with a warning in the log.
   select:
     runs-on: ubuntu-24.04
     timeout-minutes: 5

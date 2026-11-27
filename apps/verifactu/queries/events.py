@@ -3,13 +3,14 @@
 from functools import reduce
 from operator import and_
 
-from django.db.models import Case, Q, When
+from django.db.models import Case, When
 from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import Event
 from apps.verifactu.schemas.events import EventListIn, EventOut
 from apps.verifactu.schemas.fields import Page
+from base.text_search import contains_text
 
 from .reads import VIEW, page
 
@@ -56,7 +57,7 @@ def list_events(ctx: OperationContext, data: EventListIn) -> dict:
     words = _words(data.search)
     if words:
         queryset = queryset.filter(
-            reduce(and_, (Q(search_text__icontains=word.lower()) for word in words))
+            reduce(and_, (contains_text(word.lower(), "search_text") for word in words))
         )
     if data.kind:
         queryset = queryset.filter(kind=data.kind)
