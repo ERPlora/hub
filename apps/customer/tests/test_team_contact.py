@@ -22,7 +22,7 @@ def test_a_colleague_without_a_name_who_writes_on_a_card_is_named_without_their_
     made = post(zoe, "/customer/customers", {"name": "Lucía Gómez"})
     assert made.status_code == 201, made.content
     card = made.json()["id"]
-    granted = post(zoe, "/customer/consents/grant", {"customer_id": card, "channel": "email", "notice_text": "Yes."})
+    granted = post(zoe, "/customer/consents/grant", {"customer_id": card, "channel": "email"})
     assert granted.status_code == 201, granted.content
     ana = signed_in("ana")
 

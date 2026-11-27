@@ -1961,6 +1961,8 @@ Pasos:
      preferencias personales en este negocio.» y su rol.
   2. En «Datos de la cuenta» cambia «Nombre», «Apellidos» o «Correo electrónico» («Solo para contactarte: no es el
      correo con el que entras.») y pulsa «Guardar mis datos»: «Perfil guardado», y el menú lateral ya dice el nombre nuevo, sin recargar.
+     Si su cuenta de erplora.com no tiene nombre, «Nombre» trae lo que va antes de la @ de su correo, nunca el correo
+     entero.
   3. «Elegir imagen» sube una foto JPG, PNG o WebP de hasta 2 MB («Foto actualizada»); «Quitar» la borra («Foto
      quitada»).
   4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» («Paleta de
@@ -1973,7 +1975,9 @@ Pasos:
      su dato («Idioma: English», «Tamaño de la interfaz: 110%»; lo que vuelve a ser del negocio, por su nombre: «El
      idioma del negocio»). Al confirmarla cambia solo eso, y el tema, la
      paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
-     aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo.
+     aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo. Con la
+     apariencia («ponme el modo oscuro»), igual: la aplicación abierta pasa al tema, la paleta o el tamaño nuevos sin
+     recargar.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»; sin él, el menú
 lateral y las caras dicen el de su ficha de Personal vinculada, STAFF-F03), su foto, su idioma
@@ -2433,7 +2437,9 @@ Pasos:
      y un interruptor o, en lo que un responsable puede aprobar con su PIN, «Permitido», «Con aprobación» o «No».
   2. Cambia lo que quiera y pulsa «Guardar» al final: «Rol guardado.». Sin nada cambiado, «Guardar» no se puede pulsar.
   3. Si otra persona lo guarda mientras tanto, lo que aquí no se ha tocado se pone al día.
-  4. También se pide al asistente: «que el rol Cajero no pueda anular ventas», «llama Caja de tarde al rol Cajero».
+  4. También se pide al asistente: «que el rol Cajero no pueda cobrar ni anular ventas», «llama Caja de tarde al rol
+     Cajero». Antes de proponer el cambio lee todo lo que permite el rol, también con muchas apps encendidas, así que
+     quita justo lo que se le pide: «Cobrar» y «Anular una venta», y nada más de Ventas / TPV.
      La tarjeta dice el rol, cada permiso con la misma frase de «Qué permite» y lo que pasará a hacer («Permitido»,
      «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR,
      y al aceptarla solo cambia lo que se pidió.
@@ -2850,9 +2856,12 @@ Pasos:
   1. Si la respuesta nombra una pantalla de este negocio, bajo la burbuja sale «Ir a …» con su nombre (hasta cuatro,
      sin repetir) y la propia mención se puede pulsar.
   2. Puede llevar al Inicio, a Empleados, a Apps, a Ajustes, a Mi perfil, a Archivos (a quien los ve), a Sistema (a
-     quien administra) y a las pantallas del menú de cada app encendida.
+     quien administra), a cada pestaña de esas pantallas que la persona puede abrir (Empleados › Roles, Ajustes ›
+     Negocio…) y a las pantallas del menú de cada app encendida. Los roles del negocio los manda a Empleados › Roles,
+     no a los puestos de la app Personal.
   3. El botón usa el nombre que la persona ve en el menú («Ir a Ajustes», «Ir a Inicio» y, para una app, su nombre y
-     el de la pantalla), nunca la dirección.
+     el de la pantalla), nunca la dirección; el de una pestaña dice su pantalla («Ir a Empleados») y la abre en esa
+     pestaña.
   4. Al pulsarlo se abre esa pantalla y el panel se cierra para que se vea.
 Entra: las pantallas que nombra la respuesta; las de este negocio y las de sus apps encendidas.
 Sale: la pantalla abierta; no se pide nada.
@@ -3921,7 +3930,8 @@ Pasos:
      durar varios días.
   3. Cualquiera del negocio ve en la tarjeta si está encendido, quién lo cambió por última vez y cuándo («Último
      cambio: Ana, 24/11/2026, 10:30.») y, en «Últimas entradas de soporte», las 10 últimas entradas de soporte (quién y
-     cuándo), la más reciente primero; lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
+     cuándo; una cuenta de soporte sin nombre, por lo que va antes de la @ de su correo), la más reciente primero;
+     lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
      soporte de ERPlora ha entrado todavía.». A quien no administra el negocio el interruptor le sale desactivado, con
      «Solo quien administra el negocio puede cambiarlo.».
   4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio con «Entrar como soporte», en el
@@ -4826,7 +4836,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`; si su rol propio
   dice «No», la herramienta no está en su catálogo y no corre ni con pase), y arma las
-  instrucciones con las pantallas que puede enlazar, lo que sabe del negocio (`base/assistant/business_facts.py`: país,
+  instrucciones con las pantallas que puede enlazar (las de la plataforma, cada pestaña que la persona puede abrir con
+  el nombre que le da `base/platform_screens.py`, y las del menú de cada app encendida;
+  `base/tests/test_assistant_screen_links.py`), lo que sabe del negocio (`base/assistant/business_facts.py`: país,
   zona y hora de allí, el idioma del negocio y el de «Mi perfil» de la persona (`base.profile.get`), sector, apps
   encendidas, con `base.administer_hub` el plan de la foto con las apps que cuenta, `activation.chosen_on` contra
   `plan.max_apps`, y los ajustes de cada app encendida que los declara en `assistant_settings` de su `LiveAppConfig`
@@ -4866,7 +4878,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   la voz del dispositivo (`hubAssistant(doc).speak` = `speakAloud`, `base/frontend/lib/assistant-hub.ts`).
 - **La ayuda de un módulo** (BASE-F115): `base.help.get` (query, `base.view_home`, `database=False`, `ai=AI(…)`, en
   `base/queries/app_help.py`; su ruta, `GET /api/help`, en `base/api_help.py`, que monta `config/api.py`) lee la parte
-  del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Un módulo tiene la ayuda
+  del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Con `offset` deja fuera los
+  primeros flujos, para que el asistente siga leyendo donde se cortó una respuesta que no le cabía de una vez; la
+  ventana de ayuda no lo manda. Un módulo tiene la ayuda
   lista cuando declara `help = Help(…)` (`live.meta.Help`, con un vídeo de YouTube opcional por idioma, que valida
   `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esas apps en `help_apps`. Con ellas, `HelpEntry.vue`
   pinta el «?» en la barra de la página visible y abre `HelpWindow.vue` (con `HelpContent.vue` y `HelpFlowList.vue`, en
@@ -5003,7 +5017,11 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   manda: lo leen `access_for`, `base.session.me` (el nombre del rol y los permisos que un responsable puede aprobar),
   la huella de `base.session.access` y el asistente. Los «Roles por revisar» los cuenta
   `base.queries.roles.roles_to_review` en `base.bell.counters`. `base.role.detail` dice de cada permiso si un responsable
-  puede aprobarlo (`approvable`) y si queda por revisar (`to_review`). En la SPA, `RolesList.vue` es la lista, `NewRoleModal.vue`
+  puede aprobarlo (`approvable`) y si queda por revisar (`to_review`). Con `offset` deja fuera los primeros paneles: el
+  asistente sigue leyendo donde se cortó una respuesta que no le cabía de una vez (con 23 apps encendidas ya no cabe);
+  la pantalla no lo manda. `base/tests/test_assistant_reads_whole.py` comprueba que toda lectura del asistente que crece
+  con las apps encendidas (lo que permite un rol, la ayuda de una app, las recetas de Automatizaciones) y se corta pide
+  solo lo que su entrada admite y, siguiendo el corte, se lee entera. En la SPA, `RolesList.vue` es la lista, `NewRoleModal.vue`
   el alta y `RolePage.vue` la página de un rol, que pinta `RoleEditor.vue` (con `useSettingsForm`) en uno propio para
   quien tiene `base.manage_roles`; al cambiar algo de lo que permite manda todos los permisos que enseña, y así queda revisado.
 - Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su

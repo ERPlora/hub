@@ -22,7 +22,7 @@ from base.models.access import Credential
 from base.models import Hub, Membership
 from base.models.profile import Profile
 from base.tenancy.context import use_hub
-from base.tests.test_auth_views import A, HOST, ON_HUB_A
+from base.tests.test_auth_views import A, HOST, ON_HUB_A, callback
 
 pytestmark = ON_HUB_A
 
@@ -220,3 +220,14 @@ def test_it_says_whether_i_have_a_pin(client, ana, hub_a):
 
 def test_without_a_session_there_is_no_profile(client, db):
     assert client.get("/api/me/profile", HTTP_HOST=HOST).status_code == 401
+
+
+def test_a_person_who_joins_with_an_account_without_a_name_is_not_named_by_their_address(client, fake_saas, hub_a):
+    # erplora.com names an account without a name by its address.
+    address = "nora.ruiz+bar@example.com"
+    fake_saas(body={"user_id": "77", "email": address, "name": address, "locale": "es", "role": "hub_employee"})
+    callback(client, {"code": "c1", "next": "/"})
+    assert get(client)["first_name"] == "nora.ruiz+bar"
+    post(client, "/me/preferences", {"language": "en", "theme_mode": "", "palette": "", "ui_scale": 100})
+    with use_hub(hub_a):
+        assert Profile.objects.get(username="saas:77").first_name == "nora.ruiz+bar"
