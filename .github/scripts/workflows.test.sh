@@ -327,11 +327,10 @@ check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if u
       not unsmoked)
 check("smoke has a timeout of its own, in whole minutes",
       isinstance(smoke_job.get("timeout-minutes"), int) and smoke_job.get("timeout-minutes") > 0)
-# The specs reach the stack's Postgres with `docker compose exec` (tests/e2e/global-setup.ts), and nightly_e2e.py takes
-# the SaaS from ../saas, as in the erplora-next tree.
-check("smoke starts Postgres with docker compose before the smoke", before(smoke_job, "docker compose", "smoke-e2e.sh"))
-check("smoke clones ERPlora/saas into ../saas before the smoke",
-      before(smoke_job, "clone-repo.sh ERPlora/saas ../saas", "smoke-e2e.sh"))
+# Postgres by docker compose and the SaaS in ../saas come from the action e2e-stack, which the nightly shares and
+# tests/test_nightly_workflow.py checks.
+check("smoke sets up the stack with the action e2e-stack before the smoke",
+      before(smoke_job, "./.github/actions/e2e-stack", "smoke-e2e.sh"))
 uploads = [step for step in steps(smoke_job) if str(step.get("uses", "")).startswith("actions/upload-artifact@")]
 smoke_dir = str((smoke_step.get("env") or {}).get("NIGHTLY_DIR", ""))
 check("a red smoke keeps the run's log and Playwright's traces (NIGHTLY_DIR/runs/)",

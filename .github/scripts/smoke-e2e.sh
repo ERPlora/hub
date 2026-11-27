@@ -25,4 +25,4 @@ done
 commit="$(git -C "$here" rev-parse HEAD)"
 export NIGHTLY_DIR="${NIGHTLY_DIR:-$HOME/.erplora/hub-smoke-e2e}" NIGHTLY_HUB_PORT="${NIGHTLY_HUB_PORT:-9780}"
 NIGHTLY_GREP=@smoke NIGHTLY_HUB_REF="$commit" NIGHTLY_MAX_MINUTES="$CAP_MINUTES" \
-  exec python3 "$here/../../scripts/nightly_e2e.py" --no-publish ${specs[@]+"${specs[@]}"}
+  exec python3 "$here/../../scripts/nightly_e2e.py" ${specs[@]+"${specs[@]}"}
