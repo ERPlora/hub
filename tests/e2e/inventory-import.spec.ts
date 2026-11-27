@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
-import { cleanInventory, createProduct, dialog, fill, pickCombo, productBySku, productsReady, shootFlow, stamp } from './inventory-helpers';
+import { cleanInventory, createProduct, dialog, fill, pickCombo, productBySku, productsReady, savedCategoryRow, shootFlow, stamp } from './inventory-helpers';
 import { rowAction } from './service-helpers';
 
 test.afterAll(() => {
@@ -94,11 +94,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
   await pickCombo(page, form.locator('[data-testid=inventory-category-tax]'), 'drink', /(Restaurant — drink|Restauración — bebida|Restaurante — bebida).*10/);
   await page.screenshot({ path: shot('inventory-category-new-1280') });
   await shootFlow(page, 'INVENTORY-F06');
-  await form.locator('[data-testid=inventory-category-form-submit]').click();
-  await expect(form).toBeHidden();
-  await shown(page).locator('[data-testid=inventory-categories-search] input').fill(name);
-  const row = shown(page).locator('[data-testid=inventory-categories-row]', { hasText: name });
-  await expect(row).toBeVisible();
+  const row = await savedCategoryRow(page, form, name);
 
   await row.click();
   await expect(form).toBeVisible();

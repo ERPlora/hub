@@ -1,6 +1,5 @@
 """The user accounts a staff record can hang from (STAFF-F03)."""
 
-from django.db.models import Q
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import PermissionDenied
@@ -8,6 +7,7 @@ from live.operations import operation
 
 from apps.staff.schemas.accounts import AccountListIn, AccountPage
 from base.models import HubUser, Membership
+from base.text_search import contains_text
 
 from .reads import _page
 
@@ -39,7 +39,7 @@ def list_accounts(ctx: OperationContext, params: AccountListIn) -> dict:
     if params.user_id:
         people = people.filter(pk=params.user_id)
     if params.search:
-        people = people.filter(Q(name__icontains=params.search) | Q(email__icontains=params.search))
+        people = people.filter(contains_text(params.search, "name", "email"))
     page = _page(people.order_by("name", "email", "id"), params)
     page["rows"] = [{"user_id": person.pk, "name": person.display_name} for person in page["rows"]]
     return page
