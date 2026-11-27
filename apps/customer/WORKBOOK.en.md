@@ -274,17 +274,17 @@ not exist.
 Involved: BASE-F119
 
 ### CUSTOMER-F03 Open a customer's card
-<!-- from WORKBOOK.md sha256:91e5a4c2477e -->
+<!-- from WORKBOOK.md sha256:0a411e680a22 -->
 Status: done
 Actor: everyone
 Screen: Customer card
 Steps:
 1. From **Customers**, tap the row.
 2. The card shows all its details (also internal notes, birthday, anniversary and custom fields; a birthday
-   without its year, as "March 12"), its groups and tags, its consent per channel, the
-   activity (newest first, 50 per page; each entry says when and who: the person by their name or, if their
-   account has none, by what goes before the @ of their email, never the whole email; the API key by its
-   own, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
+   without its year, as "March 12"), its groups and tags, its consent per channel, the activity (newest first, 50
+   per page; each entry says when and who: the person by their name (the one in My profile or, without it, their
+   account's) or, if they have none, by what goes before the @ of their email, never the whole email; the API key
+   by its own, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
    records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps. The
    email, the phone and the address each consent was given for, only to whoever sees the customers' contact
    details.
