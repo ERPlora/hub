@@ -64,3 +64,13 @@ class AccessSettingsUpdateIn(Schema):
             raise ValueError(str(SAY_THE_MINUTES))
         return minutes
 
+
+class SessionIdleIn(Schema):
+    """No input: the device of the browser that asks (its device cookie)."""
+
+
+class SessionIdleOut(Schema):
+    idle_minutes: int | None = Field(
+        description="After how many minutes without use this device's session closes; null: it does not (a personal "
+        "device, or a business that does not always ask)."
+    )

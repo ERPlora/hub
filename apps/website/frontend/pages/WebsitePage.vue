@@ -331,13 +331,14 @@ function setHoursShown(shown: boolean): void {
           <ion-button
             fill="clear"
             data-testid="website-share"
+            :aria-label="t('website.actions.share')"
+            :title="t('website.actions.share')"
             @click="sharing = true"
           >
             <HubIcon
-              slot="start"
+              slot="icon-only"
               name="ion:qr-code-outline"
             />
-            {{ t('website.actions.share') }}
           </ion-button>
         </div>
       </div>

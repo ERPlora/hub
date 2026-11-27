@@ -1,7 +1,7 @@
 name: test
 
-# The tests of every push (ci.yml on any branch but main and pre; deploy.yml on main and pre before
-# it deploys), in four jobs that run side by side: python (pytest over Postgres, in a matrix of shards,
+# The tests of every push (ci.yml on any branch but main and pre, and on each entry of the merge queue;
+# deploy.yml on main and pre before it deploys), in four jobs that run side by side: python (pytest over Postgres, in a matrix of shards,
 # each spread over its runner's CPUs with pytest-xdist, on the tests the job select chose), frontend (the SPA's lint, typecheck, Vitest and build),
 # scripts (workflow and script lints and the script tests) and smoke (the browser smoke). The job `test` waits for the
 # four: called as the job `test`, its check is "test / test", the one main and pre require.
@@ -12,7 +12,8 @@ on:
       affected-base:
         description: >-
           The ref a working branch is compared with, so that pytest runs only the tests of the apps it changes and of
-          the apps that depend on them (scripts/affected_tests.py). Empty runs the whole suite, as main and pre do.
+          the apps that depend on them (scripts/affected_tests.py). Empty runs the whole suite, as main, pre and the
+          merge queue do.
         type: string
         default: ""
 
@@ -20,9 +21,10 @@ permissions:
   contents: read
 
 jobs:
-  # Which tests python runs and in how many shards: the whole suite, or for a branch whose changes all sit inside
-  # apps/<id>/, the tests of those apps and of the apps that depend on them, in as few shards as they need. Anything it
-  # cannot work out runs the whole suite, with a warning in the log.
+  # Which tests python runs and in how many shards: the whole suite, or for a branch whose changes stay inside the apps'
+  # folders, its own test modules and the few files only some tests read (the size allow list, the e2e specs, the
+  # WORKBOOKs), the tests of those apps and of the apps that depend on them, those test modules and the tests that read
+  # those files, in as few shards as they need. Anything it cannot work out runs the whole suite, with a warning in the log.
   select:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -242,45 +244,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: uv.lock
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          version: 10.34.7 # the Dockerfile's PNPM_VERSION and package.json's packageManager
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          cache: pnpm
-      # The erplora-next tree nightly_e2e.py expects around the Hub: the SaaS of origin/main in ../saas (every login
-      # goes through erplora.com), the shared image library in ../blueprints and compose.yaml's Postgres in .., which
-      # the specs reach with `docker compose exec`. Each checkout gets the .env of a new one.
-      - name: The SaaS, the image library and Postgres beside the Hub
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          bash .github/scripts/clone-repo.sh ERPlora/saas ../saas
-          bash .github/scripts/clone-repo.sh ERPlora/blueprints ../blueprints img
-          cp .env.example .env
-          cp ../saas/.env.example ../saas/.env
-          cat > ../compose.yaml <<'YAML'
-          services:
-            postgres:
-              image: pgvector/pgvector:pg18
-              environment:
-                POSTGRES_USER: hub
-                POSTGRES_PASSWORD: hub
-                POSTGRES_DB: hub
-              ports:
-                - "5432:5432"
-              healthcheck:
-                test: ["CMD-SHELL", "pg_isready -U hub -d hub"]
-                interval: 2s
-                timeout: 3s
-                retries: 30
-          YAML
-          docker compose -f ../compose.yaml up -d --wait
+      # uv, pnpm, node, the SaaS in ../saas, the image library in ../blueprints and compose.yaml's Postgres in ..,
+      # as the nightly sets them up too.
+      - uses: ./.github/actions/e2e-stack
       - name: The browser smoke
         env:
           NIGHTLY_DIR: ${{ runner.temp }}/hub-smoke-e2e
@@ -314,6 +280,7 @@ jobs:
           --spec tests/e2e/base-app-activation.spec.ts
           --spec tests/e2e/demo.spec.ts
           --spec tests/e2e/two-tabs-live.spec.ts
+          --spec tests/e2e/screens-text-fits.spec.ts
       # The run's log, both runservers' logs and Playwright's output (each failed test's trace and screenshot).
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

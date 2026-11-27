@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the workflows' shape (deploy.yml, test.yml, ci.yml, rollback.yml): one push run of a branch
 # at a time, its tests and image build side by side, a working branch's pytest narrowed to the apps it
-# changes while main and pre run the whole suite, and a rollback waits only for a deploy.
+# changes while main, pre and the merge queue run the whole suite, and a rollback waits only for a deploy.
 #   bash .github/scripts/workflows.test.sh
 # Needs python3 with PyYAML (preinstalled on GitHub's ubuntu runners and on macOS).
 set -euo pipefail
@@ -190,8 +190,12 @@ check("the cache keeps one entry per runner image and per test.yml (where the pa
 on_call = ((test.get("on") or test.get(True) or {}).get("workflow_call") or {}).get("inputs") or {}
 check("test.yml takes the base a branch is compared with, empty by default (the whole suite)",
       (on_call.get("affected-base") or {}).get("type") == "string" and on_call["affected-base"].get("default") == "")
-check("ci.yml compares a working branch with origin/main",
-      (ci.get("jobs", {}).get("test") or {}).get("with") == {"affected-base": "origin/main"})
+# The merge queue tests every change once more, on top of what entered main before it, and runs the whole suite there:
+# its runs come with the event merge_group and give no base. `push && 'origin/main' || ''`, because an empty string is
+# false in an expression: `merge_group && '' || 'origin/main'` would always give origin/main.
+check("ci.yml compares a working branch with origin/main, and gives the merge queue no base (the whole suite)",
+      (ci.get("jobs", {}).get("test") or {}).get("with")
+      == {"affected-base": "${{ github.event_name == 'push' && 'origin/main' || '' }}"})
 check("deploy.yml gives test.yml no base, so main and pre run the whole suite before they deploy",
       "with" not in jobs.get("test", {}))
 select_job = tjobs.get("select", {})
@@ -308,6 +312,7 @@ SMOKE_GROUPS = {
     "appointments, services and vouchers": ("appointment-agenda", "appointment-charge", "service-catalog",
                                             "service-vouchers", "sale-voucher"),
     "sign-up, apps, the demo and live updates": ("base-sign-up-taxes-on", "base-app-activation", "demo", "two-tabs-live"),
+    "the agenda «By professional» reads its texts whole": ("screens-text-fits",),
 }
 grouped = []
 for group, names in SMOKE_GROUPS.items():
@@ -323,23 +328,32 @@ check(f"every spec the smoke names exists and has a test tagged @smoke{': ' if u
       not unsmoked)
 check("smoke has a timeout of its own, in whole minutes",
       isinstance(smoke_job.get("timeout-minutes"), int) and smoke_job.get("timeout-minutes") > 0)
-# The specs reach the stack's Postgres with `docker compose exec` (tests/e2e/global-setup.ts), and nightly_e2e.py takes
-# the SaaS from ../saas, as in the erplora-next tree.
-check("smoke starts Postgres with docker compose before the smoke", before(smoke_job, "docker compose", "smoke-e2e.sh"))
-check("smoke clones ERPlora/saas into ../saas before the smoke",
-      before(smoke_job, "clone-repo.sh ERPlora/saas ../saas", "smoke-e2e.sh"))
+# Postgres by docker compose and the SaaS in ../saas come from the action e2e-stack, which the nightly shares and
+# tests/test_nightly_workflow.py checks.
+check("smoke sets up the stack with the action e2e-stack before the smoke",
+      before(smoke_job, "./.github/actions/e2e-stack", "smoke-e2e.sh"))
 uploads = [step for step in steps(smoke_job) if str(step.get("uses", "")).startswith("actions/upload-artifact@")]
 smoke_dir = str((smoke_step.get("env") or {}).get("NIGHTLY_DIR", ""))
 check("a red smoke keeps the run's log and Playwright's traces (NIGHTLY_DIR/runs/)",
       bool(smoke_dir) and any(str(step.get("if", "")) == "failure()"
                               and (step.get("with") or {}).get("path") == f"{smoke_dir}/runs/" for step in uploads))
 
-# --- ci.yml: a newer push supersedes the run of the older one -----------------------------------
+# --- ci.yml: every working branch and the merge queue; a newer push supersedes the run of the older one ---
 check("ci.yml runs test.yml", (ci.get("jobs", {}).get("test") or {}).get("uses") == "./.github/workflows/test.yml")
+check("ci.yml's only job is test, so the check main requires is still «test / test»", list(ci.get("jobs", {})) == ["test"])
+ci_on = ci.get("on") or ci.get(True) or {}
+check("ci.yml runs for the merge queue (merge_group), which waits for «test / test» before it merges",
+      "merge_group" in ci_on)
+# The queue tests each entry on a branch of its own, gh-readonly-queue/<base>/pr-<n>-<sha>, and a push to it would start
+# a second run of the same commit beside the merge_group one.
+check("a push runs ci.yml on every branch but main, pre and the merge queue's own (gh-readonly-queue/**)",
+      (ci_on.get("push") or {}) == {"branches-ignore": ["main", "pre", "gh-readonly-queue/**"]})
+# Each entry of the queue has a ref of its own, so its run is never in the group of another entry's or of a branch's;
+# and only a push cancels: the queue itself stops the runs of the entries it drops.
 ci_lock = ci.get("concurrency") or {}
-check("ci.yml cancels the run of an older push to the same branch",
+check("ci.yml cancels the run of an older push to the same branch, never a run of the merge queue",
       ci_lock.get("group") == "ci-${{ github.repository }}-${{ github.ref_name }}"
-      and ci_lock.get("cancel-in-progress") is True)
+      and ci_lock.get("cancel-in-progress") == "${{ github.event_name == 'push' }}")
 
 print()
 if failures:

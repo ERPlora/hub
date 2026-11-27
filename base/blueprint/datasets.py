@@ -2,61 +2,44 @@
 
 import csv
 import io
-from collections.abc import Callable
-from dataclasses import dataclass
 from functools import cache
-from typing import Any
 from uuid import UUID
 
 import pydantic
 from django.apps import apps as django_apps
-from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import OperationError
+from live.meta import module_configs
 
-from base import blueprint_products
+from base import activation, blueprint_products
 from base.blueprint.calls import (
     NO_NAME,
     PAGE,
     ROW_REFUSED,
+    Dataset,
     Loaded,
-    _call,
-    _create_each,
     _created,
-    _key,
     _money,
-    _pages,
     _quantity,
-    _reason,
-    _text,
-    _total,
+    call,
+    count_of,
+    create_each,
+    ids_of,
+    natural_key,
+    pages,
+    reason,
+    remover,
+    text_of,
 )
-from base.blueprint.photos import _load_image
+from base.blueprint.photos import load_image
 
 #: What a spreadsheet runs as a formula; the customers' export quotes a cell that starts with one (CUSTOMER-F09).
 FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
+PRODUCT_IMAGES = ("inventory.product.set_image", "inventory.product.upload_image")
+SERVICE_IMAGES = ("service.service.set_image", "service.service.upload_image")
 CATEGORY_MISSING = _("«%(row)s»: the category «%(category)s» is not there, so it was left without it.")
-
-
-@dataclass(frozen=True)
-class Dataset:
-    """One kind of thing an app lets travel, through that app's own operations."""
-
-    key: str
-    label: Promise
-    rows: Callable[[OperationContext], list[dict]]
-    ids: Callable[[OperationContext], list[str]]
-    count: Callable[[OperationContext], int]
-    load: Callable[[OperationContext, list[dict], Loaded], None]
-    remove: Callable[[OperationContext, str], None]
-    #: Personal data (a person's name, phone, email): it travels in a backup only, never in a template.
-    personal: bool = False
-
-    @property
-    def app(self) -> str:
-        return self.key.split(".", 1)[0]
 
 
 def app_label(app: str) -> str:
@@ -80,24 +63,24 @@ def _inventory_category_rows(ctx: OperationContext) -> list[dict]:
             "color": row.color,
             "order": row.order,
         }
-        for row in _pages(ctx, "inventory.category.list")
+        for row in pages(ctx, "inventory.category.list")
     ]
 
 
 def _inventory_category_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
-    existing = {_key(row.name) for row in _pages(ctx, "inventory.category.list")}
+    existing = {natural_key(row.name) for row in pages(ctx, "inventory.category.list")}
 
     def build(row: dict) -> dict:
-        fields = {"name": _text(row, "name"), "tax_category_key": _text(row, "tax_category_key") or None}
+        fields = {"name": text_of(row, "name"), "tax_category_key": text_of(row, "tax_category_key") or None}
         fields |= {name: row[name] for name in ("description", "icon", "color", "order") if row.get(name) not in (None, "")}
         return fields
 
-    _create_each(ctx, rows, loaded, name="inventory.category.create", key=lambda row: _key(_text(row, "name")),
-                 existing=existing, build=build, label=lambda row: _text(row, "name"))
+    create_each(ctx, rows, loaded, name="inventory.category.create", key=lambda row: natural_key(text_of(row, "name")),
+                 existing=existing, build=build, label=lambda row: text_of(row, "name"))
 
 
 def _inventory_product_rows(ctx: OperationContext) -> list[dict]:
-    names = {row.id: row.name for row in _pages(ctx, "inventory.category.list")}
+    names = {row.id: row.name for row in pages(ctx, "inventory.category.list")}
     return [
         {
             "name": row.name,
@@ -115,7 +98,7 @@ def _inventory_product_rows(ctx: OperationContext) -> list[dict]:
             "is_active": row.is_active,
             **blueprint_products.optional_fields(row),
         }
-        for row in _pages(ctx, "inventory.product.list")
+        for row in pages(ctx, "inventory.product.list")
     ]
 
 
@@ -123,19 +106,19 @@ def _product_cells(row: dict, line: int) -> dict:
     """A product's row as the cells ``inventory.product.bulk_create`` reads."""
     return {
         "line": line,
-        "name": _text(row, "name"),
-        "sku": _text(row, "sku"),
+        "name": text_of(row, "name"),
+        "sku": text_of(row, "sku"),
         "price": _money(row.get("price", 0)),
         "cost": _money(row.get("cost", 0)),
-        "stock": _text(row, "stock"),
-        "low_stock_threshold": _text(row, "low_stock_threshold"),
-        "ean13": _text(row, "ean13"),
-        "description": _text(row, "description"),
-        "unit": _text(row, "unit"),
-        "product_type": _text(row, "product_type"),
-        "price_quantity": _text(row, "price_quantity"),
-        "pricing_unit": _text(row, "pricing_unit"),
-        "tax_category_key": _text(row, "tax_category_key"),
+        "stock": text_of(row, "stock"),
+        "low_stock_threshold": text_of(row, "low_stock_threshold"),
+        "ean13": text_of(row, "ean13"),
+        "description": text_of(row, "description"),
+        "unit": text_of(row, "unit"),
+        "product_type": text_of(row, "product_type"),
+        "price_quantity": text_of(row, "price_quantity"),
+        "pricing_unit": text_of(row, "pricing_unit"),
+        "tax_category_key": text_of(row, "tax_category_key"),
     } | blueprint_products.allergens_cell(row)
 
 
@@ -143,10 +126,10 @@ def _create_products(ctx: OperationContext, rows: list[dict], loaded: Loaded) ->
     """Import ``rows``, a page at most; the ones created, each with its new id."""
     cells = [_product_cells(row, line) for line, row in enumerate(rows, start=1)]
     try:
-        report = _call(ctx, "inventory.product.bulk_create", rows=cells)
+        report = call(ctx, "inventory.product.bulk_create", rows=cells)
     except (OperationError, pydantic.ValidationError) as exc:
         for row in rows:
-            loaded.refuse(_text(row, "name") or _text(row, "sku"), _reason(exc))
+            loaded.refuse(text_of(row, "name") or text_of(row, "sku"), reason(exc))
         return []
     made = []
     for outcome in report.rows:
@@ -157,7 +140,7 @@ def _create_products(ctx: OperationContext, rows: list[dict], loaded: Loaded) ->
             loaded.already += 1
         else:
             # Named as the person knows it: its name, its code only without one.
-            loaded.refuse(_text(row, "name") or outcome.key or _text(row, "sku"), outcome.reason)
+            loaded.refuse(text_of(row, "name") or outcome.key or text_of(row, "sku"), outcome.reason)
     return made
 
 
@@ -165,10 +148,10 @@ def _product_change(row: dict, categories: dict[str, UUID], loaded: Loaded) -> d
     """What the import does not take of a product's row: its categories, by their ids, and its marks."""
     ids = []
     for name in blueprint_products.category_names(row):
-        if _key(name) in categories:
-            ids.append(categories[_key(name)])
+        if natural_key(name) in categories:
+            ids.append(categories[natural_key(name)])
         else:
-            loaded.warn(str(CATEGORY_MISSING) % {"row": _text(row, "sku"), "category": name})
+            loaded.warn(str(CATEGORY_MISSING) % {"row": text_of(row, "sku"), "category": name})
     return ({"category_ids": ids} if ids else {}) | blueprint_products.marks(row)
 
 
@@ -178,17 +161,17 @@ def _inventory_product_load(ctx: OperationContext, rows: list[dict], loaded: Loa
         made += _create_products(ctx, rows[start : start + PAGE], loaded)
     if not made:
         return
-    categories = {_key(row.name): row.id for row in _pages(ctx, "inventory.category.list")}
+    categories = {natural_key(row.name): row.id for row in pages(ctx, "inventory.category.list")}
     for pk, row in made:
         change = _product_change(row, categories, loaded)
         if not change:
             continue
         try:
-            _call(ctx, "inventory.product.update", id=pk, **change)
+            call(ctx, "inventory.product.update", id=pk, **change)
         except (OperationError, pydantic.ValidationError) as exc:
-            loaded.warn(str(ROW_REFUSED) % {"row": _text(row, "sku"), "reason": _reason(exc)})
+            loaded.warn(str(ROW_REFUSED) % {"row": text_of(row, "sku"), "reason": reason(exc)})
     for pk, row in made:
-        _load_image(ctx, loaded, "inventory.product", pk, row, _text(row, "name") or _text(row, "sku"))
+        load_image(ctx, loaded, PRODUCT_IMAGES, pk, row, text_of(row, "name") or text_of(row, "sku"))
 
 
 # service: categories and services
@@ -204,22 +187,22 @@ def _service_category_rows(ctx: OperationContext) -> list[dict]:
             "color": row.color,
             "sort_order": row.sort_order,
         }
-        for row in _pages(ctx, "service.category.list")
+        for row in pages(ctx, "service.category.list")
     ]
 
 
 def _service_category_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
-    existing = {_key(row.name) for row in _pages(ctx, "service.category.list")}
+    existing = {natural_key(row.name) for row in pages(ctx, "service.category.list")}
     # A parent before its children: the ones without a parent first.
-    ordered = sorted(rows, key=lambda row: bool(_text(row, "parent")))
+    ordered = sorted(rows, key=lambda row: bool(text_of(row, "parent")))
 
     def build(row: dict) -> dict:
-        fields = {"name": _text(row, "name"), "parent": _text(row, "parent") or None}
+        fields = {"name": text_of(row, "name"), "parent": text_of(row, "parent") or None}
         fields |= {name: row[name] for name in ("description", "icon", "color", "sort_order") if row.get(name) not in (None, "")}
         return fields
 
-    _create_each(ctx, ordered, loaded, name="service.category.create", key=lambda row: _key(_text(row, "name")),
-                 existing=existing, build=build, label=lambda row: _text(row, "name"))
+    create_each(ctx, ordered, loaded, name="service.category.create", key=lambda row: natural_key(text_of(row, "name")),
+                 existing=existing, build=build, label=lambda row: text_of(row, "name"))
 
 
 SERVICE_FIELDS = (
@@ -237,22 +220,22 @@ def _service_rows(ctx: OperationContext) -> list[dict]:
             **{name: getattr(row, name) for name in SERVICE_FIELDS},
             **({"image": row.image} if row.image else {}),
         }
-        for row in _pages(ctx, "service.service.list")
+        for row in pages(ctx, "service.service.list")
     ]
 
 
 def _service_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
-    existing = {_key(row.name) for row in _pages(ctx, "service.service.list")}
+    existing = {natural_key(row.name) for row in pages(ctx, "service.service.list")}
 
     def build(row: dict) -> dict:
         fields = {name: row[name] for name in SERVICE_FIELDS if name in row}
         if fields.get("tax_category_key") == "":
             fields["tax_category_key"] = None
-        return {"name": _text(row, "name"), "category": _text(row, "category") or None, **fields}
+        return {"name": text_of(row, "name"), "category": text_of(row, "category") or None, **fields}
 
-    _create_each(ctx, rows, loaded, name="service.service.create", key=lambda row: _key(_text(row, "name")),
-                 existing=existing, build=build, label=lambda row: _text(row, "name"),
-                 after=lambda row, pk: _load_image(ctx, loaded, "service.service", pk, row, _text(row, "name")))
+    create_each(ctx, rows, loaded, name="service.service.create", key=lambda row: natural_key(text_of(row, "name")),
+                 existing=existing, build=build, label=lambda row: text_of(row, "name"),
+                 after=lambda row, pk: load_image(ctx, loaded, SERVICE_IMAGES, pk, row, text_of(row, "name")))
 
 
 # table: zones and tables
@@ -261,42 +244,42 @@ def _service_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> No
 def _zone_rows(ctx: OperationContext) -> list[dict]:
     return [
         {"name": row.name, "description": row.description, "color": row.color, "sort_order": row.sort_order}
-        for row in _pages(ctx, "table.zone.list")
+        for row in pages(ctx, "table.zone.list")
     ]
 
 
 def _zone_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
-    existing = {_key(row.name) for row in _pages(ctx, "table.zone.list")}
+    existing = {natural_key(row.name) for row in pages(ctx, "table.zone.list")}
 
     def build(row: dict) -> dict:
-        fields = {"name": _text(row, "name")}
+        fields = {"name": text_of(row, "name")}
         return fields | {name: row[name] for name in ("description", "color", "sort_order") if row.get(name) not in (None, "")}
 
-    _create_each(ctx, rows, loaded, name="table.zone.create", key=lambda row: _key(_text(row, "name")),
-                 existing=existing, build=build, label=lambda row: _text(row, "name"))
+    create_each(ctx, rows, loaded, name="table.zone.create", key=lambda row: natural_key(text_of(row, "name")),
+                 existing=existing, build=build, label=lambda row: text_of(row, "name"))
 
 
 def _table_key(zone: str, number: str) -> str:
-    return f"{_key(zone)}\x00{_key(number)}" if number.strip() else ""
+    return f"{natural_key(zone)}\x00{natural_key(number)}" if number.strip() else ""
 
 
 def _table_rows(ctx: OperationContext) -> list[dict]:
     return [
         {"number": row.number, "name": row.name, "capacity": row.capacity, "shape": row.shape, "zone": row.zone_name or ""}
-        for row in _pages(ctx, "table.table.list")
+        for row in pages(ctx, "table.table.list")
     ]
 
 
 def _table_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
-    existing = {_table_key(row.zone_name or "", row.number) for row in _pages(ctx, "table.table.list")}
+    existing = {_table_key(row.zone_name or "", row.number) for row in pages(ctx, "table.table.list")}
 
     def build(row: dict) -> dict:
-        fields = {"number": _text(row, "number"), "zone": _text(row, "zone") or None}
+        fields = {"number": text_of(row, "number"), "zone": text_of(row, "zone") or None}
         return fields | {name: row[name] for name in ("name", "capacity", "shape") if row.get(name) not in (None, "")}
 
-    _create_each(ctx, rows, loaded, name="table.table.create",
-                 key=lambda row: _table_key(_text(row, "zone"), _text(row, "number")), existing=existing, build=build,
-                 label=lambda row: " ".join(part for part in (_text(row, "zone"), _text(row, "number")) if part))
+    create_each(ctx, rows, loaded, name="table.table.create",
+                 key=lambda row: _table_key(text_of(row, "zone"), text_of(row, "number")), existing=existing, build=build,
+                 label=lambda row: " ".join(part for part in (text_of(row, "zone"), text_of(row, "number")) if part))
 
 
 # customer: the customers (personal data: a backup only)
@@ -315,7 +298,7 @@ def _uncell(text: str) -> str:
 
 
 def _customer_rows(ctx: OperationContext) -> list[dict]:
-    exported = _call(ctx, "customer.customer.export")
+    exported = call(ctx, "customer.customer.export")
     return [
         {name: _uncell(line.get(name) or "") for name in CUSTOMER_FIELDS}
         for line in csv.DictReader(io.StringIO(exported.csv))
@@ -323,14 +306,14 @@ def _customer_rows(ctx: OperationContext) -> list[dict]:
 
 
 def _customer_identity(name: str, phone: str, email: str) -> str:
-    return f"{_key(name)}\x00{phone.strip()}\x00{_key(email)}"
+    return f"{natural_key(name)}\x00{phone.strip()}\x00{natural_key(email)}"
 
 
 def _customer_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
-    existing = {_customer_identity(row.name, row.phone, row.email) for row in _pages(ctx, "customer.customer.list")}
+    existing = {_customer_identity(row.name, row.phone, row.email) for row in pages(ctx, "customer.customer.list")}
     fresh = []
     for row in rows:
-        values = {name: _text(row, name) for name in CUSTOMER_FIELDS}
+        values = {name: text_of(row, name) for name in CUSTOMER_FIELDS}
         if not values["name"]:
             loaded.refuse("", str(NO_NAME))
         elif _customer_identity(values["name"], values["phone"], values["email"]) in existing:
@@ -340,10 +323,10 @@ def _customer_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> N
     for start in range(0, len(fresh), CUSTOMER_BATCH):
         chunk = fresh[start : start + CUSTOMER_BATCH]
         try:
-            result = _call(ctx, "customer.customer.import", rows=chunk)
+            result = call(ctx, "customer.customer.import", rows=chunk)
         except (OperationError, pydantic.ValidationError) as exc:
             for values in chunk:
-                loaded.refuse(values["name"], _reason(exc))
+                loaded.refuse(values["name"], reason(exc))
             continue
         for outcome in result.rows:
             if outcome.id is not None:
@@ -352,90 +335,99 @@ def _customer_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> N
                 loaded.refuse(chunk[outcome.index]["name"], next(iter(outcome.errors.values()), ""))
 
 
-def _ids(name: str, **params: Any) -> Callable[[OperationContext], list[str]]:
-    return lambda ctx: [str(row.id) for row in _pages(ctx, name, **params)]
-
-
-def _count(name: str) -> Callable[[OperationContext], int]:
-    return lambda ctx: _total(ctx, name)
-
-
-def _remover(name: str) -> Callable[[OperationContext, str], None]:
-    return lambda ctx, pk: _call(ctx, name, id=pk)
-
-
-#: Every dataset, in load order: what a row names is loaded before it (a category before its products).
-DATASETS: tuple[Dataset, ...] = (
+#: The datasets the platform holds for Inventory, Services, Tables and Customers, in load order: what a row names is loaded
+#: before it (a category before its products). Any other app declares its own (:data:`HOOK`).
+PLATFORM_DATASETS: tuple[Dataset, ...] = (
     Dataset(
         key="inventory.category",
         label=pgettext_lazy("blueprint dataset", "Product categories"),
         rows=_inventory_category_rows,
-        ids=_ids("inventory.category.list"),
-        count=_count("inventory.category.list"),
+        ids=ids_of("inventory.category.list"),
+        count=count_of("inventory.category.list"),
         load=_inventory_category_load,
-        remove=_remover("inventory.category.delete"),
+        remove=remover("inventory.category.delete"),
     ),
     Dataset(
         key="inventory.product",
         label=pgettext_lazy("blueprint dataset", "Products"),
         rows=_inventory_product_rows,
-        ids=_ids("inventory.product.list"),
-        count=_count("inventory.product.list"),
+        ids=ids_of("inventory.product.list"),
+        count=count_of("inventory.product.list"),
         load=_inventory_product_load,
-        remove=_remover("inventory.product.delete"),
+        remove=remover("inventory.product.delete"),
+        images=PRODUCT_IMAGES,
     ),
     Dataset(
         key="service.category",
         label=pgettext_lazy("blueprint dataset", "Service categories"),
         rows=_service_category_rows,
-        ids=_ids("service.category.list"),
-        count=_count("service.category.list"),
+        ids=ids_of("service.category.list"),
+        count=count_of("service.category.list"),
         load=_service_category_load,
-        remove=_remover("service.category.delete"),
+        remove=remover("service.category.delete"),
     ),
     Dataset(
         key="service.service",
         label=pgettext_lazy("blueprint dataset", "Services"),
         rows=_service_rows,
-        ids=_ids("service.service.list"),
-        count=_count("service.service.list"),
+        ids=ids_of("service.service.list"),
+        count=count_of("service.service.list"),
         load=_service_load,
-        remove=_remover("service.service.archive"),
+        remove=remover("service.service.archive"),
+        images=SERVICE_IMAGES,
     ),
     Dataset(
         key="table.zone",
         label=pgettext_lazy("blueprint dataset", "Zones"),
         rows=_zone_rows,
-        ids=_ids("table.zone.list"),
-        count=_count("table.zone.list"),
+        ids=ids_of("table.zone.list"),
+        count=count_of("table.zone.list"),
         load=_zone_load,
-        remove=_remover("table.zone.delete"),
+        remove=remover("table.zone.delete"),
     ),
     Dataset(
         key="table.table",
         label=pgettext_lazy("blueprint dataset", "Tables"),
         rows=_table_rows,
-        ids=_ids("table.table.list"),
-        count=_count("table.table.list"),
+        ids=ids_of("table.table.list"),
+        count=count_of("table.table.list"),
         load=_table_load,
-        remove=_remover("table.table.delete"),
+        remove=remover("table.table.delete"),
     ),
     Dataset(
         key="customer.customer",
         label=pgettext_lazy("blueprint dataset", "Customers"),
         rows=_customer_rows,
-        ids=_ids("customer.customer.list"),
-        count=_count("customer.customer.list"),
+        ids=ids_of("customer.customer.list"),
+        count=count_of("customer.customer.list"),
         load=_customer_load,
-        remove=_remover("customer.customer.delete"),
+        remove=remover("customer.customer.delete"),
         personal=True,
     ),
 )
 
 
+#: The hook of a ``LiveAppConfig`` that says what of the app travels in a blueprint: a list of :class:`Dataset`.
+HOOK = "blueprint_datasets"
+
+
+@cache
+def every_dataset() -> tuple[Dataset, ...]:
+    """Every dataset, in load order: app by app, each after the apps it requires, so that what a row names is there
+    before it (a product before the modifier group that applies to it); inside an app, in its own order."""
+    by_app: dict[str, list[Dataset]] = {}
+    for part in PLATFORM_DATASETS:
+        by_app.setdefault(part.app, []).append(part)
+    for config in module_configs():
+        if (declared := getattr(config, HOOK, None)) is not None:
+            by_app.setdefault(config.label, []).extend(declared())
+    order = activation.in_requires_order(by_app, activation.module_graph())
+    return tuple(part for app in order for part in by_app[app])
+
+
 @cache
 def _datasets_by_key() -> dict[str, Dataset]:
-    return {dataset.key: dataset for dataset in DATASETS}
+    return {dataset.key: dataset for dataset in every_dataset()}
 
 
 def dataset(key: str) -> Dataset:
@@ -445,4 +437,4 @@ def dataset(key: str) -> Dataset:
 
 def datasets_of(app: str) -> list[Dataset]:
     """The datasets of ``app``, in load order."""
-    return [dataset for dataset in DATASETS if dataset.app == app]
+    return [dataset for dataset in every_dataset() if dataset.app == app]

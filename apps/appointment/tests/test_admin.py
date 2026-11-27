@@ -22,16 +22,11 @@ from apps.appointment.admin import (
     RecurringServiceInline,
     SettingsAdmin,
 )
-from apps.appointment.models import (
-    Appointment,
-    AppointmentService,
-    BlockedTime,
-    Counter,
-    History,
-    Recurring,
-    RecurringService,
-    Settings,
-)
+from apps.appointment.models.appointments import Appointment, AppointmentService, History
+from apps.appointment.models.blocked_times import BlockedTime
+from apps.appointment.models.numbering import Counter
+from apps.appointment.models.series import Recurring, RecurringService
+from apps.appointment.models.settings import Settings
 
 from .conftest import HUB_DB, MONDAY, at, make_appointment, make_block, make_series
 

@@ -4,7 +4,8 @@ Health data lives only in the «Health and allergies» block of the card, after 
 only that screen records (CUSTOMER-F32), and no tool of the assistant reads or writes it. Asked «Lucía QA es alérgica al
 gluten … Apúntaselo en su ficha», the assistant offered a note «Alergia al gluten» (hub#2278): out of that block, with no
 permission, no warning for whoever serves her and not erased if she withdraws it. Every free text a person writes on a
-card says that health data does not go there, where it goes, and that the person does it there.
+card says that health data does not go there, where it goes, and that the person does it there; and that an allergy to
+mark on a dish someone will eat is no datum of the card, so the assistant still marks that one on the dish's line.
 """
 
 import json
@@ -24,7 +25,8 @@ from .conftest import HUB_DB
 REPORTED = (
     "Lucía QA es alérgica al gluten y nos ha dicho que no le importa que lo apuntemos. Apúntaselo en su ficha, por favor."
 )
-#: The block of the card as its screen titles it, in the language the descriptions are written in.
+#: The block of the card as its screen titles it, in the language the descriptions are written in: they name it in their
+#: own words, never quoting the screen's English title for a person who reads another language.
 FRONTEND = Path(apps.get_app_config("customer").path) / "frontend/locale"
 HEADING = json.loads((FRONTEND / "en.json").read_text())["customer"]["health"]["heading"]
 #: A screen of the Hub, named by its path.
@@ -56,9 +58,11 @@ def read(tool: dict, datum: str | None) -> str:
 
 def assert_sends_health_data_to_its_block(text: str) -> None:
     assert "Never for allergies, sensitivity tests or other health data" in text
-    assert f"«{HEADING}» block of the customer's card" in text
+    assert f"{HEADING.lower()} block of the customer's card" in text
     assert "with the customer's own explicit permission, which only that screen records" in text
-    assert "You have no tool for them: tell the person to do it there." in text
+    assert "No tool of yours writes that block: tell the person to do it there." in text
+    assert "An allergy to mark on a dish someone will eat is not kept on the card" in text
+    assert "You have no tool for them" not in text
     screens = SCREEN.findall(text)
     own = {item.path for item in apps.get_app_config("customer").navigation}
     assert screens

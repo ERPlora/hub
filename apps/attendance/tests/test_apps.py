@@ -2,16 +2,18 @@
 gets, its scheduled task and the assistant's contract of every operation (``ai`` and described input
 fields)."""
 
-
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
-from live.meta import Category, Help, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
 from live.operations import INTERNAL, registry
 
 from apps.attendance import events as E
 from apps.attendance import queries, services  # noqa: F401  (importing them registers the operations)
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.shell_icons import shell_icon_registry
 
 # Clocking someone else in or out (ATTENDANCE-F12) is a permission of its own.
@@ -238,5 +240,20 @@ def test_attendance_has_no_setup_steps_nor_bell_counters():
     assert attendance().bell == []
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert attendance().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert attendance().help.videos == {"es": "uOXeTh1ZSSE", "en": "bJRtG4HzBgM"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("ATTENDANCE-F01",), "d0mJ-eWWSs4", "r7rMT_CeHdI"),
+    (("ATTENDANCE-F02",), "-r7iRA_l84E", "NqHXQAtrRXs"),
+    (("ATTENDANCE-F06",), "7Iw3EckX5sk", "vO7WaXRXYLI"),
+    (("ATTENDANCE-F10", "ATTENDANCE-F07"), "2AIG_S251qE", "ISb1OnHEnUA"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("attendance", language) == help_videos.by_task(TASK_VIDEOS, language)

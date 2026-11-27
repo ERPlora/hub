@@ -29,6 +29,8 @@ from live.operations import Operation, registry
 
 from base.business import babel_locale, business_zone, currency_decimals
 
+from . import card_marks
+
 # The card's helpers by the names this module reads them by (``live.assistant``'s).
 _LEFT_OUT = LEFT_OUT
 _resolved = shared.resolved
@@ -219,8 +221,11 @@ def card(
     names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``).
     With ``ctx`` and a callable ``ai["summary"]``, its fields are exactly what that callable returns; it receives
     ``(ctx, arguments, fields) -> list[dict]``, with the detailed fields already in ``language``, and runs in it too.
-    ``found`` gathers the ids of the records it read to name them (``fingerprint``)."""
-    shown = _card_details(op, arguments, language, ctx, found)
+    ``found`` gathers the ids of the records it read to name them (``fingerprint``). Each datum is said as the write
+    takes it, and as its screen says it (``card_marks``)."""
+    taken = card_marks.as_taken(op, arguments)
+    shown = _card_details(op, taken, language, ctx, found)
+    shown["fields"] = card_marks.marked(op, shown["fields"], taken, language)
     summary = op.ai.get("summary") if isinstance(op.ai, dict) else None
     if ctx is None or not callable(summary):
         return shown
@@ -342,7 +347,8 @@ def preview(
 
 
 def check_of(op: Operation) -> Any:
-    """The read ``op``'s ``ai=`` names to check its data before its card (``check``), or ``None``."""
+    """The read ``op``'s ``ai=`` names to check its data before its card (``check``), or the reads, in order; or
+    ``None``."""
     declared = op.ai
     return declared.get("check") if isinstance(declared, dict) else getattr(declared, "check", None)
 
@@ -350,19 +356,21 @@ def check_of(op: Operation) -> Any:
 def checked(
     ctx: OperationContext, op: Operation, arguments: dict, *, found: list | None = None
 ) -> ToolOutcome | None:
-    """Why the read the write ``op`` names as its check (``check_of``) refuses ``arguments`` — run as ``ctx``'s person,
-    with the data of the write its input takes —, or ``None`` when it takes them or the write names none (hub#538: a
-    role the business does not have reached the card, and the write refused it only after the person's yes). Nothing
-    of its answer is shown: a normal write's card stays a single line; the id of what it found goes to ``found``
-    (``fingerprint``: a record the write takes by its name is the one the check found)."""
-    name = check_of(op)
-    if name is None:
-        return None
-    read = registry[name]
-    failure, answer = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
-    if failure is None and found is not None:
-        found.append(answer.model_dump(mode="json").get("id"))
-    return failure
+    """Why the first of the reads the write ``op`` names as its check (``check_of``) that refuses ``arguments`` does
+    — each run as ``ctx``'s person, with the data of the write its input takes —, or ``None`` when all of them take
+    them or the write names none (hub#538: a role the business does not have reached the card, and the write refused
+    it only after the person's yes). Nothing of their answers is shown: a normal write's card stays a single line; the
+    id of what each found goes to ``found`` (``fingerprint``: a record the write takes by its name is the one the check
+    found)."""
+    declared = check_of(op)
+    for name in (declared,) if isinstance(declared, str) else declared or ():
+        read = registry[name]
+        failure, answer = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
+        if failure is not None:
+            return failure
+        if found is not None:
+            found.append(answer.model_dump(mode="json").get("id"))
+    return None
 
 
 def fingerprint(drawn: dict, found: list) -> str:

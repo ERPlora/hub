@@ -162,9 +162,10 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The Hub admin's «Restore to a separate copy…», for the platform's admins (staff and superuser); the worker "
         "makes the copy next to the business, which is never closed nor changed.",
     ),
-    "staff.account.list": (
+    "staff.account.check": (
         CHECKED_INSIDE,
-        "staff.add_member or staff.change_member (the «Hub user» selector of the record's form, STAFF-F03).",
+        "staff.add_member or staff.change_member, what the two writes it checks before the assistant's card ask for "
+        "(STAFF-F01, STAFF-F03); no route and no assistant tool.",
     ),
     "staff.member.current": (
         OWN_SESSION,
@@ -245,8 +246,7 @@ def test_the_platform_s_operations_refuse_a_business_s_owner_with_every_permissi
 @HUB_DB
 @pytest.mark.parametrize("name", of_kind(CHECKED_INSIDE))
 def test_what_checks_its_permissions_itself_refuses_without_them(name, hub_a):
-    # The positive side (who holds one of them reads) is each app's own test (apps/staff/tests/test_queries_accounts.py,
-    # test_accounts_for_whoever_adds_or_edits_records).
+    # The positive side (who holds one of them reads) is each app's own test (apps/staff/tests/test_queries_accounts.py).
     op = registry[name]
     employee = get_user_model().objects.create_user(username="saas:2")
     Membership.objects.create(user=employee, host=A.key, role=Membership.Role.EMPLOYEE)

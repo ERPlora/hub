@@ -33,6 +33,7 @@ import { openReportProblem } from '../base/frontend/lib/report-problem';
 import { shellSidebar, SIDEBAR } from '../base/frontend/lib/sidebar';
 import { beforeSignOut } from '../base/frontend/lib/sign-out';
 import { OPERATION_ROUTES } from './generated/operation-routes';
+import './icon-buttons.css';
 
 /**
  * base's pieces of the chrome: the assistant's sparkles at the end of the topbar, «Upgrade plan» and «Manage on
@@ -232,7 +233,8 @@ export async function boot(
   if (blocked !== true) await router.replace(blocked);
   await chrome;
   app.mount('#app');
-  // base's way in: the idle lock of a till, the person's appearance, «Now serving» after a switch.
+  // base's way in: the idle lock of a till (and the minutes the business changes), the person's appearance, «Now
+  // serving» after a switch.
   startWayIn(doc, {
     translate: (key, values) => (app.config.globalProperties as unknown as { $t: Translate }).$t(key, values),
     logout: () => void signOut(doc),
@@ -240,6 +242,7 @@ export async function boot(
     paint: (mode, palette, scale) => applyUserThemePreferences(mode, palette as ThemePalette | null, undefined, scale),
     reset: resetUserThemePreferences,
     label: () => session.session.value?.user?.label,
+    stream: client.stream,
   });
   onSessionChanged(() => void reload());
   // The server writes the texts of every live read in the stream's language (BASE-F64, hub#1038): a session back in

@@ -384,7 +384,7 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
   const soup = shown(page).locator(`[data-testid=combo-course-${starters}] [data-testid^=combo-choice-][data-status]`, { hasText: 'Soup' });
   const soupId = (await soup.getAttribute('data-testid'))!.replace('combo-choice-', '');
   await shown(page).locator(`[data-testid=combo-choice-${soupId}-delete]`).click();
-  await expect(page.locator('ion-modal[data-testid=combo-choice-delete]:visible')).toContainText('Remove «');
+  await expect(page.locator('ion-modal[data-testid=combo-choice-delete]:visible')).toContainText('Remove “');
   await page.locator('[data-testid=combo-choice-delete-submit]').click();
   await expect.poll(() => choicesOf(page, starters)).toEqual([dish('Salad'), dish('Lentils')]);
 
@@ -414,7 +414,7 @@ test('COMBO-F03, F05, F06: several dishes at once, choices and courses changed, 
 
   // Withdraw a course after its confirmation.
   await shown(page).locator(`[data-testid=combo-course-${dessert}-delete]`).click();
-  await expect(page.locator('ion-modal[data-testid=combo-course-delete]')).toContainText('Remove the course «Dessert» and its choices?');
+  await expect(page.locator('ion-modal[data-testid=combo-course-delete]')).toContainText('Remove the course “Dessert” and its choices?');
   // Counted on the page, not in `shown()`: while the dialog is open, `shown()` is the dialog.
   const card = page.locator(`[data-testid=combo-course-${dessert}]`);
   await expect(card).toHaveCount(1);
@@ -570,7 +570,7 @@ test('COMBO-F01, F04: the list finds the menu and withdraws it after its confirm
   await shoot(page, 'APP-COMBO-COMBO-F01', '.ion-page:not(.ion-page-hidden) [data-testid^=combo-menus]');
   await rowAction(page, 'combo-menus', id, 'delete');
   const dialog = page.locator('ion-modal[data-testid=combo-menus-delete]');
-  await expect(dialog).toContainText(`«${MENU}» stops being on sale`);
+  await expect(dialog).toContainText(`“${MENU}” stops being on sale`);
   await shoot(page, 'APP-COMBO-COMBO-F04', 'ion-modal[data-testid=combo-menus-delete] [data-testid]');
   // Counted on the page, not in `shown()`: while the dialog is open, `shown()` is the dialog, where the
   // list has no row before anything is withdrawn.

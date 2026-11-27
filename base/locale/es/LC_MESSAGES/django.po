@@ -327,6 +327,10 @@ msgstr "%(app)s es obligatoria para los negocios de %(country)s: no se puede des
 msgid "Your team"
 msgstr "Tu equipo"
 
+#: home/setup_steps.py:34
+msgid "Finish setting up your business"
+msgstr "Termina de configurar tu negocio"
+
 #: queries.py:180
 msgid "Add the people who will use the till, each with their own way in."
 msgstr "Añade a las personas que usarán el TPV, cada una con su forma de entrar."
@@ -2891,6 +2895,14 @@ msgid "Nobody changes their own role: ask somebody above you."
 msgstr "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
 
 #: people.py
+msgid ""
+"The accountancy firm only reads and takes no place of the plan: it keeps the "
+"role of its invitation."
+msgstr ""
+"La gestoría solo lee y no ocupa plaza del plan: se queda con el rol de su "
+"invitación."
+
+#: people.py
 msgid "You may only give a role to people below you in the business."
 msgstr "Solo puedes dar un rol a quien está por debajo de ti en el negocio."
 
@@ -2917,3 +2929,14 @@ msgstr "Hay una app encendida o un permiso nuevo que aún no llevan: mira lo que
 #: bell.py
 msgid "Review the roles"
 msgstr "Revisar los roles"
+
+#: assistant/card_marks.py
+msgctxt "base"
+msgid "No limit"
+msgstr "Sin límite"
+
+#: assistant/card_marks.py
+#, python-format
+msgctxt "base"
+msgid "%(datum)s per %(unit)s"
+msgstr "%(datum)s por %(unit)s"

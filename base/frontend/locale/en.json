@@ -34,7 +34,7 @@
     },
     "setup": {
       "title": "Finish setting up your business",
-      "progress": "{done} of {total} done",
+      "progress": "{done} of {total} done | {done} of {total} done",
       "viewAll": "View all",
       "viewLess": "Show less",
       "configure": "Set up",
@@ -399,7 +399,7 @@
         "undoTitle": "Undo an import",
         "undoHint": "Removes only what that import brought. What you created afterwards stays.",
         "undo": "Undo",
-        "undoConfirmTitle": "Undo «{name}»",
+        "undoConfirmTitle": "Undo “{name}”",
         "undoConfirmMessage": "The row this import brought will be removed. What you created afterwards stays. | The {n} rows this import brought will be removed. What you created afterwards stays.",
         "undone": "Import undone:",
         "removed": "{app} — {n} row removed | {app} — {n} rows removed",
@@ -415,10 +415,10 @@
         "confirmTitle": "This cannot be undone",
         "confirmMessage": "{n} row will be removed for good: | {n} rows will be removed for good:",
         "confirmLabel": "Remove for good",
-        "typeName": "Type «{name}» to confirm",
+        "typeName": "Type “{name}” to confirm",
         "done": "Business reset:",
         "busy": "A reset is under way: wait for it to finish.",
-        "keptCopy": "A full copy of the data from before is kept in «Copies».",
+        "keptCopy": "A full copy of the data from before is kept in “Copies”.",
         "progress": {
           "copying": "Copying the business's data before emptying…",
           "copyingHint": "Then {sections} will be emptied. You can leave this screen: it goes on by itself.",
@@ -432,11 +432,11 @@
           "hub_not_ready": "The business is closed, so nothing was emptied.",
           "retry": "Try again"
         },
-        "copyFirst": "Before emptying, a full copy of the business's data is made and kept for 90 days, in «Copies» below."
+        "copyFirst": "Before emptying, a full copy of the business's data is made and kept for 90 days, in “Copies” below."
       },
       "copies": {
         "title": "Copies of the data",
-        "intro": "Before each reset, ERPlora makes a full copy of the business's data and keeps it for 90 days. It brings the whole business back as it was (PostgreSQL's format, restored with pg_restore). To take your products, services or settings to another business, use «Export».",
+        "intro": "Before each reset, and when the business is deleted, ERPlora makes a full copy of all the business's data as it was and keeps it for 90 days. You can download it to keep it yourself; it cannot be loaded in “Import”. To take your products, services or settings to another business, use “Export”.",
         "loading": "Reading the copies…",
         "loadError": "The copies could not be read.",
         "empty": "No copies yet: one is made before each reset.",
@@ -454,7 +454,7 @@
       "use": "Use this one",
       "all": "See all templates",
       "later": "Not now",
-      "preparing": "Preparing «{name}»…",
+      "preparing": "Preparing “{name}”…",
       "loadError": "The templates to start with could not be loaded.",
       "readyTitle": "Your apps and your catalogue are ready",
       "readyHint": "What is left only you can answer: your business's details. They are in the list below.",
@@ -514,7 +514,7 @@
         "retry": "Resend",
         "discard": "Discard",
         "retryAll": "Resend all",
-        "more": "Showing the {shown} most recent of {total}.",
+        "more": "Showing the most recent of {total}. | Showing the {count} most recent of {total}.",
         "empty": {
           "heading": "All in order",
           "body": "No failed events. The queue of events lives in the database: a restart never loses it."
@@ -606,7 +606,7 @@
           "of": "{used} of {limit}",
           "perMonth": "{used} of {limit} a month",
           "noLimit": "{used} · No limit",
-          "connections": "{used} of {limit} connections",
+          "connections": "{used} of {limit} connection | {used} of {limit} connections",
           "connectionsOpen": "{used} connection | {used} connections",
           "notIncluded": "Your plan does not include {name}",
           "notIncludedAssistant": "Your plan does not include the assistant",
@@ -618,7 +618,7 @@
           "full": "Full"
         },
         "fellShort": "Fell short once this week | Fell short {count} times this week",
-        "topCapacity": "You already have the maximum capacity: tell us in «Report a problem».",
+        "topCapacity": "You already have the maximum capacity: tell us in “Report a problem”.",
         "notMeasured": "Not measured yet.",
         "notMeasuredToday": "Not measured today yet.",
         "notMeasuredYet": "Measured every night: the first figure comes tomorrow.",
@@ -704,7 +704,7 @@
     "pinSetup": {
       "title": "Create your PIN",
       "why": "With it you will enter this till without your password.",
-      "choose": "Choose a {n}-digit PIN",
+      "choose": "Choose a {n}-digit PIN | Choose a {n}-digit PIN",
       "confirm": "Confirm your PIN",
       "mismatch": "The PINs do not match, try again",
       "later": "Not now",
@@ -784,7 +784,7 @@
         "change": "Change PIN",
         "set": "Set PIN",
         "saved": "PIN updated",
-        "length": "The PIN must have {n} digits.",
+        "length": "The PIN must have {n} digit. | The PIN must have {n} digits.",
         "mismatch": "The two PINs do not match."
       },
       "roles": {
@@ -819,7 +819,7 @@
       "again": "Ask again after inactivity",
       "untilSignOut": "Until signing out",
       "minutes": "{n} min",
-      "againMinutes": "A till nobody touches for {n} minutes closes the session and shows the PIN pad: the next sale carries the name of the next person.",
+      "againMinutes": "A till nobody touches for {n} minute closes the session and shows the PIN pad: the next sale carries the name of the next person. | A till nobody touches for {n} minutes closes the session and shows the PIN pad: the next sale carries the name of the next person.",
       "againShift": "The PIN pad asks again when the session ends: at the end of the shift or when someone signs out.",
       "digits": "PIN digits",
       "four": "4 digits",
@@ -852,10 +852,8 @@
       "removeBody": "Its session closes at once. To use it again, someone has to enter on it with their account.",
       "removeYours": "It is the device you are using: removing it will close your session and you will have to enter again.",
       "removeFailed": "Could not remove this device. Check the connection and try again.",
-      "pruneOne": "Remove the device unused for 30 days",
-      "pruneMany": "Remove the {n} devices unused for 30 days",
-      "pruneAsk": "Remove {n} devices nobody has used for 30 days?",
-      "pruneAskOne": "Remove the device nobody has used for 30 days?",
+      "prune": "Remove the device unused for 30 days | Remove the {n} devices unused for 30 days",
+      "pruneAsk": "Remove the device nobody has used for 30 days? | Remove {n} devices nobody has used for 30 days?",
       "pruneBody": "They stop showing here and, to use one again, someone will have to enter on it with their account. Those used in the last 30 days and the one you are using stay.",
       "pruneConfirm": "Remove",
       "pruneFailed": "Could not remove the unused devices. Check the connection and try again.",
@@ -970,7 +968,8 @@
       },
       "save": "Save",
       "saved": "Role saved.",
-      "saveError": "The role could not be saved"
+      "saveError": "The role could not be saved",
+      "mine": "Nobody changes their own role: ask somebody above you."
     },
     "person": {
       "title": "Person",
@@ -980,9 +979,10 @@
       "retry": "Retry",
       "data": {
         "heading": "Their details",
-        "managed": "Name, email and role are changed on erplora.com.",
+        "managed": "Name, email and the role of the invitation are changed on erplora.com.",
         "open": "Open on erplora.com",
-        "notEntered": "Not in this hub yet: their PIN and badge are kept for when they come in."
+        "notEntered": "Not in this hub yet: their PIN and badge are kept for when they come in.",
+        "invitation": "Role of the invitation"
       },
       "pin": {
         "heading": "PIN",
@@ -1017,6 +1017,26 @@
       "refused": {
         "ownerOnly": "Only the owner changes the owner's way in.",
         "ownBadge": "Nobody registers their own badge: ask another administrator."
+      },
+      "role": {
+        "heading": "Role in this business",
+        "intro": "It rules over the role of their invitation: what they see and may do here changes at once, without signing in again.",
+        "label": "Role",
+        "invitation": "From the invitation ({role})",
+        "given": "{name} now has the role {role}.",
+        "failed": "The role could not be changed.",
+        "loading": "Loading the roles…",
+        "loadError": "The roles could not be loaded.",
+        "retry": "Retry",
+        "none": "This business has no roles of its own yet: they are made in Employees › Roles, from any role.",
+        "make": "Make a role",
+        "refused": {
+          "owner": "The owner is always the owner: nobody gives them another role.",
+          "accountant": "The accountancy firm only reads and takes no place of the plan: it keeps the role of its invitation.",
+          "own": "Nobody changes their own role: ask somebody above you.",
+          "above": "You may only give a role to people below you in the business.",
+          "beyond": "A role may not allow more than you may do yourself."
+        }
       }
     },
     "apiKeys": {
@@ -1281,9 +1301,9 @@
           "heading": "The file could not be opened",
           "body": "The file's content did not arrive. Check the connection and try again."
         },
-        "pdfPages": "Showing the first {shown} of {total} pages. Download the file to read it all.",
+        "pdfPages": "Showing the first page of {total}. Download the file to read it all. | Showing the first {count} of {total} pages. Download the file to read it all.",
         "textCut": "Showing the beginning of the file. Download it to read it all.",
-        "tableCut": "Showing the first {shown} rows. Download the file to see them all.",
+        "tableCut": "Showing the first row. Download the file to see them all. | Showing the first {count} rows. Download the file to see them all.",
         "damaged": {
           "heading": "The file could not be read",
           "body": "It may be damaged or saved in another format. Download it to open it with an app on your device."
@@ -1298,11 +1318,9 @@
         "yes": "TRUE",
         "no": "FALSE",
         "json": {
-          "oneItem": "1 item",
-          "items": "{count} items",
-          "oneField": "1 field",
-          "fields": "{count} fields",
-          "more": "{count} more. Download the file to see them all.",
+          "items": "{count} item | {count} items",
+          "fields": "{count} field | {count} fields",
+          "more": "{count} more. Download the file to see it. | {count} more. Download the file to see them all.",
           "broken": "This file is not valid JSON: it is shown as it is."
         }
       },

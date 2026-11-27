@@ -1,6 +1,6 @@
 """Read operations of the prices of a price list."""
 
-from django.db.models import CharField, Q
+from django.db.models import CharField
 from django.db.models.functions import Coalesce, Lower
 from live.context import OperationContext
 from live.errors import NotFound
@@ -11,6 +11,7 @@ from apps.pricing.queries.rows import item_label, item_row
 from apps.pricing.schemas.fields import Page
 from apps.pricing.schemas.prices import PriceItemDetailOut, PriceItemIdIn, PriceItemListIn, PriceItemOut
 from base.ordering import list_order
+from base.text_search import contains_text
 
 
 @operation(
@@ -49,11 +50,7 @@ def list_price_items(ctx: OperationContext, params: PriceItemListIn) -> dict:
     if params.kind:
         rows = rows.filter(product__isnull=params.kind == "service")
     if params.search:
-        rows = rows.filter(
-            Q(product__name__icontains=params.search)
-            | Q(product__sku__icontains=params.search)
-            | Q(service_name__icontains=params.search)
-        )
+        rows = rows.filter(contains_text(params.search, "product__name", "product__sku", "service_name"))
     rows = rows.annotate(shown_name=Lower(Coalesce("product__name", "service_name", output_field=CharField())))
     column = {"name": "shown_name"}.get(params.sort, params.sort)
     rows = rows.order_by(*list_order(column, "min_quantity", descending=params.dir == "desc", nulls_last=True))

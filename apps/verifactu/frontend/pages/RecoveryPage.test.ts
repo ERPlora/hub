@@ -10,7 +10,7 @@ import type { Component } from 'vue';
 
 import { pick } from '../../../../base/frontend/__tests__/date-time-fields';
 import { resolveIcon } from '../../../../packages/ui/src/shell/icons';
-import { click, flush, ionValue, MANAGER, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
+import { click, EMPLOYEE, flush, ionValue, MANAGER, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { ChainStatusOut, ConfigOut } from '../operations';
 import RecoveryPage from './RecoveryPage.vue';
@@ -159,7 +159,7 @@ describe('RecoveryPage', () => {
   it('says there is no AEAT data yet, or no results with a search', async () => {
     const s = await setup();
     await s.result(AEAT_OP, { rows: [], total: 0, limit: 50, offset: 0 });
-    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No AEAT data. Press «Query AEAT».');
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No AEAT data. Press “Query AEAT”.');
     await s.emit('update:search', 'nope');
     await s.reopen();
     await s.result(AEAT_OP, { rows: [], total: 0, limit: 50, offset: 0 });
@@ -200,8 +200,11 @@ describe('RecoveryPage', () => {
     });
   });
 
-  it('the manager validates and queries but does not recover', async () => {
-    const s = await setup(CHAIN(null), { session: MANAGER });
+  it.each([
+    ['manager', MANAGER],
+    ['employee', EMPLOYEE],
+  ])('the %s validates and queries but does not recover', async (_, session) => {
+    const s = await setup(CHAIN(null), { session });
     expect(s.find('verifactu-recovery-validate').exists()).toBe(true);
     expect(s.find('verifactu-recovery-query').exists()).toBe(true);
     expect(s.find('verifactu-recovery-recover').exists()).toBe(false);

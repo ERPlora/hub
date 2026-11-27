@@ -20,8 +20,7 @@ from live.operations import get
 from apps.inventory.queries.exports import PRODUCT_HEADERS
 from base import assistant
 from base.assistant.tools import NOT_FROM_CHAT
-from base.blueprint.datasets import DATASETS, dataset
-from base.blueprint.photos import IMAGE_OPERATIONS
+from base.blueprint.datasets import dataset, every_dataset
 from base.models import Membership
 from base.permissions import access_for
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
@@ -84,11 +83,11 @@ def test_what_the_tool_says_of_the_export_is_what_the_export_does(name):
 
     assert tells_where_to_export(said)
     assert "base.blueprint.export" in NOT_FROM_CHAT
-    assert {"inventory.product", "service.service"} <= set(IMAGE_OPERATIONS)
+    assert {"inventory.product", "service.service"} <= {part.key for part in every_dataset() if part.images}
     assert "products and services go with their own photos" in said
     assert dataset("customer.customer").personal
     assert "never the customers" in said
-    assert "sale" not in {part.app for part in DATASETS}
+    assert "sale" not in {part.app for part in every_dataset()}
     assert "never the business's history" in said
 
 

@@ -11,8 +11,9 @@ import { createHmac } from 'node:crypto';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
+import { pressPin, userMenu } from './access-door';
 import { api, capture, collectProblems, horizontalOverflow, login, MY_APPS_DOOR, psql, SAAS, shot, shown, THREE_SIZES as SIZES, turnOn, untilStill } from './helpers';
-import { businessOnSaas, type SaasBusiness, type SaasOwner, saasPost, signUpOnSaas } from './saas-owner';
+import { businessOnSaas, joinsAsEmployee, type SaasBusiness, type SaasOwner, signUpOnSaas } from './saas-owner';
 import { cleanSales } from './sale-helpers';
 import { STACK } from './stack';
 
@@ -39,19 +40,6 @@ async function businessOf(owner: Person): Promise<Business> {
   return business;
 }
 
-async function joins(owner: Person, person: Person, business: Business): Promise<void> {
-  const invited = await saasPost(owner.context, '/hubs/members/invite', {
-    hub_id: business.id,
-    email: person.credentials.email,
-    role: 'hub_employee',
-    message: '',
-  });
-  expect(invited.status(), await invited.text()).toBe(200);
-  const { id } = (await invited.json()) as { id: string };
-  const accepted = await saasPost(person.context, '/hubs/invitations/accept', { id });
-  expect(accepted.status(), await accepted.text()).toBe(200);
-}
-
 /**
  * `ready` at each size and a capture once nothing moves (a page pushed over another slides
  * in for half a second: mid-way, the screen it leaves shows at its edge); back at 1440 after.
@@ -74,23 +62,8 @@ async function toTop(page: Page): Promise<void> {
     .evaluate((content) => (content as unknown as { scrollToTop: (duration: number) => Promise<void> }).scrollToTop(0));
 }
 
-async function press(page: Page, digits: string): Promise<void> {
-  for (const digit of digits) await shown(page).getByTestId(`pinpad-key-${digit}`).click();
-}
-
 async function fill(field: Locator, value: string): Promise<void> {
   await field.locator('input').fill(value);
-}
-
-/** The user menu of the side menu (pinned at 1440), and the entry `id` in it. */
-async function userMenu(page: Page, id: string): Promise<void> {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  const presented = page.evaluate(
-    () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-  );
-  await page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name').click();
-  await presented;
-  await page.locator(`ion-popover [data-testid="user-menu-${id}"]`).click();
 }
 
 /** The labels of a segment that do not fit their button (its text ends in «…»). */
@@ -126,7 +99,7 @@ test.beforeAll(async ({ browser }) => {
   owner = await signUpOnSaas(browser, 'access-owner');
   employee = await signUpOnSaas(browser, 'access-employee');
   business = await businessOf(owner);
-  await joins(owner, employee, business);
+  await joinsAsEmployee(owner, employee, business);
   origin = STACK.hub(business.slug);
 });
 
@@ -315,9 +288,9 @@ test('the employee enters on a till, creates their PIN there, and the first devi
   await atEverySize(till, 'BASE-G54', async () => {
     await expect(shown(till).getByTestId('pinpad')).toBeVisible();
   });
-  await press(till, EMPLOYEE_PIN);
+  await pressPin(till, EMPLOYEE_PIN);
   await expect(shown(till).getByTestId('pin-setup-step')).toHaveText('Confirm your PIN');
-  await press(till, EMPLOYEE_PIN);
+  await pressPin(till, EMPLOYEE_PIN);
   await expect(till).toHaveURL(`${origin}/`);
   await expect(shown(till).locator(MY_APPS_DOOR).first()).toBeAttached();
 
@@ -362,9 +335,9 @@ test('signing out on the till leaves its PIN pad; a wrong PIN says so, the right
     await expect(shown(till).getByTestId('pin-face').first()).toBeVisible();
   });
   await door.getByTestId('pin-face').filter({ hasText: 'Bea' }).click();
-  await press(till, '0000');
+  await pressPin(till, '0000');
   await expect(door.getByTestId('pinpad-error')).toHaveText('Wrong PIN.');
-  await press(till, EMPLOYEE_PIN);
+  await pressPin(till, EMPLOYEE_PIN);
   await expect(till).toHaveURL(`${origin}/`);
   expect(await whoIsIn(till, origin)).toBe('Bea');
 });
@@ -410,7 +383,7 @@ test('«Switch user» over the sale in progress: whoever takes over enters with 
     await expect(shown(till).getByTestId('pin-face').first()).toBeVisible();
   });
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Bea' }).click();
-  await press(till, EMPLOYEE_PIN);
+  await pressPin(till, EMPLOYEE_PIN);
   await expect(till).toHaveURL(`${origin}/sale/pos`);
   await expect(till.getByTestId('toast').filter({ hasText: 'Now serving Bea' }).first()).toBeVisible();
   expect(await whoIsIn(till, origin)).toBe('Bea');
@@ -425,19 +398,18 @@ test('«Switch user» over the sale in progress: whoever takes over enters with 
 test('a till of a business that always asks goes back to the PIN pad after its idle minutes', async () => {
   await userMenu(till, 'switch-user');
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Ana López' }).click();
-  await press(till, OWNER_PIN);
+  await pressPin(till, OWNER_PIN);
   await expect(till).toHaveURL(`${origin}/settings`);
+  await till.clock.install();
   const again = shown(till).getByTestId('pin-policy-again');
   await again.locator('ion-segment-button', { hasText: /^1 min$/ }).click();
-  await expect(shown(till).getByTestId('pin-policy-card')).toContainText('A till nobody touches for 1 minutes');
+  await expect(shown(till).getByTestId('pin-policy-card')).toContainText('A till nobody touches for 1 minute closes');
   expect(own('SELECT pin_policy || pin_inactivity_minutes FROM base_accesssettings')).toBe('always1');
-  await till.clock.install();
-  await till.reload();
-  await expect(shown(till).getByTestId('pin-policy-card')).toBeVisible();
-  await till.clock.fastForward('01:05');
-  await expect(till).toHaveURL(/\/login(\?|$)/, { timeout: SAAS_STEP });
+  // Without reloading: the open till counts with the new minutes once its live stream brings them.
+  const idle = async () => (await till.clock.fastForward('00:20').catch(() => undefined), till.url());
+  await expect.poll(idle, { timeout: SAAS_STEP }).toMatch(/\/login(\?|$)/);
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Ana López' }).click();
-  await press(till, OWNER_PIN);
+  await pressPin(till, OWNER_PIN);
   await expect(till).toHaveURL(`${origin}/`);
   await till.goto(`${origin}/settings`);
   await shown(till).getByTestId('pin-policy-again').locator('ion-segment-button', { hasText: 'Until signing out' }).click();
@@ -464,7 +436,7 @@ test('the till’s session ends while working: its next page is its PIN pad, whi
     await expect(shown(till).getByTestId('access-notice')).toBeVisible();
   });
   await shown(till).getByTestId('pin-face').filter({ hasText: 'Ana López' }).click();
-  await press(till, OWNER_PIN);
+  await pressPin(till, OWNER_PIN);
   await expect(till).toHaveURL(`${origin}/settings#data`);
   await expect(shown(till).getByTestId('tab-data')).toHaveClass(/segment-button-checked/);
   expect(await whoIsIn(till, origin)).toBe('Ana López');

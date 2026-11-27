@@ -120,14 +120,14 @@ function rowAmount(row: UsageRow): string {
       return row.kind === 'capacity' ? t(`${said}.notMeasuredToday`) : t(`${said}.notMeasured`);
     case 'plain':
       return row.kind === 'capacity'
-        ? t(`${said}.amount.connectionsOpen`, { used: number(row.used ?? 0), n: row.used ?? 0 })
+        ? t('base.system.usage.amount.connectionsOpen', { used: number(row.used ?? 0), n: row.used ?? 0 })
         : figure(row, row.used ?? 0);
     case 'noLimit':
       return t(`${said}.amount.noLimit`, { used: figure(row, row.used ?? 0) });
     default: {
       const used = figure(row, row.used ?? 0);
       const limit = figure(row, row.limit ?? 0);
-      if (row.kind === 'capacity') return t(`${said}.amount.connections`, { used, limit });
+      if (row.kind === 'capacity') return t('base.system.usage.amount.connections', { used, limit, n: row.limit ?? 0 });
       const perMonth = row.kind === 'assistant' || row.kind === 'meter';
       return t(`${said}.amount.${perMonth ? 'perMonth' : 'of'}`, { used, limit });
     }
@@ -420,14 +420,6 @@ function pillTone(row: UsageRow) {
   min-width: 0;
 }
 
-.system-usage-row--info .system-usage-amount {
-  grid-column: 2;
-  grid-row: 1;
-  justify-self: end;
-  text-align: end;
-  font-weight: 600;
-}
-
 .system-usage-pill {
   grid-column: 2;
   grid-row: 1;
@@ -493,13 +485,6 @@ function pillTone(row: UsageRow) {
 
   .system-usage-row--info {
     grid-template-columns: 10rem minmax(0, 1fr);
-  }
-
-  .system-usage-row--info .system-usage-amount {
-    grid-column: 2;
-    justify-self: start;
-    text-align: start;
-    font-weight: 400;
   }
 }
 </style>

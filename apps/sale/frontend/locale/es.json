@@ -97,7 +97,6 @@
       "discountTicket": "Descuento del tique",
       "total": "Total",
       "printPrebill": "Imprimir cuenta",
-      "charge": "Cobrar",
       "chargeAmount": "Cobrar · {amount}",
       "chargeLines": "Cobrar {n} línea · {amount} | Cobrar {n} líneas · {amount}",
       "openCart": "Abrir carrito",
@@ -196,6 +195,7 @@
         "free": "Gratis"
       },
       "noServices": "Sin servicios.",
+      "searchFoundNothing": "Ningún producto ni servicio coincide con la búsqueda.",
       "servicesLoadFailed": "No se han podido cargar los servicios.",
       "servicePriceTitle": "Importe de {name}",
       "servicePriceSuggest": "Usar {price}",

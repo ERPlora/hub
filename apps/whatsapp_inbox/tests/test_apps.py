@@ -1,6 +1,6 @@
 """The WhatsApp inbox declares its module metadata, its menu, its permissions and what each role gets."""
 
-
+import pytest
 from django.apps import apps
 from django.conf import settings
 from django.utils import translation
@@ -10,7 +10,6 @@ from live.meta import (
     BellCounter,
     Category,
     DeviceNotice,
-    Help,
     LiveAppConfig,
     Nav,
     module_configs,
@@ -18,6 +17,8 @@ from live.meta import (
 )
 
 from apps.whatsapp_inbox import events
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.shell_icons import shell_icon_registry
 
 
@@ -268,5 +269,17 @@ def test_the_inbox_has_no_setup_steps_nor_panels():
     assert (inbox().setup, inbox().widgets) == ([], [])
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert inbox().help == Help()
+def test_its_help_window_has_no_tour_yet():
+    assert inbox().help.videos == {}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("WHATSAPP_INBOX-F16",), "bdZh9fc-kM8", "mEqjI-FsgX8"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("whatsapp_inbox", language) == help_videos.by_task(TASK_VIDEOS, language)

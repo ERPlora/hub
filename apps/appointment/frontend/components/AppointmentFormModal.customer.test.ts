@@ -42,7 +42,7 @@ describe('AppointmentFormModal: a new customer without leaving the agenda (CUSTO
   function expectChoicesKept(s: Awaited<ReturnType<typeof setup>>) {
     expect([s.inDoc('appointment-form-service-cut'), s.inDoc('appointment-form-service-colour')].every(Boolean)).toBe(true);
     expect(s.staffPicker().props('modelValue')).toEqual({ id: 's1', label: 'Ana López' });
-    expect([s.kept('day'), s.kept('time'), s.field('minutes').value]).toEqual(['2026-10-19', '10:00', '90']);
+    expect([s.kept('day'), s.kept('time'), s.held()]).toEqual(['2026-10-19', '10:00', '90']);
   }
 
   /** «Create and assign»: its submit button sends the quick form (an `ion-button` only does that once

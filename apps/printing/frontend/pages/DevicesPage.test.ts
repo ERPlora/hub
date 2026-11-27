@@ -108,7 +108,7 @@ describe('DevicesPage', () => {
     const manager = await setup({ session: MANAGER });
     await manager.result(LIST, page([OTHER]));
     expect(manager.find('printing-devices-this').text()).toBe(
-      'This device does not print yet: «Print from this device» sets it up with the printers it reaches.',
+      'This device does not print yet: “Print from this device” sets it up with the printers it reaches.',
     );
     const employee = await setup({ session: EMPLOYEE });
     await employee.result(LIST, page([OTHER]));

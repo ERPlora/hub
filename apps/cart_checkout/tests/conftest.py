@@ -1,10 +1,9 @@
-"""Fixtures of the cart_checkout tests: contexts per role and scope, a fixed clock, and builders of the data a test
-starts from (straight to the models: the operations are under test).
+"""Fixtures of the cart_checkout tests: contexts per role and scope, a fixed clock, builders of the data a test
+starts from (straight to the models: the operations are under test), and the helpers that run an operation and read
+the events it left, which the tests of every module of services/ share.
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
-
-The builders import the models lazily, so that the tests of apps.py still collect while models.py does not exist.
 """
 
 import datetime as dt
@@ -14,7 +13,10 @@ import pytest
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
+from live.operations import get
 
+from apps.cart_checkout.models import Cart
 from apps.cash_register.tests.conftest import across_a_change_of_zone
 from apps.flow.tests.test_relay import listen
 from apps.invoice.tests.conftest import catalog_of
@@ -34,6 +36,8 @@ __all__ = [
 
 #: The moment every test lives in (no real clock): 14 October 2026, 10:00 in Madrid.
 NOW = dt.datetime(2026, 10, 14, 8, 0, tzinfo=dt.UTC)
+LATER = NOW + dt.timedelta(hours=1)
+EARLIER = NOW - dt.timedelta(hours=1)
 
 
 def ctx_for(
@@ -128,3 +132,41 @@ def make_order(
         total_amount=total_amount,
         **fields,
     )
+
+
+# Running the operations
+
+
+def run(name, data: dict, role="hub_admin", **ctx):
+    op = get(name)
+    return op(ctx_for(role, **ctx), op.input.model_validate(data))
+
+
+def events() -> list[str]:
+    return list(OutboxEvent.objects.order_by("id").values_list("name", flat=True))
+
+
+def payload(name: str) -> dict:
+    return OutboxEvent.objects.filter(name=name).latest("id").payload
+
+
+def refused(error, code: str):
+    """Asserts the operation was refused with ``code`` and left no event."""
+    assert error.value.code == code
+    assert events() == []
+
+
+def stored(cart) -> Cart:
+    return Cart.objects.get(pk=cart.pk)
+
+
+def add(cart_or_token, quantity="1", unit_price=1250, **fields):
+    token = cart_or_token if isinstance(cart_or_token, str) else cart_or_token.session_token
+    data = {
+        "session_token": token,
+        "product_ref": "p-1",
+        "product_name": "Champú",
+        "quantity": quantity,
+        "unit_price": unit_price,
+    } | fields
+    return run("cart_checkout.item.add", data)

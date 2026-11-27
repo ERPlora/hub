@@ -15,6 +15,7 @@ from apps.schedule.models import Override, SpecialDay
 from apps.schedule.schemas.fields import ByIdIn
 from apps.schedule.schemas.overrides import OverrideOut
 from apps.schedule.schemas.special_days import SpecialDayOut
+from base.text_search import contains_text
 
 from .outputs import override_out, special_day_out
 
@@ -35,7 +36,7 @@ def _by_text(rows: QuerySet[Any], field: str, text: str, label: Any) -> Any:
     """The row whose ``field`` is ``text`` (any case), else the one that contains it; 409 if several."""
     matches = list(
         rows.filter(**{f"{field}__iexact": text})[: MAX_CANDIDATES + 1]
-    ) or list(rows.filter(**{f"{field}__icontains": text})[: MAX_CANDIDATES + 1])
+    ) or list(rows.filter(contains_text(text, field))[: MAX_CANDIDATES + 1])
     if len(matches) > 1:
         names = ", ".join(str(match) for match in matches[:MAX_CANDIDATES])
         raise Conflict(

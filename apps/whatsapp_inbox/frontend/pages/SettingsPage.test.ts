@@ -254,7 +254,7 @@ describe('SettingsPage: Meta templates (WHATSAPP_INBOX-F27, F28)', () => {
     await empty.result(TEMPLATES, { rows: [], total: 0, limit: 50, offset: 0 });
     expect(empty.wrapper.findComponent(EmptyState).props()).toMatchObject({
       heading: 'No templates.',
-      message: 'Create one with «Add template»: Meta reviews it. The ones made in WhatsApp Manager appear here too.',
+      message: 'Create one with “Add template”: Meta reviews it. The ones made in WhatsApp Manager appear here too.',
     });
   });
 

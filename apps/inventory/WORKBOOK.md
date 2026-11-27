@@ -143,7 +143,7 @@ interruptor activo/inactivo, «Sí»/«No» para quien no puede cambiar producto
 configurar · Falta la categoría fiscal», entera mientras la fila tiene sitio (también a 1280 px con el
 menú lateral abierto y la columna «Foto») y, si no, acabada en «…» con el texto entero al pasar el
 ratón; a su lado, la insignia roja «Agotado» si el artículo está agotado. Buscador «Buscar
-producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
+producto…» por nombre o SKU, sin distinguir mayúsculas ni tildes («cafe» encuentra «Café con leche»); orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
 desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»): un extremo que no se puede leer lo dice debajo
 de su campo, con las mismas palabras que el precio del producto («Esto no es un importe…», «Este importe no
 puede ser negativo.», las dos lecturas de «1.250» o «Esto no es una cantidad…»), y no filtra; 50 por página;
@@ -158,12 +158,13 @@ ya lo está, «Volver a poner a la venta», «Ocultar de la página web» o, si 
 (estos dos pares, para quien puede cambiar productos) y «Eliminar». Tocar la
 fila abre la ficha. Si la fila no tiene sitio, también los de la vista pasan al «⋮».
 
-El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
-SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
+El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (al crear, con la nota «Déjalo vacío
+para numerarlo solo (10000, 10001…).»; bloqueado al editar: «El SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
 crear), «Umbral stock bajo», «EAN-13», «Descripción», «Tipo» («Físico» o «Servicio», solo al
 crear), la casilla «Controlar stock de este artículo» con su nota, «Unidad de medida», «Categoría
 fiscal» («Elige una categoría fiscal»), «Categorías» (si hay alguna) y la casilla «Mostrar en la página web»
-(marcada en un alta), y «Guardar» / «Guardar cambios» («Guardando…»).
+(marcada en un alta), y «Guardar» / «Guardar cambios» («Guardando…»). Mientras falta el nombre o la categoría
+fiscal, el botón está apagado y encima de los botones sale qué falta, una cosa cada vez.
 
 La foto del artículo (INVENTORY-F30 a F32): la tabla lleva la columna «Foto», delante del nombre, con la
 miniatura de la foto o las iniciales sobre su color, y las tarjetas su línea «Foto»; la ficha la enseña
@@ -222,7 +223,7 @@ un movimiento no se edita ni se borra. Busca por producto, SKU o número de tiqu
 
 #### Detalle
 Tabla de solo lectura: Fecha, Nombre, SKU, Tipo («Inicial», «Recepción», «Venta», «Anulación»,
-«Recuento», «Descuento», «Devolución»), Cantidad (con signo), Saldo, Motivo y Referencia (en una venta, el número
+«Recuento», «Baja», «Devolución»), Cantidad (con signo), Saldo, Motivo y Referencia (en una venta, el número
 de su tique, su factura o la propia venta). Buscador por producto, SKU, referencia o número de
 tique; filtros por Tipo y por Referencia; más recientes primero; 50 por página.
 
@@ -333,7 +334,11 @@ Pantalla: Productos
 Pasos:
 1. En **Productos**, pulsa **+**: se abre el panel del formulario, con el cursor en Nombre; si mientras
    se abre ya has entrado en otro campo, el cursor se queda donde estás y lo que escribes va ahí.
-2. Escribe Nombre, SKU y Precio. El precio admite «2,20», «1.234,56» o lo que se pegue de la
+2. Escribe Nombre y Precio. El SKU es opcional («Déjalo vacío para numerarlo solo (10000, 10001…).»): vacío,
+   el producto recibe el siguiente número propio del catálogo, a partir de 10000 (uno más que el mayor de 5 a 9
+   cifras que ya tenga un producto, también uno eliminado; un código de barras usado como SKU no cuenta), y ese
+   número es su SKU para siempre, como uno escrito. Lo hace también el asistente o la API si no lo dicen. El
+   precio admite «2,20», «1.234,56» o lo que se pegue de la
    pantalla; al salir del campo se reescribe en el formato del negocio. Son opcionales «Coste
    (EUR)» (en la moneda del negocio: «Coste (PLN)» en Polonia), «Stock inicial», «Umbral stock bajo» (vacío = 10), «EAN-13» y «Descripción».
 3. Elige «Tipo» («Físico» o «Servicio»), la «Unidad de medida» («Unidad (ud)» de entrada) y la
@@ -360,7 +365,9 @@ TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28
 se puede dar de alta ya desactivado, fuera del TPV hasta que se active (INVENTORY-F03), como vuelve uno
 que estaba desactivado al recuperarse desde una copia aparte (BASE-F114). Una copia de seguridad o una plantilla de
 «Datos y copias» (BASE-F35) guarda qué productos son «Servicio», y al cargarla (BASE-F31) lo siguen siendo.
-Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
+Si falla: «Guardar» está apagado mientras falten Nombre o categoría fiscal, y encima de los botones dice qué
+falta, una cosa cada vez: «Escribe el nombre para continuar.» y después «Elige la categoría fiscal para
+continuar.». También está apagado, sin frase, mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
 como 150 000; hasta entonces, salir del precio o del coste lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende. Sin categorías
@@ -397,7 +404,9 @@ las categorías de producto.
 Sale: el producto cambiado, con sus categorías, en un solo paso. Inventario avisa del cambio y de
 cada categoría añadida o quitada. El precio nuevo vale para lo que se añada a una cuenta desde
 ahora: una cuenta abierta conserva el precio de cuando se pidió (lo decide Ventas).
-Si falla: los mismos rechazos que el alta, dentro del panel, y no se guarda nada.
+Si falla: los mismos rechazos que el alta, dentro del panel, y no se guarda nada. Con el nombre borrado, o con
+la categoría fiscal que Impuestos desactivó todavía puesta, «Guardar cambios» está apagado y dice qué falta,
+como en el alta.
 Pedido al asistente, un producto que el negocio no tiene, o un nombre que vale para varios, no saca tarjeta: el
 asistente dice cuál no está o pregunta cuál es (como en toda acción de Inventario, ver «Servicios»).
 La categoría fiscal no se puede vaciar: el campo no tiene opción vacía. La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
@@ -474,8 +483,10 @@ Pasos:
    quieres, «Tipo de IVA / Impuesto» («— (por defecto)» lo deja vacío).
 3. Pulsa «Guardar» o «Guardar cambios». La categoría sale en la tabla con su número de productos.
 Entra: las categorías fiscales y su tipo, de Impuestos.
-Sale: la categoría guardada. Editarla desde la pantalla no toca lo que la pantalla no enseña: la
-descripción, el icono, el color y el orden que se pusieron por el asistente o la API se conservan.
+Sale: la categoría guardada. Una nueva sale la última en el TPV, detrás de las que ya había; la que
+se crea con su posición (por el asistente o la API) la conserva. Editarla desde la pantalla no toca lo
+que la pantalla no enseña: la descripción, el icono, el color y el orden que se pusieron por el
+asistente o la API se conservan.
 Ventas la lee para la tira de categorías del TPV, y Cocina para elegir qué envía a cada estación.
 Una categoría no se desactiva: se crea, se edita o se elimina.
 Si falla: «Guardar» está apagado sin Nombre. Un rechazo sale dentro del panel, con su
@@ -526,8 +537,8 @@ Sale: el enlace entre producto y categoría, guardado junto con el producto; Inv
 cada categoría añadida o quitada. Un producto puede estar en varias. Ventas filtra la rejilla del
 TPV con estos enlaces (solo de productos activos) y Cocina los usa para su reparto. El TPV enseña
 las categorías en la posición que les dio el negocio (por el asistente o la API, y la que trae la
-plantilla del sector) y, a igual posición, por nombre; las que nadie ha colocado van por nombre. Los
-productos, por nombre.
+plantilla del sector) y, a igual posición, por nombre; una categoría creada sin posición toma la
+siguiente a la última (INVENTORY-F06, F10). Los productos, por nombre.
 Si falla: los rechazos del formulario; si algo falla no se guarda ni el producto ni sus
 categorías. Un producto sin categoría se vende igual: sale en «Todos».
 Implicados: KITCHEN-F04, SALE-F01
@@ -588,7 +599,8 @@ Pasos:
    comas o por punto y coma).
 2. Se reconocen las columnas Nombre (obligatoria), Slug y Categoría fiscal por su cabecera, en
    español o inglés («Nombre»/«name», «IVA»/«tax»…).
-3. Se crea una categoría por fila con nombre; el slug, si no viene, se saca del nombre.
+3. Se crea una categoría por fila con nombre, en el orden del fichero y detrás de las que ya había
+   (en el TPV salen las últimas); el slug, si no viene, se saca del nombre.
 4. Al acabar, «Resultado de la importación»: «Filas», «Creadas», «Omitidas (ya existían)»,
    «Fallidas», una línea por fallo y «Copiar informe». La tabla se recarga.
 Entra: el fichero; las categorías fiscales y los textos aprendidos, de Impuestos.
@@ -719,10 +731,10 @@ Pasos:
    tarjeta de confirmación con el producto, la cantidad y el motivo. Contada en el mismo mensaje que un
    recuento («se han roto tres botellas de agua y he contado los refrescos: quedan 40»), la rotura se da
    de baja igual y el recuento es solo de lo contado: un recuento nunca apunta una rotura.
-3. En **Movimientos** sale «Descuento» con la cantidad en negativo y el motivo.
+3. En **Movimientos** sale «Baja» con la cantidad en negativo y el motivo.
 Entra: el producto, la cantidad (en el escalón de su unidad) y el motivo. También se puede pedir
 por la API.
-Sale: el stock baja y queda el movimiento «Descuento»; Inventario avisa de que el stock cambió y,
+Sale: el stock baja y queda el movimiento «Baja»; Inventario avisa de que el stock cambió y,
 si cruza el umbral, del cruce (INVENTORY-F18). Lo pueden pedir el responsable y el administrador.
 Si falla: si no hay bastante y «Permitir vender sin stock» está apagado, «No hay stock suficiente
 para completar la operación.». Un producto que no existe: «Este producto no existe en este hub.».

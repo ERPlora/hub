@@ -11,7 +11,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday, salonCleanUp } from './appointment-helpers';
-import { cardDeletes } from './customer-helpers';
+import { cardDeletes, pickCustomer } from './customer-helpers';
 import { dayAsShown, pickDay, pickTime } from './date-time-fields';
 import { expectTextClearOfLabel } from './field-labels';
 import { A, api, psql, shot, shown } from './helpers';
@@ -100,12 +100,7 @@ async function goToDay(page: Page, day = DAY): Promise<void> {
 }
 
 async function fillBooking(page: Page, who: Cast): Promise<void> {
-  const form = page.locator('ion-modal[data-testid=appointment-form]');
-  await form.locator('[data-testid=customer-search-trigger]').click();
-  const search = page.locator('ion-modal[data-testid=customer-search-modal]');
-  await search.locator('[data-testid=customer-picker-search] input').fill(who.customer.name);
-  await search.locator(`[data-testid=customer-picker-result-${who.customer.id}]`).click();
-  await expect(search).toBeHidden();
+  await pickCustomer(page, page.locator('ion-modal[data-testid=appointment-form]'), who.customer);
   await chooseServiceStaffAndDay(page, who, DAY);
 }
 
@@ -168,10 +163,11 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     await expect(block).toContainText(who.customer.name);
     await page.screenshot({ path: shot('appointment-grid-desktop'), animations: 'disabled' });
     const box = (await block.boundingBox())!;
+    const hour = (await view.locator('[data-testid=appointment-grid-hour]').first().boundingBox())!.width;
     await page.mouse.move(box.x + 10, box.y + box.height / 2);
     await page.mouse.down();
-    await page.mouse.move(box.x + 60, box.y + box.height / 2, { steps: 5 });
-    await page.mouse.move(box.x + 106, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.move(box.x + 10 + hour / 2, box.y + box.height / 2, { steps: 5 });
+    await page.mouse.move(box.x + 10 + hour, box.y + box.height / 2, { steps: 5 });
     await page.mouse.up();
     await expect
       .poll(() => psql(`select to_char(start at time zone 'Europe/Madrid', 'HH24:MI') from appointment_appointment where id = '${appointment.id}'`))
@@ -206,7 +202,7 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     await page.goto(`${A}/appointment/agenda`);
     await goToDay(page);
     // While its check is open, «Charge» is «Go to the check» and goes back to the same one.
-    await expect(view.locator(`[data-testid=appointment-list-row-${second.id}-charge]`)).toContainText('Go to the check');
+    await expect(view.locator(`[data-testid=appointment-list-row-${second.id}-charge]`)).toHaveAttribute('title', /^Go to the check/);
     await rowAction(page, 'appointment-list', second.id, 'charge');
     await page.waitForURL(/\/sale\/pos\?order=/);
     expect(psql(`select count(*) from sale_order where appointment_id = '${second.id}'`)).toBe('1');
@@ -289,7 +285,7 @@ test('CUSTOMER-F25: a new customer from «New appointment» without leaving the 
     await search.locator('[data-testid=customer-picker-search] input').fill(name);
     await expect(search.locator('[data-testid=customer-picker-empty]')).toBeVisible();
     const quickAdd = search.locator('[data-testid=customer-search-quick-add]');
-    await expect(quickAdd).toHaveText(`+ New customer «${name}»`);
+    await expect(quickAdd).toHaveText(`+ New customer “${name}”`);
     const sizes = [
       ['390', { width: 390, height: 844 }],
       ['834', { width: 834, height: 1112 }],

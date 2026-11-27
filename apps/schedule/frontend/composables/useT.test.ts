@@ -23,7 +23,7 @@ describe('useT', () => {
       }),
       { global: { plugins: [i18n] } },
     );
-    expect(wrapper.text()).toBe('Schedules · «Christmas» will be deleted. This cannot be undone.');
+    expect(wrapper.text()).toBe('Schedules · “Christmas” will be deleted. This cannot be undone.');
     i18n.global.locale.value = 'es';
     await wrapper.vm.$nextTick();
     expect(wrapper.text()).toBe('Horarios · Se eliminará «Christmas». No se puede deshacer.');

@@ -32,3 +32,10 @@ def test_a_name_said_whole_wins_over_the_names_that_contain_it():
     day = make_combo("Day")
     make_combo("Menu of the day")
     assert find_combo(None, "DAY") == day
+
+
+def test_a_menu_said_without_its_accents_is_found():
+    day = make_combo("Menú del día QA")
+    make_combo("Kids menu")
+    assert run("combo.combo.get", {"combo": "menu del dia QA"}).id == day.id
+    assert run("combo.combo.get", {"combo": "menu del día qa"}).id == day.id

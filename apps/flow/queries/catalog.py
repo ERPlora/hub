@@ -42,18 +42,21 @@ def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
 
 
 def catalog_events(scope: Scope) -> dict[str, LiveAppConfig]:
-    """``{event name: its app}``: the ``events.ALL`` of every active app."""
+    """``{event name: its app}``: the ``events.ALL`` of every active app, but its ``events.SYSTEM_ONLY``."""
     return _events_of(active_apps(scope))
 
 
 def _events_of(apps: dict[str, LiveAppConfig]) -> dict[str, LiveAppConfig]:
+    """``{event name: its app}`` of ``apps``, but what only the platform records (``events.SYSTEM_ONLY``)."""
     found: dict[str, LiveAppConfig] = {}
     for label, config in apps.items():
         module_name = f"{config.name}.events"
         if find_spec(module_name) is None:
             continue
-        for name in getattr(importlib.import_module(module_name), "ALL", []):
-            if name.startswith(f"{label}."):
+        module = importlib.import_module(module_name)
+        system_only = set(getattr(module, "SYSTEM_ONLY", ()))
+        for name in getattr(module, "ALL", []):
+            if name.startswith(f"{label}.") and name not in system_only:
                 found[name] = config
     return found
 
@@ -259,7 +262,7 @@ def in_part(data: CatalogIn, app: str, name: str) -> bool:
         },
         "description": "What an automation can start on and do in this business: the events of the active apps "
         "(`sale.sale.completed`…) and the actions and reads it can be granted, with the data each one asks for. "
-        "One with `ask_first` only goes in an «Ask the assistant» step with «Ask me first». A business with many apps "
+        "One with `ask_first` only goes in an `assistant` step whose `mode` is `ask`. A business with many apps "
         "has more than you can read at once: first read the names in the apps you need (`apps` and `only_names`), "
         "then read whole only the events and actions you will use, by name (`names`)."
     },

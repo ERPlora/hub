@@ -12,7 +12,7 @@ import type { BrowserContext } from '@playwright/test';
 import { describe, expect, it } from 'vitest';
 
 import { SAAS } from './helpers';
-import { saasPost } from './saas-owner';
+import { joinsAsEmployee, type SaasOwner, saasPost } from './saas-owner';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -56,6 +56,39 @@ describe('saasPost', () => {
       'POST /hubs/businesses: no csrftoken of the SaaS (sign in first)',
     );
     expect(posted).toEqual([]);
+  });
+});
+
+/** An account signed in on the SaaS whose POSTs are recorded, each answered 200 with `answer`. */
+function accountAnswering(email: string, answer: unknown) {
+  const posted: { url: string; data: unknown }[] = [];
+  const context = {
+    cookies: async () => [{ name: 'csrftoken', value: 'of-the-saas', domain: new URL(SAAS).hostname }],
+    request: {
+      post: async (url: string, options: { data: unknown }) => {
+        posted.push({ url, data: options.data });
+        return { status: () => 200, text: async () => JSON.stringify(answer), json: async () => answer };
+      },
+    },
+  } as unknown as BrowserContext;
+  return { account: { context, credentials: { email, password: '' } } as SaasOwner, posted };
+}
+
+describe('joinsAsEmployee', () => {
+  it("has the owner invite the person as an employee and the person accept, through the SaaS's API", async () => {
+    const owner = accountAnswering('owner@example.com', { id: 'invitation-1' });
+    const person = accountAnswering('person@example.com', {});
+
+    const id = await joinsAsEmployee(owner.account, person.account, { id: 'hub-1', slug: 'bar' });
+
+    expect(id).toBe('invitation-1');
+    expect(owner.posted).toEqual([
+      {
+        url: `${SAAS}/api/hubs/members/invite`,
+        data: { hub_id: 'hub-1', email: 'person@example.com', role: 'hub_employee', message: '' },
+      },
+    ]);
+    expect(person.posted).toEqual([{ url: `${SAAS}/api/hubs/invitations/accept`, data: { id: 'invitation-1' } }]);
   });
 });
 

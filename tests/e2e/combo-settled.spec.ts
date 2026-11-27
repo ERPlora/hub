@@ -104,7 +104,7 @@ test('combo-e2e-wait: after the Menus specs’ wait the till’s menu sheet has 
       await tile.click();
       const sheet = page.locator('ion-modal[data-testid=pos-menu]');
       await expect(sheet).toBeVisible();
-      await expect(sheet.locator('[data-testid=pos-menu-add]')).toContainText('Choose 1 in «Starters»');
+      await expect(sheet.locator('[data-testid=pos-menu-add]')).toContainText('Choose 1 in “Starters”');
       await untilStill(page);
       expect.soft(await moving(page), `still moving after the Menus specs’ wait at ${size.label}`).toEqual([]);
       await capture(page, `${KEY}-${size.label}`);

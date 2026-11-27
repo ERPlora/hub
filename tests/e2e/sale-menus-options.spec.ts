@@ -184,11 +184,11 @@ test('SALE-F12: a menu from «All» is composed course by course, charged by car
   const sheet = page.locator('ion-modal[data-testid=pos-menu]');
   await expect(sheet).toBeVisible();
   const add = sheet.locator('[data-testid=pos-menu-add]');
-  await expect(add).toContainText('Choose 1 in «Starters»');
+  await expect(add).toContainText('Choose 1 in “Starters”');
   await add.click();
   await expect(sheet.locator('.pos-options__group--missing')).toHaveCount(1);
   await sheet.locator(`[data-testid=pos-menu-dish-${await optionOf(context, lentils)}]`).click();
-  await expect(add).toContainText('Choose 1 in «Mains»');
+  await expect(add).toContainText('Choose 1 in “Mains”');
   await sheet.locator(`[data-testid=pos-menu-dish-${await optionOf(context, hake)}]`).click();
   await expect(add).toContainText(/13[.,]50/);
   await shots(page, 'SALE-F12', async () => {
@@ -219,7 +219,7 @@ test('SALE-F20: «Current order» says what waits and sends it to the kitchen as
   await expect(shown(page).locator('[data-testid=pos-cart-round-hint]')).toBeVisible();
   await shown(page).locator('[data-testid=pos-kitchen-rush]').click();
   const send = shown(page).locator('[data-testid=pos-kitchen-send]');
-  await expect(send).toContainText('Send RUSH (1)');
+  await expect(send.locator('button')).toHaveAccessibleName('Send RUSH (1)');
   await shots(page, 'SALE-F20', async () => {
     // The phone keeps the check in a drawer: its button opens it.
     await openTillCart(page);
@@ -276,7 +276,7 @@ test('SALE-F42: the steak of a menu asks its doneness, goes to the kitchen with 
   const options = sheet.locator(`[data-testid=pos-menu-dish-options-${steakChoice}]`);
   await expect(options).toContainText(DONENESS);
   const add = sheet.locator('[data-testid=pos-menu-add]');
-  await expect(add).toContainText(`Choose 1 in «${DONENESS}»`);
+  await expect(add).toContainText(`Choose 1 in “${DONENESS}”`);
   await add.click();
   await expect(options.locator('.pos-options__group--missing')).toContainText(DONENESS);
   await options.getByRole('button', { name: 'Rare' }).click();

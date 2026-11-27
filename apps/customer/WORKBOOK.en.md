@@ -274,17 +274,17 @@ not exist.
 Involved: BASE-F119
 
 ### CUSTOMER-F03 Open a customer's card
-<!-- from WORKBOOK.md sha256:91e5a4c2477e -->
+<!-- from WORKBOOK.md sha256:0a411e680a22 -->
 Status: done
 Actor: everyone
 Screen: Customer card
 Steps:
 1. From **Customers**, tap the row.
 2. The card shows all its details (also internal notes, birthday, anniversary and custom fields; a birthday
-   without its year, as "March 12"), its groups and tags, its consent per channel, the
-   activity (newest first, 50 per page; each entry says when and who: the person by their name or, if their
-   account has none, by what goes before the @ of their email, never the whole email; the API key by its
-   own, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
+   without its year, as "March 12"), its groups and tags, its consent per channel, the activity (newest first, 50
+   per page; each entry says when and who: the person by their name (the one in My profile or, without it, their
+   account's) or, if they have none, by what goes before the @ of their email, never the whole email; the API key
+   by its own, or "Done by the platform" when nobody did it in person, such as the purchase a charged sale
    records, an automation or a recovery from a separate copy), its purchases and the blocks of other apps. The
    email, the phone and the address each consent was given for, only to whoever sees the customers' contact
    details.
@@ -545,7 +545,7 @@ approval is needed", "This needs a manager's approval.". Nothing changes.
 Involved: APPOINTMENT-F23, RESERVATION-F21, SALE-F33, SERVICE-F28, WHATSAPP_INBOX-F12, ONLINE_BOOKING-F09, BASE-F84
 
 ### CUSTOMER-F14 Record the consent of a channel
-<!-- from WORKBOOK.md sha256:0fafbdb274e4 -->
+<!-- from WORKBOOK.md sha256:267361b6ee06 -->
 Status: done
 Actor: everyone who manages cards
 Screen: Customer card
@@ -558,14 +558,19 @@ Steps:
    if they say yes. This exact sentence is what gets stored as the record, together with your name and
    the time.".
 3. If the customer says yes, tap **They said yes**. "Consent recorded." shows.
-In: the channel, the exact sentence and its version, the origin ("at the counter" to begin with) and, if
-there is one, a proof. The address is put by the server with the card's at that moment (the email, the
-phone for WhatsApp, SMS and calls, or the postal address) and who records it comes from the session.
-Out: a new fact that is never edited or deleted, a "Consent given" entry in the activity and the
-consent-given notice (`customer.consent.granted`).
-If it fails: an empty sentence or a date in the future are rejected next to their field; "This customer
-is no longer available." if the card is no longer there. Whoever does not manage cards sees the state
-without buttons. Editing, creating or importing a card NEVER sets consent.
+4. It can also be asked of the assistant ("Lucía says yes to the WhatsApp offers"). Its card says the
+   customer, the channel and "Read it out loud" with the same sentence, to read it to her before tapping
+   **Run it**; nobody types or dictates it. Running it leaves the same as **They said yes**.
+In: the channel, the origin ("at the counter" to begin with) and, if there is one, a proof. Nobody sends
+the sentence and its version: the server puts them, the same on the card, on the assistant's card and in
+the API, in the language of whoever records it. The server also puts the address, with the card's at
+that moment (the email, the phone for WhatsApp, SMS and calls, or the postal address), and who records it
+comes from the session.
+Out: a new fact that is never edited or deleted, with the sentence and its version as the proof, a
+"Consent given" entry in the activity and the consent-given notice (`customer.consent.granted`).
+If it fails: a date in the future is rejected next to its field; "This customer is no longer available."
+if the card is no longer there. Whoever does not manage cards sees the state without buttons. Editing,
+creating or importing a card NEVER sets consent.
 Involved: none
 
 ### CUSTOMER-F15 Withdraw the consent of a channel
@@ -929,7 +934,7 @@ row of its own.
 Involved: BASE-F119
 
 ### CUSTOMER-F32 Note allergies or the sensitivity test with their permission
-<!-- from WORKBOOK.md sha256:0e310d72620d -->
+<!-- from WORKBOOK.md sha256:7e76caefffb6 -->
 Status: done
 Actor: everyone who manages cards (seeing it: everyone)
 Screen: Customer card
@@ -954,15 +959,16 @@ Out: the permission, as one more fact of the consent book (purpose "health data"
 "Activity" and its notice `customer.health.consent_granted` or `customer.health.consent_withdrawn`), and
 the health data, with "Health data updated" in the activity (without its content) and the
 `customer.health.updated` notice. The notices carry only identifiers. Withdrawing the permission ERASES
-the health data in the same step. The assistant neither reads nor notes health data: asked for an allergy,
-it sends to this block (CUSTOMER-F05).
+the health data in the same step. The assistant neither reads nor notes health data: asked to keep an allergy on
+the card, it sends to this block (CUSTOMER-F05). The allergy of whoever is going to eat a dish is no datum of the
+card: it marks it on that dish's line, without this permission (SALE-F41).
 If it fails: without the permission in force nothing is saved: "Record their permission first to keep
 health data.". A test with a future date: "This date is in the future."; a result without a date: "Enter
 the date of the test.", each under its field: it goes as soon as that field is corrected and comes back if
 the next try is refused too; what is not of a field shows in the block and stays until the next try.
 "This customer is no longer available." if the card is no longer there. Whoever
 does not manage cards sees the block without buttons.
-Involved: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16
+Involved: CUSTOMER-F05, CUSTOMER-F13, CUSTOMER-F16, SALE-F41
 
 ### CUSTOMER-F33 Recover a deleted card
 <!-- from WORKBOOK.md sha256:d22a2a0e055b -->

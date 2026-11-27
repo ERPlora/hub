@@ -242,7 +242,7 @@ def test_the_assistants_card_says_the_check_the_dish_and_the_allergy_by_their_na
     arguments = {"order_id": order_id, "line_id": str(line_id), "allergy": ["milk", "gluten"]}
     fields = fields_of("sale.order.set_line_allergy", arguments, "es")
     assert (fields["order_id"]["value"], fields["line_id"]["value"]) == ("Table 4", "Burger")
-    assert (fields["allergy"]["label"], fields["allergy"]["value"]) == ("Alergia del cliente", ["Leche", "Gluten"])
+    assert (fields["allergy"]["label"], fields["allergy"]["value"]) == ("Alergia del cliente", ["Gluten", "Leche"])
 
 
 def test_the_assistant_hears_an_allergen_off_the_list_before_any_card_is_drawn(kitchen):

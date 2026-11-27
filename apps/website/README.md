@@ -43,7 +43,7 @@ producto actual no tenía página por negocio.
 | Usa de otras apps | Inventario y Servicios por el nombre de sus consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`, `service.service.list_for_sale`, `service.category.list`), solo con la app activa en el hub (`base.apps_on.active_apps`). De la plataforma: `base.operations.hub_id`, `base.operations.business_currency` (la moneda de los precios en la vista previa y el catálogo público), `base.business.currency_of` (la misma moneda en la página pública, de la fila del registro que el host ya cargó, sin una transacción por visita) y `base.business.currency_decimals` (sus decimales), `storages["hub_files"]`, `base.media` (`/p/media/…`), `base.throttle` y la zona horaria del hub (`control.Hub.timezone`, el «hoy» del horario; Madrid si está vacía) |
 | La usa | `base.public_home`: la entrada `/` del host del hub carga `apps/website/public_home.py` (`is_published`, `respond`) por `import_module`; ninguna app de negocio la lee |
 | Pantallas | `/website` (editor, vista previa y «Compartir y QR») y la página pública en `/` |
-| Operaciones | 9 consultas (`queries.py`) y 4 acciones (`services.py`); 11 con su ruta en `/api/website/…` (las 3 `website.public.*` sin sesión) y `expose_api`, y `website.category.get` y `website.image.get` sin ruta; todas con `ai=`: 5 herramientas del asistente y las demás `INTERNAL` |
+| Operaciones | 9 consultas (`queries/`) y 4 acciones (`services.py`); 11 con su ruta en `/api/website/…` (las 3 `website.public.*` sin sesión) y `expose_api`, y `website.category.get` y `website.image.get` sin ruta; todas con `ai=`: 5 herramientas del asistente y las demás `INTERNAL` |
 | Eventos | 4, `website.<entidad>.<hecho>` (`events.py`); no reacciona a ninguno |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial`, `0002_theme_palettes`, `0003_theme_overrides` (las dos, solo JSON del tema), `0004_site_reviews_snapshot` y `0005_image_filename`; todas reversibles |
@@ -66,7 +66,7 @@ pnpm e2e tests/e2e/website-flows.spec.ts tests/e2e/website.spec.ts   # sin GOOGL
 ```
 
 - Servidor: un `tests/test_<fichero>.py` por fichero; `test_live.py` prueba que guardar y publicar en un hub no avisa
-  a otro, y `test_queries.py`/`test_services.py` que cada hub lee y escribe solo su fila.
+  a otro, y `test_queries_*.py`/`test_services.py` que cada hub lee y escribe solo su fila.
 - Pantallas y paquete público: `frontend/**/*.test.ts`; el catálogo y las reseñas se pintan igual en el servidor y en
   el paquete (`frontend/public/*.fixture.json`, comprobados por los dos lados).
 - `website-flows.spec.ts` recorre un test por flujo en 390, 834 y 1440 px y deja la página de `a` desconectada al

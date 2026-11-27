@@ -6,6 +6,7 @@ from live.operations import operation
 from apps.appointment.schemas.agenda import LanesIn, LanesOut
 from apps.staff.models import Member
 from base.business import zone_name
+from base.only_theirs import only_theirs
 
 from .access import VIEW_OWN, own_staff_id
 from .business import day_bounds
@@ -65,6 +66,7 @@ def agenda_lanes(ctx: OperationContext, data: LanesIn) -> dict:
         members = bookable + list(kept.order_by("first_name", "last_name", "id"))
         unassigned = in_range.filter(staff__isnull=True).count()
     else:
+        only_theirs()
         members = list(Member.objects.filter(pk=own)) if own else []
         unassigned = 0
     return {

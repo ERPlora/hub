@@ -38,6 +38,7 @@ OWN_BADGE = "base.badge_own"
 
 #: Why a person cannot be given a role by who asks.
 ROLE_OF_OWNER = "base.role_of_owner"
+ROLE_OF_ACCOUNTANT = "base.role_of_accountant"
 ROLE_OWN = "base.role_own"
 ROLE_ABOVE = "base.role_above"
 
@@ -45,6 +46,9 @@ OWNER_ONLY_MESSAGE = _("Only the owner changes the owner's way in.")
 OWN_BADGE_MESSAGE = _("Nobody registers their own badge: ask another administrator.")
 ROLE_REFUSALS = {
     ROLE_OF_OWNER: _("The owner is always the owner: nobody gives them another role."),
+    ROLE_OF_ACCOUNTANT: _(
+        "The accountancy firm only reads and takes no place of the plan: it keeps the role of its invitation."
+    ),
     ROLE_OWN: _("Nobody changes their own role: ask somebody above you."),
     ROLE_ABOVE: _("You may only give a role to people below you in the business."),
 }
@@ -72,9 +76,12 @@ def refusal(*, actor: str, actor_role: str, target: str, target_role: str, badge
 
 def role_refusal(*, actor: str, actor_role: str, target: str, target_role: str) -> str | None:
     """Why ``actor`` (a username, with the role of its invitation) may not change the role of ``target`` in the business;
-    ``None`` when it may: only of somebody below, by their invitations."""
+    ``None`` when it may: only of somebody below, by their invitations, and never of the accountancy firm, whose
+    place of the plan is free because it only reads."""
     if target_role == Membership.Role.OWNER:
         return ROLE_OF_OWNER
+    if target_role == Membership.Role.ACCOUNTANT:
+        return ROLE_OF_ACCOUNTANT
     if actor == target:
         return ROLE_OWN
     return ROLE_ABOVE if role_rank(target_role) <= role_rank(actor_role) else None
