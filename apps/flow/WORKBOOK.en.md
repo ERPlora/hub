@@ -100,11 +100,10 @@ gallery**, with ready-made automations to start from and the ones other apps bri
 and each row open the editor, and **How does this work?** opens the guide.
 
 #### What it shows, from top to bottom
-<!-- from WORKBOOK.md sha256:2a6d9b6c391c -->
+<!-- from WORKBOOK.md sha256:ffe93a8a999d -->
 Menu **Automations**, a single entry. From top to bottom:
 
-- The **New automation** button, top right; on a phone it is only its **+**, so that the title can be read
-  in full.
+- The **New automation** button, top right: only its **+**, with its name on hover.
 - **Waiting for your answer** — only if there is some question you can answer: each card, which automation
   it comes from, the question and its details (in a change by the assistant, also, right below the
   question, what it wants to do —"Cancel a reservation"— and each piece of data it would send, in words),
@@ -229,15 +228,16 @@ your answer**, with what an automation asks them.
 Involved: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 See, search and sort the automations
-<!-- from WORKBOOK.md sha256:f1ee30a2384a -->
+<!-- from WORKBOOK.md sha256:6fe3e4d161f2 -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
 Steps:
 1. In **Your automations** each row says the name, when it starts in words, when it last ran and how it
-   ended, and whether it is "Active" or "Paused". A name that does not fit in its row ends in an ellipsis,
-   never split mid-word: it can be read in full by resting the pointer on it, on the phone's card and when
-   opening it.
+   ended, and whether it is "Active" or "Paused". A long name is read in full, never split mid-word: on a
+   tablet and on a desk it takes the lines it needs in its row, broken between words, and it also shows when
+   resting the pointer on it; on the phone's card the title ends in an ellipsis past two lines and the name
+   is read in full below, under "Name", and when opening it.
 2. Type in the search box (name, the notice that starts it or the actions it does) or filter by
    **Showing** and **Starts with**; sort by **Last touched** or **Name**.
 3. With no results: "Nothing here matches that." and **Show them all again**.
@@ -758,7 +758,7 @@ texts). The other customers' runs carry on.
 Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Resume a run from the step that failed
-<!-- from WORKBOOK.md sha256:3917331922d1 -->
+<!-- from WORKBOOK.md sha256:9843e8426ee8 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -768,9 +768,12 @@ Steps:
    system to answer.
 2. Press the button and confirm: "Resume it from the step that failed?" with **Yes, resume it** or
    **Cancel**.
-3. "Resumed: it finished well." appears (or "…it is waiting"); if it fails again, "It was resumed and stopped
-   by an error again: …" next to the run, which can be resumed again. Its steps keep "Resumed here, from the
-   step that had failed".
+3. The notice says what the run is doing at that moment, as the one of **Run now** does: "Resumed: it finished
+   well.", "…it finished, the condition was not met.", "…it is waiting", "…it is calling another system", "…it is
+   waiting for an answer in “Waiting for your answer”." or "…the assistant is on it"; never "finished well" of
+   one that is still going on. If it fails again, at once or when the other system does not answer, "It was
+   resumed and stopped by an error again: …" next to the run, which can be resumed again. Its steps keep
+   "Resumed here, from the step that had failed".
 In: the run stopped by an error (by voice, by its reference: "resume the welcome one that failed"). The
 assistant's card names it "Automation run: Welcome · 15 Oct 2026, 21:00", as History does and with its
 automation in front, never by its code.

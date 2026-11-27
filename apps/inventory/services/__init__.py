@@ -17,6 +17,7 @@ from . import (
     products as products,
     sale_reactions as sale_reactions,
     settings as settings,
+    skus as skus,
     stock as stock,
     writes as writes,
 )

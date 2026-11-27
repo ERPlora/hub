@@ -82,7 +82,7 @@ def test_an_employee_is_told_only_of_her_own_agenda(salon, make_user):
 
 
 def test_an_erased_customer_is_still_told_without_her_name(salon):
-    from apps.appointment.models import Appointment
+    from apps.appointment.models.appointments import Appointment
 
     erased = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), source="whatsapp")
     Appointment.objects.filter(pk=erased.pk).update(customer_name="")

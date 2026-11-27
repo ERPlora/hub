@@ -146,10 +146,11 @@ def told(plan: dict) -> dict:
 
 def test_a_new_member_tells_the_model_where_the_roles_are_and_checks_its_role_before_the_card():
     """The tool invites the model to read the business's roles first (``staff.role.list``), and the write names the
-    read that checks its role before its card (``staff.role.resolve``, with the write's own permission)."""
+    reads that check its role (``staff.role.resolve``, with the write's own permission) and its account
+    (``staff.account.check``) before its card."""
     create = get("staff.member.create")
     assert "staff.role.list" in shared.description(create)
-    assert assistant.cards.check_of(create) == "staff.role.resolve"
+    assert assistant.cards.check_of(create) == ("staff.role.resolve", "staff.account.check")
     resolve = get("staff.role.resolve")
     assert (resolve.kind, assistant.tools.is_tool(resolve), resolve.permission) == ("query", False, create.permission)
 
@@ -168,10 +169,7 @@ def test_a_new_member_with_a_role_the_business_does_not_have_gets_no_card_and_th
     datum (``invalid_payload`` on ``role`` or ``role_id``) and nothing is created."""
     make_role("Retired", is_active=False)
     plan = turn(call("staff.member.create", {"first_name": "Luis", "last_name": "QA", **role}))
-    assert plan["confirm"] is None
-    assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
-        ("staff.member.create", "error", "invalid_payload")
-    ]
+    assert (plan["confirm"], plan["executed"]) == (None, [])
     error = told(plan)["error"]
     assert (error["code"], set(error["fields"])) == ("invalid_payload", set(role))
     assert not Member.objects.exists()

@@ -16,7 +16,7 @@ from django.utils.text import slugify
 from django.utils.translation import gettext_lazy as _
 
 from base import images
-from base.blueprint.datasets import DATASETS, _datasets_by_key
+from base.blueprint.datasets import _datasets_by_key, every_dataset
 
 FORMAT = "erplora.blueprint"
 FORMAT_VERSION = 1
@@ -227,4 +227,4 @@ def _rows(raw: Any) -> list[dict]:
 
 def _in_order(data: dict[str, list[dict]]) -> dict[str, list[dict]]:
     """The datasets in their load order (a category before the products that name it)."""
-    return {dataset.key: data[dataset.key] for dataset in DATASETS if dataset.key in data}
+    return {dataset.key: data[dataset.key] for dataset in every_dataset() if dataset.key in data}

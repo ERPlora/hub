@@ -62,6 +62,7 @@ function remove(index: number): void {
         fill="clear"
         color="medium"
         :aria-label="$t('schedule.intervals.remove')"
+        :title="$t('schedule.intervals.remove')"
         :disabled="rows.length <= 1"
         @click="remove(index)"
       >

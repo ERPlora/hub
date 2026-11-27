@@ -21,7 +21,7 @@ import pytest
 from django.apps import apps as global_apps
 from django.db import IntegrityError, connections, transaction
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.whatsapp_inbox.tests.test_migrations import migrate
 from base.tenancy.context import current_alias
 

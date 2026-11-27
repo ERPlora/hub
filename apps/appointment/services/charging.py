@@ -9,7 +9,7 @@ from live.errors import AppInactive, Conflict, NotFound, OperationError, Permiss
 from live.operations import UnknownOperation, get, operation
 
 from apps.appointment import events
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.queries.access import CHANGE_OWN, may_change
 from apps.appointment.queries.reads import find_appointment
 from apps.appointment.schemas.appointments import AppointmentRefIn

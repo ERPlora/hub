@@ -386,10 +386,8 @@ def test_with_the_count_required_a_close_without_a_count_gets_no_card_and_hears_
     failure, preview = close_preview({})
     assert (failure.outcome, failure.code, preview) == ("error", "cash_register.closing_balance_required", None)
     plan = turn(call("cash_register.session.close", {}))
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [
-        ("error", "cash_register.closing_balance_required")
-    ]
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    assert json.loads(plan["append"][0]["content"])["error"]["code"] == "cash_register.closing_balance_required"
     assert Session.objects.get().status == Session.Status.OPEN
 
 

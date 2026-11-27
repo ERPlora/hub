@@ -69,7 +69,7 @@ class Salon:
 
     def live(self) -> list[tuple]:
         """The business's live appointments: their customer's name, professional, start, minutes, services and notes."""
-        from apps.appointment.models import Appointment
+        from apps.appointment.models.appointments import Appointment
 
         with use_hub(self.hub):
             return [
@@ -93,7 +93,7 @@ def booked_events(hub: Hub, name: str = "appointment.appointment.created") -> in
 def gone_from_the_agenda(hub: Hub, *appointments) -> None:
     """``appointments``' rows gone altogether from ``hub``, with what hangs from them: what the business no longer has
     (no operation destroys an appointment: a lost database does)."""
-    from apps.appointment.models import Appointment
+    from apps.appointment.models.appointments import Appointment
 
     with use_hub(hub):
         Appointment.objects.filter(pk__in=[one.id for one in appointments]).delete()
@@ -118,7 +118,7 @@ class TestAppointmentsComeBack:
     def test_a_deleted_appointment_comes_back_the_same_and_one_gone_is_booked_anew(self, recoveries, every_app_on):
         """hub#1326: the one the business deleted (APPOINTMENT-F11 keeps it) comes back by Appointments' restore, with
         its number and its history; only the one it no longer has is booked again, by the agenda's create."""
-        from apps.appointment.models import Appointment
+        from apps.appointment.models.appointments import Appointment
 
         salon = Salon(recoveries, every_app_on, ANA, LUIS)
         ana, luis = salon.cards

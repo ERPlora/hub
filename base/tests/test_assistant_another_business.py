@@ -20,7 +20,7 @@ from live.operations import get
 from apps.inventory.queries.exports import PRODUCT_HEADERS
 from base import assistant
 from base.assistant.tools import NOT_FROM_CHAT
-from base.blueprint.datasets import DATASETS, dataset
+from base.blueprint.datasets import dataset, every_dataset
 from base.blueprint.photos import IMAGE_OPERATIONS
 from base.models import Membership
 from base.permissions import access_for
@@ -88,7 +88,7 @@ def test_what_the_tool_says_of_the_export_is_what_the_export_does(name):
     assert "products and services go with their own photos" in said
     assert dataset("customer.customer").personal
     assert "never the customers" in said
-    assert "sale" not in {part.app for part in DATASETS}
+    assert "sale" not in {part.app for part in every_dataset()}
     assert "never the business's history" in said
 
 
