@@ -2,7 +2,6 @@
 and resolved."""
 
 
-from django.db.models import Q
 from django.utils import translation
 from live.context import OperationContext
 from live.operations import operation
@@ -11,6 +10,7 @@ from apps.tax.models import TaxAlias
 from apps.tax.queries.naming import resolve_category_text
 from apps.tax.schemas.aliases import AliasListIn, AliasPage, AliasResolveIn, AliasResolveOut
 from base.ordering import list_order
+from base.text_search import contains_text
 
 
 def alias_row(alias: TaxAlias) -> dict:
@@ -57,9 +57,9 @@ def list_aliases(ctx: OperationContext, params: AliasListIn) -> dict:
         aliases = TaxAlias.objects.select_related("category").filter(is_active=True)
         if params.search:
             search = params.search.strip()
-            aliases = aliases.filter(Q(alias__icontains=search) | Q(category__key__icontains=search))
+            aliases = aliases.filter(contains_text(search, "alias", "category__key"))
         if params.alias:
-            aliases = aliases.filter(alias__icontains=params.alias.strip())
+            aliases = aliases.filter(contains_text(params.alias.strip(), "alias"))
         if params.tax_category_key:
             aliases = aliases.filter(category__key=params.tax_category_key)
         if params.source:

@@ -277,7 +277,8 @@ def _disable_card(ctx: OperationContext, arguments: dict, fields: list[dict]) ->
 def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F18/F24: the app on and chosen, and what it needs on along with it (not chosen: it does not count). A
     paid one without its right (or needing one) is 402 ``app_entitlement_blocked``; one more chosen app at the plan's
-    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this);
+    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this),
+    but never one the business's country requires;
     409 ``base.app_vetoed`` when it, or what would come along, refuses (``can_enable``, hub#694).
     While the hub's tables for it (or for what it needs) are not made yet, ``creating`` (202): the worker makes them
     and turns it on; one that failed is tried again."""
@@ -285,9 +286,10 @@ def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
         return _enable(ctx, data)
 
 
-def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:  # noqa: C901
+def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     hub = _business_hub(ctx)
-    app = _business_module(ctx, data.app, hub).label
+    config = _business_module(ctx, data.app, hub)
+    app = config.label
     graph = activation.module_graph()
     blocked = entitlement.blocked_apps(ctx.scope)
     for label in [app, *sorted(activation.needs([app], graph))]:
@@ -306,17 +308,7 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:  # noqa: C901
     if vetoed is not None:
         raise AppVetoed(vetoed[1], app=vetoed[0])
     if changes.get(app, current[app]).chosen and not (current[app].wanted and current[app].chosen):
-        limit = queries.apps.app_limit(hub)
-        shown = {config.label for config in home.shown_modules.shown_modules(demo_hub=bool(hub and hub.is_demo))}
-        enabled = activation.chosen_on(current, among=shown)
-        if limit is not None and enabled >= limit:
-            with translation.override(ctx.language):
-                message = ngettext(
-                    "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off.",
-                    "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off.",
-                    limit,
-                ) % {"count": limit}
-            raise AppLimitReached(message, max_apps=limit, enabled=enabled)
+        _refuse_past_limit(ctx, hub, config, current)
     changes = _tables_first(changes, current, apps_created(hub))
     _write_states(ctx.scope.key, changes)
     on_now = [label for label, row in changes.items() if row.on]
@@ -331,6 +323,25 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:  # noqa: C901
     if on_now:
         _load_what_waited(ctx, on_now)
     return _app_answer(app, answer, _named(ctx, along), already=current[app].on)
+
+
+def _refuse_past_limit(ctx: OperationContext, hub: Hub | None, config: Any, current: dict) -> None:
+    """One more app the business chooses at its plan's limit: 402 ``base.app_limit_reached``. Never one its country
+    requires (VeriFactu in Spain): the plan's limit never keeps a business from what the law asks of it."""
+    if home.mandatory_apps.mandatory_in(config, hub.country if hub else ""):
+        return
+    limit = queries.apps.app_limit(hub)
+    shown = {module.label for module in home.shown_modules.shown_modules(demo_hub=bool(hub and hub.is_demo))}
+    enabled = activation.chosen_on(current, among=shown)
+    if limit is None or enabled < limit:
+        return
+    with translation.override(ctx.language):
+        message = ngettext(
+            "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off.",
+            "You have reached the %(count)s-app limit of your plan. Upgrade your plan or turn one off.",
+            limit,
+        ) % {"count": limit}
+    raise AppLimitReached(message, max_apps=limit, enabled=enabled)
 
 
 def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
@@ -425,7 +436,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     # A dict, not AI(...): AI has no ``check`` (base.assistant.cards.check_of), the read run before the card (hub#542, hub#539).
     ai={
         "description": "Tries again to set up one of this business's apps that could not be turned on (its state "
-        "«failed» in base.app.list; by its name as the person says it, or its id), with what it needs that failed too: "
+        "`failed` in base.app.list; by its name as the person says it, or its id), with what it needs that failed too: "
         "it is set up in a moment and then shows in the menu. Refused for an app that is not waiting for it, or when the "
         "name fits several apps (ask which one).",
         "risk": "normal",

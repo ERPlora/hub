@@ -1,12 +1,12 @@
 // «ExportButton»: a toolbar button that saves a file the server writes with the rows a list shows. Shared by the
-// screens that export: it asks `load` for the file, hands it to the Hub's `saveFile`, says while it works, takes no
-// second click, and tells a refusal with its reason.
+// screens that export: the download icon alone, named and titled by its label; it asks `load` for the file, hands it
+// to the Hub's `saveFile`, spins and says so while it works, takes no second click, and tells a refusal with its reason.
 import { toastError } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { browserDownloads, outOfTheApp } from '../__tests__/app-download';
-import { flush, mountBase } from '../__tests__/mount-base';
+import { accessibleName, flush, mountBase } from '../__tests__/mount-base';
 import ExportButton from './ExportButton.vue';
 
 afterEach(() => {
@@ -23,6 +23,11 @@ const PROPS = {
 const mount = (load: () => Promise<{ filename: string; blob: Blob }>, over: Record<string, unknown> = {}) =>
   mountBase(ExportButton, { props: { ...PROPS, load, ...over } });
 const button = (m: Awaited<ReturnType<typeof mount>>) => m.wrapper.get('[data-testid="x-export"]');
+/** The button is its icon alone: what it says is its accessible name and its tooltip. */
+const says = (m: Awaited<ReturnType<typeof mount>>) => {
+  const el = button(m);
+  return { shown: el.text(), name: accessibleName(el.element), tooltip: el.attributes('title'), spins: el.find('ion-spinner').exists() };
+};
 
 describe('ExportButton', () => {
   it('asks for the file once, saves it under its name and says so while it works', async () => {
@@ -30,18 +35,19 @@ describe('ExportButton', () => {
     const load = vi.fn(() => new Promise<{ filename: string; blob: Blob }>((resolve) => (answer = resolve)));
     const saved = browserDownloads();
     const m = await mount(load);
-    expect(button(m).text()).toBe('Download in Excel');
+    expect(says(m)).toEqual({ shown: '', name: 'Download in Excel', tooltip: 'Download in Excel', spins: false });
     await button(m).trigger('click');
     await button(m).trigger('click');
     expect(load).toHaveBeenCalledTimes(1);
-    expect(button(m).text()).toBe('Preparing…');
+    await flush();
+    expect(says(m)).toEqual({ shown: '', name: 'Preparing…', tooltip: 'Preparing…', spins: true });
     expect(m.wrapper.getComponent(IonButton).props('disabled')).toBe(true);
 
     answer({ filename: 'invoices.xlsx', blob: new Blob(['x']) });
     await flush();
     await flush();
     expect(saved.map((file) => file.name)).toEqual(['invoices.xlsx']);
-    expect(button(m).text()).toBe('Download in Excel');
+    expect(says(m)).toMatchObject({ name: 'Download in Excel', spins: false });
   });
 
   it('a refusal is told with its reason and can be tried again', async () => {

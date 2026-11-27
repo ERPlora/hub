@@ -39,6 +39,7 @@ from apps.cart_checkout.schemas import (
 from base import operations as platform
 from base.business import currency_decimals
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 CART_NOT_FOUND = _("That cart does not exist in this business.")
 CART_AMBIGUOUS = _("“%(said)s” matches several carts: %(codes)s. Say which one.")
@@ -134,7 +135,7 @@ def _by_customer(said: str) -> UUID | None:
     carts of ONE customer, the only active one (an old converted cart does not make «Ana's cart»
     ambiguous); carts of different customers («ana» is a piece of «Mariana») are always asked about."""
     candidates: list[Cart] = []
-    for lookup in (Q(customer_email__iexact=said), Q(customer_name__icontains=said)):
+    for lookup in (Q(customer_email__iexact=said), contains_text(said, "customer_name")):
         candidates = list(live_carts().filter(lookup).order_by("session_token", "id"))
         if candidates:
             break
@@ -279,13 +280,13 @@ def _bounds(**bounds) -> dict:
     return {lookup: value for lookup, value in bounds.items() if value is not None}
 
 
-def _containing(**fragments) -> dict:
-    """``field__icontains`` for every fragment given (stripped; an empty one narrows nothing)."""
-    return {
-        f"{field}__icontains": text.strip()
-        for field, text in fragments.items()
-        if text is not None and text.strip()
-    }
+def _containing(**fragments) -> Q:
+    """The rows whose field contains every fragment given (stripped; an empty one narrows nothing)."""
+    found = Q()
+    for field, text in fragments.items():
+        if text is not None and text.strip():
+            found &= contains_text(text.strip(), field)
+    return found
 
 
 # --- Carts ----------------------------------------------------------------------------------------
@@ -321,11 +322,9 @@ def list_carts(ctx: OperationContext, params: CartListIn) -> dict:
     carts = live_carts()
     if params.search and params.search.strip():
         text = params.search.strip()
-        carts = carts.filter(
-            Q(session_token__icontains=text) | Q(customer_email__icontains=text) | Q(customer_name__icontains=text)
-        )
+        carts = carts.filter(contains_text(text, "session_token", "customer_email", "customer_name"))
     carts = carts.filter(
-        **_containing(
+        _containing(
             session_token=params.session_token,
             customer_email=params.customer_email,
             customer_name=params.customer_name,
@@ -417,13 +416,11 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     items = cart.items.all()  # Its lines know their cart (its currency): no read of it per line.
     if params.search and params.search.strip():
         text = params.search.strip()
-        items = items.filter(
-            Q(product_ref__icontains=text) | Q(product_name__icontains=text) | Q(sku__icontains=text)
-        )
+        items = items.filter(contains_text(text, "product_ref", "product_name", "sku"))
     if params.product_ref:
         items = items.filter(product_ref=params.product_ref.strip())
     items = items.filter(
-        **_containing(product_name=params.product_name, sku=params.sku),
+        _containing(product_name=params.product_name, sku=params.sku),
         **_bounds(
             quantity__gte=params.quantity_min,
             quantity__lte=params.quantity_max,
@@ -494,7 +491,7 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     orders = Order.objects.select_related("cart")
     if params.search and params.search.strip():
         text = params.search.strip()
-        orders = orders.filter(Q(order_number__icontains=text) | Q(customer_email__icontains=text))
+        orders = orders.filter(contains_text(text, "order_number", "customer_email"))
     if params.cart_id:
         orders = orders.filter(cart_id=params.cart_id)
     if params.status:
@@ -504,7 +501,7 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     if params.currency and params.currency.strip():
         orders = orders.filter(currency=params.currency.strip().upper())
     orders = orders.filter(
-        **_containing(
+        _containing(
             order_number=params.order_number,
             customer_email=params.customer_email,
             payment_method=params.payment_method,

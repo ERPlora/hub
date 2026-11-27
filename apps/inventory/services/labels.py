@@ -29,7 +29,7 @@ SKU_NOT_BARCODE = _(
     expose_api=True,
     ai={
         "description": "Print the barcode label of a product (its name, its SKU as the code and its price) on the "
-        "printer of the «Label» function, named by its id, SKU or name; each call prints one label. When the answer "
+        "printer of the label function, named by its id, SKU or name; each call prints one label. When the answer "
         "says no device that prints that printer is on, say it stays in the queue until a device set up in Printing › "
         "Devices prints it, never that it was printed.",
         "risk": "normal",
