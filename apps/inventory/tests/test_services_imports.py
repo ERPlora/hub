@@ -93,6 +93,18 @@ def test_repeating_a_category_file_duplicates_nothing():
     assert Category.objects.count() == 1
 
 
+def test_imported_categories_go_after_the_last_one_in_the_order_of_the_file():
+    run("inventory.category.create", CategoryIn(name="Starters", order=2))
+
+    import_categories({"name": "Wines"}, {"name": ""}, {"name": "Beers"})
+
+    assert list(Category.objects.order_by("order", "name").values_list("name", "order")) == [
+        ("Starters", 2),
+        ("Wines", 3),
+        ("Beers", 4),
+    ]
+
+
 # inventory.product.bulk_create (INVENTORY-F09)
 
 
