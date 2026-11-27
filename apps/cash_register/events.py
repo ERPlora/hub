@@ -1,6 +1,6 @@
 """Events of the cash register app (``cash_register.<entity>.<fact>``) and its reactions: none.
 
-services.py records them in the outbox, in the command's transaction; live.py names the ones that re-run
+services/ records them in the outbox, in the command's transaction; live.py names the ones that re-run
 each live query. Each event carries only what the WORKBOOK's «Lo que avisa» lists.
 
 No reactions: the sale lines of a shift are read from sale (its requirement) when they are looked at, so

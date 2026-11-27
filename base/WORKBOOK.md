@@ -3123,8 +3123,8 @@ Pasos:
      cortó.», con «Reintentar».
   3. «Nueva conversación», arriba del panel, la vacía y empieza de cero.
   4. Al cerrar sesión (también cuando la caja se cierra sola por inactividad) se borra, y se corta la respuesta que
-     estuviera llegando. Al cambiar de usuario con PIN, la de quien se fue se borra con lo que hubiera escrito sin
-     enviar y sus adjuntos, y quien llega encuentra el panel cerrado y vacío.
+     estuviera llegando. Al cambiar de usuario, con PIN o con placa, la de quien se fue se borra con lo que hubiera
+     escrito sin enviar y sus adjuntos. En los dos casos, quien entra después encuentra el panel cerrado y vacío.
   5. Se guarda lo que escribió la persona (de sus adjuntos, solo el nombre), lo que respondió el asistente, sus avisos
      y sus recibos.
 Entra: los mensajes del panel; los cierres de sesión y los cambios de usuario.
@@ -4950,8 +4950,10 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   los de las apps; en `base.assistant` quedan solo los del Hub (`empty`, `setupIntro`, `shortcuts`, `setup`,
   `card.actions`, `card.operations` y `screens`). Estado por pestaña en `state.ts` del paquete; la conversación, en
   `sessionStorage` (`erplora.assistant.history`, de una persona: otra empieza vacía) y el abierto o cerrado en
-  `localStorage` (`erplora.assistant.open`); sin IndexedDB. `signOut()` de `frontend/main.ts` la olvida antes de
-  `logout` (también el bloqueo por inactividad). Comprobaciones de la respuesta en `grounding.ts`, formato en
+  `localStorage` (`erplora.assistant.open`); sin IndexedDB. Quien deja la caja se lleva su conversación y deja el
+  panel cerrado (`handOverAssistant()` de `lib/sign-out.ts`): `signOut()` de `frontend/main.ts` lo hace antes de
+  `logout` (también el bloqueo por inactividad) y «Cambiar de usuario» antes de recargar la pantalla para quien entra,
+  con PIN y con placa. El abierto o cerrado es del dispositivo y, sin eso, pasaría a la persona siguiente. Comprobaciones de la respuesta en `grounding.ts`, formato en
   `markdown.ts` (nunca `v-html`), adjuntos y voz en `input.ts` (`MediaRecorder`, dos minutos), el dictado en
   `dictation.ts` (`useDictation`: una grabación por pulsación, 2 MB, el texto al cuadro y el panel abierto; el mismo
   para el cuadro y para la app que abre el asistente dictando), fallos y cupo en `guide.ts`, todos en
