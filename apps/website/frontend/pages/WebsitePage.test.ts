@@ -454,7 +454,9 @@ describe('WebsitePage', () => {
     await s.show();
     // One hook per control: the button and its dialog are told apart (the e2e clicks the button by it).
     expect(s.wrapper.findAll('[data-testid="website-share"]')).toHaveLength(1);
-    await s.wrapper.get('[data-testid="website-share"]').trigger('click');
+    const share = s.wrapper.get('[data-testid="website-share"]');
+    expect([share.text(), share.attributes('aria-label'), share.attributes('title')]).toEqual(['', 'Share and QR', 'Share and QR']);
+    await share.trigger('click');
     await settle();
     expect(s.testid('website-share-url').text()).toBe('https://a.erplora.com/');
   });

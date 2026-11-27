@@ -1,7 +1,7 @@
 // «Your automations» (WORKBOOK FLOW-F02, F03, F06, F07): the live list of the business's automations in a
 // server-side DataTable — name and when it starts in words, its last run, Active/Paused with its switch
-// —, search, «Showing», «Starts with» and «Order»; several chosen are turned on or paused at once; each
-// row is copied or deleted (asked first); a row opens the editor.
+// —, search, «Order», and «Showing» and «Starts with» behind the table's filters button; several chosen are
+// turned on or paused at once; each row is copied or deleted (asked first); a row opens the editor.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
@@ -82,7 +82,10 @@ describe('FlowList', () => {
     const s = await setup();
     expect(s.params(OP)).toEqual([{ sort: '-updated_at', limit: 50, offset: 0 }]);
     expect(s.table().props()).toMatchObject({ serverSide: true, searchable: true, selectable: true, testid: 'flow-list', total: 2 });
-    expect((s.table().props() as Record<string, unknown>).searchPlaceholder).toBe('Search by name, by what starts it or by what it does');
+    // Three columns, like the Hub's other short lists: no column chooser, so the search, «Order» and the filters
+    // button keep one line on a desk.
+    expect((s.table().props() as Record<string, unknown>).columnPicker).toBe(false);
+    expect((s.table().props() as Record<string, unknown>).searchPlaceholder).toBe('Search automation…');
   });
 
   it('each row says its name, when it starts, its last run and whether it is on', async () => {
@@ -92,7 +95,7 @@ describe('FlowList', () => {
     expect(first.text()).toContain('When a sale is charged');
     expect(first.text()).toContain('Never ran');
     expect(first.text()).toContain('Active');
-    expect(second.text()).toContain('Every day at 09:00');
+    expect(second.text()).toContain('Every day at 9:00 AM');
     expect(second.text()).toContain('Stopped by an error');
     expect(second.text()).toContain('Paused');
   });
@@ -106,19 +109,59 @@ describe('FlowList', () => {
     expect(titled).toContainEqual(['When a sale is charged', 'When a sale is charged']);
   });
 
-  it('«Showing», «Starts with» and «Order» query the server again', async () => {
+  it('«Showing» and «Starts with» are filters of the table, behind its filters button (FLOW-F02)', async () => {
     const s = await setup();
-    await ionValue(s.find('flow-list-state').element, 'paused');
-    await ionValue(s.find('flow-list-trigger').element, 'schedule');
+    const props = s.table().props() as Record<string, unknown>;
+    expect(props.filterable).toBe(true);
+    expect(props.filterFields).toEqual([
+      {
+        key: 'state',
+        label: 'Showing',
+        type: 'select',
+        options: [
+          { value: 'active', label: 'Only the running ones' },
+          { value: 'paused', label: 'Only the paused ones' },
+        ],
+      },
+      {
+        key: 'trigger_kind',
+        label: 'Starts with',
+        type: 'select',
+        options: [
+          { value: 'event', label: 'Something happening' },
+          { value: 'schedule', label: 'The clock' },
+          { value: 'at', label: 'A date' },
+          { value: 'manual', label: 'You, by hand' },
+        ],
+      },
+    ]);
+    expect(s.find('flow-list-state').exists()).toBe(false);
+    expect(s.find('flow-list-trigger').exists()).toBe(false);
+  });
+
+  it('«Order» is a select of its own in the bar, named for assistive tech (FLOW-F02)', async () => {
+    const s = await setup();
+    const order = s.find('flow-list-sort');
+    expect(order.attributes('aria-label')).toBe('Order');
+    // Ionic Vue hands these to the element as properties, never as attributes.
+    const select = order.element as HTMLElement & { label?: string; fill?: string };
+    expect(select.label).toBeUndefined();
+    expect(select.fill).toBeUndefined();
+  });
+
+  it('the filters and «Order» query the server again', async () => {
+    const s = await setup();
+    s.table().vm.$emit('filtersChange', { state: 'paused', trigger_kind: 'schedule' });
     await ionValue(s.find('flow-list-sort').element, 'name');
     await s.reopen();
     expect(s.params(OP)).toEqual([{ sort: 'name', enabled: false, trigger_kind: 'schedule', limit: 50, offset: 0 }]);
+    expect((s.table().props() as Record<string, unknown>).filters).toEqual({ state: 'paused', trigger_kind: 'schedule' });
     expect(s.find('flow-list-count').text()).toBe('Showing 2 of 2');
   });
 
   it('each switch says which automation it turns on or off', async () => {
     const s = await setup();
-    expect(s.find('flow-list-toggle-f1').attributes('aria-label')).toBe('Turn «Flow f1» on or off');
+    expect(s.find('flow-list-toggle-f1').attributes('aria-label')).toBe('Turn “Flow f1” on or off');
   });
 
   it('the switch turns one on, and warns when it lacks its permissions', async () => {
@@ -171,7 +214,7 @@ describe('FlowList', () => {
     s.table().vm.$emit('action', { actionId: 'delete', row: flow('f1') });
     await settle();
     expect(mocks.confirm).toHaveBeenCalledWith({
-      title: 'Delete «Flow f1»?',
+      title: 'Delete “Flow f1”?',
       message: 'This cannot be undone. Its history stays.',
       tone: 'danger',
       confirmLabel: 'Yes, delete it',
@@ -203,6 +246,18 @@ describe('FlowList', () => {
     await click(s.find('flow-list-clear').element);
     await s.reopen();
     expect(s.params(OP)).toEqual([{ sort: '-updated_at', limit: 50, offset: 0 }]);
+  });
+
+  it('showing them all again also lets go of the filters', async () => {
+    const s = await setup();
+    s.table().vm.$emit('filtersChange', { state: 'paused' });
+    await flush();
+    await s.reopen();
+    await s.result(OP, page([], 0));
+    await click(s.find('flow-list-clear').element);
+    await s.reopen();
+    expect(s.params(OP)).toEqual([{ sort: '-updated_at', limit: 50, offset: 0 }]);
+    expect((s.table().props() as Record<string, unknown>).filters).toEqual({});
   });
 
   it('the button to show them all again sits inside the notice, so it is centred under its text (FLOW-F02)', async () => {

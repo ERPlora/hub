@@ -8,7 +8,7 @@ from live.outbox import record_event
 
 from apps.schedule import events
 from apps.schedule.models import WeekDay, WeekDayInterval
-from apps.schedule.queries import week_out
+from apps.schedule.queries.outputs import week_out
 from apps.schedule.schemas.fields import NoParamsIn
 from apps.schedule.schemas.week import SetDayIn, WeekOut
 

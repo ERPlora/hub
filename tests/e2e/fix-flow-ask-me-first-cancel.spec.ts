@@ -38,7 +38,7 @@ for (const viewport of VIEWPORTS) {
       await pick(page, 'flow-assistant-addtool-s1', 'Cancel a reservation', 'Cancel a reservation');
       await expect(editor.locator('[data-testid="flow-assistant-tool-s1-reservation.reservation.cancel"]')).toHaveText('Cancel a reservation');
       await expect(editor.locator('[data-testid=flow-assistant-askfirst-s1]')).toHaveText(
-        'Only after a yes from someone who may do it themselves: «Cancel a reservation».',
+        'Only after a yes from someone who may do it themselves: “Cancel a reservation”.',
       );
       await editor.locator('[data-testid=flow-assistant-askfirst-s1]').scrollIntoViewIfNeeded();
       await noHorizontalScroll(page, viewport.label);

@@ -8,7 +8,9 @@ from live.errors import NotFound
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox import events
-from apps.whatsapp_inbox.models import Channel, Conversation, Message, Template, TemplateSample
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
+from apps.whatsapp_inbox.models.templates import Template, TemplateSample
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, ctx_for, receive, run, system, template
 from base.tenancy.context import use_hub
 

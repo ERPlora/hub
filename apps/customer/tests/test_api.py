@@ -370,7 +370,7 @@ def test_the_card_round_trip(admin_client):  # noqa: PLR0915
     granted = post(
         admin_client,
         "/customer/consents/grant",
-        {"customer_id": customer_id, "channel": "email", "notice_text": "Yes"},
+        {"customer_id": customer_id, "channel": "email"},
     )
     assert (granted.status_code, granted.json()["contact_point"]) == (
         201,

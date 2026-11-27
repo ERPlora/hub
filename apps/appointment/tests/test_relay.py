@@ -10,12 +10,23 @@ what these tests write is committed.
 import pytest
 from live.models import OutboxEvent
 
-from apps.appointment.models import Appointment, Recurring
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring
 from apps.sale.models import Order
 from apps.tax.models import TaxCategory
 from base.models.relay import EventDelivery
 
-from .conftest import HUB_DB_COMMITTED, MONDAY, make_customer, make_member, make_service, run, wall
+from .conftest import (
+    HUB_DB_COMMITTED,
+    MONDAY,
+    as_ctx,
+    ctx_for,
+    make_customer,
+    make_member,
+    make_service,
+    run,
+    wall,
+)
 
 pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("anytime", "factory_data")]
 
@@ -57,6 +68,36 @@ def test_a_check_charged_at_the_till_marks_the_appointment_and_a_void_frees_it(w
     worker_loop()
     assert delivered_to_appointment("sale.sale.voided") == ("delivered", 1)
     assert Appointment.objects.get(pk=booked.id).sale_id is None
+
+
+def test_the_history_names_whoever_charged_it_and_voided_its_sale_at_the_till(worker_loop, make_user):
+    # APPOINTMENT-F10, F17: a person of the team did it at the till, never the platform.
+    make_service("Haircut", price=2000, duration=30, tax=TaxCategory.objects.get(key="service.generic"))
+    make_customer("Lucía Pérez")
+    make_member("Ana", "López")
+    bea = make_user("bea-account")
+    bea.first_name, bea.last_name = "Bea", "Ruiz"
+    bea.save(update_fields=["first_name", "last_name"])
+    as_bea = ctx_for("hub_admin", actor=bea)
+    booked = book()
+    opened = as_ctx(as_bea, "appointment.appointment.charge", {"id": str(booked.id)})
+    sale = as_ctx(
+        as_bea,
+        "sale.sale.complete",
+        {"idempotency_key": "appointment-relay-0002", "order_id": str(opened.order_id), "payments": [{"method": "card"}]},
+    )
+    worker_loop()
+    as_ctx(as_bea, "sale.sale.void", {"sale_id": str(sale.id), "reason": "Wrong customer"})
+    worker_loop()
+
+    page = run("appointment.appointment.history", {"id": str(booked.id)})
+
+    assert [(line.action, line.actor, line.by_platform) for line in page.rows] == [
+        ("created", "tester", False),
+        ("charged", "Bea Ruiz", False),
+        ("completed", "Bea Ruiz", False),
+        ("uncharged", "Bea Ruiz", False),
+    ]
 
 
 def test_a_check_voided_at_the_till_lets_charge_open_a_new_one(worker_loop):

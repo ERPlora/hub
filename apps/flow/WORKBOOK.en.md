@@ -100,11 +100,10 @@ gallery**, with ready-made automations to start from and the ones other apps bri
 and each row open the editor, and **How does this work?** opens the guide.
 
 #### What it shows, from top to bottom
-<!-- from WORKBOOK.md sha256:2a6d9b6c391c -->
+<!-- from WORKBOOK.md sha256:28fe347730fe -->
 Menu **Automations**, a single entry. From top to bottom:
 
-- The **New automation** button, top right; on a phone it is only its **+**, so that the title can be read
-  in full.
+- The **New automation** button, top right: only its **+**, with its name on hover.
 - **Waiting for your answer** — only if there is some question you can answer: each card, which automation
   it comes from, the question and its details (in a change by the assistant, also, right below the
   question, what it wants to do —"Cancel a reservation"— and each piece of data it would send, in words),
@@ -114,10 +113,11 @@ Menu **Automations**, a single entry. From top to bottom:
 - **Proposed by the assistant** — only if there are drafts: "The assistant wrote them when you asked it
   for an automation. They do nothing until you review and turn them on.", and for each one its name, the
   "Draft" label, **Review** and an × ("Discard") (FLOW-F18, FLOW-F19).
-- **Your automations** — only if there is some. The search box "Search by name, by what starts it or by
-  what it does", the **Showing** filters (on, paused) and **Starts with** (something that happens, a
-  schedule, a date, by hand), the order (touched last, name) and the count. Each row: a box to pick it,
-  the name, when it starts in words ("When a sale is charged", "Every day at 09:00", "Only when you press
+- **Your automations** — only if there is some. Under the heading, the count ("Showing 1 of 3"). In the
+  list's bar, as in the other lists: the search box "Search automation…", the order (touched last, name)
+  and the filters button, which opens **Showing** (on, paused) and **Starts with** (something that
+  happens, a schedule, a date, by hand). Each row: a box to pick it,
+  the name, when it starts in words ("When a sale is charged", "Every day at 9:00 AM", "Only when you press
   Run"), the last run, the "Active" or "Paused" label, the switch, **Make a copy** and **Delete**. With
   several picked, **Turn them on** and **Pause them** (FLOW-F02, FLOW-F03).
 - **The gallery**, always below: "Pick one and it becomes yours, paused, so you can look at it before it
@@ -229,17 +229,20 @@ your answer**, with what an automation asks them.
 Involved: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 See, search and sort the automations
-<!-- from WORKBOOK.md sha256:f1ee30a2384a -->
+<!-- from WORKBOOK.md sha256:a5a77530ac5d -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
 Steps:
 1. In **Your automations** each row says the name, when it starts in words, when it last ran and how it
-   ended, and whether it is "Active" or "Paused". A name that does not fit in its row ends in an ellipsis,
-   never split mid-word: it can be read in full by resting the pointer on it, on the phone's card and when
-   opening it.
-2. Type in the search box (name, the notice that starts it or the actions it does) or filter by
-   **Showing** and **Starts with**; sort by **Last touched** or **Name**.
+   ended, and whether it is "Active" or "Paused". A long name is read in full, never split mid-word: on a
+   tablet and on a desk it takes the lines it needs in its row, broken between words, and it also shows when
+   resting the pointer on it; on the phone's card the title ends in an ellipsis past two lines and the name
+   is read in full below, under "Name", and when opening it.
+2. Type in the search box (name, the notice that starts it or the actions it does) or, with the filters
+   button, filter by **Showing** and **Starts with**; sort by **Last touched** or **Name**. On a desk the
+   search box, the order and the filters button fit on one line; on a phone the search box takes its own
+   line and the rest goes below.
 3. With no results: "Nothing here matches that." and **Show them all again**.
 4. Tap a row to open it in the editor.
 In: the business's automations, in pages of up to 100.
@@ -268,7 +271,7 @@ If it fails: the message in red at the top; the row stays as it was.
 Involved: FLOW-F12, FLOW-F14, FLOW-F22, FLOW-F23
 
 ### FLOW-F04 Create an automation from a gallery card
-<!-- from WORKBOOK.md sha256:74ee22014b8c -->
+<!-- from WORKBOOK.md sha256:e2b833147fbb -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automations
@@ -286,7 +289,7 @@ Steps:
 In: the ten cards: seven of "Any business", two of "Hair and beauty" and one of "Bars and restaurants". A
 card hides if an app it uses is missing, and below the gallery it says which.
 Out: a new automation, **paused and without permissions**, with the card's name and values (wait a day,
-100,00 €, six people…).
+€100.00, six people…).
 If it fails: the message in red inside the card; nothing is created.
 Involved: FLOW-F05, FLOW-F08, FLOW-F12, FLOW-F13, FLOW-F14
 
@@ -295,15 +298,15 @@ The ten cards of the gallery, with their sector, when they start and what they d
 | Card | Sector | Starts | Does |
 |---|---|---|---|
 | Welcome a new customer | any | A customer card is created | Waits a day and leaves the task of welcoming them |
-| Note the big sales on the card | any | A sale is charged | Only if it has a customer and is over 100,00 €: adds a note to their card |
+| Note the big sales on the card | any | A sale is charged | Only if it has a customer and is over €100.00: adds a note to their card |
 | The checklist of someone new in the team | any | Someone is added in Staff | Leaves the task of preparing their first day |
 | Review the till when it closes | any | A till is closed | Leaves the task of reviewing the close |
 | Find out when the tax agency rejects a record | any | VeriFactu marks a record as rejected | Leaves an urgent task |
-| Review the week on Friday | any | Fridays at 18:00 | Leaves the task of reviewing the week |
-| Check the agenda every morning | salon | Every day at 09:00 | Leaves the task of going over the agenda |
+| Review the week on Friday | any | Fridays at 6:00 PM | Leaves the task of reviewing the week |
+| Check the agenda every morning | salon | Every day at 9:00 AM | Leaves the task of going over the agenda |
 | Call whoever did not come | salon | An appointment is marked "No-show" | Leaves an urgent task of calling them |
 | Prepare the tables of big groups | restaurant | A reservation comes in | Only if they are six or more: leaves the task of preparing it |
-| Hear about big sales | any | A sale is charged | Only if it is over 100,00 €: leaves a task |
+| Hear about big sales | any | A sale is charged | Only if it is over €100.00: leaves a task |
 
 ### FLOW-F05 Reach a card from somewhere else
 <!-- from WORKBOOK.md sha256:4b833ce83f77 -->
@@ -391,7 +394,7 @@ saved.
 Involved: FLOW-F10, FLOW-F11, FLOW-F12, FLOW-F14
 
 ### FLOW-F10 Choose when it starts
-<!-- from WORKBOOK.md sha256:2e4a8b622098 -->
+<!-- from WORKBOOK.md sha256:4d29160723e9 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -399,15 +402,16 @@ Steps:
 1. Tap the "When this happens…" card and choose:
    - **Something happens**: in "Choose what happens", the notices of the business's active apps, said in
      words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…), with
-     the word of the app they belong to ("an opening hours override is created", as in Schedule) and with a
-     search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
-     10000"); without them it starts on its own with every notice.
+     the word of the app they belong to ("an opening hours override is created", as in Schedule), with the
+     name of that app under each one and never its code, and with a search box. Below, **Only when…**:
+     conditions on the notice's data ("the total is greater than 10000"); without them it starts on its own
+     with every notice.
    - **On a schedule**: "How often" (every day, every week, every month), the day of the week or of the
      month when it applies, and the time, in the business's time. A day of the month that does not exist
      (the 31st in April) is skipped that month.
    - **Once, at a date and time**.
    - **Only by hand**: it does not start on its own; it runs with **Run now**.
-2. The card sums up what was chosen ("When a sale is charged", "Every Friday at 18:00"…).
+2. The card sums up what was chosen ("When a sale is charged", "Every Friday at 6:00 PM"…).
 In: the notices of the active apps.
 Out: the trigger, on **Save**.
 If it fails: a notice that does not exist in the business, a schedule without a time or a past date are
@@ -420,7 +424,7 @@ that same reason, never with "does not exist".
 Involved: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Add, order and fill in the steps
-<!-- from WORKBOOK.md sha256:7f7588b6c2e4 -->
+<!-- from WORKBOOK.md sha256:f167335140a6 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -429,9 +433,11 @@ Steps:
    it.
 2. Fill in its form:
    - **Do something**: "What to do" (an action of the active apps, chosen from a list with a search box:
-     "Create a task", "Write a note on a customer"…) and "With this information": a field for each piece of
-     data the action asks for (the required ones marked) and **Add information** for the optional ones.
-   - **Look something up**: "What to look up" (a query of the active apps), its data and "What to keep"
+     "Create a task", "Write a note on a customer"…, with the name of its app under each one and never its
+     code) and "With this information": a field for each piece of data the action asks for (the required
+     ones marked) and **Add information** for the optional ones.
+   - **Look something up**: "What to look up" (a query of the active apps, chosen the same way: "Look for
+     WhatsApp conversations", with "WhatsApp inbox" under it), its data and "What to keep"
      ("The first row it finds, field by field" or "Only how many there are"). If it finds nothing, the
      automation carries on; to stop it, an "Only continue if…" on "Found something" is added after it.
    - **Only continue if…**: one or several rows "Data", "Is" ("equal to", "not equal to", "one of",
@@ -584,7 +590,7 @@ with unsaved changes it is disabled: "Save it first: "Run now" runs what is save
 Involved: FLOW-F14, FLOW-F16, FLOW-F21
 
 ### FLOW-F16 See what it did and why it failed
-<!-- from WORKBOOK.md sha256:7060399034ec -->
+<!-- from WORKBOOK.md sha256:19e90f35d472 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -597,9 +603,10 @@ Steps:
    "Waiting", "Cancelled"), the day and the time, **Copy the reference** and ▾ to see its steps in words
    ("Did: Create a task", "Found 3", "Found nothing, and carried on", "Waited 1 hour", "It stopped here
    because this was not met: Total greater than 10000").
-4. One stopped by an error says what happened and what to do, in your language even if the automation was
-   saved in another ("It tried to do something you have not allowed it to do ("…"), so it stopped. Open
-   Permissions and allow what it needs."); if the error is from the app that did the action, its sentence
+4. One stopped by an error says what happened and, under it and only once, what to do, in your language even
+   if the automation was saved in another ("It tried to do something you have not allowed it to do ("Create
+   a task"), so it stopped." and "Open Permissions and allow what it needs."), with the action named as in
+   Permissions and in Try it; if the error is from the app that did the action, its sentence
    comes out as it is, in the automation's language, with the technical text folded.
 In: that automation's runs of the last 90 days, and all those still waiting.
 Out: nothing. The history keeps each finished run **90 days** and then forgets it; one that is waiting or
@@ -754,7 +761,7 @@ texts). The other customers' runs carry on.
 Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Resume a run from the step that failed
-<!-- from WORKBOOK.md sha256:3917331922d1 -->
+<!-- from WORKBOOK.md sha256:9843e8426ee8 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -764,9 +771,12 @@ Steps:
    system to answer.
 2. Press the button and confirm: "Resume it from the step that failed?" with **Yes, resume it** or
    **Cancel**.
-3. "Resumed: it finished well." appears (or "…it is waiting"); if it fails again, "It was resumed and stopped
-   by an error again: …" next to the run, which can be resumed again. Its steps keep "Resumed here, from the
-   step that had failed".
+3. The notice says what the run is doing at that moment, as the one of **Run now** does: "Resumed: it finished
+   well.", "…it finished, the condition was not met.", "…it is waiting", "…it is calling another system", "…it is
+   waiting for an answer in “Waiting for your answer”." or "…the assistant is on it"; never "finished well" of
+   one that is still going on. If it fails again, at once or when the other system does not answer, "It was
+   resumed and stopped by an error again: …" next to the run, which can be resumed again. Its steps keep
+   "Resumed here, from the step that had failed".
 In: the run stopped by an error (by voice, by its reference: "resume the welcome one that failed"). The
 assistant's card names it "Automation run: Welcome · 15 Oct 2026, 21:00", as History does and with its
 automation in front, never by its code.
@@ -1290,7 +1300,7 @@ what it asks. A record the person confirming cannot see (a run, for whoever only
 question asked of another role) does not show on the card.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:ada15a0332da -->
+<!-- from WORKBOOK.md sha256:08383c8a217e -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
@@ -1307,7 +1317,7 @@ question asked of another role) does not show on the card.
 | The names of the business's secrets, never their value, and whether the server can keep them (live) | manage | F26, F27 | `flow.secret.list` |
 | The questions this person is waiting to answer, those that expire first at the top, up to 100, and of each change by the assistant its action and its data in words, read as that person and in their language (live) | answer | F01, F29, F38 | `flow.question.list` |
 | A question waiting for an answer, as it shows in "Waiting for your answer", only for whoever can answer it | answer (their role) | F29 | `flow.question.get` |
-| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live) | see | F01, F33–F36 | `flow.recipe.list` |
+| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live; the assistant reads on with `offset` where an answer too long to be told at once was cut) | see | F01, F33–F36 | `flow.recipe.list` |
 
 ### What it offers: actions (they change data)
 <!-- from WORKBOOK.md sha256:fc67ed817046 -->

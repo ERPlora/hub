@@ -24,10 +24,11 @@ from apps.flow.queries.reads import ANSWER, SYSTEM, TURN
 from apps.flow.phrasing import action_label
 from apps.flow.schemas.fields import DueIn, DueOut
 from apps.flow.schemas.questions import AnsweredOut, AnswerIn
+from base.queries.people import actor_name
 
 from .assistant_steps import _make_proposal, _step_of
 from .engine import _finish, _go_on, _log, _own
-from .writes import DISABLED, _actor
+from .writes import DISABLED
 
 QUESTION_DECIDED = _("Someone already answered this one. Nothing was done twice.")
 QUESTION_TOO_LATE = _("Too late: nobody answered it in time, so it was closed. Nothing was done.")
@@ -43,10 +44,7 @@ def _asked_for(run: FlowRun) -> dict[str, str]:
 
 def _who(ctx: OperationContext) -> str:
     """The name of whoever answers, as the history says it («Marta»)."""
-    actor = ctx.actor
-    if hasattr(actor, "get_username"):
-        return (actor.get_full_name() or actor.get_username())[:128]
-    return _actor(ctx)
+    return actor_name(ctx.actor)[:128]
 
 
 def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left: dict, now: dt.datetime) -> None:  # noqa: PLR0913, PLR0917

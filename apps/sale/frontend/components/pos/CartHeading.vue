@@ -76,14 +76,16 @@ function edit(): void {
         class="pos-chip"
         data-testid="pos-table-chip"
       >
-        <HubIcon name="ion:grid-outline" />{{ $t('sale.pos.table.chip', { number: tableNumber }) }}
+        <HubIcon name="ion:grid-outline" />
+        <span>{{ $t('sale.pos.table.chip', { number: tableNumber }) }}</span>
       </ion-chip>
       <ion-chip
         v-if="customerName"
         class="pos-chip"
         data-testid="pos-customer-chip"
       >
-        <HubIcon name="ion:person-outline" />{{ customerName }}
+        <HubIcon name="ion:person-outline" />
+        <span>{{ customerName }}</span>
       </ion-chip>
       <ion-chip
         class="pos-chip pos-chip--button"
@@ -92,7 +94,8 @@ function edit(): void {
         :aria-label="`${$t('sale.pos.staffPickerTitle')}: ${served}`"
         @click="emit('staff')"
       >
-        <HubIcon name="ion:person-circle-outline" />{{ served }}
+        <HubIcon name="ion:person-circle-outline" />
+        <span>{{ served }}</span>
       </ion-chip>
       <ion-chip
         v-if="needsCustomer"
@@ -102,7 +105,8 @@ function edit(): void {
         :aria-label="$t('sale.pos.customerRequiredCharge')"
         @click="emit('askCustomer')"
       >
-        <HubIcon name="ion:person-add-outline" />{{ $t('sale.pos.customerRequiredShort') }}
+        <HubIcon name="ion:person-add-outline" />
+        <span>{{ $t('sale.pos.customerRequiredShort') }}</span>
       </ion-chip>
       <span
         v-if="!tableNumber && !customerName && !needsCustomer"
