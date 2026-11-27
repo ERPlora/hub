@@ -115,6 +115,23 @@ export function formatShortDate(day: string, locale: string): string {
   return formatIn(locale, { dateStyle: 'medium' }).format(asUtc(day));
 }
 
+/** «Thursday, November 26» / «jueves, 26 de noviembre»: a day in a sentence. */
+export function formatDayMonth(day: string, locale: string): string {
+  return formatIn(locale, { weekday: 'long', month: 'long', day: 'numeric' }).format(asUtc(day));
+}
+
+/** «Wed, Nov 25» / «mié, 25 nov»: a day in a summary line. */
+export function formatShortDayMonth(day: string, locale: string): string {
+  return formatIn(locale, { weekday: 'short', month: 'short', day: 'numeric' }).format(asUtc(day));
+}
+
+/** A wall-clock `HH:MM` `minutes` later, round the clock (`23:30` + 45 = `00:15`). */
+export function addMinutes(time: string, minutes: number): string {
+  const [hours = 0, mins = 0] = time.split(':').map(Number);
+  const total = (((hours * 60 + mins + minutes) % 1440) + 1440) % 1440;
+  return `${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
+}
+
 /** A wall-clock `HH:MM` as the reader writes it («9:05», «9:05 PM»). */
 export function formatTime(time: string, locale: string): string {
   return formatIn(locale, { hour: 'numeric', minute: '2-digit' }).format(asUtc('2000-01-01', time.slice(0, 5)));

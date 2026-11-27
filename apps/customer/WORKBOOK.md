@@ -271,14 +271,14 @@ Actor: todos
 Pantalla: Ficha de cliente
 Pasos:
 1. Desde **Clientes**, toca la fila.
-2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos
-   personalizados; un cumpleaños sin año, como «12 de marzo»), sus grupos y etiquetas, su
-   consentimiento por canal, la actividad (más reciente primero, 50 por página; cada entrada dice
-   cuándo y quién: la persona por su nombre o, si su cuenta no tiene, por lo que va antes de la @ de su
-   correo, nunca el correo entero; la API key por el suyo, o «Lo hizo la plataforma» cuando no la hizo
-   nadie en persona, como la compra que apunta una venta cobrada, una automatización o una recuperación
-   desde una copia aparte), sus compras y los bloques de otras apps. El email, el teléfono y la dirección para la
-   que se dio cada consentimiento, solo a quien ve el contacto de los clientes.
+2. La ficha enseña todos sus datos (también notas internas, cumpleaños, aniversario y campos personalizados; un
+   cumpleaños sin año, como «12 de marzo»), sus grupos y etiquetas, su consentimiento por canal, la actividad (más
+   reciente primero, 50 por página; cada entrada dice cuándo y quién: la persona por su nombre (el de Mi perfil o,
+   sin él, el de su cuenta) o, si no tiene ninguno, por lo que va antes de la @ de su correo, nunca el correo
+   entero; la API key por el suyo, o «Lo hizo la plataforma» cuando no la hizo nadie en persona, como la compra
+   que apunta una venta cobrada, una automatización o una recuperación desde una copia aparte), sus compras y los
+   bloques de otras apps. El email, el teléfono y la dirección para la que se dio cada consentimiento, solo a
+   quien ve el contacto de los clientes.
 3. **← Volver** regresa a la lista.
 Entra: la ficha y, aparte, su actividad, sus compras y su historial de consentimientos.
 Sale: nada; solo lectura. Si otra persona la cambia mientras está abierta, se ve el cambio sin
@@ -534,14 +534,19 @@ Pasos:
    pulsa solo si dice que sí. Esta frase exacta es la que queda guardada como prueba, junto a tu
    nombre y la hora.».
 3. Si el cliente dice que sí, pulsa **Ha dicho que sí**. Sale «Consentimiento registrado.».
-Entra: el canal, la frase exacta y su versión, el origen («en el mostrador» de entrada) y, si lo hay,
-un justificante. La dirección la pone el servidor con la de la ficha en ese momento (el email, el
-teléfono para WhatsApp, SMS y llamadas, o la dirección postal) y quién lo apunta sale de la sesión.
-Sale: un hecho nuevo que nunca se edita ni se borra, una entrada «Consentimiento dado» en la
-actividad y el aviso de consentimiento dado (`customer.consent.granted`).
-Si falla: una frase vacía o una fecha en el futuro se rechazan junto a su campo; «Este cliente ya no
-está disponible.» si la ficha ya no está. Quien no gestiona fichas ve el estado sin botones. Editar,
-crear o importar una ficha NUNCA pone consentimiento.
+4. También se le puede pedir al asistente («Lucía dice que sí a las ofertas por WhatsApp»). Su tarjeta
+   dice la clienta, el canal y «Léelo en voz alta» con la misma frase, para leérsela antes de pulsar
+   **Ejecutar**; nadie la escribe ni la dicta. Al ejecutarla queda lo mismo que con **Ha dicho que sí**.
+Entra: el canal, el origen («en el mostrador» de entrada) y, si lo hay, un justificante. La frase y su
+versión no las manda nadie: las pone el servidor, las mismas en la ficha, en la tarjeta del asistente y
+en la API, en el idioma de quien lo apunta. La dirección también la pone el servidor, con la de la ficha
+en ese momento (el email, el teléfono para WhatsApp, SMS y llamadas, o la dirección postal), y quién lo
+apunta sale de la sesión.
+Sale: un hecho nuevo que nunca se edita ni se borra, con la frase y su versión como prueba, una entrada
+«Consentimiento dado» en la actividad y el aviso de consentimiento dado (`customer.consent.granted`).
+Si falla: una fecha en el futuro se rechaza junto a su campo; «Este cliente ya no está disponible.» si
+la ficha ya no está. Quien no gestiona fichas ve el estado sin botones. Editar, crear o importar una
+ficha NUNCA pone consentimiento.
 Implicados: ninguno
 
 ### CUSTOMER-F15 Retirar el consentimiento de un canal
@@ -1199,6 +1204,12 @@ asistente.
   `customer.activity.add`) llevan `schemas/health.NOT_FOR_HEALTH_DATA`, que le dice que la salud no va ahí,
   a qué bloque mandar y que la alergia de un plato va en su línea, con la herramienta que encuentra buscándola; lo
   fijan `tests/test_assistant_health_data.py` (hub#2278) y `apps/sale/tests/test_assistant_line_allergy.py`.
+- La frase del consentimiento de marketing y su versión viven solo en `consent_notice.py` (F14): la ficha la
+  recibe en `customer.customer.detail` (`consent_notice`, en el idioma de quien lee), la tarjeta del asistente la
+  enseña con el resumen de `customer.consent.grant` (`services/assistant_cards.consent_words`, justo detrás del
+  canal para que quepa en la tarjeta de una línea) y el servicio la guarda en el idioma de quien lo apunta.
+  `customer.consent.grant` no la recibe, como tampoco la dirección: un texto enviado se ignora. Lo fija
+  `tests/test_consent_notice.py` (hub#2671).
 - Toda operación declara `ai`: `AI(…)` con su descripción para el asistente, su `risk` en las escrituras y sus `asks`
   (2–4 frases en `en` y `es`, como las diría quien la usa); las de salud y las tres de compras que solo lanza la venta
   (`customer.purchase.*`), `INTERNAL`. `tests/test_assistant_asks.py` comprueba que cada frase lleva a su herramienta
@@ -1358,8 +1369,9 @@ El componente `CustomerSearch` de Clientes (Venta lo importa por su ruta, de los
   cifras, la ficha, la actividad y las compras: lo escribe el formateador de la plataforma, nunca la pantalla.
 - **El teléfono se guarda en E.164 o no se guarda**: toda escritura lo normaliza, y uno que no es un
   número válido de su país rechaza el guardado.
-- **El consentimiento no se pone editando, creando ni importando.** Solo con su acción, que exige la
-  frase; cada decisión es un hecho nuevo que nada edita ni borra; quién lo apuntó sale de la sesión.
+- **El consentimiento no se pone editando, creando ni importando.** Solo con su acción, que guarda la
+  frase del negocio y su versión; cada decisión es un hecho nuevo que nada edita ni borra; quién lo apuntó
+  sale de la sesión.
 - **Una venta cuenta una sola vez, y una anulación y cada devolución restan una sola vez**; una venta
   sin cliente no toca ninguna ficha.
 - **Un pedido tiene como mucho un cliente.**

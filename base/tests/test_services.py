@@ -83,6 +83,13 @@ def test_a_long_name_fits_the_user(request_):
     assert user.first_name == "A" * 150
 
 
+def test_an_account_without_a_name_is_named_by_what_goes_before_its_at(request_):
+    # erplora.com names an account without a name by its address.
+    nameless = dataclasses.replace(ANA, email="ana.ruiz+bar@example.com", name="ana.ruiz+bar@example.com")
+    user = open_session_from_saas(request_, nameless, A.key)
+    assert (user.first_name, user.email) == ("ana.ruiz+bar", "ana.ruiz+bar@example.com")
+
+
 def test_a_user_deactivated_on_the_hub_gets_no_session(request_):
     get_user_model().objects.create_user("saas:42", is_active=False)
     with pytest.raises(InactiveUser):

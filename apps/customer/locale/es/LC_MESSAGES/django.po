@@ -639,3 +639,9 @@ msgstr "Sí"
 msgctxt "custom field value"
 msgid "No"
 msgstr "No"
+
+msgid "I want to receive offers and news from this business through this channel. I can unsubscribe whenever I want."
+msgstr "Quiero recibir ofertas y novedades de este negocio por este canal. Puedo darme de baja cuando quiera."
+
+msgid "Read it out loud"
+msgstr "Léelo en voz alta"

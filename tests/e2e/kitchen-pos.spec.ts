@@ -106,7 +106,7 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
   const flame = view.locator('[data-testid=pos-kitchen-rush]');
   await flame.click();
   await expect(flame).toHaveAttribute('aria-pressed', 'true');
-  await expect(view.locator('[data-testid=pos-kitchen-send]')).toContainText('Send RUSH (1)');
+  await expect(view.locator('[data-testid=pos-kitchen-send] button')).toHaveAccessibleName('Send RUSH (1)');
   for (const size of SIZES) {
     await page.setViewportSize({ width: size.width, height: size.height });
     // On a phone the check is the drawer behind the cart button, opened once the till has laid itself out for the
@@ -114,7 +114,7 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
     await openTillCart(page);
     await expect(view.locator('[data-testid=pos-kitchen-send]')).toBeInViewport({ ratio: 1 });
     if ((await flame.getAttribute('aria-pressed')) !== 'true') await flame.click();
-    await expect(view.locator('[data-testid=pos-kitchen-send]')).toContainText('Send RUSH (1)');
+    await expect(view.locator('[data-testid=pos-kitchen-send] button')).toHaveAccessibleName('Send RUSH (1)');
     await untilStill(page);
     await capture(page, `APP-KITCHEN-KITCHEN-F18-${size.label}`);
   }
@@ -127,7 +127,7 @@ test('KITCHEN-F18, F19, F20: the till sends rounds, follows them in «Order tick
   await view.locator(`[data-testid=pos-product-${soup.id}]`).click();
   await view.locator(`[data-testid=pos-product-${bread.id}]`).click();
   await expect(flame).toHaveAttribute('aria-pressed', 'false');
-  await expect(view.locator('[data-testid=pos-kitchen-send]')).toContainText('Send order (2)');
+  await expect(view.locator('[data-testid=pos-kitchen-send] button')).toHaveAccessibleName('Send order (2)');
   await view.locator('[data-testid=pos-kitchen-send]').click();
   const sent = toastSaying(page, 'Order 2 sent to the kitchen.');
   await expect(sent).toBeVisible();

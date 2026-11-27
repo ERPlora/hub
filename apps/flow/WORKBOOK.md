@@ -105,8 +105,7 @@ y cada fila abren el editor, y **¿Cómo funciona esto?** abre la guía.
 #### Lo que enseña, de arriba abajo
 Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 
-- El botón **Nueva automatización**, arriba a la derecha; en el móvil es solo su **+**, para que el título
-  se lea entero.
+- El botón **Nueva automatización**, arriba a la derecha: solo su **+**, con su nombre al pasar el ratón.
 - **Esperan tu respuesta** — solo si hay alguna pregunta que puedas contestar: cada tarjeta, de qué
   automatización viene, la pregunta y sus detalles (en un cambio del asistente, además, justo debajo de la
   pregunta, lo que quiere hacer —«Anular una reserva»— y cada dato que mandaría, en palabras), a quién se le hizo, qué pasa si nadie contesta y qué hace un no, **Añadir una nota
@@ -115,9 +114,10 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
   pediste una automatización. No hacen nada hasta que las revises y las actives.», y por cada uno su
   nombre, la etiqueta «Borrador», **Revisar** y una × («Descartar») (FLOW-F18, FLOW-F19).
-- **Tus automatizaciones** — solo si hay alguna. El buscador «Busca por nombre, por lo que la arranca o
-  por lo que hace», los filtros **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa, un
-  horario, una fecha, a mano), el orden (tocadas al final, nombre) y el recuento. Cada fila: casilla
+- **Tus automatizaciones** — solo si hay alguna. Bajo el título, el recuento («Se ven 1 de 3»). En la barra
+  de la lista, como en las demás listas: el buscador «Buscar automatización…», el orden (tocadas al final,
+  nombre) y el botón de filtros, que abre **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa,
+  un horario, una fecha, a mano). Cada fila: casilla
   para elegirla, el nombre, cuándo arranca en palabras («Cuando se cobra una venta», «Todos los días a
   las 09:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
   el interruptor, **Hacer una copia** y **Borrar**. Con varias elegidas, **Encenderlas** y **Ponerlas en
@@ -233,11 +233,15 @@ Actor: propietario, administrador, asistente
 Pantalla: Automatizaciones
 Pasos:
 1. En **Tus automatizaciones** cada fila dice el nombre, cuándo arranca en palabras, cuándo se ejecutó
-   por última vez y cómo acabó, y si está «Activa» o «En pausa». Un nombre que no cabe en su fila acaba
-   en puntos suspensivos, nunca partido a media palabra: se lee entero al dejar el puntero encima, en la
-   tarjeta del teléfono y al abrirla.
-2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o filtra por
-   **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**.
+   por última vez y cómo acabó, y si está «Activa» o «En pausa». Un nombre largo se lee entero, nunca
+   partido a media palabra: en la tableta y en el escritorio ocupa en su fila las líneas que necesita,
+   cortadas entre palabras, y sale también al dejar el puntero encima; en la tarjeta del teléfono, el
+   título acaba en puntos suspensivos pasadas dos líneas y el nombre se lee entero debajo, en «Nombre», y
+   al abrirla.
+2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o, con el botón de
+   filtros, filtra por **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**. En
+   el escritorio el buscador, el orden y el botón de filtros caben en una línea; en el teléfono el buscador
+   va en su propia línea y lo demás debajo.
 3. Sin resultados: «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas**.
 4. Toca una fila para abrirla en el editor.
 Entra: las automatizaciones del negocio, en páginas de hasta 100.
@@ -392,9 +396,9 @@ Pasos:
 1. Toca la tarjeta «Cuando pase esto…» y elige:
    - **Pasa algo**: en «Elige qué pasa», los avisos de las apps activas del negocio, dichos en palabras
      («se cobra una venta», «se crea una ficha de cliente», «una cita se marca como no vino»…), con la
-     palabra de la app que los tiene («se crea un cambio temporal», como en Horarios) y con
-     buscador. Debajo, **Solo cuando…**: condiciones sobre los datos del aviso («el total es mayor que
-     10000»); sin ellas arranca sola con cada aviso.
+     palabra de la app que los tiene («se crea un cambio temporal», como en Horarios), con el nombre de
+     esa app debajo de cada uno y nunca su código, y con buscador. Debajo, **Solo cuando…**: condiciones
+     sobre los datos del aviso («el total es mayor que 10000»); sin ellas arranca sola con cada aviso.
    - **Según un horario**: «Cada cuánto» (todos los días, todas las semanas, todos los meses), el día de
      la semana o del mes si toca, y la hora, en la hora del negocio. Un día del mes que no existe (el 31
      en abril) se salta ese mes.
@@ -421,9 +425,11 @@ Pasos:
    lo quita.
 2. Rellena su formulario:
    - **Hacer algo**: «Qué hacer» (una acción de las apps activas, elegida de una lista con buscador:
-     «Crear una tarea», «Apuntar una nota en un cliente»…) y «Con esta información»: un campo por cada
-     dato que la acción pide (los obligatorios marcados) y **Añadir información** para los opcionales.
-   - **Consultar algo**: «Qué consultar» (una consulta de las apps activas), sus datos y «Qué guardar»
+     «Crear una tarea», «Apuntar una nota en un cliente»…, con el nombre de su app debajo de cada una y
+     nunca su código) y «Con esta información»: un campo por cada dato que la acción pide (los
+     obligatorios marcados) y **Añadir información** para los opcionales.
+   - **Consultar algo**: «Qué consultar» (una consulta de las apps activas, elegida igual: «Buscar
+     conversaciones de WhatsApp», con «Bandeja de WhatsApp» debajo), sus datos y «Qué guardar»
      («La primera fila que encuentre, campo a campo» o «Solo cuántas hay»). Si no encuentra nada, la
      automatización sigue; para pararla, se añade después un «Solo sigue si…» sobre «Encontró algo».
    - **Solo sigue si…**: una o varias filas «Dato», «Es» («igual a», «distinto de», «uno de», «está
@@ -752,7 +758,10 @@ Pasos:
    paso que falló**. Antes, arregla la causa: concede el permiso que faltaba, vuelve a encender la app o
    espera a que el otro sistema responda.
 2. Pulsa el botón y confirma: «¿Reanudarla desde el paso que falló?» con **Sí, reanúdala** o **Cancelar**.
-3. Sale «Reanudada: terminó bien.» (o «…está esperando»); si vuelve a fallar, «Se reanudó y volvió a
+3. El aviso dice lo que hace la ejecución en ese momento, como el de **Ejecutar ahora**: «Reanudada: terminó
+   bien.», «…terminó, no se cumplía la condición.», «…está esperando», «…está llamando a otro sistema», «…espera
+   una respuesta en «Esperan tu respuesta».» o «…el asistente está en ello»; nunca «terminó bien» de una que
+   sigue en marcha. Si vuelve a fallar, en el acto o cuando el otro sistema no responde, «Se reanudó y volvió a
    pararse por un error: …» junto a la ejecución, que se puede reanudar otra vez. En sus pasos queda
    «Reanudada aquí, desde el paso que había fallado».
 Entra: la ejecución parada por un error (por voz, por su referencia: «reanuda la de bienvenida que falló»). La
@@ -1267,7 +1276,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26, F27 | `flow.secret.list` |
 | Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente su acción y sus datos en palabras, leídos como esa persona y en su idioma (en vivo) | contestar | F01, F29, F38 | `flow.question.list` |
 | Una pregunta que espera respuesta, como sale en «Esperan tu respuesta», solo para quien puede contestarla | contestar (su rol) | F29 | `flow.question.get` |
-| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F01, F33–F36 | `flow.recipe.list` |
+| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo; el asistente sigue leyendo con `offset` donde se cortó una respuesta que no le cabía de una vez) | ver | F01, F33–F36 | `flow.recipe.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
 

@@ -1,6 +1,6 @@
 """The list of menus, and one menu with its courses and choices (COMBO-F01, F05, F06, F12)."""
 
-from django.db.models import Count, Q
+from django.db.models import Count
 from live.context import OperationContext
 from live.operations import operation
 
@@ -9,6 +9,7 @@ from apps.combo.schemas.menus import ComboDetailOut, ComboListIn, ComboPage
 from apps.combo.schemas.references import ComboRefIn
 from base import images
 from base.ordering import list_order
+from base.text_search import contains_text
 
 from .reads import find_combo
 from .rows import _page, combo_row, detail_row, with_tree
@@ -41,11 +42,9 @@ def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
         courses=Count("groups")
     )
     if params.search:
-        combos = combos.filter(
-            Q(name__icontains=params.search) | Q(kitchen_name__icontains=params.search)
-        )
+        combos = combos.filter(contains_text(params.search, "name", "kitchen_name"))
     if params.name:
-        combos = combos.filter(name__icontains=params.name)
+        combos = combos.filter(contains_text(params.name, "name"))
     if params.supply_kind:
         combos = combos.filter(supply_kind=params.supply_kind)
     if params.is_active is not None:

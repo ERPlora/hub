@@ -42,7 +42,7 @@ monedas y al cerrar quedan para siempre el esperado, el contado y la diferencia.
 | `requires` | `["sale"]`; Ventas no requiere Caja (sería un ciclo): pregunta por nombre a `cash_register.session.current` |
 | Usa de otras apps | Ventas, su requisito: lee `Sale`, `SalePayment`, `RefundPayment` y sus cuentas abiertas (`sale.order.list`). Sin requisito, por nombre: Cocina (`kitchen.ticket.board`) e Impresión (`printing.job.summary`; `printing.job.create` encola el informe) |
 | Pantallas | `/cash_register/sessions`, `/cash_register/sessions/:id`, `/cash_register/settings` |
-| Operaciones | 10 consultas (`queries/`) y 9 acciones (`services.py`), todas con `ai=`; 19 rutas en `/api/cash_register/…`, una por operación |
+| Operaciones | 10 consultas (`queries/`) y 9 acciones (`services/`), todas con `ai=`; 19 rutas en `/api/cash_register/…`, una por operación |
 | Eventos | 7, `cash_register.<entidad>.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
 | Tarea programada | `auto_close_sessions` → `cash_register.session.auto_close`, `*/5 * * * *`, `collapse` (la corre el worker) |
 | Migraciones | `0001_initial`, `0002_auto_close_time_callable_default`, `0003_session_people` y `0004_actors_without_address`; los índices que necesita de Ventas están en `sale/0005_cash_register_indexes` |
@@ -63,7 +63,7 @@ pnpm e2e tests/e2e/cash-register-flows.spec.ts tests/e2e/cash-register-settings.
 pnpm e2e tests/e2e/cash-register-assistant.spec.ts   # con el SaaS y el proveedor del asistente (tests/e2e/README.md, «El asistente»)
 ```
 
-- `tests/test_integration_sale.py` y `test_integration_printing.py` van contra Ventas e Impresión reales,
+- `tests/test_integration_sale.py` y `test_services_reports.py` (informes X y Z) van contra Ventas e Impresión reales,
   sin dobles; `tests/test_concurrency.py`, con sesiones reales en hilos; `test_integration_assistant.py`,
   el cierre por el asistente contra su turno real (`base.assistant.turn`).
 - `cash-register-flows.spec.ts` recorre los 17 flujos con pantalla en 390, 834 y 1440.

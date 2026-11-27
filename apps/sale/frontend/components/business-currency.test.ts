@@ -34,7 +34,8 @@ describe('the till, in the business’s currency', () => {
     const m = await mountSale(CartFooter, { props: FOOT, locale: 'es', business: business(POLISH) });
     await m.live();
     expect(plain(m.find('pos-total').text())).toBe('12,50 zł');
-    expect(plain(m.find('pos-charge').text())).toBe('Cobrar · 12,50 zł');
+    expect(plain(m.find('pos-charge').text())).toBe('12,50 zł');
+    expect(plain(m.find('pos-charge').attributes('aria-label') ?? '')).toBe('Cobrar · 12,50 zł');
   });
 
   it('a business in Japan sees yen without decimals', async () => {
@@ -47,10 +48,11 @@ describe('the till, in the business’s currency', () => {
   it('a ¥1,500 check before the business answers its money: a dash, as while the total is on its way', async () => {
     const m = await mountSale(CartFooter, { props: { ...FOOT, total: 1500 }, locale: 'es', business: null });
     await m.live();
-    const before = [plain(m.find('pos-total').text()), plain(m.find('pos-charge').text())];
+    const charge = () => plain(m.find('pos-charge').attributes('aria-label') ?? '');
+    const before = [plain(m.find('pos-total').text()), plain(m.find('pos-charge').text()), charge()];
     await m.result('base.business.get', business(JAPANESE));
-    const after = [plain(m.find('pos-total').text()), plain(m.find('pos-charge').text())];
-    expect({ before, after }).toEqual({ before: ['—', 'Cobrar · —'], after: ['1.500 ¥', 'Cobrar · 1.500 ¥'] });
+    const after = [plain(m.find('pos-total').text()), plain(m.find('pos-charge').text()), charge()];
+    expect({ before, after }).toEqual({ before: ['—', '—', 'Cobrar · —'], after: ['1.500 ¥', '1.500 ¥', 'Cobrar · 1.500 ¥'] });
   });
 
   it('the discount switches to an amount with the business’s sign, not «€»', async () => {

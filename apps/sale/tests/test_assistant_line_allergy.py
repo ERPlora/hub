@@ -56,7 +56,7 @@ def test_the_search_for_an_allergy_on_a_dish_finds_the_tool_of_the_line(language
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
 def test_no_text_of_the_reported_turn_says_an_allergy_on_a_dish_has_no_tool(make_user):
     texts = turn_texts(owner_of_a(make_user, "es"), REPORTED)
-    to_the_card = [text for text in texts if "«Health and allergies» block" in text]
+    to_the_card = [text for text in texts if "Never for allergies, sensitivity tests or other health data" in text]
 
     assert to_the_card  # positive control: «clienta» brings Customers' tools, which send health data to the card
     for text in to_the_card:

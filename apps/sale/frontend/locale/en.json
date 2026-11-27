@@ -97,7 +97,6 @@
       "discountTicket": "Ticket discount",
       "total": "Total",
       "printPrebill": "Print bill",
-      "charge": "Charge",
       "chargeAmount": "Charge · {amount}",
       "chargeLines": "Charge {n} line · {amount} | Charge {n} lines · {amount}",
       "openCart": "Open cart",
@@ -196,6 +195,7 @@
         "free": "Free"
       },
       "noServices": "No services.",
+      "searchFoundNothing": "No product or service matches your search.",
       "servicesLoadFailed": "The services could not be loaded.",
       "servicePriceTitle": "Amount of {name}",
       "servicePriceSuggest": "Use {price}",

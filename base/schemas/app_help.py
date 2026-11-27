@@ -3,6 +3,8 @@
 from ninja import Schema
 from pydantic import Field
 
+from base.schemas.assistant import ReadOn
+
 
 class AppHelpIn(Schema):
     """``base.help.get``: the app whose help is asked for."""
@@ -14,6 +16,7 @@ class AppHelpIn(Schema):
             "Employees, Files, Apps, System, Settings, My profile)."
         ),
     )
+    offset: ReadOn = 0
 
 
 class HelpScreenOut(Schema):

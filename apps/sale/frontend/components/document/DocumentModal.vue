@@ -96,6 +96,7 @@ async function queued(saleId: string): Promise<boolean> {
         fill="clear"
         color="medium"
         :aria-label="$t('sale.document.close')"
+        :title="$t('sale.document.close')"
         data-testid="sale-document-close"
         @click="open = false"
       >
@@ -120,6 +121,7 @@ async function queued(saleId: string): Promise<boolean> {
           expand="block"
           :disabled="!paper || sending"
           :aria-label="$t('sale.document.print')"
+          :title="$t('sale.document.print')"
           data-testid="sale-document-print"
           @click="print"
         >

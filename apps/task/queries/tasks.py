@@ -4,12 +4,13 @@ task by what the caller calls it and its subtasks; and the row a write answers w
 import datetime as dt
 from uuid import UUID
 
-from django.db.models import Case, Count, F, IntegerField, OuterRef, Q, QuerySet, Subquery, Value, When
+from django.db.models import Case, Count, F, IntegerField, OuterRef, QuerySet, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from live.context import OperationContext
 from live.operations import operation
 
 from base.ordering import list_order_for
+from base.text_search import contains_text
 from apps.task.models import Comment, Task
 from apps.task.queries.reads import Caller, _full_name, _page, business_today, resolve_project, resolve_task, user_name
 from apps.task.schemas import SubtaskListIn, TaskListIn, TaskMineIn, TaskOut, TaskPage, TaskRefIn
@@ -102,17 +103,12 @@ def filter_tasks(tasks: QuerySet[Task], params: TaskListIn) -> QuerySet[Task]:  
     if params.search:
         text = params.search
         tasks = tasks.filter(
-            Q(number__icontains=text)
-            | Q(title__icontains=text)
-            | Q(description__icontains=text)
-            | Q(assignee_name__icontains=text)
-            | Q(project__name__icontains=text)
-            | Q(project__code__icontains=text)
+            contains_text(text, "number", "title", "description", "assignee_name", "project__name", "project__code")
         )
     if params.number:
-        tasks = tasks.filter(number__icontains=params.number)
+        tasks = tasks.filter(contains_text(params.number, "number"))
     if params.title:
-        tasks = tasks.filter(title__icontains=params.title)
+        tasks = tasks.filter(contains_text(params.title, "title"))
     if params.status:
         tasks = tasks.filter(status=params.status)
     if params.priority:
@@ -130,7 +126,7 @@ def filter_tasks(tasks: QuerySet[Task], params: TaskListIn) -> QuerySet[Task]:  
     if params.assigned_to_id:
         tasks = tasks.filter(assigned_to_id=params.assigned_to_id)
     if params.assignee:
-        tasks = tasks.filter(assignee_name__icontains=params.assignee)
+        tasks = tasks.filter(contains_text(params.assignee, "assignee_name"))
     if params.unassigned:
         tasks = tasks.filter(assigned_to__isnull=True)
     if params.parent_id:
@@ -213,7 +209,7 @@ def my_tasks(ctx: OperationContext, params: TaskMineIn) -> dict:
     else:
         tasks = Task.objects.filter(assigned_to_id=caller.member.pk).exclude(status__in=Task.CLOSED)
     if params.search:
-        tasks = tasks.filter(Q(number__icontains=params.search) | Q(title__icontains=params.search))
+        tasks = tasks.filter(contains_text(params.search, "number", "title"))
     if params.due_within_days is not None:
         horizon = business_today() + dt.timedelta(days=params.due_within_days)
         tasks = tasks.filter(due_date__isnull=False, due_date__lte=horizon)

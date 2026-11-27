@@ -7,7 +7,7 @@ import pytest
 from django.utils import translation
 from live import assistant as shared
 from live.context import OperationContext
-from live.operations import get, registry
+from live.operations import NOT_A_TOOL, get, registry
 
 from base import assistant, entitlement
 from base.models import Membership
@@ -51,6 +51,22 @@ def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
 )
 def test_what_is_not_a_tool_is_never_offered_even_to_who_may_do_everything(name, why):
     assert name not in assistant.tools.catalog(ctx({"*"})), why
+
+
+def test_no_description_written_for_the_model_is_dropped_for_want_of_a_permission():
+    """An ``ai=`` dictionary that describes a tool on an operation with no permission is read as no tool
+    (``Operation.ai_spec``), so the model never sees what was written for it: a read the assistant needs, such as the
+    accounts a staff record can hang from, is left without a way in. It says it is no tool, or it gets a permission."""
+    open_ops = [op for op in registry.values() if op.permission is None]
+    assert any(isinstance(op.ai, dict) for op in open_ops)  # not an empty sweep
+    dropped = sorted(
+        op.name
+        for op in open_ops
+        if isinstance(op.ai, dict)
+        and str(op.ai.get("description", "")).strip()
+        and not str(op.ai["description"]).strip().startswith(NOT_A_TOOL)
+    )
+    assert dropped == []
 
 
 @HUB_DB  # the catalogue is of the apps on in the business (base.activation)
