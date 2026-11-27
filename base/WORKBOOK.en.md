@@ -947,7 +947,7 @@ If it fails: without the list, as in "My apps".
 Involved: APPS-F01, APPS-F07, BASE-F14, BASE-F20
 
 ### BASE-F18 Turn on an app
-<!-- from WORKBOOK.md sha256:cdbe0b45b120 -->
+<!-- from WORKBOOK.md sha256:8e30f1c5b8b2 -->
 Status: done
 Actor: administrator
 Screen: Apps
@@ -964,9 +964,10 @@ In: the chosen app, the ones it needs and what the business has subscribed to on
 Out: the app running in this business, chosen by it: it counts towards its plan's limit of apps.
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have reached the
 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for the owner in the browser (not in
-the installed app). A paid app not subscribed to offers no "Turn on". Neither does an app this business cannot use: it
-shows "Not available" and, for whoever runs the business, the reason below it ("VeriFactu is only for businesses in
-Spain."). Any other failure shows in a notice with the app's name and the reason, which stays until it is closed.
+the installed app). The limit never stops an app the business's country requires (VeriFactu in Spain): it turns on
+even with the plan at its limit. A paid app not subscribed to offers no "Turn on". Neither does an app this business
+cannot use: it shows "Not available" and, for whoever runs the business, the reason below it ("VeriFactu is only for
+businesses in Spain."). Any other failure shows in a notice with the app's name and the reason, which stays until it is closed.
 Involved: APPS-F07, VERIFACTU-F01, BASE-F19, BASE-F20
 
 ### BASE-F19 Know what else comes with an app
@@ -1233,7 +1234,7 @@ damaged, a newer version of ERPlora made it or it is larger than 20 MB) and it s
 Involved: BASE-F31
 
 ### BASE-F31 Review and load what the file brings
-<!-- from WORKBOOK.md sha256:ac59a05a4943 -->
+<!-- from WORKBOOK.md sha256:3188f27a81a3 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Import)
@@ -1255,10 +1256,13 @@ Steps:
      duplicated nor overwritten. If an app of the template is still being set up, its part comes in by
      itself as soon as it is ready, with no coming back and nothing to tap.
 In: the template or the file and the apps ticked.
-Out: the apps ticked that were off, turned on before loading, with the ones they need and within the plan's
-limit of apps, as if they were turned on in Apps (`base.app.enabled`); in each app ticked, what it brings and
-was missing, added as if it were added by hand in that app (its categories, products, services, areas,
-tables and, from a backup, customers), and the report kept (`base.blueprint.imported`).
+Out: the apps ticked that were off, turned on before loading and within the plan's limit of apps, each one
+chosen by the business as if it were turned on in Apps (`base.app.enabled`): they count towards the plan's limit
+of apps and turning another one off does not take them along; the ones they need that were not ticked come along
+with them, and Taxes, which the country requires, comes along with the ones that need it without counting towards
+the plan, as at the sign-up. In each app ticked, what it brings and was missing, added as if it were added by hand in
+that app (its categories, products, services, areas, tables and, from a backup, customers), and the report kept
+(`base.blueprint.imported`).
 If it fails: "The import failed:" with the reason and it stays on the review; with no app ticked, "Choose at least
 one app." and it cannot be imported; if none of its apps can be turned on here, "Nothing of this file can
 load in your business: none of its apps can be turned on here.". An app that could not be turned on (the
