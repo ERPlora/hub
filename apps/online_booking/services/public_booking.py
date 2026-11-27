@@ -10,7 +10,7 @@ from live.errors import Conflict, InvalidPayload, OperationError
 from live.operations import get, operation
 from live.outbox import record_event
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.queries.booking import bookable_members
 from apps.appointment.queries.business import now
 from apps.appointment.schemas import booking as diary_booking

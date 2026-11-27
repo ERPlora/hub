@@ -3,7 +3,7 @@
 from live.context import OperationContext
 from live.operations import get, operation
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.schemas import changes as diary_changes
 from apps.online_booking.queries.links import find_by_token, public_booking_out
 from apps.online_booking.queries.visitors import PUBLIC, delegated
