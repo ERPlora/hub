@@ -16,7 +16,8 @@ from django.utils.translation import override
 from live.errors import Conflict
 
 from apps.whatsapp_inbox import clock
-from apps.whatsapp_inbox.models import Channel, Conversation, Message
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.conversations import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import HUB_DB, NOW, connect, ctx_for, receive, run, system
 from base.tenancy.context import use_hub
 

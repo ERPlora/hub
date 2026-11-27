@@ -26,12 +26,16 @@ class MemberEventIn(Payload):
     id: UUID = Field(description="The professional.")
 
 
-class SaleFromAppointmentIn(Payload):
+class AtTheTill(Payload):
+    actor: str = Field("", description="Who did it at the till, as the outbox keeps them; empty: the platform.")
+
+
+class SaleFromAppointmentIn(AtTheTill):
     sale_id: UUID
     appointment_id: UUID
 
 
-class SaleVoidedIn(Payload):
+class SaleVoidedIn(AtTheTill):
     sale_id: UUID
 
 

@@ -9,10 +9,12 @@ fails is left out. The stand-in modules here name real operations registered for
 
 import json
 import logging
+from pathlib import Path
 from types import SimpleNamespace
 
 import psycopg
 import pytest
+from django.conf import settings
 from django.utils.translation import gettext_lazy
 from live.assistant import description
 from live.context import OperationContext, system_context
@@ -196,6 +198,13 @@ def test_the_platforms_steps_are_translated(modules):
     assert apps["description"].startswith("Activa al menos una app")
 
 
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_the_list_comes_with_its_title_as_the_home_shows_it_in_the_language_of_who_asks(modules, language):
+    """The assistant names the list by this title, never by English words of its tool's description in a Spanish chat."""
+    catalogue = json.loads((Path(settings.BASE_DIR) / f"base/frontend/locale/{language}.json").read_text(encoding="utf-8"))
+    assert setup_status(ctx(language=language))["title"] == catalogue["base"]["setup"]["title"]
+
+
 def test_your_apps_is_pending_without_an_app_on_and_unavailable_when_none_can_be(modules):
     modules(module("sale"), module("stock"), on=[])
     assert by_key(setup_status(ctx(ADMIN)))["base.apps"]["state"] == "pending"
@@ -219,7 +228,14 @@ def test_your_team_is_done_with_two_active_people_in_this_hub(modules, make_user
 
 def test_whoever_cannot_administer_the_hub_gets_no_platform_step(modules):
     modules(module("sale"))
-    assert setup_status(ctx()) == {"total": 0, "pending": 0, "unavailable": 0, "blocking_pending": 0, "items": []}
+    assert setup_status(ctx()) == {
+        "title": "Finish setting up your business",
+        "total": 0,
+        "pending": 0,
+        "unavailable": 0,
+        "blocking_pending": 0,
+        "items": [],
+    }
 
 
 # --- base.setup.status: the apps a business must have on in its country (hub#997) -----------------------------------
