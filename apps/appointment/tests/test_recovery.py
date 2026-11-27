@@ -19,7 +19,8 @@ from django.apps import apps
 from django.db import connections
 from django.utils import timezone
 
-from apps.appointment.models import Appointment, Recurring, RecurringService
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring, RecurringService
 from apps.appointment.queries.recovery import (
     appointments_deleted_in_business,
     appointments_in_copy,

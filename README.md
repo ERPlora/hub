@@ -76,7 +76,7 @@ bash .github/scripts/smoke-e2e.sh --spec tests/e2e/login-and-shell.spec.ts   # s
 Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
 suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
 citas, los servicios y los bonos, el alta de un negocio, activar y desactivar apps, la demo, la actualización en vivo
-entre pestañas y que los textos de las pantallas de los recorridos de peluquería y restaurante se lean enteros. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pasada nocturna»): sus worktrees,
+entre pestañas y que los textos de las pantallas de los recorridos de peluquería y restaurante se lean enteros. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pila de la pasada»): sus worktrees,
 sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
 
 - **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.

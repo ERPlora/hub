@@ -245,45 +245,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: uv.lock
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          version: 10.34.7 # the Dockerfile's PNPM_VERSION and package.json's packageManager
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 24
-          cache: pnpm
-      # The erplora-next tree nightly_e2e.py expects around the Hub: the SaaS of origin/main in ../saas (every login
-      # goes through erplora.com), the shared image library in ../blueprints and compose.yaml's Postgres in .., which
-      # the specs reach with `docker compose exec`. Each checkout gets the .env of a new one.
-      - name: The SaaS, the image library and Postgres beside the Hub
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          bash .github/scripts/clone-repo.sh ERPlora/saas ../saas
-          bash .github/scripts/clone-repo.sh ERPlora/blueprints ../blueprints img
-          cp .env.example .env
-          cp ../saas/.env.example ../saas/.env
-          cat > ../compose.yaml <<'YAML'
-          services:
-            postgres:
-              image: pgvector/pgvector:pg18
-              environment:
-                POSTGRES_USER: hub
-                POSTGRES_PASSWORD: hub
-                POSTGRES_DB: hub
-              ports:
-                - "5432:5432"
-              healthcheck:
-                test: ["CMD-SHELL", "pg_isready -U hub -d hub"]
-                interval: 2s
-                timeout: 3s
-                retries: 30
-          YAML
-          docker compose -f ../compose.yaml up -d --wait
+      # uv, pnpm, node, the SaaS in ../saas, the image library in ../blueprints and compose.yaml's Postgres in ..,
+      # as the nightly sets them up too.
+      - uses: ./.github/actions/e2e-stack
       - name: The browser smoke
         env:
           NIGHTLY_DIR: ${{ runner.temp }}/hub-smoke-e2e

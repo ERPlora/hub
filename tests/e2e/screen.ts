@@ -15,6 +15,16 @@ export const THREE_SIZES_TALL_TABLET = [
  *  still counts the 721 px it would have without the bar. Open the page at `withoutBar`, then `underAddressBar`. */
 export const CHROME_LANDSCAPE = { width: 1280, page: 665, withoutBar: 721 } as const;
 
+/** The sizes a window that has to fit is measured at, besides the address bar: the same tablet with the page as low,
+ *  and without the bar, the desktop, the tablet upright and the low phone. */
+export const FIT_SIZES = [
+  { width: 1280, height: 665 },
+  { width: 1280, height: 720 },
+  { width: 1440, height: 900 },
+  { width: 820, height: 1180 },
+  { width: 375, height: 667 },
+] as const;
+
 /** Chrome's address bar over a page opened `CHROME_LANDSCAPE.withoutBar` high: the page loses its height, `vh` does
  *  not. Removing the style it returns takes the bar away. */
 export function underAddressBar(page: Page): Promise<ElementHandle> {
