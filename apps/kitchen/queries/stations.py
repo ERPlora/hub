@@ -17,6 +17,7 @@ from apps.kitchen.queries.state import in_flight_views
 from apps.kitchen.schemas.fields import StationRefIn
 from apps.kitchen.schemas.routing import RoutingListIn, RoutingPage
 from apps.kitchen.schemas.stations import StationListIn, StationOut, StationPage
+from base.text_search import contains_text
 
 
 def in_progress_by_station(settings: KitchenSettings) -> dict[UUID | None, int]:
@@ -80,7 +81,7 @@ def list_stations(ctx: OperationContext, params: StationListIn) -> dict:
         ),
     )
     if params.search:
-        stations = stations.filter(name__icontains=params.search)
+        stations = stations.filter(contains_text(params.search, "name"))
     if params.is_active is not None:
         stations = stations.filter(is_active=params.is_active)
     counts = in_progress_by_station(current_settings())

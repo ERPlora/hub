@@ -2,7 +2,8 @@
 // (base's, each app's and, when asked, the shared `ui`), their sources (`.ts` and `.vue`, without tests, their helpers,
 // declarations or builds), the code of each (a `.vue`, its `<script>` blocks at their own lines) and what a guard finds
 // in them, as `<path>:<line>` by app; and, for the guards that parse the code (TypeScript's AST), `linesWhere`, the
-// lines of the nodes a guard looks for, and `bare`, which they read an expression with. The frontends are listed and
+// lines of the nodes a guard looks for, and `bare`, which they read an expression with; for the guards that read a
+// component's template, `templateLinesWhere`. The frontends are listed and
 // read without holding the worker (hub#1315): some 2,000 files, and on a loaded machine each first open waits on its own.
 import { readdirSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
@@ -59,6 +60,20 @@ export function linesWhere(text: string, name: string, holds: (node: ts.Node) =>
     visit(file);
     return lines;
   });
+}
+
+/** The lines of a component's outermost `<template>` (the file `name`, a `.vue`) that `holds` is true of, at their own
+ *  lines of the file. */
+export function templateLinesWhere(text: string, name: string, holds: (line: string) => boolean): number[] {
+  if (!name.endsWith('.vue')) return [];
+  const start = text.indexOf('<template>');
+  const end = text.lastIndexOf('</template>');
+  if (start === -1 || end === -1) return [];
+  const before = text.slice(0, start).split('\n').length;
+  return text
+    .slice(start, end)
+    .split('\n')
+    .flatMap((line, index) => (holds(line) ? [before + index] : []));
 }
 
 /** The sources under `dir`: `.ts` and `.vue`, without tests, their helpers, declarations or builds. Each folder is

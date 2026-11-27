@@ -141,7 +141,7 @@
       "correctedLink": "Ver el registro que lo subsana",
       "verify": "Cotejar en la AEAT",
       "transmit": "Enviar ahora",
-      "transmitted": "Enviado: {accepted} aceptados, {rejected} rechazados, {waiting} en espera.",
+      "transmitted": "Enviado: {accepted}, {rejected}, {waiting}.",
       "transmitFailed": "No se ha podido enviar",
       "ask": "Preguntar a la AEAT",
       "askHeld": "La AEAT ya tiene {number}: sale de la cola.",
@@ -160,11 +160,17 @@
       "events": "Eventos",
       "reasonRequired": "Escribe por qué la factura se emitió por error."
     },
+    "answers": {
+      "sent": "{count} enviado | {count} enviados",
+      "accepted": "{count} aceptado | {count} aceptados",
+      "rejected": "{count} rechazado | {count} rechazados",
+      "waiting": "{count} en espera"
+    },
     "contingency": {
       "title": "Cola de contingencia",
       "process": "Procesar cola",
       "processing": "Procesando…",
-      "processed": "{sent} enviados, {accepted} aceptados, {rejected} rechazados, {waiting} en espera.",
+      "processed": "{sent}, {accepted}, {rejected}, {waiting}.",
       "processFailed": "No se pudo procesar la cola",
       "search": "Buscar factura o error…",
       "empty": "Cola vacía: todo está en la AEAT.",
@@ -280,7 +286,7 @@
       "holder": "Titular",
       "uploaded": "Subido el",
       "expires": "Caduca el",
-      "expiresSoon": "Caduca en {n} días: sube aquí el renovado.",
+      "expiresSoon": "Caduca en {n} día: sube aquí el renovado. | Caduca en {n} días: sube aquí el renovado.",
       "expired": "El certificado ha caducado. Sube uno vigente para poder enviar a la AEAT.",
       "proof": {
         "label": "AEAT de pruebas",

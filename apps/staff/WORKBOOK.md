@@ -274,13 +274,14 @@ Pasos:
 2. Elige la cuenta de esa persona, o «Sin acceso al Hub» para desvincular, y guarda.
 Entra: las cuentas activas con acceso a este negocio, solo su identificador y su nombre
 (`staff.account.list`; las lee quien puede dar de alta o editar fichas).
-Sale: el vínculo. Con él, la persona ve su propia ficha (STAFF-F08) y pide sus ausencias (STAFF-F24).
-No cambia ningún permiso ni la comisión: una venta cuenta para quien se eligió al cobrarla (STAFF-F21).
+Sale: el vínculo. Con él, la persona ve su propia ficha (STAFF-F08) y pide sus ausencias (STAFF-F24), y si no
+tiene nombre en su perfil, las caras de la caja y la tarjeta del menú de usuario la llaman por el de la ficha
+(BASE-F55). No cambia ningún permiso ni la comisión: una venta cuenta para quien se eligió al cobrarla (STAFF-F21).
 Dar de baja la ficha libera la cuenta.
 Si falla: «Ese usuario del Hub ya está vinculado a Ana García. Un usuario del Hub solo puede
 pertenecer a un miembro del equipo: desvincúlalo allí primero o elige otro usuario.», también si dos personas lo vinculan a la vez; «Ese usuario del Hub no
 tiene acceso a este negocio.».
-Implicados: ATTENDANCE-F01, TASK-F03
+Implicados: ATTENDANCE-F01, TASK-F03, BASE-F55
 
 ### STAFF-F04 Crear, editar y retirar un rol
 Estado: hecho (servidor y pantalla)
@@ -343,8 +344,11 @@ Pasos:
 1. Quien puede dar de alta pide al asistente que dé de alta a varias personas (hasta 100 de una vez)
    con su nombre y, si quiere, email, teléfono, rol, fecha de alta, tarifa, reservable, bio y
    especialidades.
-2. Se crea una ficha **Activa** por cada fila válida.
-3. La respuesta dice qué fichas se crearon y qué filas se omitieron con su motivo.
+2. Antes de crearlas, la tarjeta de confirmación dice cada persona por su nombre y apellidos («Crear en Personal:
+   Carla Ruiz, Diego Martín, Elena Sanz»; con más de cuatro, las tres primeras y cuántas más). Una fila sin nombre
+   o sin apellidos cuenta entre las «más».
+3. Se crea una ficha **Activa** por cada fila válida.
+4. La respuesta dice qué fichas se crearon y qué filas se omitieron con su motivo.
 Entra: las filas del lote; los roles activos del negocio.
 Sale: una ficha por fila válida y un aviso `staff.member.created` por cada una (ninguno si no entra
 ninguna).

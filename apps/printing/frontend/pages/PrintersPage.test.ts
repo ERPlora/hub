@@ -24,6 +24,7 @@ import type { PrinterOut } from '../operations';
 import PrintersPage from './PrintersPage.vue';
 import en from '../locale/en.json';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 const LIST = 'printing.printer.list';
 const printer = (id: string, more: Partial<PrinterOut> = {}): PrinterOut => ({
@@ -159,7 +160,9 @@ describe('PrintersPage: search printers (PRINTING-F02)', () => {
   it('whoever sets printers up searches; the employee does not', async () => {
     const s = await setup();
     await s.result(LIST, PAGE);
-    expect(s.find('printing-printers-discover').text()).toBe('Search printers');
+    const discover = s.find('printing-printers-discover');
+    // The search icon alone: «Search printers» is its name and its tooltip.
+    expect([discover.text(), accessibleName(discover.element), discover.attributes('title')]).toEqual(['', 'Search printers', 'Search printers']);
     expect(s.wrapper.findComponent(DiscoverPrintersModal).exists()).toBe(true);
     const manager = await setup({ session: MANAGER });
     expect(manager.find('printing-printers-discover').exists()).toBe(true);

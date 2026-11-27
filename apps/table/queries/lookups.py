@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict, NotFound
 
 from apps.table.models import Table, TableSession, Zone
+from base.text_search import contains_text
 from .floor import live_sessions, table_label
 
 #: How many names an ambiguous reference lists.
@@ -30,7 +31,7 @@ SESSION_AMBIGUOUS = _("Table %(number)s has %(count)s open checks: say which one
 
 
 def _first_match(rows, field: str, said: str) -> list:
-    for lookup in (Q(**{f"{field}__iexact": said}), Q(**{f"{field}__icontains": said})):
+    for lookup in (Q(**{f"{field}__iexact": said}), contains_text(said, field)):
         found = list(rows.filter(lookup).order_by(field, "id")[: MAX_CANDIDATES + 1])
         if found:
             return found

@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from apps.printing.models import PrintDevice, Printer, PrintJob
 
-from .device_reads import SEEN_WITHIN, active_devices
+from .device_reads import active_devices, devices_on
 
 #: A job that has waited this long with no device there to print it rings the bell: not every till that restarts
 #: (the old hub's ``UNDRAINED_ALERT_SECONDS``).
@@ -61,7 +61,13 @@ def stalled(usages: list[str]) -> dict[str, int]:
     no device there can print — one set up here whose last news is within :data:`SEEN_WITHIN` (the old hub's
     ``print_hosts::is_undrained``). A device set up but off prints nothing: nobody is printing its papers."""
     now = timezone.now()
-    there = active_devices().filter(last_seen_at__gte=now - SEEN_WITHIN)
-    _papers, takeable = _takeable(there, usages)
+    _papers, takeable = _takeable(devices_on(now), usages)
     jobs = _waiting_for_nobody(usages, takeable, since=now - STALLED_AFTER)
     return {usage: jobs.get(usage, 0) for usage in usages}
+
+
+def waits_for_device(job: PrintJob) -> bool:
+    """Whether ``job`` waits in the queue with no device there to print it, as :func:`stalled` counts one but from the
+    moment it is queued: nothing has printed it, and nothing will until such a device is set up or on."""
+    _papers, takeable = _takeable(devices_on(timezone.now()), [job.usage])
+    return PrintJob.objects.filter(PENDING, pk=job.pk).exclude(takeable).exists()

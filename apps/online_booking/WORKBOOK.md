@@ -497,7 +497,7 @@ del equipo con su sesión abierta.
   Ajustes bloquea su fila: dos guardados a la vez conservan lo de cada uno. Cancelar con el enlace no bloquea
   nada propio: Citas bloquea la cita al anularla, y de dos cancelaciones a la vez entra una y la otra recibe
   409 `appointment.cannot_cancel` (`tests/test_concurrency.py`, con hilos y sesiones reales).
-- **Límites**: 5 por visitante y hora y 100 por negocio y hora (429; constantes de `services.py`), y las
+- **Límites**: 5 por visitante y hora y 100 por negocio y hora (429; constantes de `services/public_booking.py`), y las
   próximas por móvil de los Ajustes (409; 3 de fábrica); se cuentan sobre `Booking` y las citas, en la
   transacción de la reserva.
 - **Reloj**: el de Citas (`apps.appointment.queries.business.now`, `base.business.business_zone`); los tests lo fijan.

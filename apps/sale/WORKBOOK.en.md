@@ -127,7 +127,7 @@ check and pick it up later from **Open checks**; in a restaurant, this is also w
 to a table and send the order to the kitchen.
 
 #### Details
-<!-- from WORKBOOK.md sha256:36113985af20 -->
+<!-- from WORKBOOK.md sha256:fe52c4bb26a2 -->
 It opens in the application's full screen; the ⋮ menu of the category strip has "Full screen" /
 "Exit full screen" (the browser's, when the device allows it) and it closes by tapping outside, with Esc
 or with the phone's back button. Two areas:
@@ -135,7 +135,7 @@ or with the phone's back button. Two areas:
 - **Catalog**: the strip of Inventory categories with their number of articles, sold-out ones included
   ("All" first and, with Services, "Services" after it; the rest, in the position the business gave them
   and, at equal position, by name: INVENTORY-F08), the magnifier that opens the search ("Search
-  product…", by name or SKU; with Services it also searches its services), the "Speak" key and the grid:
+  product…", by name or SKU; with Services it also searches its services), the microphone key ("Speak") and the grid:
   articles with their initials, their unit and their price (what is sold out, greyed with "Sold out"),
   and at the end the "Open price" tile. In "Services", each service with its initials, its duration and
   its price ("From", "Hourly", "Variable" or "Free" if it is not a fixed price). With many articles,
@@ -147,14 +147,15 @@ or with the phone's back button. Two areas:
   professional underneath; buttons for discount, note, comp and the quantity selector (a line sent to the
   kitchen only shows its quantity, "Order N", the gift and the ⊗ button "Void this item"; one paid with a
   voucher, "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket
-  discount" row if there is one, "Total", the discount button, the printer ("Print bill") and "Charge ·
-  <amount>". In the phone's drawer, the top bar and the footer with "Charge" always stay in view, above
+  discount" row if there is one, "Total", the discount button, the printer ("Print bill"), all of them icon only, and
+  "Charge": the money icon with the amount, called "Charge · <amount>". In the phone's drawer, the top bar and the footer with "Charge" always stay in view, above
   the tab bar, and what is in between (title, chips, tabs and lines) scrolls. The customer button's name
   takes two lines at most (a longer one ends in "…"); on a very narrow phone, the button keeps only its
   icon and the customer chip in the heading already names them.
 
 **Speak** (the strip's microphone key; only for whoever may use the assistant and on a device that can
-record): press it and speak. While it records it turns red, is called "Stop" and "Listening…" shows
+record; only the icon, called "Speak"): press it and speak. While it records it turns red, changes to the stop
+icon, is called "Stop" and "Listening…" shows
 underneath; press it again to finish (it stops by itself after two minutes). After "Transcribing…",
 what was understood lands in the assistant's box, after whatever had been written, and its panel opens:
 the person reads what was understood, corrects it if needed and sends it themselves. **Nothing is sent
@@ -276,7 +277,7 @@ settings…"; error: "Could not load settings." with "Retry"; without permission
 by its address, "No access" (BASE-F118).
 
 ## States of each screen
-<!-- from WORKBOOK.md sha256:74842b18b608 -->
+<!-- from WORKBOOK.md sha256:2fa9a3c5cc56 -->
 
 | State | What the person sees |
 |---|---|
@@ -285,7 +286,7 @@ by its address, "No access" (BASE-F118).
 | Error | The notice with "Retry"; an action's refusal shows inside its sheet or window, next to its field. |
 | Reconnecting | What is painted stays; a band warns "Reconnecting…" until the connection is back. |
 | App inactive (`app_inactive`) | "This app is not active in this business". |
-| Speaking (Sell) | The "Speak" key, red, says "Stop" and "Listening…" shows underneath; on stopping, "Transcribing…". A notice says what fails: no voice, "Nothing was heard. Try again closer to the microphone."; with the microphone denied, "Microphone access is blocked. Allow it in your browser to speak." (in the installed app, which has no browser, "Microphone access is blocked. Allow it in your device settings to speak."); too long, "The recording is too long: say something shorter."; if it cannot be transcribed, "The audio could not be transcribed. Try again."; offline, "No connection: talking to the assistant needs the internet.". |
+| Speaking (Sell) | The microphone key, red, changes to the stop icon and is called "Stop"; "Listening…" shows underneath; on stopping, "Transcribing…". A notice says what fails: no voice, "Nothing was heard. Try again closer to the microphone."; with the microphone denied, "Microphone access is blocked. Allow it in your browser to speak." (in the installed app, which has no browser, "Microphone access is blocked. Allow it in your device settings to speak."); too long, "The recording is too long: say something shorter."; if it cannot be transcribed, "The audio could not be transcribed. Try again."; offline, "No connection: talking to the assistant needs the internet.". |
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". What a manager can approve with their PIN (voiding and refunding a sale, voiding a sent line, deleting a check with something ordered, the open price and discounts above the maximum) does show and, when pressed, asks "An approval is needed". |
 
 ## Unsaved changes on Android
@@ -344,7 +345,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SALE-F42 | Choose the modifiers of a dish in a menu | restaurant | done |
 
 ### SALE-F01 Sell and charge in cash
-<!-- from WORKBOOK.md sha256:c8fb17dbd758 -->
+<!-- from WORKBOOK.md sha256:4e7ab596ec4b -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -354,7 +355,7 @@ Steps:
    search by name or SKU.
 2. Tap the article: it goes in as a line of the check. Tapping it again (same professional, no note or
    discount) raises the quantity; the line's selector raises or lowers it, and at 0 the line goes.
-3. Press "Charge · €18.50" at the foot of the check (on a phone, first open the check with the floating
+3. Press "Charge" at the foot of the check, the money icon with "€18.50" (on a phone, first open the check with the floating
    button, which shows the total). On a phone on its side, the check takes the whole screen: its bar and
    its foot stay put, with "Charge" in view, and the lines scroll between them.
 4. In the **Charge** sheet, with cash chosen, enter the amount tendered on the keypad; the change shows
@@ -376,7 +377,7 @@ check closed. With Invoicing, its ticket (F2) numbered in the year's series in t
 (INVENTORY-F21) and Customers adds the purchase to the record (CUSTOMER-F20). Each line keeps the
 category, rate, country, region and Taxes rule it was charged with.
 If it fails: while the business has not yet said its currency, **Sell** shows no figures: the total, the lines,
-the tiles, the search, the open checks and the floating button say "—", and the foot "Charge · —"; the **Charge**
+the tiles, the search, the open checks and the floating button say "—", as does the amount of the foot's "Charge"; the **Charge**
 sheet stays on "Working out the total…", with no keypad and "Charge" grey. As soon as the business says its
 currency, the figures show; if it cannot be read, the sheet says so with "Retry". If the check cannot be valued
 (for example, because a VAT rule is missing), the foot says why instead of "—": it names the article and its tax
@@ -393,13 +394,13 @@ which charges what is there.
 Involved: INVENTORY-F21, CUSTOMER-F19, CUSTOMER-F20, TAX-F18
 
 ### SALE-F02 Charge by card or another method with no change
-<!-- from WORKBOOK.md sha256:d4c1079935ac -->
+<!-- from WORKBOOK.md sha256:90113c8b1041 -->
 Status: done
 Vertical: common
 Actor: employee, manager
 Screen: Charge
 Steps:
-1. With the check ready, press "Charge · €18.50".
+1. With the check ready, press "Charge" (the money icon with "€18.50").
 2. In the **Charge** sheet, tap **Card** (or whatever the method is; the active methods the settings
    allow are shown).
 3. "Exact amount" and "Charge €18.50 on the card terminal, then confirm." are read: charge on the
@@ -883,7 +884,7 @@ its tables and seat, there is no button and Tables is not asked anything.
 Involved: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24, TABLE-F33
 
 ### SALE-F20 Send the order to the kitchen and void a sent line
-<!-- from WORKBOOK.md sha256:38a11388c5a4 -->
+<!-- from WORKBOOK.md sha256:1a2608507bd3 -->
 Status: done
 Vertical: restaurant
 Actor: employee (send), manager (void; the cashier, with a manager's approval)
@@ -892,10 +893,10 @@ Steps:
 1. With Kitchen active, the check has two tabs: "Check", with all its lines, and "Current order", with
    what is still to be sent; the tab says how many items are waiting ("Current order, 2 items to send").
    With nothing pending, "Everything is sent". While something is waiting, both tabs carry "Send order (N)"
-   pinned above the total and "Charge".
+   (the send icon with the number of items) pinned above the total and "Charge".
 2. Review quantities and who serves ("Current order" leaves only what is pending) and press "Send order
-   (N)" from either tab. For it to go out as a rush, first arm the flame next to it: the button changes to
-   "Send RUSH (N)". "Order N sent to the kitchen." shows at the top of the screen, so "Charge" can be
+   (N)" from either tab. For it to go out as a rush, first arm the flame next to it: the button turns red
+   and is called "Send RUSH (N)". "Order N sent to the kitchen." shows at the top of the screen, so "Charge" can be
    pressed without waiting for it to go; the lines are marked with their round ("Order N") and the time
    sent, and the flame disarms. A double send never sends anything twice. On a low screen, the check
    scrolls so that at least one whole line can be read.
@@ -937,7 +938,7 @@ Through the assistant: its confirmation card says the check (a table's, by its t
 Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
-<!-- from WORKBOOK.md sha256:c1de49a32c77 -->
+<!-- from WORKBOOK.md sha256:81e5316a2d06 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -961,7 +962,9 @@ leaves the check marked as requested, whether it comes out on the receipt printe
 until it is charged in full or deleted; printing it again, adding lines or charging part of it does not remove it.
 Asked of the assistant ("print the bill for table 4"), it only comes out on the receipt printer: if none takes it,
 it is neither printed nor marked, and its receipt says it was not done, with the reason: "No receipt printer takes
-this bill: open it in Sales to print it on this device.".
+this bill: open it in Sales to print it on this device.". If it takes it but no device that is on prints its queue,
+the assistant says it waits in that printer's queue and will come out when a device set up to print it does, never
+that it has printed it.
 If it fails: while the business has not yet said its currency, "Bill" keeps loading and the printer stays grey:
 the paper never goes out with a supposed figure; if the currency cannot be read, it says so with "Retry", as
 when the bill cannot be worked out. If it does not print, "Bill could not be printed"; if the installed app does
@@ -971,7 +974,7 @@ another business".
 Involved: PRINTING-F09, TABLE-F34, INVOICE-F21, BASE-F97
 
 ### SALE-F22 Charge only part of the check
-<!-- from WORKBOOK.md sha256:a77753750562 -->
+<!-- from WORKBOOK.md sha256:f6b48edff776 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -979,10 +982,10 @@ Screen: Sell
 Steps:
 1. With two or more lines, tap the lines this person pays for (the line, not its buttons): they are
    marked with a circle.
-2. With lines marked, the button at the foot says what it will charge: "Charge 1 line · €1.80" or
-   "Charge 2 lines · €7.00", with what the server works out for those lines, the same amount the sheet
-   will charge; while it arrives, a dash. The "Total" row stays the whole check's. With nothing marked,
-   the button goes back to "Charge · €12.00".
+2. With lines marked, the button at the foot shows what it will charge, "€1.80" or "€7.00", and is called
+   "Charge 1 line · €1.80" or "Charge 2 lines · €7.00", with what the server works out for those lines, the
+   same amount the sheet will charge; while it arrives, a dash. The "Total" row stays the whole check's.
+   With nothing marked, the button goes back to the total, "Charge · €12.00".
 3. Press "Charge": the sheet says "Paying 2 lines of €12.00" and charges only those.
 4. After charging, the **Sale document** of that charge opens and, behind it, the check stays open with
    what is left; what was charged does not show again. Charging the last pending line closes the check.
@@ -1177,7 +1180,7 @@ be read, "Unavailable".
 Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, BASE-F119, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
-<!-- from WORKBOOK.md sha256:a66effd35f44 -->
+<!-- from WORKBOOK.md sha256:b299e5b0a8e5 -->
 Status: done
 Vertical: common
 Actor: employee (of their sales), manager (of all of them)
@@ -1232,7 +1235,10 @@ the assistant, "That sale does not exist.". If the assistant is asked ("reprint 
 if a receipt printer takes the paper; if not, nothing is printed and its receipt says it was not done, with the
 reason: "No receipt printer takes this sale's paper: open the sale to print it on this device."; with its fiscal
 document pending, "Its fiscal document is still pending: open the sale to issue it.", and if its VeriFactu record
-cannot be read, "Its VeriFactu record could not be read, and its paper never prints without its QR.".
+cannot be read, "Its VeriFactu record could not be read, and its paper never prints without its QR.". If the printer
+takes it but no device that is on prints its queue (none set up with it, or the one that has it, off), the ticket
+waits in that queue: the assistant says it waits in that printer's queue and will come out when a device set up to
+print it does, never that it has reprinted it.
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Void a charged sale
