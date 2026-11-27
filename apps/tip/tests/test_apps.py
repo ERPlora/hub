@@ -2,6 +2,8 @@
 
 from django.apps import apps
 from django.conf import settings
+from django.utils import translation
+from live.assistant.fields import choice_label
 from live.meta import Category, CheckoutStep, LiveAppConfig, module_configs, permissions_for_role
 from live.operations import registry
 
@@ -92,3 +94,10 @@ def test_every_operation_is_described_for_the_assistant():
     for name, op in registry.items():
         if name.startswith("tip."):
             assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), name
+
+
+def test_the_report_s_views_are_named_as_its_screen_names_them():
+    # The assistant says «Por turno», never the code «shift», when it answers with the report (tip.report.get).
+    for language, names in (("en", ["By person", "By shift"]), ("es", ["Por persona", "Por turno"])):
+        with translation.override(language):
+            assert [str(choice_label("tip", "report", "by", view)) for view in ("person", "shift")] == names

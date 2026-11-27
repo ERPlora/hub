@@ -32,6 +32,8 @@ class TipConfig(LiveAppConfig):
     assistant_settings = ("tip.settings.get",)
     # The «Tip» row of the charge sheet, which Sales mounts without knowing Tips (frontend/components/TipStep.vue).
     checkout = [CheckoutStep(key="tip", component="TipStep", permission="tip.add_tip")]
+    # The report's views as its screen names them, so the assistant never says the code (tip.report.get).
+    choices = {"by": (("person", _("By person")), ("shift", _("By shift")))}
     permissions = {
         "tip.view_tip": _("View tips (an employee, their own)"),
         "tip.add_tip": _("Record tips"),

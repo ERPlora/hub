@@ -198,3 +198,9 @@ msgstr "Mis propinas"
 
 msgid "Your user is not linked to any staff record: ask a manager to link it in Staff."
 msgstr "Tu usuario no está vinculado a ninguna ficha de Personal: pide a un responsable que la vincule en Personal."
+
+msgid "By person"
+msgstr "Por persona"
+
+msgid "By shift"
+msgstr "Por turno"
