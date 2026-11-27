@@ -2895,6 +2895,14 @@ msgid "Nobody changes their own role: ask somebody above you."
 msgstr "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
 
 #: people.py
+msgid ""
+"The accountancy firm only reads and takes no place of the plan: it keeps the "
+"role of its invitation."
+msgstr ""
+"La gestoría solo lee y no ocupa plaza del plan: se queda con el rol de su "
+"invitación."
+
+#: people.py
 msgid "You may only give a role to people below you in the business."
 msgstr "Solo puedes dar un rol a quien está por debajo de ti en el negocio."
 

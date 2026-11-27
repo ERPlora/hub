@@ -970,7 +970,8 @@
       },
       "save": "Save",
       "saved": "Role saved.",
-      "saveError": "The role could not be saved"
+      "saveError": "The role could not be saved",
+      "mine": "Nobody changes their own role: ask somebody above you."
     },
     "person": {
       "title": "Person",
@@ -980,9 +981,10 @@
       "retry": "Retry",
       "data": {
         "heading": "Their details",
-        "managed": "Name, email and role are changed on erplora.com.",
+        "managed": "Name, email and the role of the invitation are changed on erplora.com.",
         "open": "Open on erplora.com",
-        "notEntered": "Not in this hub yet: their PIN and badge are kept for when they come in."
+        "notEntered": "Not in this hub yet: their PIN and badge are kept for when they come in.",
+        "invitation": "Role of the invitation"
       },
       "pin": {
         "heading": "PIN",
@@ -1017,6 +1019,26 @@
       "refused": {
         "ownerOnly": "Only the owner changes the owner's way in.",
         "ownBadge": "Nobody registers their own badge: ask another administrator."
+      },
+      "role": {
+        "heading": "Role in this business",
+        "intro": "It rules over the role of their invitation: what they see and may do here changes at once, without signing in again.",
+        "label": "Role",
+        "invitation": "From the invitation ({role})",
+        "given": "{name} now has the role {role}.",
+        "failed": "The role could not be changed.",
+        "loading": "Loading the roles…",
+        "loadError": "The roles could not be loaded.",
+        "retry": "Retry",
+        "none": "This business has no roles of its own yet: they are made in Employees › Roles, from any role.",
+        "make": "Make a role",
+        "refused": {
+          "owner": "The owner is always the owner: nobody gives them another role.",
+          "accountant": "The accountancy firm only reads and takes no place of the plan: it keeps the role of its invitation.",
+          "own": "Nobody changes their own role: ask somebody above you.",
+          "above": "You may only give a role to people below you in the business.",
+          "beyond": "A role may not allow more than you may do yourself."
+        }
       }
     },
     "apiKeys": {
