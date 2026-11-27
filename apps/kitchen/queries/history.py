@@ -2,7 +2,6 @@
 
 import datetime as dt
 
-from django.db.models import Q
 from live.context import OperationContext
 from live.operations import operation
 
@@ -11,6 +10,7 @@ from apps.kitchen.queries.reads import start_of
 from apps.kitchen.schemas.history import LogListIn, LogPage
 from apps.sale.queries.people import person_names
 from base.relay import by_platform
+from base.text_search import contains_text
 
 
 def log_row(entry: LogEntry, names: dict[str, str] | None = None) -> dict:
@@ -55,10 +55,7 @@ def log_row(entry: LogEntry, names: dict[str, str] | None = None) -> dict:
 def list_log(ctx: OperationContext, params: LogListIn) -> dict:
     entries = LogEntry.objects.select_related("ticket", "item", "station")
     if params.search:
-        entries = entries.filter(
-            Q(ticket__number__icontains=params.search)
-            | Q(notes__icontains=params.search)
-        )
+        entries = entries.filter(contains_text(params.search, "ticket__number", "notes"))
     if params.action is not None:
         entries = entries.filter(action=params.action)
     if params.ticket_id is not None:
