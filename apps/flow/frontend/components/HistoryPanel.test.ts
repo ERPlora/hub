@@ -56,6 +56,16 @@ async function setup(rows: RunOut[], failed = 0, total = rows.length) {
   return m;
 }
 
+/** The owner presses «Resume» on the run stopped by an error (`r2`) and says yes; the server answers `answer`. */
+async function resumeAnswered(answer: [number, unknown]) {
+  confirm.mockResolvedValue(true);
+  const m = await setup([{ ...FAILED, resumable: true }], 1);
+  m.answerBy({ '/api/flow/runs/retry': answer });
+  await click(m.find('flow-run-retry-r2').element);
+  await settle();
+  return m;
+}
+
 describe('HistoryPanel', () => {
   it('says «Loading…» as a status until the first runs are in, with the one LoadingNote of flow (hub#969)', async () => {
     const m = await mountFlow(HistoryPanel, { props: { flowId: 'f1', steps: STEPS, catalog: CATALOG } });
@@ -147,11 +157,7 @@ describe('HistoryPanel', () => {
   // FLOW-F24: a run stopped by an error at a step resumes there, after a confirmation.
   it('a run that can be resumed offers it, asks first and resumes it at the step that failed', async () => {
     toastSuccess.mockClear();
-    confirm.mockResolvedValue(true);
-    const m = await setup([{ ...FAILED, resumable: true }], 1);
-    m.answerBy({ '/api/flow/runs/retry': [200, run('r2', { status: 'succeeded' })] });
-    await click(m.find('flow-run-retry-r2').element);
-    await settle();
+    const m = await resumeAnswered([200, run('r2', { status: 'succeeded' })]);
     expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ title: 'Resume it from the step that failed?', confirmLabel: 'Yes, resume it' }));
     expect(m.sent().filter((call) => call.path === '/api/flow/runs/retry').map((call) => call.body)).toEqual([{ id: 'r2' }]);
     expect(toastSuccess).toHaveBeenCalledWith('Resumed: it finished well.');
@@ -166,11 +172,7 @@ describe('HistoryPanel', () => {
   });
 
   it('a resumed run that stops again, or a refusal, is said next to the run', async () => {
-    confirm.mockResolvedValue(true);
-    const m = await setup([{ ...FAILED, resumable: true }], 1);
-    m.answerBy({ '/api/flow/runs/retry': [200, run('r2', { status: 'failed', error_message: 'Not allowed yet.' })] });
-    await click(m.find('flow-run-retry-r2').element);
-    await settle();
+    const m = await resumeAnswered([200, run('r2', { status: 'failed', error_message: 'Not allowed yet.' })]);
     expect(m.find('flow-run-retry-problem-r2').text()).toBe('It was resumed and stopped by an error again: Not allowed yet.');
     m.answerBy({ '/api/flow/runs/retry': [409, { error: { code: 'flow.disabled', message: 'This automation is paused: turn it on to run it.' } }] });
     await click(m.find('flow-run-retry-r2').element);
@@ -190,37 +192,25 @@ describe('HistoryPanel', () => {
     ['asking', 'ask', 'asking', 'Resumed: it is waiting for an answer in “Waiting for your answer”.'],
   ] as const)('a run resumed that is now %s at a %s step says so', async (status, kind, outcome, notice) => {
     toastSuccess.mockClear();
-    confirm.mockResolvedValue(true);
-    const m = await setup([{ ...FAILED, resumable: true }], 1);
     const log = [{ step: 's1', kind, outcome, at: '2026-10-15T12:00:00+02:00' }];
-    m.answerBy({ '/api/flow/runs/retry': [200, run('r2', { status, log })] });
-    await click(m.find('flow-run-retry-r2').element);
-    await settle();
+    await resumeAnswered([200, run('r2', { status, log })]);
     expect(toastSuccess.mock.calls).toEqual([[notice]]);
   });
 
   it('a run resumed that stops again at once has no «Resumed» notice, only why next to it', async () => {
     toastSuccess.mockClear();
-    confirm.mockResolvedValue(true);
-    const m = await setup([{ ...FAILED, resumable: true }], 1);
-    m.answerBy({ '/api/flow/runs/retry': [200, run('r2', { status: 'failed', error_message: 'Not allowed yet.' })] });
-    await click(m.find('flow-run-retry-r2').element);
-    await settle();
+    const m = await resumeAnswered([200, run('r2', { status: 'failed', error_message: 'Not allowed yet.' })]);
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(m.find('flow-run-retry-problem-r2').text()).toBe('It was resumed and stopped by an error again: Not allowed yet.');
   });
 
   it('a resumed run that ends later without an error says nothing of an error next to it', async () => {
-    confirm.mockResolvedValue(true);
     const asking = run('r2', {
       status: 'asking',
       finished_at: null,
       log: [{ step: 's1', kind: 'ask', outcome: 'asking', at: '2026-10-15T12:00:00+02:00' }],
     });
-    const m = await setup([{ ...FAILED, resumable: true }], 1);
-    m.answerBy({ '/api/flow/runs/retry': [200, asking] });
-    await click(m.find('flow-run-retry-r2').element);
-    await settle();
+    const m = await resumeAnswered([200, asking]);
     const answeredNo = { ...asking, status: 'cancelled' as const, error_code: 'flow.question_rejected', error_message: 'Cancelled: Ana answered no to «Book».' };
     await m.result(OP, { rows: [answeredNo], total: 1, limit: 20, offset: 0, failed: 0 }, {}, 2);
     expect(m.find('flow-run-trouble-r2').text()).toContain('Cancelled: Ana answered no to «Book».');
@@ -228,16 +218,12 @@ describe('HistoryPanel', () => {
   });
 
   it('a resumed call that fails again later says so next to the run, with why', async () => {
-    confirm.mockResolvedValue(true);
     const calling = run('r2', {
       status: 'calling',
       finished_at: null,
       log: [{ step: 's1', kind: 'http', outcome: 'calling', host: 'qa.invalid', at: '2026-10-15T12:00:00+02:00' }],
     });
-    const m = await setup([{ ...FAILED, resumable: true }], 1);
-    m.answerBy({ '/api/flow/runs/retry': [200, calling] });
-    await click(m.find('flow-run-retry-r2').element);
-    await settle();
+    const m = await resumeAnswered([200, calling]);
     await m.result(OP, { rows: [calling], total: 1, limit: 20, offset: 0, failed: 0 }, {}, 2);
     expect(m.find('flow-run-retry-problem-r2').exists()).toBe(false);
     const failedAgain = { ...calling, status: 'failed' as const, error_code: 'flow.http_timeout', error_message: 'It could not reach qa.invalid.', resumable: true };
@@ -246,12 +232,8 @@ describe('HistoryPanel', () => {
   });
 
   it('a resumed run that waits and stops by an error after the wait says so next to the run', async () => {
-    confirm.mockResolvedValue(true);
     const waiting = run('r2', { status: 'waiting', finished_at: null, log: [{ step: 's1', kind: 'delay', outcome: 'waiting', at: '2026-10-15T12:00:00+02:00' }] });
-    const m = await setup([{ ...FAILED, resumable: true }], 1);
-    m.answerBy({ '/api/flow/runs/retry': [200, waiting] });
-    await click(m.find('flow-run-retry-r2').element);
-    await settle();
+    const m = await resumeAnswered([200, waiting]);
     const failedAgain = { ...waiting, status: 'failed' as const, error_code: 'flow.not_allowed', error_message: NOT_ALLOWED, resumable: true };
     await m.result(OP, { rows: [failedAgain], total: 1, limit: 20, offset: 0, failed: 1 }, {}, 2);
     expect(m.find('flow-run-retry-problem-r2').text()).toBe(`It was resumed and stopped by an error again: ${NOT_ALLOWED}`);
