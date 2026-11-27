@@ -10,6 +10,7 @@ Every test with the database runs as production does: inside business A's own da
 """
 
 import datetime as dt
+import json
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -17,6 +18,7 @@ from django.test import RequestFactory
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
 
 from apps.flow.tests.test_relay import listen, worker_loop
@@ -284,3 +286,23 @@ def booking_data(
     }
     data.update(fields)
     return data
+
+
+def events(name: str) -> list[dict]:
+    return [
+        event.payload for event in OutboxEvent.objects.filter(name=name).order_by("id")
+    ]
+
+
+WAIT = 1.0
+QUIET = 0.3
+
+
+def received(session, timeout=WAIT):
+    return [(note.channel, json.loads(note.payload)) for note in session.notifies(timeout=timeout)]
+
+
+def noted_for() -> set[tuple[str, str]]:
+    """The businesses the events of the outbox at hand are noted down for: the channel of a notice is the command's,
+    so only the rows tell an event written down for another business."""
+    return set(OutboxEvent.objects.values_list("scope_kind", "scope_key"))
