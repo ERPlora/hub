@@ -92,6 +92,7 @@ const time = (day: Day, index: number, edge: keyof Interval, value: unknown) =>
           fill="clear"
           color="medium"
           :aria-label="t('website.hours.remove')"
+          :title="t('website.hours.remove')"
           :data-testid="`website-hours-${row.day}-${index}-remove`"
           :disabled="disabled"
           @click="remove(row.day, index)"
@@ -107,14 +108,15 @@ const time = (day: Day, index: number, edge: keyof Interval, value: unknown) =>
         fill="clear"
         size="small"
         :data-testid="`website-hours-add-${row.day}`"
+        :aria-label="t('website.hours.add')"
+        :title="t('website.hours.add')"
         :disabled="disabled"
         @click="add(row.day)"
       >
         <HubIcon
-          slot="start"
+          slot="icon-only"
           name="ion:add-outline"
         />
-        {{ t('website.hours.add') }}
       </ion-button>
     </div>
     <p

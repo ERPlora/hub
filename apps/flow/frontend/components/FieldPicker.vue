@@ -69,11 +69,13 @@ function choose(path: string): void {
         <IonButtons slot="end">
           <IonButton
             data-testid="flow-picker-close"
+            :aria-label="$t('flow.picker.close')"
+            :title="$t('flow.picker.close')"
             @click="emit('update:open', false)"
           >
             <HubIcon
+              slot="icon-only"
               name="ion:close-outline"
-              :label="$t('flow.picker.close')"
             />
           </IonButton>
         </IonButtons>

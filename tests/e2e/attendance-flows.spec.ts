@@ -271,7 +271,7 @@ for (const vp of VIEWPORTS) {
       const text = readFileSync((await file.path()) as string, 'utf8');
       expect(text.startsWith('﻿'), 'a BOM, so a spreadsheet reads the accents').toBe(true);
       const [header, ...lines] = text.slice(1).trim().split('\r\n');
-      expect(header).toBe('date,user,clock_in,clock_out,break_minutes,worked_minutes,status,within_radius_in,within_radius_out');
+      expect(header).toBe('Date,Person,Clock-in,Clock-out,Break minutes,Worked minutes,Status,Clock-in within radius,Clock-out within radius');
       expect(lines.join('\n')).toContain(`${bea} Clock`);
       expect(lines.join('\n')).toContain(`${cid} Clock`);
       // A month without days: the table says so and the file only has the header.

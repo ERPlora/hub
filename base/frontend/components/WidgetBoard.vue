@@ -230,6 +230,7 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
                   fill="clear"
                   color="medium"
                   :aria-label="t('base.widgets.remove', { widget: widget.title })"
+                  :title="t('base.widgets.remove', { widget: widget.title })"
                   :data-testid="`widgets-remove-${widget.key}`"
                   @click="remove(widget.key)"
                 >
@@ -261,6 +262,7 @@ function onReorder(event: CustomEvent<{ from: number; to: number; complete: (dat
                 slot="end"
                 fill="clear"
                 :aria-label="t('base.widgets.add', { widget: widget.title })"
+                :title="t('base.widgets.add', { widget: widget.title })"
                 :data-testid="`widgets-add-${widget.key}`"
                 @click="add(widget.key)"
               >
