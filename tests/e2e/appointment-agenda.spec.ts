@@ -11,7 +11,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { aMonday, salonCleanUp } from './appointment-helpers';
-import { cardDeletes } from './customer-helpers';
+import { cardDeletes, pickCustomer } from './customer-helpers';
 import { dayAsShown, pickDay, pickTime } from './date-time-fields';
 import { expectTextClearOfLabel } from './field-labels';
 import { A, api, psql, shot, shown } from './helpers';
@@ -100,12 +100,7 @@ async function goToDay(page: Page, day = DAY): Promise<void> {
 }
 
 async function fillBooking(page: Page, who: Cast): Promise<void> {
-  const form = page.locator('ion-modal[data-testid=appointment-form]');
-  await form.locator('[data-testid=customer-search-trigger]').click();
-  const search = page.locator('ion-modal[data-testid=customer-search-modal]');
-  await search.locator('[data-testid=customer-picker-search] input').fill(who.customer.name);
-  await search.locator(`[data-testid=customer-picker-result-${who.customer.id}]`).click();
-  await expect(search).toBeHidden();
+  await pickCustomer(page, page.locator('ion-modal[data-testid=appointment-form]'), who.customer);
   await chooseServiceStaffAndDay(page, who, DAY);
 }
 
@@ -207,7 +202,7 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     await page.goto(`${A}/appointment/agenda`);
     await goToDay(page);
     // While its check is open, «Charge» is «Go to the check» and goes back to the same one.
-    await expect(view.locator(`[data-testid=appointment-list-row-${second.id}-charge]`)).toContainText('Go to the check');
+    await expect(view.locator(`[data-testid=appointment-list-row-${second.id}-charge]`)).toHaveAttribute('title', /^Go to the check/);
     await rowAction(page, 'appointment-list', second.id, 'charge');
     await page.waitForURL(/\/sale\/pos\?order=/);
     expect(psql(`select count(*) from sale_order where appointment_id = '${second.id}'`)).toBe('1');

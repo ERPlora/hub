@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { bare, findingsByApp, frontendSources, hubFrontends, linesWhere, scriptBlocks } from './frontend-sources';
+import { bare, findingsByApp, frontendSources, hubFrontends, linesWhere, scriptBlocks, templateLinesWhere } from './frontend-sources';
 
 // Node's synchronous listing and reading, watched: the guards list and read the frontends without them (hub#1315).
 // In Node's environment, where a module's own `node:fs` is the watched one.
@@ -77,6 +77,30 @@ describe('linesWhere', () => {
 
   it('gives nothing when no node holds', () => {
     expect(linesWhere('const a = 1;', 'format.ts', isTwo)).toEqual([]);
+  });
+});
+
+describe('templateLinesWhere', () => {
+  const marked = (line: string): boolean => line.includes('<mark');
+
+  it('gives the lines of a .vue whose outermost <template> holds, at their own lines of the file', () => {
+    const component = [
+      '<script setup lang="ts">',
+      "const html = '<mark>';",
+      '</script>',
+      '<template>',
+      '  <p>plain</p>',
+      '  <template v-if="on"><mark /></template>',
+      '  <mark />',
+      '</template>',
+      '<style>/* <mark> */</style>',
+    ].join('\n');
+    expect(templateLinesWhere(component, 'Marked.vue', marked)).toEqual([6, 7]);
+  });
+
+  it('gives nothing for a .ts or a .vue without a template', () => {
+    expect(templateLinesWhere('<template><mark /></template>', 'notes.ts', marked)).toEqual([]);
+    expect(templateLinesWhere('<script setup lang="ts">const a = "<mark>";</script>', 'Plain.vue', marked)).toEqual([]);
   });
 });
 

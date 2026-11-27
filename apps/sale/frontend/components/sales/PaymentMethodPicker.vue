@@ -127,6 +127,7 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
         <ion-buttons slot="end">
           <ion-button
             :aria-label="$t('sale.sales.picker.close')"
+            :title="$t('sale.sales.picker.close')"
             :data-testid="`${testid}-close`"
             @click="open = false"
           >

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { browserDownloads, insideTheAppSaving, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { iconOnly, iconOnlyNamed } from '../../../../base/frontend/__tests__/icon-only';
 import { mountWebsite, settle } from '../__tests__/mount-website';
 import ShareDialog from './ShareDialog.vue';
 
@@ -53,6 +54,9 @@ describe('ShareDialog', () => {
     const qr = wrapper.get('[data-testid="website-share-qr"]');
     expect(qr.attributes('src')).toBe('/api/website/qr?format=svg');
     expect(qr.attributes('alt')).toBe('QR code of your website');
+    // «Copy link» is its icon alone beside the address; the two downloads keep their words: the format tells them apart.
+    expect(iconOnly(wrapper.get('[data-testid="website-share-copy"]'))).toEqual(iconOnlyNamed('Copy link'));
+    expect(wrapper.get('[data-testid="website-share-copy"]').attributes('expand')).toBeUndefined();
     expect(wrapper.get('[data-testid="website-share-png"]').text()).toBe('Download PNG');
     expect(wrapper.get('[data-testid="website-share-svg"]').text()).toBe('Download SVG');
     expect(wrapper.get('[data-testid="website-share-signed-in"]').text()).toContain('private window');
@@ -159,6 +163,7 @@ describe('ShareDialog', () => {
 
   it('closing it tells the page', async () => {
     const { wrapper } = await dialog();
+    expect(iconOnly(wrapper.get('[data-testid="website-share-close"]'))).toEqual(iconOnlyNamed('Close'));
     await wrapper.get('[data-testid="website-share-close"]').trigger('click');
     expect(wrapper.emitted('update:open')).toEqual([[false]]);
   });

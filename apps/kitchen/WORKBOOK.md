@@ -161,7 +161,7 @@ debajo, cada otro dato con el icono de su columna delante, sin repetir el destin
 perfil puede hacer y se esconden las que el estado no admite. Tocar una fila abre su detalle: los
 platos con la alergia del cliente, su menú, sus suplementos, su estación y su estado. «Nueva comanda» abre el panel
 (a pantalla completa en el móvil) con Tipo, Destino, Notas y sus platos (producto del catálogo, cantidad y nota;
-«Añadir plato»), y «Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
+«Añadir plato», su +), y «Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
 tabla con reintento; un rechazo de una acción sale en su diálogo o encima de la tabla, y uno del alta,
 dentro del panel.
 
@@ -598,8 +598,8 @@ Pantalla: Ventas: Vender
 Pasos:
 1. En **Ventas → Vender**, con la cuenta abierta, abre la pestaña «Comanda actual»: lo que falta por
    enviar. Al añadir el primer producto, que abre la cuenta, el TPV se queda en esa pestaña.
-2. Si la ronda corre prisa, toca la llama: el botón pasa a «Enviar URGENTE (N)». Cada toque la arma o
-   la desarma.
+2. Si la ronda corre prisa, toca la llama: el botón se pone rojo y pasa a llamarse «Enviar URGENTE (N)». Cada
+   toque la arma o la desarma.
 3. Pulsa «Enviar comanda (N)» (o «Enviar URGENTE (N)»): sale «Comanda N enviada a cocina.» y la llama
    se desarma.
 4. Ventas marca las líneas pendientes con una ronda nueva (SALE-F20) y Cocina abre la comanda

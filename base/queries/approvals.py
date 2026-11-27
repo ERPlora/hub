@@ -14,9 +14,10 @@ from base import access, approvals as approval_rules, blueprint, business
 from base.models.approvals import Approval
 from base.permissions import ADMINISTER_HUB, VIEW_HOME, access_for
 from base.schemas.approvals import ApprovalExportIn, ApprovalExportOut, ApprovalListIn, ApprovalListOut, ApproversIn, ApproversOut
+from base.text_search import contains_text
 
 from .access import access_settings, pin_people
-from .people import face_name
+from .people import faces_of
 
 
 # ── People and permissions: a manager's approval ───────────────────────────────────────────────────────────────────
@@ -119,8 +120,7 @@ def _approvals_kept(data: ApprovalExportIn, currency: str | None):
             if needle.lower() in approval_action(name, figures, currency).lower()
         ]
         rows = rows.filter(
-            Q(requested_by_name__icontains=needle)
-            | Q(approved_by_name__icontains=needle)
+            contains_text(needle, "requested_by_name", "approved_by_name")
             | Q(operation__in=named)
             | Q(id__in=figured)
         )
@@ -201,9 +201,5 @@ def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
     if found is None:
         return {"people": [], "pin_length": pin_length}
     op = found[0]
-    people = [
-        {"id": str(credential.pk), "name": face_name(user), "initials": access.initials(face_name(user))}
-        for credential, user in pin_people(ctx.scope.key)
-        if holds(user, ctx.scope, op.permission)
-    ]
-    return {"people": sorted(people, key=lambda person: person["name"].casefold()), "pin_length": pin_length}
+    approvers = [(credential, user) for credential, user in pin_people(ctx.scope.key) if holds(user, ctx.scope, op.permission)]
+    return {"people": faces_of(ctx.scope, approvers), "pin_length": pin_length}

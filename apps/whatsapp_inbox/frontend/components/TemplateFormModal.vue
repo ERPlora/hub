@@ -476,19 +476,19 @@ const canDismiss = useUnsavedFormOnOpen(ID, form, open);
               size="small"
               :disabled="uploading"
               :data-testid="`${ID}-header-file-choose`"
+              v-bind="{ 'aria-label': t(`whatsapp_inbox.templates.editor.${uploading ? 'uploading' : form.sample ? 'changeFile' : 'chooseFile'}`), title: t(`whatsapp_inbox.templates.editor.${uploading ? 'uploading' : form.sample ? 'changeFile' : 'chooseFile'}`) }"
               @click="picker?.click()"
             >
               <ion-spinner
                 v-if="uploading"
-                slot="start"
+                slot="icon-only"
                 name="crescent"
               />
               <HubIcon
                 v-else
-                slot="start"
+                slot="icon-only"
                 name="ion:cloud-upload-outline"
               />
-              {{ uploading ? $t('whatsapp_inbox.templates.editor.uploading') : form.sample ? $t('whatsapp_inbox.templates.editor.changeFile') : $t('whatsapp_inbox.templates.editor.chooseFile') }}
             </ion-button>
           </div>
           <p
@@ -658,7 +658,7 @@ const canDismiss = useUnsavedFormOnOpen(ID, form, open);
               fill="clear"
               color="medium"
               :data-testid="`${ID}-button-${index}-remove`"
-              :aria-label="$t('whatsapp_inbox.templates.editor.buttonRemove')"
+              v-bind="{ 'aria-label': $t('whatsapp_inbox.templates.editor.buttonRemove'), title: $t('whatsapp_inbox.templates.editor.buttonRemove') }"
               @click="removeButton(index)"
             >
               <HubIcon
@@ -671,14 +671,14 @@ const canDismiss = useUnsavedFormOnOpen(ID, form, open);
             fill="outline"
             size="small"
             :data-testid="`${ID}-button-add`"
+            v-bind="{ 'aria-label': $t('whatsapp_inbox.templates.editor.buttonAdd'), title: $t('whatsapp_inbox.templates.editor.buttonAdd') }"
             :disabled="form.buttons.length >= MAX_BUTTONS"
             @click="addButton"
           >
             <HubIcon
-              slot="start"
+              slot="icon-only"
               name="ion:add-outline"
             />
-            {{ $t('whatsapp_inbox.templates.editor.buttonAdd') }}
           </ion-button>
         </section>
       </div>
@@ -727,6 +727,10 @@ const canDismiss = useUnsavedFormOnOpen(ID, form, open);
   margin: 4px 0 0;
   color: var(--ion-color-danger);
   font-size: 0.85rem;
+}
+/* «Add button», the one button of a group of its own, is its «+» alone: at the start, not stretched across it. */
+.wa-template-form__group > ion-button {
+  justify-self: start;
 }
 .wa-template-form__button {
   display: grid;

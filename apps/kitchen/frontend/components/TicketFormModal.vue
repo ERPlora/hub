@@ -238,20 +238,25 @@ async function save(): Promise<void> {
               :title="t('kitchen.form.removeDish')"
               @click="remove(index, $event)"
             >
-              <HubIcon name="ion:trash-outline" />
+              <HubIcon
+                slot="icon-only"
+                name="ion:trash-outline"
+              />
             </ion-button>
           </div>
         </div>
         <ion-button
           fill="outline"
+          class="kitchen-ticket-form__add"
           data-testid="kitchen-ticket-form-add-dish"
+          :aria-label="t('kitchen.form.addDish')"
+          :title="t('kitchen.form.addDish')"
           @click="dishes = [...dishes, dish()]"
         >
           <HubIcon
-            slot="start"
+            slot="icon-only"
             name="ion:add-outline"
           />
-          {{ t('kitchen.form.addDish') }}
         </ion-button>
       </div>
     </template>
@@ -283,5 +288,9 @@ async function save(): Promise<void> {
 }
 .kitchen-ticket-form__remove {
   margin-top: 8px;
+}
+/* Its «+» alone, at the start of the form's grid rather than stretched across it. */
+.kitchen-ticket-form__add {
+  justify-self: start;
 }
 </style>
