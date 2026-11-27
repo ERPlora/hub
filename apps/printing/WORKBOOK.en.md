@@ -582,7 +582,7 @@ If it fails: with Sales switched off, the note shows without the link.
 Involved: SALE-F02
 
 ### PRINTING-F16 Send to print from the assistant
-<!-- from WORKBOOK.md sha256:0a85995d9466 -->
+<!-- from WORKBOOK.md sha256:7ac6cc0d2fe6 -->
 Status: done
 Actor: administrator, manager, employee
 Screen: Assistant
@@ -595,6 +595,9 @@ Steps:
    printer and the device by their name, the job as the queue titles it (its document and its number) and
    the document of a new job with the queue's word, never by an identifier; what whoever
    asks cannot see, or what is no longer there (a retired device), does not show on the card.
+3. What it leaves in a queue no device that is on prints (none set up with that printer, or the one
+   that has it, off) it does not call printed: it says it waits in that printer's queue and will come
+   out when a device set up to print it does.
 In: the request.
 Out: the same as the screen.
 If it fails: the same as the screen, with the server's words.

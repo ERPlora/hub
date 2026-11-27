@@ -85,7 +85,6 @@ const actions = computed<DataTableAction<AppointmentRow>[]>(() =>
     icon: ICONS[id],
     color: COLORS[id] ?? 'medium',
     pinned: id === 'charge',
-    showLabel: id === 'charge',
     disabled: (row: AppointmentRow) => !allows(id, row, props.now),
   })),
 );
