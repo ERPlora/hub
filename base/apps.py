@@ -6,6 +6,7 @@ requires, category, premium or menu of its own).
 
 import re
 from functools import cached_property
+from typing import Any
 
 from django.conf import settings
 from django.utils import translation
@@ -55,8 +56,6 @@ class BaseConfig(LiveAppConfig):
     kind = "platform"
     verbose_name = _("Base")
     default_auto_field = "django.db.models.BigAutoField"
-    # The fourteen allergens live in the platform: an answer of any app names them by these (``base.allergens.NAMED``).
-    choices = {"allergens": ALLERGENS}
     # Everyone of the hub sees the Home; whoever runs the hub is also told its platform steps and the failed events.
     # Everyone sees and opens the files; whoever runs the hub uploads, renames and deletes them.
     # «Manage on erplora.com» at the menu's foot: the owner, an administrator and a manager open this business on
@@ -95,6 +94,15 @@ class BaseConfig(LiveAppConfig):
     }
     # The help of the Hub's own screens (base.platform_screens).
     help = Help()
+
+    @cached_property
+    def choices(self) -> dict[str, tuple[tuple[str, Any], ...]]:
+        """The closed lists base names that no field holds: the fourteen allergens, which an answer of any app names by
+        these (``base.allergens.NAMED``), and why a person may not be given a role, as their page says it. Those words
+        live with the role rules, which need the models, so they are read once the apps are ready."""
+        from base.people import ROLE_REFUSALS
+
+        return {"allergens": ALLERGENS, "role_refusal": tuple(ROLE_REFUSALS.items())}
 
     @cached_property
     def assistant_synonyms(self) -> tuple[tuple[str, ...], ...]:
