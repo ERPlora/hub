@@ -135,12 +135,12 @@ lost, mark it sold out or delete it. Tapping the row opens its card, with the ba
 The table's buttons import and export the catalog as a CSV file.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:de523566fa33 -->
+<!-- from WORKBOOK.md sha256:155744333e4a -->
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
 Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
 "Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
-"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
+"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU, ignoring case and accents ("cafe" finds "Café con leche"); sorting by
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
 "Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
 is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a

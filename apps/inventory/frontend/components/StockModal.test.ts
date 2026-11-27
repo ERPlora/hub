@@ -245,7 +245,7 @@ describe('StockModal: write-off', () => {
 });
 
 describe('StockModal: a write-off the server refuses', () => {
-  it('an article without stock control: the reason under the quantity, the dialog open', async () => {
+  it('an article without stock control: the reason once, under the quantity, the dialog open', async () => {
     const s = await setup('write_off');
     const message = 'This article does not track its stock: there is nothing to write off.';
     s.net.onApi(() => refusal(409, 'inventory.stock_not_tracked', message, { qty: message }));
@@ -253,7 +253,7 @@ describe('StockModal: a write-off the server refuses', () => {
     await s.type('inventory-stock-reason', 'Broken bottle');
     await s.submit();
     expect(s.el('inventory-stock-qty')?.errorText).toBe(message);
-    expect(s.el('inventory-stock-form-error')?.textContent).toContain(message);
+    expect(s.el('inventory-stock-form-error')).toBeNull();
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 });

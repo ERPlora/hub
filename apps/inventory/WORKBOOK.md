@@ -143,7 +143,7 @@ interruptor activo/inactivo, «Sí»/«No» para quien no puede cambiar producto
 configurar · Falta la categoría fiscal», entera mientras la fila tiene sitio (también a 1280 px con el
 menú lateral abierto y la columna «Foto») y, si no, acabada en «…» con el texto entero al pasar el
 ratón; a su lado, la insignia roja «Agotado» si el artículo está agotado. Buscador «Buscar
-producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
+producto…» por nombre o SKU, sin distinguir mayúsculas ni tildes («cafe» encuentra «Café con leche»); orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
 desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»): un extremo que no se puede leer lo dice debajo
 de su campo, con las mismas palabras que el precio del producto («Esto no es un importe…», «Este importe no
 puede ser negativo.», las dos lecturas de «1.250» o «Esto no es una cantidad…»), y no filtra; 50 por página;

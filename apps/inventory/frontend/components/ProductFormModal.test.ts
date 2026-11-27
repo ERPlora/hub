@@ -131,13 +131,13 @@ describe('ProductFormModal: new product', () => {
     expect(s.el('inventory-product-price')?.errorText).toMatch(/^This amount can be read in two ways/);
   });
 
-  it('a refusal stays in the dialog: SKU taken under the SKU, the message on top', async () => {
+  it('a refusal stays in the dialog: SKU taken, said once under the SKU', async () => {
     const s = await setup();
     await s.fillRequired();
     s.net.onApi(() => refusal(409, 'inventory.sku_taken', 'That SKU already exists in the catalog.', { sku: 'That SKU already exists in the catalog.' }));
     await s.submit();
     expect(s.el('inventory-product-sku')?.errorText).toBe('That SKU already exists in the catalog.');
-    expect(s.el('inventory-product-form-error')?.textContent).toContain('That SKU already exists in the catalog.');
+    expect(s.el('inventory-product-form-error')).toBeNull();
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 
