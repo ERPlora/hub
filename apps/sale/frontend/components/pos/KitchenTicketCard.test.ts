@@ -72,6 +72,12 @@ describe('KitchenTicketCard', () => {
     expect(m.find('pos-kitchen-dish-i2-voided').text()).toBe('Anulado');
   });
 
+  it('says a dish sold by measure with its unit, as the kitchen does', async () => {
+    const ticket = kitchenTicket({ items: [kitchenItem({ id: 'i1', name: 'Gambas', quantity: '0.350', unit: 'kg' })] });
+    expect((await setup({ ticket })).find('pos-kitchen-dish-i1').text()).toBe('0,35 kg Gambas');
+    expect((await setup({ ticket }, 'en')).find('pos-kitchen-dish-i1').text()).toBe('0.35 kg Gambas');
+  });
+
   it('offers «Mark rush» on a round that cooks and says which way it goes', async () => {
     for (const status of ['pending', 'preparing'] as const) {
       const m = await setup({ ticket: kitchenTicket({ status }) });

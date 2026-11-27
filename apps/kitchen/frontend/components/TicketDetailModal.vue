@@ -9,7 +9,7 @@ import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatDateTime, formatQuantity } from '../lib/format';
+import { formatDateTime, orderTicketQuantity } from '../lib/format';
 import KitchenAllergyNotice from './KitchenAllergyNotice.vue';
 
 const props = defineProps<{ ticketId: string; timezone: string }>();
@@ -76,7 +76,7 @@ const title = computed(() => t('kitchen.detail.title', { number: ticket.value?.n
           :key="dish.id"
           :data-status="dish.status"
         >
-          <strong>{{ formatQuantity(dish.quantity, locale) }}× {{ dish.name }}</strong>
+          <strong>{{ orderTicketQuantity(dish.quantity, dish.unit, locale) }} {{ dish.name }}</strong>
           <KitchenAllergyNotice
             class="kitchen-detail__allergy"
             :line="dish"
