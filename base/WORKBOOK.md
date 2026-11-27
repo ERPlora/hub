@@ -2435,7 +2435,9 @@ Pasos:
      y un interruptor o, en lo que un responsable puede aprobar con su PIN, «Permitido», «Con aprobación» o «No».
   2. Cambia lo que quiera y pulsa «Guardar» al final: «Rol guardado.». Sin nada cambiado, «Guardar» no se puede pulsar.
   3. Si otra persona lo guarda mientras tanto, lo que aquí no se ha tocado se pone al día.
-  4. También se pide al asistente: «que el rol Cajero no pueda anular ventas», «llama Caja de tarde al rol Cajero».
+  4. También se pide al asistente: «que el rol Cajero no pueda cobrar ni anular ventas», «llama Caja de tarde al rol
+     Cajero». Antes de proponer el cambio lee todo lo que permite el rol, también con muchas apps encendidas, así que
+     quita justo lo que se le pide: «Cobrar» y «Anular una venta», y nada más de Ventas / TPV.
      La tarjeta dice el rol, cada permiso con la misma frase de «Qué permite» y lo que pasará a hacer («Permitido»,
      «Con aprobación» o «No»), y, bajo «Lo que va a pasar», cuántas personas tienen ese rol. Pide escribir CONFIRMAR,
      y al aceptarla solo cambia lo que se pidió.
@@ -4888,7 +4890,9 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   la voz del dispositivo (`hubAssistant(doc).speak` = `speakAloud`, `base/frontend/lib/assistant-hub.ts`).
 - **La ayuda de un módulo** (BASE-F115): `base.help.get` (query, `base.view_home`, `database=False`, `ai=AI(…)`, en
   `base/queries/app_help.py`; su ruta, `GET /api/help`, en `base/api_help.py`, que monta `config/api.py`) lee la parte
-  del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Un módulo tiene la ayuda
+  del cliente del WORKBOOK del módulo con `base/workbook_help.py`, sin tocar la base de datos. Con `offset` deja fuera los
+  primeros flujos, para que el asistente siga leyendo donde se cortó una respuesta que no le cabía de una vez; la
+  ventana de ayuda no lo manda. Un módulo tiene la ayuda
   lista cuando declara `help = Help(…)` (`live.meta.Help`, con un vídeo de YouTube opcional por idioma, que valida
   `live.E023`), y el JSON `hub-home` de `base/spa.py` nombra esas apps en `help_apps`. Con ellas, `HelpEntry.vue`
   pinta el «?» en la barra de la página visible y abre `HelpWindow.vue` (con `HelpContent.vue` y `HelpFlowList.vue`, en
@@ -5025,7 +5029,11 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   manda: lo leen `access_for`, `base.session.me` (el nombre del rol y los permisos que un responsable puede aprobar),
   la huella de `base.session.access` y el asistente. Los «Roles por revisar» los cuenta
   `base.queries.roles.roles_to_review` en `base.bell.counters`. `base.role.detail` dice de cada permiso si un responsable
-  puede aprobarlo (`approvable`) y si queda por revisar (`to_review`). En la SPA, `RolesList.vue` es la lista, `NewRoleModal.vue`
+  puede aprobarlo (`approvable`) y si queda por revisar (`to_review`). Con `offset` deja fuera los primeros paneles: el
+  asistente sigue leyendo donde se cortó una respuesta que no le cabía de una vez (con 23 apps encendidas ya no cabe);
+  la pantalla no lo manda. `base/tests/test_assistant_reads_whole.py` comprueba que toda lectura del asistente que crece
+  con las apps encendidas (lo que permite un rol, la ayuda de una app, las recetas de Automatizaciones) y se corta pide
+  solo lo que su entrada admite y, siguiendo el corte, se lee entera. En la SPA, `RolesList.vue` es la lista, `NewRoleModal.vue`
   el alta y `RolePage.vue` la página de un rol, que pinta `RoleEditor.vue` (con `useSettingsForm`) en uno propio para
   quien tiene `base.manage_roles`; al cambiar algo de lo que permite manda todos los permisos que enseña, y así queda revisado.
 - Llaves de API: `base.models.api_keys.ApiKey` en la BD del hub (token `erpk_live_` + 256 bits, se guarda su SHA-256 y su

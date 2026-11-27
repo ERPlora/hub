@@ -27,7 +27,7 @@ from base.permissions import (
     states_of_business_role,
 )
 from base.roles import APPROVAL, basic_state, to_review
-from base.schemas.roles import RoleDetailOut, RoleIn, RoleListIn, RoleListOut
+from base.schemas.roles import RoleDetailIn, RoleDetailOut, RoleListIn, RoleListOut
 from base.sensitive import DATA_PERMISSIONS
 
 from .people import people_of
@@ -75,7 +75,7 @@ def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
     "base.role.detail",
     kind="query",
     permission=VIEW_HOME,
-    input=RoleIn,
+    input=RoleDetailIn,
     output=RoleDetailOut,
     ai=AI(
         description=(
@@ -90,19 +90,20 @@ def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
         },
     ),
 )
-def role_detail(ctx: OperationContext, data: RoleIn) -> dict:
-    """Employees › Roles › What it allows: one role, read only."""
+def role_detail(ctx: OperationContext, data: RoleDetailIn) -> dict:
+    """Employees › Roles › What it allows: one role, read only; its panels from the ``offset``-th on."""
     with translation.override(ctx.language):
         basic = basic_role(data.role)
         on = configs_on(ctx.scope)
         members = members_by_role(ctx.scope)
         if basic is not None:
-            found = {**_basic_out(basic, members), "apps": _panels(on, states_of(RoleHeld(basic.value, None), on))}
+            panels = _panels(on, states_of(RoleHeld(basic.value, None), on))
+            found = {**_basic_out(basic, members), "apps": panels[data.offset :]}
         else:
             role = business_role(data.role)
             review = to_review(role.states, grantable(on))
-            apps = _panels(on, states_of(RoleHeld(role.origin, role), on), review)
-            found = {**_own_out(role, members, on), "apps": apps}
+            panels = _panels(on, states_of(RoleHeld(role.origin, role), on), review)
+            found = {**_own_out(role, members, on), "apps": panels[data.offset :]}
     return {**found, "mine": found["key"] == ruling_key(ctx)}
 
 
