@@ -71,7 +71,14 @@ class CartCheckoutConfig(LiveAppConfig):
             permission="cart_checkout.view_cart",
         ),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "BsQdeNv70R0", "en": "xjvkg4GVStE"},
+        flow_videos={
+            "CART_CHECKOUT-F01": {"es": ["kx8RsQwjKB8"], "en": ["WKCQruONKUI"]},
+            "CART_CHECKOUT-F05": {"es": ["kx8RsQwjKB8"], "en": ["WKCQruONKUI"]},
+            "CART_CHECKOUT-F06": {"es": ["kx8RsQwjKB8"], "en": ["WKCQruONKUI"]},
+        },
+    )
 
     fiscal_archive_models = ("Cart", "CartItem", "Order")
 
