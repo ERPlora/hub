@@ -4,7 +4,7 @@ the finders services/ reuses: the settings row, a tip by its id or its sale's nu
 import datetime as dt
 from uuid import UUID
 
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
@@ -16,6 +16,8 @@ from apps.tip.models import Settings, Tip
 from apps.tip.schemas import SettingsOut, SuggestionIn, SuggestionOut, TipListIn, TipOut, TipPage, TipRefIn
 from base.business import business_zone
 from base.operations import call
+from base.only_theirs import only_theirs
+from base.text_search import contains_text
 
 
 TIP_NOT_FOUND = _("That tip no longer exists.")
@@ -63,7 +65,7 @@ def settings_row(settings: Settings) -> dict:
             "es": ("enséñame los ajustes de las propinas", "¿qué propinas sugiere el cobro con tarjeta?"),
         },
         "description": "The tip settings: whether a tip is asked for at the charge (off from the factory), which of the "
-        "three suggestions comes chosen (0: «No tip»), whether another amount is allowed, and each active payment "
+        "three suggestions comes chosen (0: no tip), whether another amount is allowed, and each active payment "
         "method's three suggestions, each a percentage of the check's total before discounts or an amount in cents.",
     },
 )
@@ -92,7 +94,7 @@ def _tip_of(suggestion: dict, total: int) -> dict:
         },
         "description": "The tips the charge proposes for a payment method and the check's total before discounts, in "
         "cents: its three suggestions, each with the tip it comes to (a percentage rounded half up), which one comes "
-        "chosen (0: «No tip») and whether another amount is allowed. With tips off, none.",
+        "chosen (0: no tip) and whether another amount is allowed. With tips off, none.",
     },
 )
 def get_suggestions(ctx: OperationContext, params: SuggestionIn) -> dict:
@@ -170,6 +172,7 @@ def find_tip(ref: TipRefIn, *, lock: bool = False) -> Tip:
 def get_tip(ctx: OperationContext, params: TipRefIn) -> dict:
     tip = find_tip(params)
     if not ctx.has("tip.manage") and (tip.member_id is None or tip.member_id != own_member_id(ctx)):
+        only_theirs()
         raise NotFound(str(TIP_NOT_FOUND), code="tip.tip_not_found")
     return tip_row(tip)
 
@@ -187,11 +190,7 @@ def _day_start(day: dt.date) -> dt.datetime:
 def _filtered(params: TipListIn) -> QuerySet[Tip]:
     rows = tips()
     if params.search:
-        rows = rows.filter(
-            Q(sale__number__icontains=params.search)
-            | Q(member__first_name__icontains=params.search)
-            | Q(member__last_name__icontains=params.search)
-        )
+        rows = rows.filter(contains_text(params.search, "sale__number", "member__first_name", "member__last_name"))
     for field in ("member_id", "method_type", "status"):
         if getattr(params, field) is not None:
             rows = rows.filter(**{field: getattr(params, field)})
@@ -223,6 +222,7 @@ def _filtered(params: TipListIn) -> QuerySet[Tip]:
 def list_tips(ctx: OperationContext, params: TipListIn) -> dict:
     rows = _filtered(params)
     if not ctx.has("tip.manage"):
+        only_theirs()
         own = own_member_id(ctx)
         rows = rows.filter(member_id=own) if own is not None else rows.none()
     rows = rows.order_by("-created_at", "id")

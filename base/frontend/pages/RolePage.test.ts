@@ -12,6 +12,7 @@ function employee(fields: Partial<RoleDetail> = {}): RoleDetail {
     origin: 'basic',
     members: 2,
     to_review: false,
+    mine: false,
     apps: [
       {
         app: 'base',
@@ -124,6 +125,20 @@ describe('RolePage', () => {
     await other.result(other.call, 'base.role.detail', own);
     expect(other.wrapper.find('[data-testid="role-save"]').exists()).toBe(false);
     expect(line(other, 'sale.take_payment').text()).toContain('Permitido');
+  });
+
+  it('the role that rules over who manages the roles is only read by them, and says who changes it', async () => {
+    const mine = employee({ key: '0199aaaa-0000-7000-8000-000000000001', label: 'Personas', origin: 'own', mine: true });
+    const m = await open({ locale: 'es', session: { ...OWNER, permissions: [...OWNER.permissions, 'base.manage_roles'] } });
+    await m.result(m.call, 'base.role.detail', mine);
+    expect(m.wrapper.find('[data-testid="role-save"]').exists()).toBe(false);
+    expect(m.wrapper.findAll('ion-toggle')).toHaveLength(0);
+    expect(line(m, 'sale.take_payment').text()).toContain('Permitido');
+    expect(m.wrapper.get('[data-testid="role-mine"]').text()).toBe('Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.');
+
+    const other = await open({ locale: 'es' });
+    await other.result(other.call, 'base.role.detail', mine);
+    expect(other.wrapper.find('[data-testid="role-mine"]').exists()).toBe(false);
   });
 
   it('a basic role is only read, also by who manages the roles', async () => {

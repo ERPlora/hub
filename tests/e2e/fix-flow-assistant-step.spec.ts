@@ -53,7 +53,7 @@ for (const viewport of VIEWPORTS) {
       await expect(editor.locator('[data-testid="flow-assistant-tool-s1-task.task.list"]')).toHaveText('Look for tasks');
       await expect(editor.locator('[data-testid=flow-assistant-addtool-s1] input')).toHaveValue('');
       await expect(editor.locator('[data-testid=flow-assistant-modehint-s1]')).toHaveText(
-        'A change it wants waits for a yes in Automations, under «Waiting for your answer». What it only looks up never waits.',
+        'A change it wants waits for a yes in Automations, under “Waiting for your answer”. What it only looks up never waits.',
       );
       await noHorizontalScroll(page, viewport.label);
       await settled(page);
@@ -84,8 +84,8 @@ for (const viewport of VIEWPORTS) {
       await workerAsks(flowId);
       // The same run, still open, now finished: what the assistant did, step by step.
       const done = shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: 'Finished well' }).first();
-      await expect(done).toContainText('The assistant used «Look for tasks».');
-      await expect(done).toContainText(`The assistant answered: «${DONE.en}»`);
+      await expect(done).toContainText('The assistant used “Look for tasks”.');
+      await expect(done).toContainText(`The assistant answered: “${DONE.en}”`);
       // Two turns of the model through the SaaS: the task, and the answer to its read; nobody was asked.
       const turns = chats(provider()).slice(before);
       expect(turns).toHaveLength(2);

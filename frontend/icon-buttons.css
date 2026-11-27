@@ -1,0 +1,13 @@
+/* A button that is only its icon (`slot="icon-only"`, which gives it Ionic's `button-has-icon-only`) is still a target a
+   pointer can hit, and on a touch screen or a phone one a finger can. */
+ion-button.button-has-icon-only {
+  min-width: 36px;
+  min-height: 36px;
+}
+
+@media (pointer: coarse), (max-width: 640px) {
+  ion-button.button-has-icon-only {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

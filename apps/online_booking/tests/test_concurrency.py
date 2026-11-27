@@ -14,7 +14,7 @@ A booking's detail that a deletion lands in the middle of answers what it read o
 import pytest
 from live.errors import OperationError
 
-from apps.appointment.models import Appointment, History
+from apps.appointment.models.appointments import Appointment, History
 from apps.appointment.tests.test_concurrency import deleted_after_the_first_read_of
 from apps.customer.tests.conftest import reads, writes
 from apps.online_booking.models import Booking, Settings

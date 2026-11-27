@@ -4,7 +4,7 @@ check may sit at one.
 
 import datetime as dt
 
-from django.db.models import CharField, F, Func, Q, Value
+from django.db.models import CharField, F, Func, Value
 from django.db.models.functions import Lower
 from django.utils import timezone
 from live.context import OperationContext
@@ -17,6 +17,7 @@ from .paging import _page
 from apps.table.schemas import TableListIn, TableRefIn
 from apps.table.schemas.floor import TableOut, TablePage
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 #: Width every run of digits of a table number is padded to, to sort numbers as numbers.
 NATURAL_PAD = 12
@@ -100,11 +101,11 @@ def list_tables(ctx: OperationContext, params: TableListIn) -> dict:  # noqa: C9
     )
     if params.search and params.search.strip():
         text = params.search.strip()
-        rows = rows.filter(Q(number__icontains=text) | Q(name__icontains=text))
+        rows = rows.filter(contains_text(text, "number", "name"))
     if params.number:
-        rows = rows.filter(number__icontains=params.number.strip())
+        rows = rows.filter(contains_text(params.number.strip(), "number"))
     if params.name:
-        rows = rows.filter(name__icontains=params.name.strip())
+        rows = rows.filter(contains_text(params.name.strip(), "name"))
     if params.zone_id:
         rows = rows.filter(zone_id=params.zone_id)
     if params.zone:

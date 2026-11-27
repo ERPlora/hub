@@ -199,8 +199,7 @@
       "nothing": "Nada en cola",
       "failed": "Fallidos: {n}",
       "printsOn": "Imprime en: {name}.",
-      "alert": "{n} trabajos de impresión de {usage} llevan {age} esperando.",
-      "alertOne": "1 trabajo de impresión de {usage} lleva {age} esperando.",
+      "alert": "{n} trabajo de impresión de {usage} lleva {age} esperando. | {n} trabajos de impresión de {usage} llevan {age} esperando.",
       "alertCause": "Ninguna impresora activa tiene esta función: añade una abajo o dale esta función a una de ellas."
     },
     "jobs": {

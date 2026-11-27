@@ -66,9 +66,10 @@ def staff_username_for(saas_user_id: str) -> str:
 
 
 def _local_copy(redeemed: RedeemedUser, *, username: str, is_staff: bool, is_superuser: bool):
-    """Get or create ``username`` and make it say what the SaaS says; ``InactiveUser`` if deactivated."""
+    """Get or create ``username`` and make it say what the SaaS says, its name without an address in it (erplora.com
+    names an account without a name by its address); ``InactiveUser`` if deactivated."""
     user_model = get_user_model()
-    first_name = redeemed.name[: user_model._meta.get_field("first_name").max_length]
+    first_name = queries.people.without_address(redeemed.name)[: user_model._meta.get_field("first_name").max_length]
     wanted = {"email": redeemed.email, "first_name": first_name, "is_staff": is_staff, "is_superuser": is_superuser}
     # get_or_create: two first entries at once end in one user, not an IntegrityError.
     user, _ = user_model.objects.get_or_create(
@@ -326,7 +327,7 @@ def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
         if member.email is not None:
             wanted["email"] = member.email
         if member.name is not None:
-            wanted["name"] = member.name[: HubUser._meta.get_field("name").max_length]
+            wanted["name"] = queries.people.without_address(member.name)[: HubUser._meta.get_field("name").max_length]
         person, created = HubUser.objects.get_or_create(username=username, defaults=wanted)
         if created:
             made += 1

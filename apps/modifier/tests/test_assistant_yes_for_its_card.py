@@ -14,7 +14,6 @@ product or a category said by its name, when a group is applied or let go, is re
 unread beside the id the write takes its record by instead (hub#1291).
 """
 
-import json
 
 import pytest
 from live.operations import get, registry
@@ -26,6 +25,7 @@ from base import assistant
 from base.schemas.assistant import names
 from base.tenancy.context import use_hub
 from base.tests.test_assistant_yes_for_its_card import (
+    no_card_but_the_model_hears,
     read_as,
     said,
     turn_as,
@@ -186,9 +186,7 @@ def test_a_name_two_groups_fit_draws_no_card_and_the_model_hears_it(write):
 
     plan = turn_as(as_admin(), call(write, by_its_name("salsas")[write]))
 
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", "modifier.group_ambiguous")]
-    assert json.loads(plan["append"][0]["content"])["error"]["code"] == "modifier.group_ambiguous"
+    no_card_but_the_model_hears(plan, "modifier.group_ambiguous")
 
 
 @pytest.mark.parametrize("write", WRITES)
@@ -196,7 +194,7 @@ def test_a_name_no_group_has_draws_no_card(write):
     a_group("Salsas picantes")
     before = state()
     plan = turn_as(as_admin(), call(write, by_its_name("postres")[write]))
-    assert (plan["confirm"], [row["code"] for row in plan["executed"]]) == (None, ["not_found"])
+    no_card_but_the_model_hears(plan, "not_found")
     assert state() == before
 
 
@@ -300,9 +298,7 @@ def test_a_link_to_a_product_deleted_meanwhile_draws_no_card_and_its_id_still_le
     assert ModifierLink.objects.filter(pk=link.pk).exists()
 
     for arguments in ({"id": str(link.id)}, {"group": "extras", "product_id": str(link.product_id)}):
-        plan = turn_as(as_admin(), call("modifier.link.detach", arguments))
-        refused = [row["code"] for row in plan["executed"]]
-        assert (plan["confirm"], refused) == (None, ["not_found"]), arguments
+        no_card_but_the_model_hears(turn_as(as_admin(), call("modifier.link.detach", arguments)), "not_found")
     assert ModifierLink.objects.filter(pk=link.pk).exists()
 
     run("modifier.link.detach", {"id": str(link.id)})

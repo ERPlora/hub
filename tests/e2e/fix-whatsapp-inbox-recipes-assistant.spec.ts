@@ -130,7 +130,7 @@ for (const viewport of VIEWPORTS) {
         .locator('[data-testid=flow-inbox] article')
         .filter({ hasText: 'The assistant wants to change something in «Reservations»' });
       await expect(question).toBeVisible();
-      await expect(question).toContainText('From «WhatsApp → table booked»');
+      await expect(question).toContainText('From “WhatsApp → table booked”');
       await expect(question).toContainText(phone);
       await question.scrollIntoViewIfNeeded();
       await noHorizontalScroll(page, viewport.label);

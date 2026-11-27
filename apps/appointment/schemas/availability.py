@@ -74,10 +74,20 @@ class SlotOut(Schema):
     staff_ids: list[UUID] = Field(description="The professionals free at that time.")
 
 
+class WindowOut(Schema):
+    start: dt.datetime
+    end: dt.datetime
+
+
 class SlotsOut(Schema):
     date: dt.date
     timezone: str
     duration_minutes: int
+    windows: list[WindowOut] = Field(
+        description="The spans of the day the professional works, inside the calendar's hours: the opening hours, "
+        "their shift and their time off; blocked time and appointments do not cut them. Empty: they do not work that "
+        "day. Without a professional chosen, the business's opening hours."
+    )
     slots: list[SlotOut]
 
 

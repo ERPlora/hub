@@ -77,6 +77,7 @@ function onRow(): void {
       :data-testid="`pos-line-${line.id}-mark`"
       :aria-pressed="marked ? 'true' : 'false'"
       :aria-label="$t('sale.pos.markLine')"
+      :title="$t('sale.pos.markLine')"
       @click.stop="emit('mark')"
     >
       <HubIcon

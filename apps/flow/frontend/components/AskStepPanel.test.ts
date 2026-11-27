@@ -28,11 +28,11 @@ describe('AskStepPanel', () => {
 
   it('chooses who answers and says who else can', async () => {
     const s = await setup();
-    expect(s.find('flow-ask-who-s1').text()).toBe('Whoever runs the business answers it in Automations, under «Waiting for your answer».');
+    expect(s.find('flow-ask-who-s1').text()).toBe('Whoever runs the business answers it in Automations, under “Waiting for your answer”.');
     await ionValue(s.find('flow-ask-role-s1').element, 'manager');
     expect(s.emitted().at(-1)).toMatchObject({ role: 'manager' });
     const managers = await setup({ ...ASK, role: 'manager' });
-    expect(managers.find('flow-ask-who-s1').text()).toBe('The managers answer it in Automations, under «Waiting for your answer»; whoever runs the business can too.');
+    expect(managers.find('flow-ask-who-s1').text()).toBe('The managers answer it in Automations, under “Waiting for your answer”; whoever runs the business can too.');
   });
 
   it('waits from one hour to thirty days', async () => {
@@ -51,7 +51,7 @@ describe('AskStepPanel', () => {
     await ionValue(s.find('flow-ask-ontimeout-s1').element, 'stop');
     expect(s.emitted().at(-1)).toMatchObject({ on_timeout: 'stop' });
     const carrying = await setup({ ...ASK, on_timeout: 'continue' });
-    expect(carrying.find('flow-ask-continuehint-s1').text()).toContain('add «Only continue if…» on «Approved»');
+    expect(carrying.find('flow-ask-continuehint-s1').text()).toContain('add “Only continue if…” on “Approved”');
   });
 
   it('shows the server\'s refusals next to their field', async () => {

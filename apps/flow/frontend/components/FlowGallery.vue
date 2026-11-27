@@ -13,6 +13,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, nextTick, ref, shallowRef, watch } from 'vue';
 
+import { useBusinessMoney } from '../../../../base/frontend/lib/money';
 import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import { toPayload } from '../lib/document';
@@ -23,6 +24,7 @@ import {
   buildDocument,
   cardGrants,
   cardName,
+  cardValues,
   existingFor,
   type FlowTemplate,
   missingApps,
@@ -35,6 +37,7 @@ import type { CatalogOut, FlowOut } from '../operations';
 const props = defineProps<{ catalog: CatalogOut | null; flows: readonly FlowOut[]; openCard: string | null }>();
 const emit = defineEmits<{ created: [flow: FlowOut]; openFlow: [flow: FlowOut]; guide: [] }>();
 const phrasing = usePhrasing();
+const money = useBusinessMoney();
 const create = useCommand('flow.flow.create');
 
 const SECTORS: readonly Sector[] = ['any', 'beauty', 'food'];
@@ -85,7 +88,8 @@ function reason(operation: string): string {
   return phrasing.value.te(key) ? phrasing.value.t(key) : '';
 }
 
-const T = (card: FlowTemplate, key: string): string => phrasing.value.t(`flow.gallery.cards.${card.id}.${key}`);
+const T = (card: FlowTemplate, key: string): string =>
+  phrasing.value.t(`flow.gallery.cards.${card.id}.${key}`, cardValues(card, phrasing.value.locale, money.value));
 </script>
 
 <template>

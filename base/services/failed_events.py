@@ -127,6 +127,28 @@ def failed_event_discard(ctx: OperationContext, data: FailedEventDiscardIn) -> d
     return {"id": delivery.pk}
 
 
+def resend_done(ctx: OperationContext, *, app_label: str, event: str, match: dict) -> int:
+    """Resends the failed events for ``app_label`` of the ``event`` whose payload holds ``match``, once that app has
+    done what they asked by other means (Invoicing issued a sale's document by hand): they leave Failed events and the
+    bell, and the app's reaction, idempotent, finds the work done. Called inside that app's command; another app's,
+    a discarded one and one another worker holds stay as they are. How many went back to the queue."""
+    ids = list(
+        EventDelivery.objects.select_for_update(skip_locked=True, of=("self",))
+        .filter(
+            status=EventDelivery.Status.DEAD,
+            app_label=app_label,
+            event__name=event,
+            event__scope_kind=ctx.scope.kind,
+            event__payload__contains=match,
+        )
+        .values_list("pk", flat=True)
+    )
+    if ids:
+        _requeue(ids)
+        record_event(ctx, events.FAILED_EVENT_RETRIED, {"count": len(ids)})
+    return len(ids)
+
+
 def _failed_event(ctx: OperationContext, delivery_id: UUID) -> EventDelivery:
     """The failed event ``delivery_id`` of the hub of ``ctx``, locked; not found if it is another hub's, or no longer
     failed (resent, discarded, or delivered in the meantime)."""

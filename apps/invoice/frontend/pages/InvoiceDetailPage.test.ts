@@ -15,6 +15,7 @@ import InvoicePaper from '../components/InvoicePaper.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import SubstituteModal from '../components/SubstituteModal.vue';
 import { PrintRefused } from '../../../../base/frontend/lib/print-paper';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn(), print: vi.fn() }));
 vi.mock('@erplora/ui/components', async (importOriginal) => ({
@@ -44,7 +45,7 @@ describe('InvoiceDetailPage: what it shows', () => {
     await s.show(INVOICE);
     expect(s.field('title')).toBe('Invoice FACT-2026-000001');
     expect(s.field('status')).toBe('Issued');
-    expect(s.field('print')).toBe('Print / PDF');
+    expect(accessibleName(s.find('invoice-detail-print').element)).toBe('Print / PDF');
     expect(s.wrapper.findComponent(AppPage).props('backHref')).toBe('/invoice/invoices');
   });
 
@@ -144,6 +145,22 @@ describe('InvoiceDetailPage: what it shows', () => {
 });
 
 describe('InvoiceDetailPage: its actions', () => {
+  it('«Print / PDF», «Download PDF» and «Send by email» are their icons alone, each named and titled by its label', async () => {
+    const s = await setup();
+    await s.show(INVOICE);
+    const actions = ['print', 'pdf', 'email'].map((id) => {
+      const button = s.find(`invoice-detail-${id}`);
+      return { shown: button.text(), name: accessibleName(button.element), tooltip: button.attributes('title') };
+    });
+    expect(actions).toEqual([
+      { shown: '', name: 'Print / PDF', tooltip: 'Print / PDF' },
+      { shown: '', name: 'Download PDF', tooltip: 'Download PDF' },
+      { shown: '', name: 'Send by email', tooltip: 'Send by email' },
+    ]);
+    // Printing wears the till's printer icon, so it does not read as «Download PDF» beside it.
+    expect(s.find('invoice-detail-print').findComponent({ name: 'HubIcon' }).props('name')).toBe('ion:receipt-outline');
+  });
+
   it('«Print / PDF» prints its A4 paper; a document of a sale is a copy', async () => {
     const s = await setup();
     await s.show({ ...INVOICE, source_type: 'sale' });
@@ -271,7 +288,12 @@ describe('InvoiceDetailPage: the states of the screen', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(INVOICE);
-    expect([s.field('title'), s.field('status'), s.field('print'), s.field('issue-date')]).toEqual(['Factura FACT-2026-000001', 'Emitida', 'Imprimir / PDF', '14/10/2026']);
+    expect([s.field('title'), s.field('status'), accessibleName(s.find('invoice-detail-print').element), s.field('issue-date')]).toEqual([
+      'Factura FACT-2026-000001',
+      'Emitida',
+      'Imprimir / PDF',
+      '14/10/2026',
+    ]);
     expect(s.field('mark-paid')).toBe('Marcar pagada');
   });
 });

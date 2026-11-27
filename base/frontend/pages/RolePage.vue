@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // «What it allows» of a role, a panel per app that is on, each permission with its phrase and what the role does with it.
-// Read only, save one the business made for who manages the roles, who adjusts it here.
+// Read only, save one the business made for who manages the roles, who adjusts it here unless it is the one they hold.
 import { InlineFeedback, StatusPill, type StatusPillTone } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
@@ -26,7 +26,8 @@ const { data, status, error, refresh } = useLive('base.role.detail', computed(()
 const role = computed(() => data.value);
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 const notFound = computed(() => failed.value && error.value?.code === 'base.role_not_found');
-const adjustable = computed(() => role.value?.origin === 'own' && session.can('base.manage_roles'));
+const manages = computed(() => role.value?.origin === 'own' && session.can('base.manage_roles'));
+const adjustable = computed(() => manages.value && !role.value?.mine);
 const members = computed(() => new Intl.NumberFormat(locale.value).format(role.value?.members ?? 0));
 </script>
 
@@ -83,6 +84,13 @@ const members = computed(() => new Intl.NumberFormat(locale.value).format(role.v
           data-testid="role-members"
         >
           {{ t('base.role.members', { n: members }) }}
+        </p>
+        <p
+          v-if="manages && role.mine"
+          class="settings-card__note"
+          data-testid="role-mine"
+        >
+          {{ t('base.role.mine') }}
         </p>
       </section>
       <section

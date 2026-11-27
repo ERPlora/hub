@@ -94,14 +94,15 @@ const columns = computed<DataTableColumn<SpecialDayOut>[]>(() => [
 ]);
 
 /** The screen has two lists: its funnel and view buttons say they are the special
- *  days'. DataTable fills the `{n}` of the count itself. */
+ *  days'. DataTable picks the label for one active filter or for several,
+ *  each that form of the message, and fills its `{n}`. */
 const tableLabels = computed<Partial<DataTableLabels>>(() => ({
   add: t('schedule.specialDays.add'),
   loadError: t('schedule.specialDays.loadError'),
   retry: t('schedule.live.retry'),
   filters: t('schedule.specialDays.table.filters'),
-  filtersActiveOne: t('schedule.specialDays.table.filtersActiveOne', { n: '{n}' }),
-  filtersActiveMany: t('schedule.specialDays.table.filtersActiveMany', { n: '{n}' }),
+  filtersActiveOne: t('schedule.specialDays.table.filtersActive', { count: 1, n: '{n}' }),
+  filtersActiveMany: t('schedule.specialDays.table.filtersActive', { count: 2, n: '{n}' }),
   viewList: t('schedule.specialDays.table.viewList'),
   viewCards: t('schedule.specialDays.table.viewCards'),
 }));

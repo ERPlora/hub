@@ -415,9 +415,10 @@ Pantalla: Zonas, Plano de sala (Editar plano)
 Pasos:
 1. En **Mesas → Zonas**, «Editar»: cambia Nombre, Descripción, Color, Orden o «Activa» y pulsa
    «Guardar cambios». En el plano, el lápiz («Editar zona») cambia Nombre y Descripción.
-2. Para borrarla (solo el administrador): «Borrar» abre «¿Borrar la zona?» con «N mesas en esta zona.
-   Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.» (con una sola, «1 mesa en esta
-   zona. … muévela o bórrala antes.»); con mesas, «Borrar zona» sale apagado.
+2. Para borrarla (solo el administrador): «Borrar» abre «¿Borrar la zona?». Sin mesas dice «La zona sale
+   del plano y de las listas.»; con mesas, «N mesas en esta zona. Una zona con mesas no se puede borrar:
+   mueve o borra antes sus mesas.» (con una sola, «1 mesa en esta zona. … muévela o bórrala antes.») y
+   «Borrar zona» sale apagado.
 3. Sin mesas, «Borrar zona» la quita de la lista y del plano.
 Entra: la zona elegida.
 Sale: la zona cambiada (avisa: `table.zone.updated`) o borrada (avisa: `table.zone.deleted`).
@@ -455,9 +456,11 @@ Pasos:
    saltan a los 60 y a los 90 minutos.
 Entra: los tres valores.
 Sale: los ajustes de sala (avisa: `table.settings.updated`).
-Si falla: un valor fuera de rango sale en su campo. El aviso se quita en cuanto se cambia algo y el
-motivo de un campo en cuanto se corrige ese campo; los dos vuelven si al guardar otra vez se rechaza.
-Un aviso que no es de ningún campo se queda hasta que se vuelve a guardar.
+Si falla: un valor fuera de rango sale en su campo; un rojo que llega antes que el ámbar, «El aviso
+rojo no puede llegar antes que el ámbar.», bajo «Aviso rojo (minutos)». El motivo de un campo sale una
+sola vez, junto al campo: el aviso de encima de «Guardar» no lo repite. El aviso se quita en cuanto se
+cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si al guardar otra
+vez se rechaza. Un aviso que no es de ningún campo se queda hasta que se vuelve a guardar.
 Implicados: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 Ver cómo está la sala
@@ -474,7 +477,7 @@ Pasos:
 3. Una mesa ocupada enseña el tiempo («0:35») y los comensales («3/4 pax»); el tiempo avanza solo y, al
    pasar los avisos de los Ajustes, solo cambian de color el tiempo y su arco. Una mesa con reserva hoy dice
    el nombre y la hora. Quién la atiende se ve en su ventana: quien atiende su cuenta en Ventas (el chip
-   «Atiende» del TPV) o, si nadie lo ha cambiado, quien la sentó, por su nombre o, si su cuenta no tiene,
+   «Atiende» del TPV) o, si nadie lo ha cambiado, quien la sentó, por su nombre o, si no tiene ninguno,
    por lo que va antes de la @ de su correo, nunca el correo entero.
 4. El plano cambia solo cuando alguien sienta, traslada, junta, divide, cobra o anula: no hay que salir y
    volver, y la ventana que tengas abierta (dividir, comensales, cerrar, «Editar mesa») sigue en el paso en
@@ -498,7 +501,7 @@ Pasos:
 3. Si quieres, antes de sentar «Asignar cliente» le pone la ficha a la cuenta. En una Reservada, si no
    eliges ninguna, la cuenta lleva el cliente de la reserva.
 4. La mesa pasa a Ocupada y en Ventas nace su cuenta abierta con el título «Mesa N» (la ve **Cuentas
-   abiertas** del TPV). Quien sienta es el camarero de la cuenta: su nombre o, si su cuenta no tiene, lo que
+   abiertas** del TPV). Quien sienta es el camarero de la cuenta: su nombre o, si no tiene ninguno, lo que
    va antes de la @ de su correo, nunca el correo entero.
 5. Con el asistente: «sienta a tres en la mesa 4» (con su zona si el número se repite).
 Entra: la mesa y los comensales; en una Reservada, los comensales y el cliente de la reserva.
@@ -720,8 +723,8 @@ Pasos:
 1. Abre **Mesas → Sesiones**: arranca en «Abiertas», las más recientes primero.
 2. «Cerradas» enseña las cerradas con «Cobrado» (en la moneda en que se cobró: la del negocio) y
    «Cierre»; «Todas», también las trasladadas, fusionadas y aparcadas.
-3. Filtra por zona, camarero o estado, o busca por número de mesa. El camarero sale por su nombre o, si su
-   cuenta no tiene, por lo que va antes de la @ de su correo, también en las cuentas de antes, y no se le
+3. Filtra por zona, camarero o estado, o busca por número de mesa. El camarero sale por su nombre o, si no
+   tiene ninguno, por lo que va antes de la @ de su correo, también en las cuentas de antes, y no se le
    busca por su correo.
 4. «Detalle» enseña zona, camarero, estado, comensales, apertura, cierre, tiempo, cobrado y notas.
 Entra: las cuentas de mesa y lo cobrado en Ventas.
@@ -1112,10 +1115,10 @@ Ventas (`sale.add_sale`), que tienen todos los papeles menos la gestoría.
   `TableSettings` (una fila). Borrados lógicos (`is_deleted`) en zonas, mesas y cuentas.
 - **Quién sienta una mesa** (BASE-F119): la cuenta de mesa guarda su camarero (`waiter_name`) con `actor_label`
   (`services/writes.py`), que nombra con `actor_name` de `base.queries.people`, la misma pieza que Ventas y Cocina: el
-  nombre de la cuenta o, sin él, lo que va antes de la @ de su correo, porque el correo de un compañero solo llega a
-  quien ve el contacto del equipo. Las cuentas guardadas antes con un correo las limpió una vez la migración `0003`, en
-  la base de datos de cada negocio: así el plano, el detalle, el filtro por camarero (su nombre, su búsqueda y su
-  orden), lo vivo y el asistente leen el nombre sin tapar nada al leer.
+  nombre de Mi perfil o el de la cuenta o, sin ninguno, lo que va antes de la @ de su correo, porque el correo de un
+  compañero solo llega a quien ve el contacto del equipo. Las cuentas guardadas antes con un correo las limpió una vez
+  la migración `0003`, en la base de datos de cada negocio: así el plano, el detalle, el filtro por camarero (su
+  nombre, su búsqueda y su orden), lo vivo y el asistente leen el nombre sin tapar nada al leer.
 - **El estado de una mesa no se guarda: se calcula al leer** — Ocupada si tiene una cuenta viva
   (abierta y con su cuenta de Ventas abierta, o sin cuenta de Ventas); si no, Bloqueada si lo está;
   si no, Reservada si tiene una retención viva que ya entró en su ventana (60 minutos antes de

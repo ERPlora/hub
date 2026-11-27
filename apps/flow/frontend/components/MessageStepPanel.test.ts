@@ -77,7 +77,7 @@ describe('MessageStepPanel', () => {
   it('a template it no longer finds stays chosen and says so', async () => {
     const gone: Step = { ...STEP, params: { phone: '', template: { name: 'old_one', language: 'es', variables: ['x'] } } };
     const s = await withTemplates(gone);
-    expect(s.find('flow-message-missing-s2').text()).toBe('«old_one» is not among your approved WhatsApp templates: WhatsApp will not send it.');
+    expect(s.find('flow-message-missing-s2').text()).toBe('“old_one” is not among your approved WhatsApp templates: WhatsApp will not send it.');
     expect(s.box('flow-message-var-s2-0')!.props('modelValue')).toBe('x');
   });
 

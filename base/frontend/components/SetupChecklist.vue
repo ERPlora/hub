@@ -108,7 +108,7 @@ function note(item: SetupItem): string {
       <span
         class="setup-progress"
         data-testid="setup-progress"
-      >{{ $t('base.setup.progress', { done: view.done, total: view.total }) }}</span>
+      >{{ $t('base.setup.progress', { done: view.done, total: view.total, n: view.total }) }}</span>
     </header>
     <ion-progress-bar
       class="setup-bar"
@@ -192,13 +192,14 @@ function note(item: SetupItem): string {
         size="small"
         class="setup-review"
         data-testid="setup-review"
+        :aria-label="$t('base.assistant.setup.ask')"
+        :title="$t('base.assistant.setup.ask')"
         @click="assistant.openForSetup()"
       >
         <HubIcon
-          slot="start"
+          slot="icon-only"
           name="ion:sparkles-outline"
         />
-        {{ $t('base.assistant.setup.ask') }}
       </ion-button>
     </footer>
   </section>
