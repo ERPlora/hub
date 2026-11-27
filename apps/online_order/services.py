@@ -11,7 +11,7 @@ from apps.online_order import events
 from apps.online_order.models import TableCode
 from apps.online_order.queries import code_row
 from apps.online_order.schemas import TableCodeOut
-from apps.table.schemas import TableRefIn
+from apps.table.schemas.tables import TableRefIn
 from base.operations import call
 
 #: Bytes of randomness in a table's code: 128 bits, 22 characters in the URL.

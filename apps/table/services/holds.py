@@ -14,14 +14,14 @@ from apps.table import events
 from apps.table.models import Hold, Table
 from apps.table.queries.holds import HOLD_NOT_FOUND, hold_row
 from apps.table.queries.lookups import find_table
-from apps.table.schemas import (
+from apps.table.schemas.fields import NoIn
+from apps.table.schemas.holds import (
     CustomerErasedIn,
     ExpiredOut,
     HoldOut,
     HoldPlaceIn,
     HoldReleaseIn,
     HoldsChangedOut,
-    NoIn,
     ReservationStatusIn,
     ReservationUpdatedIn,
 )

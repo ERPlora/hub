@@ -42,7 +42,7 @@ def written(monkeypatch) -> tuple[dict, dict[str, set[str]], dict[str, set[str]]
 
 
 def readable(core_ref: str) -> str:
-    """A class's reference without the ids that tell two classes apart: ``apps.table.schemas.SettingsOut``."""
+    """A class's reference without the ids that tell two classes apart: ``apps.table.schemas.settings.SettingsOut``."""
     return re.sub(r":\d+", "", core_ref)
 
 

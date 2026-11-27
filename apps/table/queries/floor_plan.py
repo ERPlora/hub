@@ -4,7 +4,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.table.models import Table, Zone
-from apps.table.schemas import FloorStatusOut, NoIn
+from apps.table.schemas.fields import NoIn
+from apps.table.schemas.floor_plan import FloorStatusOut
 
 
 @operation(

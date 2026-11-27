@@ -5,7 +5,8 @@ from live.operations import operation
 
 from apps.table.models import TableSettings
 from .floor import RESERVED_LEAD
-from apps.table.schemas import NoIn, SettingsOut
+from apps.table.schemas.fields import NoIn
+from apps.table.schemas.settings import SettingsOut
 from base.business import zone_name
 
 

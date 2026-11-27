@@ -13,11 +13,11 @@ from apps.table import events
 from apps.table.models import SessionMove, TableSession
 from apps.table.queries.lookups import find_session
 from apps.table.queries.sessions import order_is_open, session_out
-from apps.table.schemas import (
+from apps.table.schemas.fields import DeletedOut
+from apps.table.schemas.sessions import (
     ByIdIn,
     ByOrderIn,
     ClosedOut,
-    DeletedOut,
     SessionGuestsIn,
     SessionLinkOrderIn,
     SessionOut,
