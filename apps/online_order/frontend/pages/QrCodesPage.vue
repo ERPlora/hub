@@ -62,7 +62,7 @@ const actions = computed<DataTableAction<TableCodeOut>[]>(() => [
   ...(canChange.value
     ? [
         { id: 'regenerate', label: t('online_order.qrCodes.actions.regenerate'), icon: 'ion:refresh-outline', hidden: (row: TableCodeOut) => !withCode(row) },
-        { id: 'generate', label: t('online_order.qrCodes.actions.generate'), icon: 'ion:qr-code-outline', showLabel: true, hidden: withCode },
+        { id: 'generate', label: t('online_order.qrCodes.actions.generate'), icon: 'ion:qr-code-outline', hidden: withCode },
       ]
     : []),
 ]);
