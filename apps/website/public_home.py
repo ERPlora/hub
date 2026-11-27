@@ -6,13 +6,13 @@ the language the visitor's browser asks for (``Accept-Language`` only, never a c
 hub, the publication's version, the language, the business's day (the opening hours mark today, in the hub's time
 zone), the business's currency (its prices': its country's, ``base.business.currency_of`` of the registry row the host
 loaded, what ``base.business.get`` answers, with no transaction of its own per visitor) and the deploy
-(``queries.page_cache_key``, an hour): a publication or a new country changes the key, so a stale page is never
+(``queries.public.page_cache_key``, an hour): a publication or a new country changes the key, so a stale page is never
 served. The response sets no cookie, carries the public CSP
 (``csp.public_policy``: no nonce) and may be kept a minute by the browser, varying on ``Accept-Language`` and on
 ``Cookie``: «Sign in» comes back to ``/`` with a session, which must get the shell, never the page kept for the
-visitor. Only the hub's own site is shown, under the same guard as the public API (``queries.live_version``). Google's
-reviews are asked when the page is rendered and nothing is kept for its place (``services.refresh_reviews``; a failure
-is kept 10 minutes and the site's last good answer shows meanwhile).
+visitor. Only the hub's own site is shown, under the same guard as the public API (``queries.public.live_version``).
+Google's reviews are asked when the page is rendered and nothing is kept for its place (``services.refresh_reviews``;
+a failure is kept 10 minutes and the site's last good answer shows meanwhile).
 
 On the business's own domain (HUBS-F17, ``request.custom_domain``) only the page and its images are there, neither
 ``/auth`` nor ``/api``, so it is another page, kept apart: «Log in» goes to the business's own address, the page's script
@@ -57,7 +57,7 @@ def _scope(hub) -> Scope:
 
 def is_published(hub) -> bool:
     """Whether ``hub``'s visitors see its site: the module on there and a live publication of its own."""
-    return queries.live_version(_scope(hub)) > 0
+    return queries.public.live_version(_scope(hub)) > 0
 
 
 def respond(request: HttpRequest) -> HttpResponse:
@@ -66,11 +66,11 @@ def respond(request: HttpRequest) -> HttpResponse:
     own_domain = bool(getattr(request, "custom_domain", ""))
     language, today = visitor_language(request), local_day(request.hub.timezone)
     currency = currency_of(request.hub.country)
-    version = queries.live_version(scope)
+    version = queries.public.live_version(scope)
     marks = {"main": main_address(request.hub), "name": request.hub.name or slug}
-    html = _kept(queries.page_cache_key(slug, version, language, today, currency, own_domain=own_domain), marks)
+    html = _kept(queries.public.page_cache_key(slug, version, language, today, currency, own_domain=own_domain), marks)
     if html is None:
-        page = queries.published_page(scope)
+        page = queries.public.published_page(scope)
         if page is None:
             if own_domain:
                 raise Http404("This business has no website to show.")
@@ -84,16 +84,16 @@ def respond(request: HttpRequest) -> HttpResponse:
             language,
             name=marks["name"],
             currency=currency,
-            catalog=queries.live_catalog(scope, page["content"]) if own_domain else page.get("catalog"),
+            catalog=queries.public.live_catalog(scope, page["content"]) if own_domain else page.get("catalog"),
             today=today,
-            reviews=queries.shown_reviews(slug, page["content"], page.get("reviews_snapshot")),
+            reviews=queries.editor.shown_reviews(slug, page["content"], page.get("reviews_snapshot")),
             hub_address=public_url(slug) if own_domain else "",
             canonical=marks["main"],
         )
         cache.set(
-            queries.page_cache_key(slug, page["version"], language, today, currency, own_domain=own_domain),
+            queries.public.page_cache_key(slug, page["version"], language, today, currency, own_domain=own_domain),
             {"marks": marks, "html": html},
-            queries.CATALOG_TTL if own_domain else queries.PAGE_TTL,
+            queries.public.CATALOG_TTL if own_domain else queries.public.PAGE_TTL,
         )
     response = HttpResponse(html, content_type="text/html; charset=utf-8")
     response["Cache-Control"] = CACHE_CONTROL

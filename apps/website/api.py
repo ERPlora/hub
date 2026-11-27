@@ -29,7 +29,7 @@ router = Router(tags=["website"])
 
 @bind(router, "website.site.get", "/website/site")
 async def site_get(request):
-    return await run_operation(request, queries.get_site)
+    return await run_operation(request, queries.editor.get_site)
 
 
 @bind(router, "website.site.save", "/website/site")
@@ -61,7 +61,7 @@ async def site_unpublish(request):
     },
 )
 async def site_preview(request):
-    preview = await run_operation(request, queries.preview_site)
+    preview = await run_operation(request, queries.editor.preview_site)
     response = HttpResponse(preview.html, content_type="text/html; charset=utf-8")
     response["Cache-Control"] = "no-store"
     response["X-Frame-Options"] = "SAMEORIGIN"
@@ -92,7 +92,7 @@ async def image_upload(request, data: ImageUploadIn):
     },
 )
 async def qr_get(request, params: Query[QrIn]):
-    qr = await run_operation(request, queries.get_qr, params)
+    qr = await run_operation(request, queries.editor.get_qr, params)
     accepts = request.headers.get("Accept", "")
     if "application/json" in accepts and "image/" not in accepts:
         return qr
@@ -105,7 +105,7 @@ async def qr_get(request, params: Query[QrIn]):
 
 @bind(router, "website.catalog.categories", "/website/catalog/categories")
 async def catalog_categories(request, params: Query[CategoriesIn]):
-    return await run_operation(request, queries.list_categories, params)
+    return await run_operation(request, queries.editor.list_categories, params)
 
 
 # The public reads (no session)
@@ -113,14 +113,14 @@ async def catalog_categories(request, params: Query[CategoriesIn]):
 
 @bind(router, "website.public.site", "/website/public/site", auth=None)
 async def public_site(request):
-    return await run_operation(request, queries.public_site)
+    return await run_operation(request, queries.public.public_site)
 
 
 @bind(router, "website.public.catalog", "/website/public/catalog", auth=None)
 async def public_catalog(request):
-    return await run_operation(request, queries.public_catalog)
+    return await run_operation(request, queries.public.public_catalog)
 
 
 @bind(router, "website.public.reviews", "/website/public/reviews", auth=None)
 async def public_reviews(request):
-    return await run_operation(request, queries.public_reviews)
+    return await run_operation(request, queries.public.public_reviews)

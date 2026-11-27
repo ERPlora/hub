@@ -21,7 +21,7 @@ from apps.website.models import Image, Site
 from apps.website.schemas import PALETTE_IDS
 from apps.website.tests.conftest import HUB_DB, B, ctx_for, full_content
 from apps.website.tests.test_choices import editor_words
-from apps.website.tests.test_queries import products_catalog, services_catalog, source_off  # noqa: F401 (fixtures)
+from apps.website.tests.conftest import products_catalog, services_catalog, source_off  # noqa: F401 (fixtures)
 from apps.website.tests.test_services import png_bytes, save as save_draft, upload
 from base import assistant
 from base.tests.test_assistant import technical_names
