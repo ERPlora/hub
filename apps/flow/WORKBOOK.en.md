@@ -100,7 +100,7 @@ gallery**, with ready-made automations to start from and the ones other apps bri
 and each row open the editor, and **How does this work?** opens the guide.
 
 #### What it shows, from top to bottom
-<!-- from WORKBOOK.md sha256:b4b2cd8a2b2c -->
+<!-- from WORKBOOK.md sha256:28fe347730fe -->
 Menu **Automations**, a single entry. From top to bottom:
 
 - The **New automation** button, top right: only its **+**, with its name on hover.
@@ -117,7 +117,7 @@ Menu **Automations**, a single entry. From top to bottom:
   list's bar, as in the other lists: the search box "Search automation…", the order (touched last, name)
   and the filters button, which opens **Showing** (on, paused) and **Starts with** (something that
   happens, a schedule, a date, by hand). Each row: a box to pick it,
-  the name, when it starts in words ("When a sale is charged", "Every day at 09:00", "Only when you press
+  the name, when it starts in words ("When a sale is charged", "Every day at 9:00 AM", "Only when you press
   Run"), the last run, the "Active" or "Paused" label, the switch, **Make a copy** and **Delete**. With
   several picked, **Turn them on** and **Pause them** (FLOW-F02, FLOW-F03).
 - **The gallery**, always below: "Pick one and it becomes yours, paused, so you can look at it before it
@@ -271,7 +271,7 @@ If it fails: the message in red at the top; the row stays as it was.
 Involved: FLOW-F12, FLOW-F14, FLOW-F22, FLOW-F23
 
 ### FLOW-F04 Create an automation from a gallery card
-<!-- from WORKBOOK.md sha256:74ee22014b8c -->
+<!-- from WORKBOOK.md sha256:e2b833147fbb -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automations
@@ -289,7 +289,7 @@ Steps:
 In: the ten cards: seven of "Any business", two of "Hair and beauty" and one of "Bars and restaurants". A
 card hides if an app it uses is missing, and below the gallery it says which.
 Out: a new automation, **paused and without permissions**, with the card's name and values (wait a day,
-100,00 €, six people…).
+€100.00, six people…).
 If it fails: the message in red inside the card; nothing is created.
 Involved: FLOW-F05, FLOW-F08, FLOW-F12, FLOW-F13, FLOW-F14
 
@@ -298,15 +298,15 @@ The ten cards of the gallery, with their sector, when they start and what they d
 | Card | Sector | Starts | Does |
 |---|---|---|---|
 | Welcome a new customer | any | A customer card is created | Waits a day and leaves the task of welcoming them |
-| Note the big sales on the card | any | A sale is charged | Only if it has a customer and is over 100,00 €: adds a note to their card |
+| Note the big sales on the card | any | A sale is charged | Only if it has a customer and is over €100.00: adds a note to their card |
 | The checklist of someone new in the team | any | Someone is added in Staff | Leaves the task of preparing their first day |
 | Review the till when it closes | any | A till is closed | Leaves the task of reviewing the close |
 | Find out when the tax agency rejects a record | any | VeriFactu marks a record as rejected | Leaves an urgent task |
-| Review the week on Friday | any | Fridays at 18:00 | Leaves the task of reviewing the week |
-| Check the agenda every morning | salon | Every day at 09:00 | Leaves the task of going over the agenda |
+| Review the week on Friday | any | Fridays at 6:00 PM | Leaves the task of reviewing the week |
+| Check the agenda every morning | salon | Every day at 9:00 AM | Leaves the task of going over the agenda |
 | Call whoever did not come | salon | An appointment is marked "No-show" | Leaves an urgent task of calling them |
 | Prepare the tables of big groups | restaurant | A reservation comes in | Only if they are six or more: leaves the task of preparing it |
-| Hear about big sales | any | A sale is charged | Only if it is over 100,00 €: leaves a task |
+| Hear about big sales | any | A sale is charged | Only if it is over €100.00: leaves a task |
 
 ### FLOW-F05 Reach a card from somewhere else
 <!-- from WORKBOOK.md sha256:4b833ce83f77 -->
@@ -411,7 +411,7 @@ Steps:
      (the 31st in April) is skipped that month.
    - **Once, at a date and time**.
    - **Only by hand**: it does not start on its own; it runs with **Run now**.
-2. The card sums up what was chosen ("When a sale is charged", "Every Friday at 18:00"…).
+2. The card sums up what was chosen ("When a sale is charged", "Every Friday at 6:00 PM"…).
 In: the notices of the active apps.
 Out: the trigger, on **Save**.
 If it fails: a notice that does not exist in the business, a schedule without a time or a past date are

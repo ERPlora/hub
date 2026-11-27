@@ -13,7 +13,7 @@ import { computed, nextTick, ref } from 'vue';
 import { usePhrasing } from '../composables/usePhrasing';
 import { catalogOptions } from '../lib/catalogOptions';
 import { asCallText } from '../lib/document';
-import { actionLabel, fieldLabel } from '../lib/phrasing';
+import { actionLabel, fieldLabel, quoted } from '../lib/phrasing';
 import type { AssistantStep, CatalogOut, FixedByAppOut, Step } from '../operations';
 import ValueBox from './ValueBox.vue';
 
@@ -62,7 +62,7 @@ const offTools = computed(() =>
 
 /** The chosen ones that wait for the yes of someone who may do them, said under the mode while it asks first. */
 const waitsForWho = computed<string>(() =>
-  props.step.mode === 'ask' ? props.step.tools.filter(askFirst).map((name) => `«${label(name)}»`).join(', ') : '',
+  props.step.mode === 'ask' ? props.step.tools.filter(askFirst).map((name) => quoted(label(name), phrasing.value)).join(', ') : '',
 );
 
 function change(patch: Partial<AssistantStep>): void {

@@ -4,7 +4,7 @@ import { assistantMessages } from '@erplora/ui/components';
 import type { SessionMe } from '@erplora/ui/shell';
 import type { Component } from 'vue';
 
-import { mountInShell, type MountOptions } from '../../../../base/frontend/__tests__/mount-in-shell';
+import { type BusinessMountOptions, mountInShell } from '../../../../base/frontend/__tests__/mount-in-shell';
 import baseEn from '../../../../base/frontend/locale/en.json';
 import baseEs from '../../../../base/frontend/locale/es.json';
 import en from '../locale/en.json';
@@ -28,7 +28,7 @@ export const OWNER: SessionMe = {
 /** Someone who may look but not change (no role has it alone; a test of the read-only screen). */
 export const VIEWER: SessionMe = { ...OWNER, permissions: ['flow.view'] };
 
-export async function mountFlow(component: Component, options: MountOptions = {}) {
+export async function mountFlow(component: Component, options: BusinessMountOptions = {}) {
   return mountInShell(component, options, {
     path: '/flow/automations',
     session: OWNER,
