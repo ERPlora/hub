@@ -15,7 +15,8 @@ class ServicePriceOut(Schema):
     )
     pricing_type: PricingType | None = Field(
         description="How it is priced: fixed, hourly, from (a minimum), variable or free; empty when the business "
-        "does not show prices."
+        "does not show prices.",
+        json_schema_extra={"choices_of": "service.pricing_type"},
     )
 
 

@@ -1,6 +1,8 @@
 """A service's price on the public booking page goes with how it is priced, and both hide together."""
 
 import pytest
+from live.assistant.screen_names import screen_names
+from live.operations import get
 
 from apps.online_booking.service_price import ServicePriceOut, shown_price
 from apps.service.models.catalog import Service
@@ -22,3 +24,9 @@ def test_the_price_is_money_and_its_pricing_one_of_the_services():
     assert schema["properties"]["price"]["money"] is True
     pricing = schema["properties"]["pricing_type"]["anyOf"][0]
     assert pricing["enum"] == ["fixed", "hourly", "from", "variable", "free"]
+
+
+def test_the_assistant_names_each_pricing_as_the_services_screens_do():
+    answer = {"rows": [{"pricing_type": "from"}, {"pricing_type": "hourly"}]}
+    names = screen_names(get("online_booking.public.services"), answer, "es")
+    assert names["rows.pricing_type"] == {"from": "Desde", "hourly": "Por hora"}
