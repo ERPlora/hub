@@ -5,10 +5,11 @@ from live.context import OperationContext
 from live.operations import AI, operation
 from live.outbox import record_event
 
-from apps.customer import events
+from apps.customer import consent_notice, events
 from apps.customer.models import Activity, Consent, Customer
 from apps.customer.queries.reads import find_customer
 from apps.customer.schemas.consent import ConsentGrantIn, ConsentRow, ConsentWithdrawIn
+from apps.customer.services import assistant_cards
 from apps.customer.services.writes import _actor, _occurred_at
 
 
@@ -37,8 +38,8 @@ def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
         # Always the card's own address: the proof names the real contact (WORKBOOK F14).
         contact_point=_contact_point(customer, data.channel),
         source=data.source,
-        notice_text=data.notice_text if granted else "",
-        notice_version=data.notice_version if granted else "",
+        notice_text=consent_notice.words(ctx.language) if granted else "",
+        notice_version=consent_notice.VERSION if granted else "",
         evidence=data.evidence,
         reason="" if granted else data.reason,
         recorded_by=_actor(ctx),
@@ -78,12 +79,14 @@ def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
     permission="customer.manage",
     input=ConsentGrantIn,
     output=ConsentRow,
-    ai=AI(
-        "Records that a customer GAVE consent (opted in, said yes) for a purpose, marketing by default, on a channel "
-        "(email, SMS, WhatsApp, phone or post), as a new fact with its evidence: the exact words shown and their "
-        "version, where and when, the card's own address on that channel at that moment, and who wrote it down (from "
-        "the session). Only after the customer said yes.",
-        asks={
+    ai={
+        "description": "Records that a customer GAVE consent (opted in, said yes) for a purpose, marketing by default, "
+        "on a channel (email, SMS, WhatsApp, phone or post), as a new fact with its evidence: the business's own "
+        "consent sentence and its version, the same the customer's card reads out, where and when, the card's own "
+        "address on that channel at that moment, and who wrote it down (from the session). Nobody writes or dictates "
+        "the sentence: its card shows it to read out to the customer before running. Only after the customer said yes.",
+        "risk": "normal",
+        "asks": {
             "en": ("Ana says yes to WhatsApp offers", "Luis agreed to marketing emails"),
             "es": (
                 "Ana quiere las ofertas por WhatsApp",
@@ -91,7 +94,8 @@ def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
                 "Marta nos da permiso para los SMS",
             ),
         },
-    ),
+        "summary": assistant_cards.consent_words,
+    },
 )
 def grant_consent(ctx: OperationContext, data: ConsentGrantIn) -> Consent:
     return _record_consent(ctx, data, Consent.State.GRANTED)

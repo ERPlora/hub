@@ -8,7 +8,7 @@ from base import queries, services
 from base.schemas.api_keys import ApiDocSettingsUpdateIn, ApiKeyCreateIn, ApiKeyIdIn
 from base.schemas.approvals import ApprovalExportIn, ApprovalIn, ApproversIn
 from base.schemas.people import BadgeSetIn, PersonIn
-from base.schemas.roles import RoleAssignIn, RoleCreateIn, RoleIn, RoleUpdateIn
+from base.schemas.roles import RoleAssignIn, RoleCreateIn, RoleDetailIn, RoleIn, RoleUpdateIn
 
 router = Router()
 
@@ -47,7 +47,7 @@ async def role_list(request):
 
 
 @bind(router, "base.role.detail", "/roles/detail")
-async def role_detail(request, data: Query[RoleIn]):
+async def role_detail(request, data: Query[RoleDetailIn]):
     return await run_operation(request, queries.roles.role_detail, data)
 
 
