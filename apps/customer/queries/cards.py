@@ -19,6 +19,7 @@ from apps.customer.schemas.cards import (
     CustomerStatsOut,
     PhoneMatchOut,
 )
+from base.text_search import contains_text
 from apps.customer.schemas.fields import CustomerRefIn
 from apps.customer.search import search_term
 
@@ -86,7 +87,7 @@ def _filtered_customers(ctx: OperationContext, params: CustomerFilters) -> Query
     for field in ("name", "email", "tax_id", "company_name"):
         value = (getattr(params, field) or "").strip()
         if value:
-            cards = cards.filter(**{f"{field}__icontains": value})
+            cards = cards.filter(contains_text(value, field))
     phone = search_term(params.phone or "")
     if phone:
         cards = cards.filter(phone__contains=phone)

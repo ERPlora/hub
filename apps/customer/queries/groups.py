@@ -1,12 +1,13 @@
 """The customer groups as their list shows them, with how many live cards are in each (CUSTOMER-F27)."""
 
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from live.context import OperationContext
 from live.operations import AI, operation
 
 from apps.customer.models import CustomerGroup
 from apps.customer.queries.reads import _customer_count, _ordered, page
 from apps.customer.schemas.groups import GroupListIn, GroupPage
+from base.text_search import contains_text
 
 
 def _groups() -> QuerySet:
@@ -31,9 +32,7 @@ def _groups() -> QuerySet:
 def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     groups = _groups()
     if params.search:
-        groups = groups.filter(
-            Q(name__icontains=params.search) | Q(description__icontains=params.search)
-        )
+        groups = groups.filter(contains_text(params.search, "name", "description"))
     filters = {
         "is_active": params.is_active,
         "color": params.color,
