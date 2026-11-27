@@ -325,7 +325,7 @@ describe('CustomerListPage: actions by permission', () => {
   it('the owner gets «Add», «Import CSV», «Export CSV» and «Delete» on each row', async () => {
     const s = await setup();
     await s.show(PAGE);
-    expect([s.testid('customer-list-add').text(), s.testid('customer-list-add').attributes('title')]).toEqual(['', 'Add']);
+    expect([s.testid('customer-list-add').text(), s.testid('customer-list-add').attributes('title'), s.testid('customer-list-add').element.shadowRoot?.querySelector('button')?.getAttribute('aria-label')]).toEqual(['', 'Add', 'Add']);
     expect(s.testid('customer-import').exists()).toBe(true);
     expect(s.testid('customer-export').exists()).toBe(true);
     expect([s.prop<{ id: string }[]>('actions').map((a) => a.id), ['c1', 'c2'].map((id) => s.wrapper.find(`[data-testid="customer-list-row-${id}-open"]`).element.shadowRoot?.querySelector('button')?.getAttribute('aria-label'))]).toEqual([['open', 'delete'], ['View: Ana García', 'View: Luis']]);
@@ -496,7 +496,7 @@ describe('CustomerListPage: language and markup', () => {
     await s.show(PAGE);
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Clientes');
     expect(s.prop<{ label: string }[]>('columns').map((c) => c.label)).toEqual(['Nombre', 'Email', 'Teléfono', 'Etapa', 'Gastado']);
-    expect([s.testid('customer-list-add').text(), s.testid('customer-list-add').attributes('title')]).toEqual(['', 'Añadir']);
+    expect([s.testid('customer-list-add').text(), s.testid('customer-list-add').attributes('title'), s.testid('customer-list-add').element.shadowRoot?.querySelector('button')?.getAttribute('aria-label')]).toEqual(['', 'Añadir', 'Añadir']);
     expect(s.wrapper.get('[data-testid="customer-list-stage"]').text()).toBe('Activo');
     const fields = s.prop<Array<{ label: string; options?: Array<{ label: string }> }>>('filterFields');
     expect(fields.map((f) => f.label)).toEqual(['Origen', 'Activo']);
