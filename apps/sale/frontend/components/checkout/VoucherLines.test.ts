@@ -39,6 +39,14 @@ describe('VoucherLines', () => {
     expect(s.sent().at(-1)).toMatchObject({ path: '/api/sale/orders/remove_voucher', body: { order_id: 'o1', line_id: 'l1' } });
   });
 
+  it('says the sessions left in the singular or the plural', async () => {
+    const spent = (left: number) => previewLine(`l${left}`, { paid_by_voucher: true, voucher_name: 'Bono', voucher_remaining: left, line_total: 0 });
+    const es = await setup([spent(1), spent(2)]);
+    expect([es.text('voucher-l1-held'), es.text('voucher-l2-held')]).toEqual(['Bono: sesión gastada. Queda 1.', 'Bono: sesión gastada. Quedan 2.']);
+    const en = await setup([spent(1), spent(2)], 'c1', 'en');
+    expect([en.text('voucher-l1-held'), en.text('voucher-l2-held')]).toEqual(['Bono: session spent. 1 left.', 'Bono: session spent. 2 left.']);
+  });
+
   it('an unlimited voucher only says the session is spent', async () => {
     const s = await setup([previewLine('l1', { paid_by_voucher: true, voucher_name: 'Ilimitado', voucher_remaining: null, line_total: 0 })]);
     expect(s.text('voucher-l1-held')).toBe('Ilimitado: sesión gastada.');

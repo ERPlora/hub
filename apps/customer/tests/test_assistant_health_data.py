@@ -24,7 +24,8 @@ from .conftest import HUB_DB
 REPORTED = (
     "Lucía QA es alérgica al gluten y nos ha dicho que no le importa que lo apuntemos. Apúntaselo en su ficha, por favor."
 )
-#: The block of the card as its screen titles it, in the language the descriptions are written in.
+#: The block of the card as its screen titles it, in the language the descriptions are written in: they name it in their
+#: own words, never quoting the screen's English title for a person who reads another language.
 FRONTEND = Path(apps.get_app_config("customer").path) / "frontend/locale"
 HEADING = json.loads((FRONTEND / "en.json").read_text())["customer"]["health"]["heading"]
 #: A screen of the Hub, named by its path.
@@ -56,7 +57,7 @@ def read(tool: dict, datum: str | None) -> str:
 
 def assert_sends_health_data_to_its_block(text: str) -> None:
     assert "Never for allergies, sensitivity tests or other health data" in text
-    assert f"«{HEADING}» block of the customer's card" in text
+    assert f"{HEADING.lower()} block of the customer's card" in text
     assert "with the customer's own explicit permission, which only that screen records" in text
     assert "You have no tool for them: tell the person to do it there." in text
     screens = SCREEN.findall(text)

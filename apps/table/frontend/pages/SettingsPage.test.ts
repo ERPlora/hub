@@ -4,7 +4,7 @@
 // says «Settings saved.»; a refusal goes under its field.
 import { describe, expect, it } from 'vitest';
 
-import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
+import { pressEnter, refusalMarks } from '../../../../base/frontend/__tests__/settings-form';
 import { click, flush, ionChecked, ionValue, MANAGER, type MountOptions, mountTable } from '../__tests__/mount-table';
 import { SETTINGS } from '../__tests__/tables';
 import SettingsPage from './SettingsPage.vue';
@@ -52,7 +52,7 @@ describe('SettingsPage', () => {
     expect(s.sent().at(-1)?.body).toEqual({ timer_critical_minutes: 100 });
   });
 
-  it('a refusal goes under its field', async () => {
+  it('a refusal goes under its field, once (a red warning before the amber one)', async () => {
     const s = await setup();
     await s.show(SETTINGS);
     const refusal = { error: { code: 'invalid_payload', message: 'The red warning cannot come before the amber one.', fields: { timer_critical_minutes: 'The red warning cannot come before the amber one.' } } };
@@ -60,8 +60,7 @@ describe('SettingsPage', () => {
     await ionValue(s.field('timer_warning_minutes'), '120', 'ionInput');
     await click(s.field('save'));
     expect(s.field('timer_critical_minutes').errorText).toBe('The red warning cannot come before the amber one.');
-    expect(s.field('save-error')?.textContent).toContain('Could not save the settings');
-    expect(s.field('save-error')?.textContent).toContain('The red warning cannot come before the amber one.');
+    expect(s.field('save-error')).toBeNull();
   });
 
   describe('a refusal by fields (hub#854, as FormModal and the Services settings do: hub#821)', () => {
@@ -84,16 +83,13 @@ describe('SettingsPage', () => {
       await ionValue(s.field('timer_warning_minutes'), '700', 'ionInput');
       await ionValue(s.field('timer_critical_minutes'), '30', 'ionInput');
       await click(s.field('save'));
-      /** Whether the red notice is on screen. */
-      const notice = () => s.field('save-error') !== null;
-      const says = (name: string) => s.field(name).errorText ?? '';
-      const marked = (name: string) => s.field(name).classList.contains('ion-invalid');
-      return { ...s, notice, says, marked };
+      return { ...s, ...refusalMarks(s.field, () => s.field('save-error') !== null) };
     }
 
     it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
       const s = await refused();
       expect(s.notice()).toBe(true);
+      expect(s.field('save-error')?.textContent).toContain('Could not save the settings');
       expect([s.says('timer_warning_minutes'), s.says('timer_critical_minutes')]).toEqual([
         'Ensure this value is less than or equal to 600.',
         'The red warning cannot come before the amber one.',

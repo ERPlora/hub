@@ -31,6 +31,7 @@ from apps.cash_register.schemas import (
 from base.business import business_zone
 from base.ordering import list_order
 from base.sensitive import VIEW_COSTS
+from base.text_search import contains_text
 
 VIEW_EXPECTED = "cash_register.view_expected_totals"
 
@@ -196,7 +197,7 @@ _SESSION_SORT = {"number": ("business_day", "sequence")}
 def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
     sessions = SESSIONS.visible(ctx).select_related("register")
     if params.search:
-        sessions = sessions.filter(number__icontains=params.search.strip())
+        sessions = sessions.filter(contains_text(params.search.strip(), "number"))
     exact = {
         "number": params.number,
         "status": params.status,

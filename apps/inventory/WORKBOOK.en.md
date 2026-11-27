@@ -135,12 +135,12 @@ lost, mark it sold out or delete it. Tapping the row opens its card, with the ba
 The table's buttons import and export the catalog as a CSV file.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:26c3f8b6b683 -->
+<!-- from WORKBOOK.md sha256:5fd6448d3fab -->
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
 Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
 "Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
-"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
+"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU, ignoring case and accents ("cafe" finds "Café con leche"); sorting by
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
 "Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
 is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a
@@ -476,7 +476,7 @@ If it fails: the refusals of the product's edit form.
 Involved: SALE-F01, TAX-F01
 
 ### INVENTORY-F06 Create and edit a category
-<!-- from WORKBOOK.md sha256:990b87af6aa8 -->
+<!-- from WORKBOOK.md sha256:99bbc859de0e -->
 Status: done
 Actor: administrator, manager
 Screen: Categories
@@ -488,8 +488,10 @@ Steps:
    want, "Tax rate" ("— (default)" leaves it empty).
 3. Tap "Save" or "Save changes". The category shows in the table with its number of products.
 In: the tax categories and their type, from Taxes.
-Out: the category saved. Editing it from the screen does not touch what the screen does not show: the
-description, the icon, the colour and the order set through the assistant or the API are kept. Sales
+Out: the category saved. A new one shows last on the till, after the ones there already were; one
+created with its position (through the assistant or the API) keeps it. Editing it from the screen does
+not touch what the screen does not show: the description, the icon, the colour and the order set
+through the assistant or the API are kept. Sales
 reads it for the till's category strip, and Kitchen to choose what it sends to each station. A
 category is not turned off: it is created, edited or deleted.
 If it fails: "Save" is off without a Name. A refusal shows inside the panel, with its reason.
@@ -525,7 +527,7 @@ If it fails: "The category could not be deleted" (or the reason) above the table
 Involved: KITCHEN-F04, SALE-F01, BASE-F114, INVENTORY-F34, MODIFIER-F10
 
 ### INVENTORY-F08 Group products into categories for the till
-<!-- from WORKBOOK.md sha256:ca333a1f5a04 -->
+<!-- from WORKBOOK.md sha256:40ede8a0ed50 -->
 Status: done
 Actor: administrator, manager
 Screen: Products
@@ -541,7 +543,8 @@ Out: the link between product and category, saved together with the product; Inv
 category added or removed. A product can be in several. Sales filters the till's grid with these links
 (only of active products) and Kitchen uses them for its routing. The till shows the categories in the
 position the business gave them (through the assistant or the API, and the one the sector's template
-brings) and, at equal position, by name; the ones nobody placed go by name. The products, by name.
+brings) and, at equal position, by name; a category created without a position takes the one after the
+last (INVENTORY-F06, F10). The products, by name.
 If it fails: the form's refusals; if something fails neither the product nor its categories are saved.
 A product without a category is sold all the same: it shows under "All".
 Involved: KITCHEN-F04, SALE-F01
@@ -594,7 +597,7 @@ they may not run and nothing is created.
 Involved: TAX-F02, TAX-F14, TAX-F15, BASE-F119, INVENTORY-F26
 
 ### INVENTORY-F10 Import categories from a CSV
-<!-- from WORKBOOK.md sha256:7aa64b34ec09 -->
+<!-- from WORKBOOK.md sha256:7325e08f39cc -->
 Status: done
 Actor: administrator, manager
 Screen: Categories
@@ -603,7 +606,8 @@ Steps:
    semicolons).
 2. The columns Name (required), Slug and Tax category are recognised by their header, in Spanish or
    English ("Nombre"/"name", "IVA"/"tax"…).
-3. A category is created per row with a name; the slug, if it does not come, is taken from the name.
+3. A category is created per row with a name, in the file's order and after the ones there already
+   were (on the till they show last); the slug, if it does not come, is taken from the name.
 4. When it ends, "Import result": "Rows", "Created", "Skipped (already existed)", "Failed", a line per
    failure and "Copy report". The table reloads.
 In: the file; the tax categories and the learnt texts, from Taxes.
@@ -966,7 +970,7 @@ refund's notice does not bring them; if they go back to the shelf, they are coun
 Involved: SALE-F31
 
 ### INVENTORY-F25 Print the barcode label
-<!-- from WORKBOOK.md sha256:69d5dc301c13 -->
+<!-- from WORKBOOK.md sha256:bb06275d5ffe -->
 Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Product card
@@ -981,7 +985,9 @@ Steps:
    label is waiting in the print queue: no printer has the «Label» function. Give it to one in
    Printing.".
 In: the product's SKU, name and price; the printer with the "Label" function, from Printing. It can also
-be asked for through the assistant ("print the shampoo's label") or through the API.
+be asked for through the assistant ("print the shampoo's label") or through the API. If no device that is on prints
+that queue, the assistant says the label waits in the queue and will come out when a device set up to print it does,
+never that it has printed it.
 Out: a label job in Printing's queue, with the price in the business's currency.
 If it fails: whoever does not reach the print queue (Printing is not active, or they cannot print) sees
 the device's print dialog with the code, the SKU and the name, without a price: the browser's or, in the

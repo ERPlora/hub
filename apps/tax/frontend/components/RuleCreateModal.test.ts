@@ -214,7 +214,7 @@ describe('RuleCreateModal: sending the rule', () => {
     expect(s.control('valid_from').errorText).toBe(message);
     expect(s.control('valid_from').classList.contains('ion-invalid')).toBe(true);
     expect(s.control('rate_pct').classList.contains('ion-invalid')).toBe(false);
-    expect(s.inDoc('tax-rule-form-error')?.textContent).toContain(message);
+    expect(s.inDoc('tax-rule-form-error')).toBeNull();
     expect([s.control('country_code').value, s.control('rate_pct').value, picked(s.control('valid_from'))]).toEqual(['Spain (ES)', '10', '2020-01-01']);
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
