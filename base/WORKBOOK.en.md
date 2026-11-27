@@ -264,11 +264,11 @@ end, the card of the API's documentation.
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
 
 ### Files
-<!-- from WORKBOOK.md sha256:fc8ee636158c -->
+<!-- from WORKBOOK.md sha256:317b019d4995 -->
 From "Files" in the side menu; the whole team sees it. On the left, "Folders": the tree of the business's folders,
 which starts at "Files" (the very top), with the open folder highlighted; on a narrow screen, the tree folds into the
 "Folders" selector. On the right, "Search files…", "List" and "Grid" and, for whoever administers the business, "New
-folder" and "Upload file". Below, what the open folder holds: tapping a file opens it.
+folder" and "Upload file" (its cloud alone). Below, what the open folder holds: tapping a file opens it.
 
 #### The open folder
 <!-- from WORKBOOK.md sha256:3e9218268628 -->
@@ -821,12 +821,13 @@ In ERPlora's own business, which has no plan and buys nothing, its owner has nei
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
-<!-- from WORKBOOK.md sha256:52b15eac53e3 -->
+<!-- from WORKBOOK.md sha256:89d11e47cb24 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
-  1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
+  1. In "Finish setting up your business", they tap "Ask the assistant", its sparkles (or ask it from its
+     panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
      missing and where it is done; each step keeps its "Set up" in the list. If it names the list, it calls it as
      the Home shows it, in that person's language: "You have 4 steps left in Finish setting up your business".
@@ -1348,7 +1349,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:f4f311ae8d9b -->
+<!-- from WORKBOOK.md sha256:94ff4453084e -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1365,9 +1366,12 @@ Steps:
      done here, in Settings › Data and backups › Export, with "Template to share" or "Backup of this business", and
      what it takes: the products and the services go with their own photos inside. It does not make the file itself.
 In: the name, the language, what it is for and what is ticked.
-Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows, with the products' and
-the services' own photos inside (INVENTORY-F33); never the sales, people, PINs nor fiscal data. Nothing is kept in the
-business.
+Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows: of Inventory, the categories
+and the products, and of Services, the categories and the services, with their own photos inside (INVENTORY-F33); of
+Tables, the zones and the tables; of Modifiers, the groups, each with its options and the products (by their code) and
+categories it applies to; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
+into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
+the business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
 exported. Who does not administer the business reads "Only an administrator can export the business.". The
 administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset.
@@ -2225,12 +2229,12 @@ moment." or "Check the connection and try again.") and "Retry"; a failure never 
 Involved: BASE-F40
 
 ### BASE-F73 Upload files and make folders
-<!-- from WORKBOOK.md sha256:66add13d9bb6 -->
+<!-- from WORKBOOK.md sha256:a56840ce257f -->
 Status: done
 Actor: owner, administrator
 Screen: Files
 Steps:
-  1. In the open folder, tap "Upload file" and choose one or several, or drag them onto the manager ("Drop the files
+  1. In the open folder, tap "Upload file" (the cloud) and choose one or several, or drag them onto the manager ("Drop the files
      to upload them here"). While they upload: "Uploading 2 of 5…".
   2. "Files uploaded." shows and they appear in the folder. If there was already one with the same name, it is not
      overwritten: the new one is kept as "menu (1).pdf" and "Uploaded as “menu (1).pdf”: there was already one with that
@@ -2823,7 +2827,7 @@ shows over whatever screen is there (BASE-F97).
 Involved: BASE-F93, BASE-F97, BASE-F103, BASE-F104
 
 ### BASE-F93 Ask the assistant and read how it writes
-<!-- from WORKBOOK.md sha256:c35b194fa2da -->
+<!-- from WORKBOOK.md sha256:59c89f4cdd0b -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2865,7 +2869,8 @@ Steps:
      does not have to look them up for each question. Every date and time it says is in the business's time, the one the
      screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18. Every
      amount it says is in the currency and with the decimals the screens show: what a customer's card says is «€3.60»
-     it tells as €3.60, never as €360.00.
+     it tells as €3.60, never as €360.00. An option of a closed list it says by the name the screens give it in the
+     person's language, never by its code: of a customer just added it says she came "Walk-in", not "walk_in".
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
@@ -2954,7 +2959,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:792ca300704b -->
+<!-- from WORKBOOK.md sha256:4aed3219f25d -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3058,14 +3063,18 @@ Steps:
      offer to undo it unless asked to.
   4. What only reads (seeing the sales, looking up a customer) asks for no card; each action that changes something
      asks for its own.
-  5. Under the answer stays the receipt of each action of the turn, with the action named as on its card: "Done:
-     Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". The one
-     of a failure says the reason in one sentence: if its app refuses it, the same one its screen would give ("Not
-     done, it failed: Remove in Employees. That person is not in this business."); if what did not fit was the data
-     the assistant sent, which, with the name the card gives them ("The assistant sent data that does not fit:
-     Products."), and if it asked for a change without saying what to change, that ("The assistant did not say what
-     to change."). If the person changes language, the earlier receipts show entirely in the new one, the app's name
-     too; the reason, said in the other language, no longer shows.
+  5. Under the answer stays the receipt of each action of the turn that was put to the person, with the action named
+     as on its card: "Done: Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done,
+     not allowed: …". The one of a failure says the reason in one sentence: if its app refuses it, the same one its
+     screen would give ("Not done, it failed: Print in Sales / POS. No receipt printer takes the paper of this sale:
+     open the sale to print it on this device."); if what did not fit was the data the assistant sent (an attached file
+     heavier than the action takes), which, with the name the card gives them ("The assistant sent data that does not
+     fit: File."). What the Hub refuses before showing the card (data that do not fit, a change with nothing to
+     change, a record it cannot find) leaves no receipt, as in the assistants of Shopify or Intercom: the person was
+     asked nothing, and the assistant hears the reason and corrects it or tells them. So "Take the paella off the menu"
+     leaves only "Done: Change in Inventory", even if the assistant first tried another action with data that did not
+     fit. If the person changes language, the earlier receipts show entirely in the new one, the app's name too; the
+     reason, said in the other language, no longer shows.
 In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
 done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone; and, if its
 app declares it, the check it makes before the card, as the person: if it refuses the data (adding someone with a role
@@ -3073,8 +3082,8 @@ the business does not have, STAFF-F01), no card shows and the assistant tells it
 Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". Data the action does not take (a country or a currency that does not exist, a value
-outside its list) never reach the card: they go back to the assistant, which corrects them, and the person confirms
-only once. Neither does a change that only names its record, with no data to change (never "Change in Customers:
+outside its list) never reach the card nor leave a receipt: they go back to the assistant, which corrects them, and the
+person confirms only once. Neither does a change that only names its record, with no data to change (never "Change in Customers:
 Lucía QA" alone): the assistant hears there is nothing to change and goes on with what it was asked, with the action
 that does it, or asks what to change; if the record is not there, it hears that. "Run it" holds only for what the card
 shows: if it changes before it is tapped — the action finds another
@@ -3086,7 +3095,7 @@ the card open nothing is done, and the answer ends in "The answer was cut off." 
 Involved: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Dangerous actions: type to confirm, or not from the chat
-<!-- from WORKBOOK.md sha256:e9288e7fa947 -->
+<!-- from WORKBOOK.md sha256:a8a2d0762ade -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3111,8 +3120,9 @@ In: the risk the app declares in each action, and its data; if it declares one, 
 Out: if accepted, as in BASE-F97.
 If it fails: what was typed and does not match does not let it run; cancelling does nothing and the assistant counts
 it as cancelled. If the preview cannot be read (the record is no longer there, or the person cannot see it), no card
-shows and nothing is done: nothing is confirmed blind. The receipt says "Not done, it failed: …" or "Not done, not
-allowed: …" and the assistant tells why.
+shows and nothing is done: nothing is confirmed blind, and the assistant tells why. If the record is not there, no
+receipt is left, since the person was asked nothing (BASE-F97); if they cannot see it, the receipt says "Not done, not
+allowed: …". If it can no longer be read after "Run it" is tapped, the receipt says "Not done, it failed: …".
 Involved: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Check what the assistant says against what it really did
@@ -3230,12 +3240,13 @@ conversation that is too long says "This conversation is too long: start a new o
 Involved: BASE-F59, BASE-F60, BASE-F61
 
 ### BASE-F103 The assistant in the setup
-<!-- from WORKBOOK.md sha256:6bedff7bf9d6 -->
+<!-- from WORKBOOK.md sha256:506f16361b91 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
-  1. On the Home, while something is left, "Finish setting up your business" carries "Ask the assistant". It opens
+  1. On the Home, while something is left, "Finish setting up your business" carries "Ask the assistant", its
+     sparkles. It opens
      the panel with "Review your business's setup. Choose an option or write your question.".
   2. Opened from the bar, the empty conversation offers the same shortcuts: "What is left to set up?" and, for each
      pending step this person can do (up to four, in the list's order), "How do I set up “Your team”?", with the
@@ -3823,7 +3834,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 See the help of the screen in view
-<!-- from WORKBOOK.md sha256:c36cfdd53265 -->
+<!-- from WORKBOOK.md sha256:f68e5101166a -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: the top bar of a module whose help is ready or of a screen of the Hub ("?" button, "Help") and the help window
@@ -3852,7 +3863,7 @@ Steps:
      capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again.
   6. "Other screens" brings the other tabs of the module, or the other screens of the Hub the person can see, folded,
      each with its short summary. A link of the help to a screen of the Hub goes there and closes the help.
-  7. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: "How
+  7. "Ask the assistant", the sparkles at the foot, closes the help and opens the assistant with the question written, without sending it: "How
      do I do this: <task>?" about the last task opened or, if none was opened, "How do I use <module> on <screen>?";
      if something was already written, the question goes below it. "Close" closes the help.
 In: the module, or the screen of the Hub, and the tab the person is on.

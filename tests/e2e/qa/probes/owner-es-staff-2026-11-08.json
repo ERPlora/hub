@@ -1,6 +1,7 @@
 {
   "$schema": "../probes.schema.json",
   "probes": [
+    {"id":"owner.es.staff.account.list","app":"staff","tool":"staff.account.list","role":"owner","language":"es","phrase":"¿con qué usuario del negocio puedo vincular la ficha de Personal QA?","expect":"read"},
     {"id":"owner.es.staff.availability.for_member","app":"staff","tool":"staff.availability.for_member","role":"owner","language":"es","phrase":"dime cuándo puede trabajar Personal QA la semana del 16 de noviembre, descontando sus ausencias aprobadas","expect":"read"},
     {"id":"owner.es.staff.commission.report","app":"staff","tool":"staff.commission.report","role":"owner","language":"es","phrase":"calcula las ventas y comisiones de cada profesional durante este mes, también las de Personal QA","expect":"read"},
     {"id":"owner.es.staff.commission.summary","app":"staff","tool":"staff.commission.summary","role":"owner","language":"es","phrase":"¿qué porcentaje de comisión tiene cada persona del equipo y qué usuario tiene vinculado?","expect":"read"},

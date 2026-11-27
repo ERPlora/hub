@@ -136,12 +136,13 @@ cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
 
 - **Catálogo**: la tira de categorías de Inventario con su número de artículos, agotados incluidos
   («Todos» primero y, con Servicios, «Servicios» detrás; las demás, en la posición que les dio el negocio
-  y, a igual posición, por nombre: INVENTORY-F08), la lupa que abre el buscador («Buscar
-  producto…», por nombre o SKU; con Servicios busca también sus servicios), la tecla del micrófono («Hablar») y la
-  rejilla: artículos con sus iniciales, su unidad y su precio (lo agotado, en gris con «Agotado»), y al
-  final la baldosa «Precio libre». En «Servicios», cada servicio con sus iniciales, su duración y su
-  precio («Desde», «Por hora», «Variable» o «Gratis» si no es de precio fijo). Con muchos artículos,
-  «Cargar más», al final de la rejilla, trae los siguientes.
+  y, a igual posición, por nombre: INVENTORY-F08; cada una con su nombre entero, en dos líneas si es muy
+  largo; si no caben todas, la tira se desliza y, desde que se abre, difumina el borde que esconde más),
+  la lupa que abre el buscador («Buscar producto…», por nombre o SKU; con Servicios busca también sus
+  servicios), la tecla del micrófono («Hablar») y la rejilla: artículos con sus iniciales, su unidad y su
+  precio (lo agotado, en gris con «Agotado»), y al final la baldosa «Precio libre». En «Servicios», cada
+  servicio con sus iniciales, su duración y su precio («Desde», «Por hora», «Variable» o «Gratis» si no es
+  de precio fijo). Con muchos artículos, «Cargar más», al final de la rejilla, trae los siguientes.
 - **Cuenta** (en el móvil, un cajón que abre el botón flotante con el total): arriba, el botón de
   pausa «Aparcar esta cuenta», el de cliente («Asignar cliente» o su nombre), «Cuentas abiertas» con
   su número, y «Cerrar» en el móvil; el título editable («Cuenta nueva») y los chips de cliente,
@@ -758,8 +759,8 @@ Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesió
 de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
-La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía o, si su
-cuenta no tiene nombre, lo que va antes de la @ de su correo, nunca el correo entero (BASE-F119). En
+La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía o, si no
+tiene ningún nombre, lo que va antes de la @ de su correo, nunca el correo entero (BASE-F119). En
 Mesas, la ventana de la mesa y el plano dicen que la atiende esa persona (TABLE-F09).
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido cambiar quién atiende la cuenta. Se queda con quien la atendía.»;
@@ -1390,8 +1391,10 @@ Vertical: peluquería
 Actor: empleado, responsable
 Pantalla: Vender
 Pasos:
-1. Con Servicios activa y «Mostrar servicios en el TPV» encendido, toca «Servicios» en la tira de
-   categorías (o búscalo con la lupa).
+1. Con Servicios activa y «Mostrar servicios en el TPV» encendido, los servicios salen en «Todos», tras los
+   menús y delante de los artículos (su número cuenta los dos: «13 artículos»), y solos en «Servicios». Toca
+   el servicio en cualquiera de las dos, o búscalo por su nombre con la lupa; si la lupa no encuentra ni
+   artículos ni servicios, dice «Ningún producto ni servicio coincide con la búsqueda.».
 2. Toca el servicio: entra como línea con su precio. Si no es de precio fijo («Desde», «Por hora»,
    «Variable», «Gratis»), se abre «Importe de Mechas» con su precio como sugerencia: marca el
    importe y pulsa «Añadir 45,00 €».
@@ -1419,7 +1422,8 @@ la cuenta no se cobra: el pie dice el motivo, con el nombre de la categoría y d
 archivado, «Ese servicio ya no se ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese
 importe está fuera de lo que admite el servicio (30,00 € – 80,00 €).». Un precio reservado que no casa con
 la cita: «Ese no es el precio que reservó la cita para este servicio: está cancelada, es de otra clienta, no
-reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Servicios» no sale en la tira.
+reservó este servicio o lo reservó más barato.». Sin Servicios activa, «Servicios» no sale en la tira y «Todos»
+enseña y cuenta solo los artículos de Inventario.
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Cobrar con lo que añade otra app (la propina)

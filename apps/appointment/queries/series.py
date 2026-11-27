@@ -11,7 +11,8 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.appointment import engine
-from apps.appointment.models import Appointment, Recurring
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring
 from apps.appointment.schemas.series import RecurringDetailOut, RecurringGetIn, RecurringListIn, RecurringPage
 from base.ordering import list_order_for
 from base.text_search import contains_text

@@ -12,6 +12,8 @@ from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.meta import Help, LiveAppConfig, all_live_app_configs
 
+from base.allergens import ALLERGENS
+
 #: Where an app is said to go, beside its name: out of the menu turns it off, into it or in it turns it on.
 OUT_OF_THE_MENU = ("del menu", "from the menu", "out of the menu", "off the menu")
 INTO_THE_MENU = (
@@ -53,6 +55,8 @@ class BaseConfig(LiveAppConfig):
     kind = "platform"
     verbose_name = _("Base")
     default_auto_field = "django.db.models.BigAutoField"
+    # The fourteen allergens live in the platform: an answer of any app names them by these (``base.allergens.NAMED``).
+    choices = {"allergens": ALLERGENS}
     # Everyone of the hub sees the Home; whoever runs the hub is also told its platform steps and the failed events.
     # Everyone sees and opens the files; whoever runs the hub uploads, renames and deletes them.
     # «Manage on erplora.com» at the menu's foot: the owner, an administrator and a manager open this business on

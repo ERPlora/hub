@@ -6,7 +6,7 @@ from live.errors import PermissionDenied
 from live.models import OutboxEvent
 from live.outbox import channel_for
 
-from apps.appointment.models import Settings as Rules
+from apps.appointment.models.settings import Settings as Rules
 from apps.online_booking.models import Settings
 from base.tenancy.context import use_hub
 

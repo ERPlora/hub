@@ -161,7 +161,7 @@ debajo, cada otro dato con el icono de su columna delante, sin repetir el destin
 perfil puede hacer y se esconden las que el estado no admite. Tocar una fila abre su detalle: los
 platos con la alergia del cliente, su menú, sus suplementos, su estación y su estado. «Nueva comanda» abre el panel
 (a pantalla completa en el móvil) con Tipo, Destino, Notas y sus platos (producto del catálogo, cantidad y nota;
-«Añadir plato»), y «Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
+«Añadir plato», su +), y «Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
 tabla con reintento; un rechazo de una acción sale en su diálogo o encima de la tabla, y uno del alta,
 dentro del panel.
 
@@ -350,7 +350,7 @@ Pasos:
    que envía Ventas sola llega a Cocina un momento después, sin que nadie haga nada.
 2. Cocina abre una comanda con el número del día (`AAAAMMDD-NNNN`, el día del negocio, en su
    zona horaria), la ronda de la cuenta, la etiqueta de la cuenta («Mesa 4»), el tipo, la prioridad y el
-   camarero: su nombre o, si su cuenta no tiene, lo que va antes de la @ de su correo, nunca el correo
+   camarero: su nombre o, si no tiene ninguno, lo que va antes de la @ de su correo, nunca el correo
    entero (BASE-F119); una comanda guardada antes con el correo también se lee así.
 3. Cada línea que no es un servicio es un plato, en el orden de la cuenta, mandado a su estación
    (KITCHEN-F04); un menú, un plato por cada plato elegido (KITCHEN-F06). Las líneas de servicio no se
@@ -1049,9 +1049,9 @@ que no tiene ningún papel: solo el sistema (`*`).
   antes del cierre pasa a Servida; la de papel o con la cocina en papel desde antes del cierre, a
   Servida con sus platos).
 - **Quién envió y quién hizo cada cosa** (BASE-F119): la comanda guarda el camarero como texto y el Historial el
-  usuario de quien actúa, que se nombra al leer; los dos salen de `person_label` de Ventas
-  (`apps/sale/queries/people.py`), que da el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo
-  (`without_address` de `base.queries.people`): el correo de un compañero solo llega a quien ve el contacto del
+  usuario de quien actúa, que se nombra al leer; los dos salen de `actor_name` de `base.queries.people` (al leer, por
+  `person_names` de Ventas, `apps/sale/queries/people.py`), que da el nombre de Mi perfil o el de la cuenta o, sin
+  ninguno, lo que va antes de la @ de su correo: el correo de un compañero solo llega a quien ve el contacto del
   equipo, y la comanda en papel la lee cualquiera. Una comanda guardada antes con un correo se lee sin él en la vista
   de la comanda (`queries/views.py`: tablero, detalle, por cuenta, avisos, vivo y asistente) y en su papel
   (`services/paper.py`, la reimpresión), para todos: el nombre de quien la envió no es un dato de contacto.

@@ -24,7 +24,8 @@ from live.context import system_context
 from live.errors import OperationError
 from live.operations import atomic, get
 
-from apps.appointment.models import Appointment, Recurring
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring
 from apps.customer.models import Customer
 from apps.customer.tests.conftest import card_protected, reads, writes
 from apps.staff.models import Member

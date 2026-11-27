@@ -391,11 +391,9 @@ def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_say
     with translation.override("es"):
         plan = turn(call("invoice.invoice.rectify", {"number": rect.number, "reason": REASON}))
         why = str(queries.rectifying.CANNOT_RECTIFY_RECTIFICATION)
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
-        ("invoice.invoice.rectify", "error", "invoice.cannot_rectify_rectification")
-    ]
-    assert json.loads(plan["append"][0]["content"])["error"]["message"] == why
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    error = json.loads(plan["append"][0]["content"])["error"]
+    assert (error["code"], error["message"]) == ("invoice.cannot_rectify_rectification", why)
     assert rectifications().count() == 1
 
 
@@ -733,10 +731,7 @@ def test_a_series_with_a_code_of_another_shape_gets_no_card_and_the_model_hears_
     with translation.override("es"):
         plan = turn(call("invoice.series.create", wrong))
         why = str(schemas.series.SERIES_CODE_INVALID)
-    assert plan["confirm"] is None
-    assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
-        ("invoice.series.create", "error", "invalid_payload")
-    ]
+    assert (plan["confirm"], plan["executed"]) == (None, [])
     error = json.loads(plan["append"][0]["content"])["error"]
     assert (error["code"], set(error["fields"])) == ("invalid_payload", {"code"})
     assert error["fields"]["code"].endswith(why)
