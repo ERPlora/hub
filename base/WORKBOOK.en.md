@@ -1997,7 +1997,7 @@ try again.".
 Involved: BASE-F55, BASE-F56
 
 ### BASE-F61 Sign out
-<!-- from WORKBOOK.md sha256:0a4ca1b69bbc -->
+<!-- from WORKBOOK.md sha256:d69a01ec88f0 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: The user menu
@@ -2008,6 +2008,8 @@ Steps:
   3. On a till with the PIN pad it goes back to **Access**, ready for the next person. On another device, erplora.com
      asks "Sign out of erplora.com?": "Sign out" ends it too and erplora.com asks to sign in again; "Stay signed in"
      leaves it open and shows the account's businesses.
+  4. If they ask the assistant ("sign me out on this tablet"), it tells them to close it with "Sign out" on the
+     user card: no tool closes the session, and removing the device (BASE-F70) is for a lost one.
 In: the session.
 Out: the session closed in the business; erplora.com's, only if the person confirms it.
 If it fails: if the business does not answer, the session expires by itself.
@@ -2197,7 +2199,7 @@ a shorter one and save again.".
 Involved: BASE-F68
 
 ### BASE-F70 Remove a device that was lost
-<!-- from WORKBOOK.md sha256:f2438077c242 -->
+<!-- from WORKBOOK.md sha256:8c7769592960 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · General
@@ -2210,7 +2212,9 @@ Steps:
      If it was theirs, they leave the business.
   4. From the assistant ("remove the phone I lost this afternoon"), the card asks to type CONFIRM and,
      under "What will happen", says when it was last used ("Last used: Nov 22, 2026, 4:18 PM"): two devices
-     without a name are called the same ("Chrome · Linux") and only their last use tells them apart.
+     without a name are called the same ("Chrome · Linux") and only their last use tells them apart. If it is the
+     one they are using, it warns as the screen does: "It is the device you are using: removing it will close your
+     session and you will have to enter again.".
 In: the device.
 Out: the device forgotten and its sessions ended: the device is cut off, not the person, who can enter on it
 again with their account.
