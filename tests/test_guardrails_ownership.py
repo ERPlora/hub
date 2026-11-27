@@ -235,9 +235,11 @@ def local_names(tree: ast.Module, path: PurePosixPath, models: dict[str, str]) -
 
 
 def _from_models_of(node: ast.ImportFrom, app: str, path: PurePosixPath) -> bool:
+    """Whether the import is from the app's models: its ``models.py`` or a module of its ``models/`` package."""
+    module = (node.module or "").split(".")
     if node.level == 0:
-        return node.module == f"apps.{app}.models"
-    return node.module == "models" and path.parts[:2] == ("apps", app)
+        return module[:3] == ["apps", app, "models"]
+    return module[0] == "models" and path.parts[:2] == ("apps", app)
 
 
 class _Reads(ast.NodeVisitor):
@@ -344,13 +346,15 @@ def test_a_read_under_another_name_in_another_apps_queries_file_is_caught(tmp_pa
 def test_a_planted_read_of_an_appointment_or_a_series_is_caught_with_the_real_declaration(tmp_path):
     declared = (REPO / "apps/appointment/queries/ownership.py").read_text(encoding="utf-8")
     peek = (
-        "from apps.appointment.models import Appointment, Recurring\n\n\n"
+        "from apps.appointment.models.appointments import Appointment\n"
+        "from apps.appointment.models.series import Recurring\n\n\n"
         "def peek():\n    return Appointment.objects.all()\n\n\n"
         "def peek_series():\n    return Recurring.objects.all()\n"
     )
-    inbox = "apps/online_booking/queries/bookings.py"
-    root = tree_with(tmp_path, {"apps/appointment/queries/ownership.py": declared, inbox: peek})
-    assert unscoped_reads(root) == {(inbox, "peek"), (inbox, "peek_series")}
+    relative = "from ..models.series import Recurring\n\n\ndef peek():\n    return Recurring.objects.all()\n"
+    inbox, own = "apps/online_booking/queries/bookings.py", "apps/appointment/queries/peek.py"
+    root = tree_with(tmp_path, {"apps/appointment/queries/ownership.py": declared, inbox: peek, own: relative})
+    assert unscoped_reads(root) == {(inbox, "peek"), (inbox, "peek_series"), (own, "peek")}
 
 
 def test_a_planted_read_of_an_invoice_is_caught(tmp_path):

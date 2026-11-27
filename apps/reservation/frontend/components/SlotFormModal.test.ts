@@ -54,7 +54,7 @@ describe('SlotFormModal', () => {
     expect([s.field('start_time').value, s.field('end_time').value]).toEqual([expect.stringMatching(/^08:00\sPM$/), expect.stringMatching(/^11:30\sPM$/)]);
   });
 
-  it('puts an overlap under «From», and speaks Spanish', async () => {
+  it('puts an overlap once, under «From», and speaks Spanish', async () => {
     const s = await setup('es');
     expect(s.submit().textContent).toContain('Crear franja');
     await pick(s.field('start_time'), '15:00');
@@ -63,6 +63,7 @@ describe('SlotFormModal', () => {
     s.answer(409, { error: { code: 'reservation.slot_overlaps', message, fields: { start_time: message } } });
     await click(s.submit());
     expect(s.field('start_time').errorText).toBe(message);
+    expect(s.inDoc('reservation-slot-form-error')).toBeNull();
   });
 });
 

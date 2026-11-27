@@ -94,6 +94,13 @@ describe('ConfigPage', () => {
     expect(notYet.find('verifactu-config-expiry').exists()).toBe(false);
   });
 
+  it('says the days left in the singular or the plural', async () => {
+    const left = async (days: number) =>
+      (await ownTab({ own_certificate: { ...LOADED, expires_in_days: days, expires_soon: true } })).find('verifactu-config-expiry').text();
+    expect(await left(1)).toBe('Expires in 1 day: upload the renewed one here.');
+    expect(await left(2)).toBe('Expires in 2 days: upload the renewed one here.');
+  });
+
   it('says whether the AEAT test environment accepted it, and why it refused it', async () => {
     const untested = await ownTab({ own_certificate: { ...LOADED, aeat_proof: 'untested' } });
     expect(untested.find('verifactu-config-cert-proof').text()).toBe('Not tested yet');

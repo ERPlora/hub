@@ -89,7 +89,8 @@ def _read_problems(op: Operation, read: Operation) -> list[str]:
 
 @checks.register("base")
 def check_checks(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
-    """``base.E012``: a write's check (``check_of``) names a read of its own app whose input the write also takes."""
+    """``base.E012``: a write's check (``check_of``) names a read, or several in order, of its own app whose input the
+    write also takes."""
     errors: list[checks.CheckMessage] = []
     for op in registry.values():
         declared = check_of(op)
@@ -98,8 +99,8 @@ def check_checks(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
             errors.append(
                 checks.Error(
                     f"{op.name} declares a check that {'; '.join(problems)}.",
-                    hint='Declare ai={"check": "<app>.<entity>.<a query>"} with a read of its own app whose input the '
-                    "write also takes.",
+                    hint='Declare ai={"check": "<app>.<entity>.<a query>"} (or a tuple of them) with reads of its own app '
+                    "whose input the write also takes.",
                     obj=op.name,
                     id="base.E012",
                 )
@@ -108,12 +109,14 @@ def check_checks(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
 
 
 def _check_problems(op: Operation, declared: Any) -> list[str]:
-    if not isinstance(declared, str):
+    names = (declared,) if isinstance(declared, str) else declared
+    if not isinstance(names, tuple | list) or not names or not all(isinstance(name, str) for name in names):
         return ["is not the name of a read"]
-    read = registry.get(declared)
-    if read is None:
-        return [f"names no operation {declared}"]
-    return _read_problems(op, read)
+    problems: list[str] = []
+    for name in names:
+        read = registry.get(name)
+        problems += [f"names no operation {name}"] if read is None else _read_problems(op, read)
+    return problems
 
 
 @checks.register("base")

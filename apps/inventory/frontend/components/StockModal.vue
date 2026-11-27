@@ -127,6 +127,7 @@ const canDismiss = useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qt
     :pending="pending"
     :error="error"
     :submit-disabled="!ready || waitsForMoney"
+    :submit-hint="needs"
     @submit="save"
   >
     <div class="stock-form">
@@ -182,13 +183,6 @@ const canDismiss = useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qt
         :class="{ 'ion-invalid': !!fields.reason, 'ion-touched': !!fields.reason }"
         @update:model-value="reason = $event === null || $event === undefined ? '' : String($event)"
       />
-      <p
-        v-if="needs"
-        class="stock-form__needs"
-        data-testid="inventory-stock-needs"
-      >
-        {{ needs }}
-      </p>
     </div>
   </FormModal>
 </template>
@@ -197,12 +191,5 @@ const canDismiss = useUnsavedFormOnOpen('inventory-stock-form', () => ({ qty: qt
 .stock-form {
   display: grid;
   gap: 16px;
-}
-
-.stock-form__needs {
-  margin: 0;
-  text-align: center;
-  font-size: 0.85rem;
-  color: var(--ion-color-medium-shade, var(--ion-color-medium));
 }
 </style>

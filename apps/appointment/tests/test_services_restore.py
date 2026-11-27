@@ -15,7 +15,9 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
-from apps.appointment.models import Appointment, Counter, History, Recurring
+from apps.appointment.models.appointments import Appointment, History
+from apps.appointment.models.numbering import Counter
+from apps.appointment.models.series import Recurring
 from apps.customer.models import Customer
 from apps.service.models.catalog import Service
 from apps.staff.models import Member

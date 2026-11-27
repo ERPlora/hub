@@ -72,7 +72,7 @@ test('TAX-F04/F07: a rule is created, an overlapping one is refused on «Valid f
   const validFrom = dialog.locator('[data-testid=tax-rule-form-valid_from]');
   await expect(validFrom).toHaveClass(/ion-invalid/);
   await expect(validFrom.locator('.error-text')).toContainText(/overlaps another active rule|Se solapa con otra regla/);
-  await expect(dialog.locator('[data-testid=tax-rule-form-error]')).toBeVisible();
+  await expect(dialog.locator('[data-testid=tax-rule-form-error]')).toBeHidden();
   await page.screenshot({ path: shot('tax-rules-overlap-409-1280') });
   // «Cancel» asks before losing the refused rule (BASE-F05): the person discards it.
   await dialog.locator('[data-testid=tax-rule-form-cancel]').click();

@@ -76,8 +76,7 @@ def test_a_copy_no_longer_attached_loads_nothing_and_the_model_hears_why(owner):
     assert plan["confirm"] is None
     told = json.loads(plan["append"][0]["content"])["error"]
     assert told["code"] == "base.assistant_attachment_missing"
-    # Its receipt says why, as the person reads it.
-    [receipt] = plan["executed"]
-    assert (receipt["outcome"], receipt["code"]) == ("error", "base.assistant_attachment_missing")
-    assert NAME in receipt["reason"]["es"]
+    assert NAME in told["message"]
+    # Refused before its card: the person was never asked, so no receipt; the model tells them to attach it again.
+    assert plan["executed"] == []
     assert not ImportBatch.objects.exists()

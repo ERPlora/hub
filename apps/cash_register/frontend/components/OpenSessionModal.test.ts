@@ -78,7 +78,7 @@ describe('OpenSessionModal', () => {
     expect(prop(s.inDoc('cash-register-open-balance'), 'errorText')).toBe('This is not an amount. Type a figure, for example 12.50.');
   });
 
-  it('the server’s refusal is read in the window and at its field', async () => {
+  it('the server’s refusal is read once, at its field', async () => {
     const s = await setup();
     s.answer(409, {
       error: {
@@ -88,8 +88,8 @@ describe('OpenSessionModal', () => {
       },
     });
     await s.submit();
-    expect(s.inDoc('cash-register-open-error')?.textContent).toContain('This business requires an opening float');
     expect(prop(s.inDoc('cash-register-open-balance'), 'errorText')).toContain('This business requires an opening float');
+    expect(s.inDoc('cash-register-open-error')).toBeNull();
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 

@@ -190,14 +190,15 @@ onMounted(load);
       <p class="ion-text-center ion-margin-top">
         <ion-button
           data-testid="invoice-public-print"
+          :aria-label="$t('invoice.detail.print')"
+          :title="$t('invoice.detail.print')"
           :disabled="printing"
           @click="print"
         >
           <HubIcon
-            slot="start"
-            name="ion:download-outline"
+            slot="icon-only"
+            name="ion:receipt-outline"
           />
-          {{ $t('invoice.detail.print') }}
         </ion-button>
       </p>
       <div hidden>

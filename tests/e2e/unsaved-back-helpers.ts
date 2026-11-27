@@ -75,6 +75,7 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await add();
     await expect(form).toBeVisible();
+    await item.prepare?.(form);
     await field.fill(value);
     await pressBack(page);
     const asked = question(page);
@@ -94,6 +95,7 @@ export async function expectBackAsksOnDirtyForm(page: Page, item: UnsavedFormCas
 
     await add();
     await expect(form).toBeVisible();
+    await item.prepare?.(form);
     await expect(field).toHaveValue('');
     await pressBack(page);
     await expect(form).toBeHidden();
