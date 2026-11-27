@@ -63,11 +63,11 @@ describe('StepNode', () => {
     expect(s.emitted()).toEqual([{ id: 's1', kind: 'condition', when: { 'input.total': { gt: 2 } } }]);
   });
 
-  it('«Do something» chooses the action from this business’s, in words', async () => {
+  it('«Do something» chooses the action from this business’s, in words with its app', async () => {
     const s = await setup({ id: 's1', kind: 'command', operation: '', params: {} });
     expect(s.find('flow-step-open-s1').text()).toBe('Choose what this step does');
     const combo = s.wrapper.findComponent(Combo);
-    expect(combo.props('options')).toEqual([{ id: 'task.task.create', label: 'Create a task', hint: 'Tasks · task.task.create' }]);
+    expect(combo.props('options')).toEqual([{ id: 'task.task.create', label: 'Create a task', hint: 'Tasks' }]);
     combo.vm.$emit('update:modelValue', { id: 'task.task.create', label: 'Create a task' });
     expect(s.emitted()).toEqual([{ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: '' } }]);
   });
@@ -96,6 +96,11 @@ describe('StepNode', () => {
     expect(priority.props('helper')).toBe('low, medium, high, urgent');
     await click(s.find('flow-step-unparam-s1-priority').element);
     expect(s.emitted().at(-1)).toEqual({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Hi' } });
+  });
+
+  it('«Look something up» offers only the reads, in words with their app (hub#2599)', async () => {
+    const s = await setup({ id: 's1', kind: 'query', operation: '', params: {}, result: 'first' });
+    expect(s.wrapper.findComponent(Combo).props('options')).toEqual([{ id: 'customer.customer.detail', label: 'Read a customer', hint: 'Customers' }]);
   });
 
   it('«Look something up» chooses a read and what to keep', async () => {
