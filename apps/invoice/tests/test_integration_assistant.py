@@ -186,7 +186,7 @@ def test_the_preview_runs_by_itself_and_tells_the_model_the_invoice_that_would_b
         REASON,
         f"RECT-{today.year}-000001",
     )
-    assert (told["base_amount"], told["tax_amount"], told["total_amount"]) == ("-100.00 EUR", "-21.00 EUR", "-121.00 EUR")
+    assert (told["base_amount"], told["tax_amount"], told["total_amount"]) == ("-100,00\xa0€", "-21,00\xa0€", "-121,00\xa0€")
     assert Invoice.objects.get(pk=original.id).status == "issued"
     assert not rectifications().exists()
     assert not InvoiceSeries.objects.filter(code="RECT").exists()
