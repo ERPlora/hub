@@ -21,7 +21,9 @@ from apps.table.services.writes import (
     _bring_order,
     _event,
     _open_session,
+    _parked_holding,
     _release,
+    _reseat,
     _seat_at,
     _seatable_table,
     _seating_holds,
@@ -65,7 +67,8 @@ def _put_customer(ctx: OperationContext, order_id: UUID, customer_id: UUID | Non
         "description": "Seat a party at a free or reserved table («seat 3 at table 4»): its check opens in Sales titled "
         "with the table. Use this, not sale.order.open, whenever people sit at a table: that one opens a check no "
         "table holds. Without guests, the reservation's or the table's seats. Optionally bring an open check of Sales "
-        "to the table (its order_id, from sale.order.list), and put a customer (by name or phone) on the check.",
+        "to the table (its order_id, from sale.order.list), and put a customer (by name or phone) on the check. A "
+        "parked check of Sales brought here sits again as it was, with its guests, waiter and opening time.",
         "risk": "normal",
         # Done by the waiter with the party in front, never by an automation (TABLE-F10).
         "in_person": True,
@@ -84,6 +87,8 @@ def _put_customer(ctx: OperationContext, order_id: UUID, customer_id: UUID | Non
     },
 )
 def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
+    if data.order_id is not None and (parked := _parked_holding(data.order_id)) is not None:
+        return _reseat(ctx, parked, data)
     now = timezone.now()
     table = _seatable_table(data.table_id, data.table, data.zone, now)
     hold = _seating_holds(table, now, data.reservation_id).filter(party_size__gt=0).order_by("held_from", "id").first()
