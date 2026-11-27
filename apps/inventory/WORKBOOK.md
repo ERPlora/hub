@@ -222,7 +222,7 @@ un movimiento no se edita ni se borra. Busca por producto, SKU o número de tiqu
 
 #### Detalle
 Tabla de solo lectura: Fecha, Nombre, SKU, Tipo («Inicial», «Recepción», «Venta», «Anulación»,
-«Recuento», «Descuento», «Devolución»), Cantidad (con signo), Saldo, Motivo y Referencia (en una venta, el número
+«Recuento», «Baja», «Devolución»), Cantidad (con signo), Saldo, Motivo y Referencia (en una venta, el número
 de su tique, su factura o la propia venta). Buscador por producto, SKU, referencia o número de
 tique; filtros por Tipo y por Referencia; más recientes primero; 50 por página.
 
@@ -722,10 +722,10 @@ Pasos:
    tarjeta de confirmación con el producto, la cantidad y el motivo. Contada en el mismo mensaje que un
    recuento («se han roto tres botellas de agua y he contado los refrescos: quedan 40»), la rotura se da
    de baja igual y el recuento es solo de lo contado: un recuento nunca apunta una rotura.
-3. En **Movimientos** sale «Descuento» con la cantidad en negativo y el motivo.
+3. En **Movimientos** sale «Baja» con la cantidad en negativo y el motivo.
 Entra: el producto, la cantidad (en el escalón de su unidad) y el motivo. También se puede pedir
 por la API.
-Sale: el stock baja y queda el movimiento «Descuento»; Inventario avisa de que el stock cambió y,
+Sale: el stock baja y queda el movimiento «Baja»; Inventario avisa de que el stock cambió y,
 si cruza el umbral, del cruce (INVENTORY-F18). Lo pueden pedir el responsable y el administrador.
 Si falla: si no hay bastante y «Permitir vender sin stock» está apagado, «No hay stock suficiente
 para completar la operación.». Un producto que no existe: «Este producto no existe en este hub.».
