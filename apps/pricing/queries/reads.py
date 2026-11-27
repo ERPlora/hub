@@ -10,6 +10,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict, NotFound
 
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
+from base.text_search import contains_text
 
 #: Candidates named when a text matches several.
 MAX_CANDIDATES = 5
@@ -29,7 +30,7 @@ def _page(rows: QuerySet, params, to_row) -> dict:
 def _named(rows: QuerySet, said: str, *, missing, missing_code: str, ambiguous, ambiguous_code: str):  # noqa: PLR0913
     """The one row whose code or name is ``said`` (any case), else the one whose name holds it."""
     text = said.strip()
-    for lookup in (Q(code__iexact=text), Q(name__iexact=text), Q(name__icontains=text) | Q(code__icontains=text)):
+    for lookup in (Q(code__iexact=text), Q(name__iexact=text), contains_text(text, "name", "code")):
         candidates = list(rows.filter(lookup).order_by(Lower("code"), "id")[: MAX_CANDIDATES + 1])
         if len(candidates) == 1:
             return candidates[0]

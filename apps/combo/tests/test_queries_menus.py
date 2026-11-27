@@ -101,3 +101,11 @@ def test_a_menu_with_its_courses_and_choices_in_order():
         ("Salad", "SAL", 650, -50, "offered"),
     ]
     assert detail.sellable is True and detail.blockers == []
+
+
+def test_the_list_finds_a_menu_typed_without_its_accents():
+    day = make_combo("Menú del día QA", kitchen_name="MENÚ DÍA")
+    make_combo("Kids menu")
+    assert [r.id for r in run("combo.combo.list", {"search": "menu del dia"}).rows] == [day.id]
+    assert [r.id for r in run("combo.combo.list", {"search": "menu dia"}).rows] == [day.id]
+    assert [r.id for r in run("combo.combo.list", {"name": "MENU DEL DÍA"}).rows] == [day.id]

@@ -127,8 +127,8 @@ una acción de fila sale como aviso encima de la tabla.
 
 #### Ficha de factura
 Se abre desde una fila de **Facturas** (`/invoice/invoices/<id>`). Arriba, «Factura {número}» con la
-etiqueta de estado y los botones «Imprimir / PDF», «Descargar PDF», «Enviar por correo» (para quien emite facturas) y
-«← Volver». Si el último correo no salió, el aviso «La factura no se ha enviado por correo» y por qué. Si es una factura completa o una
+etiqueta de estado y los botones de solo icono «Imprimir / PDF», «Descargar PDF» y «Enviar por correo» (este, para
+quien emite facturas; cada uno dice su nombre al pasar el ratón) y «← Volver». Si el último correo no salió, el aviso «La factura no se ha enviado por correo» y por qué. Si es una factura completa o una
 rectificativa de una factura completa sin NIF del cliente, el aviso «Esta factura no tiene el NIF del
 cliente: la impresora de tiques no puede sacarla como factura completa.». Debajo, «Tipo», «Serie»,
 «Fecha de emisión», «Fecha de operación» (si es otra), «Vencimiento» (si lo tiene), «Cliente», «NIF cliente», «Dirección», «Emisor»,
@@ -784,7 +784,9 @@ aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora n
 se descarga: la API y el asistente dicen «Factura no encontrada.». Pedida al asistente, solo se hace si una impresora
 del sistema la recibe; si no, su recibo dice «No se hizo, falló: Imprimir en Facturación.» con el motivo, «Ninguna
 impresora del sistema recibe esta factura: ábrela para imprimirla o guardarla en PDF.» o, si no se puede leer su
-registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.».
+registro, «No se pudo leer su registro de VeriFactu, y una factura nunca se imprime sin su QR.». Si la impresora la
+recibe pero ningún dispositivo encendido imprime su cola, el asistente dice que queda en la cola de esa impresora y que
+saldrá cuando un dispositivo dado de alta la imprima, nunca que la ha impreso.
 Implicados: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (el archivo fiscal de una baja guarda este A4 en PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Marcar una factura como pagada
@@ -949,8 +951,8 @@ Pasos:
 5. Lo mismo se puede pedir al asistente («descárgame el PDF de la FACT-2026-000003»): el fichero queda bajo su
    respuesta, con «Descargar» y su nombre.
 Entra: la factura, sus líneas y, con VeriFactu, el QR de su registro.
-Sale: el fichero; la factura no cambia y el fichero no se guarda en el Hub. Mientras se hace, el botón dice
-«Preparando…».
+Sale: el fichero; la factura no cambia y el fichero no se guarda en el Hub. Mientras se hace, el botón da vueltas y
+se llama «Preparando…».
 Si falla: un aviso dice «No se ha podido descargar el PDF» y por qué, y se puede volver a pulsar. Si no se puede leer el
 registro de VeriFactu de una factura que lo tiene, «No se pudo leer su registro de VeriFactu, y una factura nunca se
 imprime sin su QR.»; si el servidor no puede hacerlo, «El PDF no se puede hacer ahora mismo. Inténtalo más tarde.». La
