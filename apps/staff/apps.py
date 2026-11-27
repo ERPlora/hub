@@ -22,6 +22,14 @@ BY_ROLE_EVENTS = [*ROLE_ALL, *MEMBER_ALL]
 class StaffConfig(LiveAppConfig):
     name = "apps.staff"
     label = "staff"
+    blueprint_stays = {
+        "Role": "pending",
+        "Member": "people",
+        "Schedule": "people",
+        "ScheduleDay": "people",
+        "TimeOff": "people",
+        "StaffSettings": "settings",
+    }
     kind = "app"
     verbose_name = _("Staff")
     icon = "ion:id-card-outline"

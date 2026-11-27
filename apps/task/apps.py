@@ -7,6 +7,12 @@ from live.meta import Category, Help, LiveAppConfig, Nav
 class TaskConfig(LiveAppConfig):
     name = "apps.task"
     label = "task"
+    blueprint_stays = {
+        "Project": "pending",
+        "Task": "pending",
+        "Comment": "history",
+        "TaskCounter": "internal",
+    }
     kind = "app"
     verbose_name = _("Tasks")
     # Registered in the shell (ION_ICONS).

@@ -9,6 +9,13 @@ from live.meta import Category, Help, LiveAppConfig, Nav
 class ReservationConfig(LiveAppConfig):
     name = "apps.reservation"
     label = "reservation"
+    blueprint_stays = {
+        "Settings": "settings",
+        "TimeSlot": "pending",
+        "BlockedDate": "pending",
+        "Reservation": "history",
+        "WaitlistEntry": "history",
+    }
     kind = "app"
     verbose_name = _("Reservations")
     # Registered in the shell (ION_ICONS); a restaurant table of its own waits in UI-REQUESTS.md.

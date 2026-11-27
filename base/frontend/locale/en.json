@@ -381,6 +381,7 @@
         "colApp": "App",
         "colData": "Data",
         "nothingToCopy": "Nothing of its own to copy",
+        "dataStays": "Its data does not travel in the file",
         "onlyBackup": "Only in a backup",
         "tablesOf": "Data of {app}",
         "selectAll": "Select all",

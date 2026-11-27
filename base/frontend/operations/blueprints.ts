@@ -134,8 +134,10 @@ export interface DatasetCount extends BlueprintPart {
 
 export interface AppDatasets extends BlueprintApp {
   icon: string;
-  /** Empty: the app travels, with nothing of its own to copy. */
+  /** Empty: the app travels without data of its own. */
   datasets: DatasetCount[];
+  /** It has data of its own that does not travel in the file (its history, its people, its settings…). */
+  keeps_data: boolean;
 }
 
 export interface Removal extends BlueprintApp {

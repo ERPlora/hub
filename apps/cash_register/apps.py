@@ -23,6 +23,14 @@ COUNTED_MOVEMENTS = (
 class CashRegisterConfig(LiveAppConfig):
     name = "apps.cash_register"
     label = "cash_register"
+    blueprint_stays = {
+        "Settings": "settings",
+        "Register": "pending",
+        "SessionCounter": "internal",
+        "Session": "history",
+        "Movement": "history",
+        "Count": "history",
+    }
     kind = "app"
     verbose_name = _("Cash register")
     icon = "ion:cash-outline"

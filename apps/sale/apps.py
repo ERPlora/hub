@@ -12,6 +12,22 @@ from base.allergens import ALLERGENS
 class SaleConfig(LiveAppConfig):
     name = "apps.sale"
     label = "sale"
+    blueprint_stays = {
+        "PaymentMethod": "pending",
+        "Settings": "settings",
+        "Department": "pending",
+        "QuickNote": "pending",
+        "Order": "history",
+        "OrderLine": "history",
+        "Sale": "history",
+        "SaleLine": "history",
+        "SalePayment": "history",
+        "SaleCounter": "internal",
+        "Refund": "history",
+        "RefundPayment": "history",
+        "RefundLine": "history",
+        "VoucherSession": "history",
+    }
     kind = "app"
     verbose_name = _("Sales & POS")
     icon = "ion:cart-outline"

@@ -328,6 +328,15 @@ def test_every_app_on_is_listed_with_what_of_it_travels_and_how_many_rows(owner)
     assert list(apps) == sorted(apps, key=lambda app: apps[app].label)
 
 
+def test_an_app_says_whether_it_keeps_data_of_its_own_that_does_not_travel(owner):
+    call(owner, "base.blueprint.import", template="restaurant.es")
+
+    apps = {app.id: app for app in call(owner, "base.dataset.list").apps}
+
+    assert (apps["inventory"].keeps_data, apps["sale"].keeps_data) == (True, True)
+    assert apps["modifier"].keeps_data is False
+
+
 def test_the_apps_data_is_for_who_runs_the_hub(manager):
     with pytest.raises(PermissionDenied):
         call(manager, "base.dataset.list")

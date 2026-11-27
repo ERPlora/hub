@@ -8,6 +8,11 @@ from live.meta import Category, Help, LiveAppConfig, Nav
 class PricingConfig(LiveAppConfig):
     name = "apps.pricing"
     label = "pricing"
+    blueprint_stays = {
+        "PriceList": "pending",
+        "PriceItem": "pending",
+        "DiscountRule": "pending",
+    }
     kind = "app"
     verbose_name = _("Price Lists")
     # Registered in the shell (ION_ICONS).

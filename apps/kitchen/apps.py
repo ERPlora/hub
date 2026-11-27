@@ -13,6 +13,16 @@ NOTICE_BODY = ["{dish_names}", _("Waiter: {waiter}")]
 class KitchenConfig(LiveAppConfig):
     name = "apps.kitchen"
     label = "kitchen"
+    blueprint_stays = {
+        "Station": "pending",
+        "ProductRoute": "pending",
+        "CategoryRoute": "pending",
+        "KitchenSettings": "settings",
+        "DayCounter": "internal",
+        "Ticket": "history",
+        "TicketItem": "history",
+        "LogEntry": "history",
+    }
     kind = "app"
     verbose_name = _("Kitchen")
     # Registered in the shell (ION_ICONS); `restaurant-outline` waits in UI-REQUESTS.md.

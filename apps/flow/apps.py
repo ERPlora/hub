@@ -15,6 +15,13 @@ RUN_ACTOR = "flow_run:"
 class FlowConfig(LiveAppConfig):
     name = "apps.flow"
     label = "flow"
+    blueprint_stays = {
+        "Flow": "pending",
+        "FlowRun": "history",
+        "Draft": "internal",
+        "Secret": "outside",
+        "Question": "history",
+    }
     kind = "app"
     verbose_name = _("Automations")
     # Registered in the shell (ION_ICONS); `git-branch` waits in UI-REQUESTS.md.

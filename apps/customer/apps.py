@@ -7,6 +7,17 @@ from live.meta import Category, Help, LiveAppConfig, Nav
 class CustomerConfig(LiveAppConfig):
     name = "apps.customer"
     label = "customer"
+    blueprint_stays = {
+        "CustomerGroup": "pending",
+        "CustomerTag": "pending",
+        "CustomField": "pending",
+        "CustomFieldValue": "pending",
+        "Activity": "history",
+        "Purchase": "history",
+        "Consent": "history",
+        "HealthRecord": "people",
+        "OrderLink": "internal",
+    }
     kind = "app"
     verbose_name = _("Customers")
     icon = "ion:people-outline"

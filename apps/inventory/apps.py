@@ -29,6 +29,12 @@ BROKEN_STOCK = ("roto", "rotura", "broke", "broken")
 class InventoryConfig(LiveAppConfig):
     name = "apps.inventory"
     label = "inventory"
+    blueprint_stays = {
+        "Settings": "settings",
+        "StockMovement": "history",
+        "SaleStock": "history",
+        "RefundStock": "history",
+    }
     kind = "app"
     verbose_name = _("Inventory")
     icon = "ion:cube-outline"
