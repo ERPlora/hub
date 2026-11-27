@@ -183,7 +183,7 @@ describe('ReservationFormModal: New reservation', () => {
     expect(s.wrapper.emitted('saved')).toHaveLength(1);
   });
 
-  it('a full slot the server does not let overbook is a plain refusal, on top', async () => {
+  it('a full slot the server does not let overbook is a plain refusal, said once under «Time»', async () => {
     const s = await setup();
     await fillNew(s);
     const message = 'That time slot is fully booked for that date.';
@@ -191,17 +191,18 @@ describe('ReservationFormModal: New reservation', () => {
     await click(s.submit());
     const confirm = s.wrapper.findAllComponents(ConfirmDialog).find((c) => c.props('testid') === 'reservation-overbook')!;
     expect(confirm.props('open')).toBe(false);
-    expect(s.inDoc('reservation-form-error')?.textContent).toContain(message);
+    expect(s.field('time').errorText).toBe(message);
+    expect(s.inDoc('reservation-form-error')).toBeNull();
   });
 
-  it('puts a refusal on top and a bad field under it, keeping what was typed', async () => {
+  it('says the refusal of a field once, under it, keeping what was typed', async () => {
     const s = await setup();
     await fillNew(s);
     const message = 'This business requires a phone number for every reservation.';
     s.answer(409, { error: { code: 'reservation.phone_required', message, fields: { guest_phone: message } } });
     await click(s.submit());
-    expect(s.inDoc('reservation-form-error')?.textContent).toContain(message);
     expect(s.field('guest_phone').errorText).toBe(message);
+    expect(s.inDoc('reservation-form-error')).toBeNull();
     expect(s.field('guest_name').value).toBe('Ana García');
   });
 });

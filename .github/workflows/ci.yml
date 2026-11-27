@@ -2,22 +2,28 @@ name: ci
 
 # Every push to a working branch runs the tests (test.yml), with the same check as deploy.yml:
 # "test / test". Its pytest compares the branch with origin/main and runs only the tests of the apps
-# it changes, when it changes nothing else. main and pre run the whole suite in deploy.yml, before they deploy.
+# it changes, when it changes nothing else. The merge queue runs them once more for each change, on top
+# of what entered main before it, with the whole suite: the event merge_group, which gives no base.
+# main and pre run the whole suite in deploy.yml, before they deploy.
 
 on:
   push:
-    branches-ignore: [main, pre]
+    # gh-readonly-queue/**: the queue's own branches, already tested by their merge_group run.
+    branches-ignore: [main, pre, gh-readonly-queue/**]
+  merge_group:
 
 permissions:
   contents: read
 
-# A newer push to the same branch supersedes the run of the older one (as in the SaaS).
+# A newer push to the same branch supersedes the run of the older one (as in the SaaS). Each entry of the
+# merge queue has a ref of its own, and its run is never cancelled here: the queue stops the ones it drops.
 concurrency:
   group: ci-${{ github.repository }}-${{ github.ref_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 jobs:
   test:
     uses: ./.github/workflows/test.yml
     with:
-      affected-base: origin/main
+      # An empty string is false in an expression, so the branch's base goes first.
+      affected-base: ${{ github.event_name == 'push' && 'origin/main' || '' }}

@@ -3,7 +3,7 @@ person names it, and the categories a write of another app holds while it names 
 
 from collections.abc import Iterable
 
-from django.db.models import Case, CharField, F, Q, Value, When
+from django.db.models import Case, CharField, F, Value, When
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -17,6 +17,7 @@ from apps.tax.queries.resolution import current_rates
 from apps.tax.schemas.categories import CategoryGetIn, CategoryListIn, CategoryNamedOut, CategoryPage
 from base.business import percent_text
 from base.ordering import list_order
+from base.text_search import contains_text
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")
 
@@ -88,11 +89,7 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
         )
         if params.search:
             categories = categories.filter(
-                Q(key__icontains=params.search)
-                | Q(name__icontains=params.search)
-                | Q(description__icontains=params.search)
-                | Q(shown_name__icontains=params.search)
-                | Q(shown_description__icontains=params.search)
+                contains_text(params.search, "key", "name", "description", "shown_name", "shown_description")
             )
         for column, value in (
             ("key", params.key),
@@ -101,7 +98,7 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
             ("shown_description", params.display_description),
         ):
             if value:
-                categories = categories.filter(**{f"{column}__icontains": value})
+                categories = categories.filter(contains_text(value, column))
         if params.is_system is not None:
             categories = categories.filter(is_system=params.is_system)
         column = {"display_name": "shown_name", "display_description": "shown_description"}.get(params.sort, params.sort)

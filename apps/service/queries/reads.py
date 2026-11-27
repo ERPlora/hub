@@ -3,6 +3,7 @@ record resolves, the rows a write holds and how a list pages."""
 
 from django.db.models import Q
 from live.errors import Conflict, NotFound
+from base.text_search import contains_text
 
 #: Run only by the platform (events.py, a recovery): no role holds it, so no person and no API key reaches it.
 SYSTEM = "service.system"
@@ -15,7 +16,7 @@ CUSTOMER_VIEW = "customer.view"
 
 def _first_match(rows, said: str) -> list:
     """The rows of the first lookup that matches (an exact name, else a part of it), at most six."""
-    for lookup in (Q(name__iexact=said), Q(name__icontains=said)):
+    for lookup in (Q(name__iexact=said), contains_text(said, "name")):
         found = list(rows.filter(lookup).order_by("name", "id")[: MAX_CANDIDATES + 1])
         if found:
             return found
