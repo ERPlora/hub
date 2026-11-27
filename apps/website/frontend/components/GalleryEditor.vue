@@ -66,7 +66,7 @@ function move(index: number, step: -1 | 1): void {
       class="wg-count"
       data-testid="website-gallery-count"
     >
-      {{ t('website.gallery.count', { n: modelValue.length, max: MAX_PHOTOS }) }}
+      {{ t('website.gallery.count', { shown: modelValue.length, count: MAX_PHOTOS }) }}
     </ion-note>
     <p
       v-if="!modelValue.length"
@@ -133,7 +133,7 @@ function move(index: number, step: -1 | 1): void {
       class="wg-empty"
       data-testid="website-gallery-full"
     >
-      {{ t('website.gallery.full', { max: MAX_PHOTOS }) }}
+      {{ t('website.gallery.full', { count: MAX_PHOTOS }) }}
     </p>
     <p
       v-if="error"

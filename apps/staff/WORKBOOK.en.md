@@ -274,7 +274,7 @@ first.".
 Involved: BASE-F119
 
 ### STAFF-F03 Link the record to an account of the business
-<!-- from WORKBOOK.md sha256:cc6a704c4d8b -->
+<!-- from WORKBOOK.md sha256:23779ced7cb6 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Staff
@@ -284,12 +284,13 @@ Steps:
 In: the active accounts with access to this business, only their identifier and their name
 (`staff.account.list`; whoever can add or edit records reads them).
 Out: the link. With it, the person sees their own record (STAFF-F08) and asks for their time off
-(STAFF-F24). It changes no permission nor the commission: a sale counts for whoever was chosen when it was
+(STAFF-F24), and if they have no name in their profile, the faces of the till and the card of the user menu call
+them by the record's (BASE-F55). It changes no permission nor the commission: a sale counts for whoever was chosen when it was
 charged (STAFF-F21). Terminating the record frees the account.
 If it fails: "That Hub user is already linked to Ana García. A Hub user can belong to only one staff member:
 unlink it there first, or pick another user.", also if two people link it
 at the same time; "That Hub user has no access to this business.".
-Involved: ATTENDANCE-F01, TASK-F03
+Involved: ATTENDANCE-F01, TASK-F03, BASE-F55
 
 ### STAFF-F04 Create, edit and retire a role
 <!-- from WORKBOOK.md sha256:98ba31251444 -->
@@ -347,15 +348,18 @@ If it fails: "That staff member does not exist in this business." if it was alre
 Involved: APPOINTMENT-F25, SERVICE-F32, ATTENDANCE-F13, TASK-F15
 
 ### STAFF-F07 Add several professionals at once
-<!-- from WORKBOOK.md sha256:34b070c0893f -->
+<!-- from WORKBOOK.md sha256:20a850cbfb07 -->
 Status: done (assistant and API)
 Actor: assistant, API
 Screen: assistant
 Steps:
 1. Whoever can add asks the assistant to add several people (up to 100 at once) with their name and, if
    they want, email, phone, role, hire date, rate, bookable, bio and specialties.
-2. An **Active** record is created for each valid row.
-3. The answer says which records were created and which rows were skipped with their reason.
+2. Before creating them, the confirmation card says each person by their first name and last name ("Create in Staff:
+   Carla Ruiz, Diego Martín, Elena Sanz"; with more than four, the first three and how many more). A row without a
+   first name or a last name counts among the "more".
+3. An **Active** record is created for each valid row.
+4. The answer says which records were created and which rows were skipped with their reason.
 In: the rows of the batch; the business's active roles.
 Out: one record per valid row and one `staff.member.created` notice for each (none if none goes in).
 If it fails: a row with a blank name, an email that is not one, a badly written date, a negative rate or a

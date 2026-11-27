@@ -75,7 +75,7 @@ def list_people(ctx: OperationContext, params: PersonListIn) -> dict:
                 "¿Pedro sigue de alta para fichar?",
             ),
         },
-        "description": "One person of the time clock by id, as the «Person» filter names them: their name and "
+        "description": "One person of the time clock by id, as its filter of people names them: their name and "
         "the staff record's status. Your own for whoever clocks; anyone for whoever sees the team, clocks others "
         "or corrects days."
     },

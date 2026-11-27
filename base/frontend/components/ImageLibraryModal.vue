@@ -3,12 +3,12 @@
 // «Photo» opens. The search box comes written with the item's name (`query`) and searches ERPlora's shared library
 // (`base.catalog_image.search`) by title and synonyms, in Spanish or English, never by file name; under two letters
 // it lists the whole library (or sector) by title. The sector tabs narrow it («All» first, then `folders` and the
-// rest in the library's order); 60 at a time with «Load more». Each image shows with its title under it, in the
-// person's language. Loading, empty and error («Retry») states; an answer that arrives after a newer search is
+// rest in the library's order); 60 at a time with «Load more». Each image shows with its whole title under it, on
+// as many lines as it takes, in the person's language. Loading, empty and error («Retry») states; an answer that arrives after a newer search is
 // dropped. A tap on an image emits `pick` and closes; «Upload photo» emits `upload` (the field opens the device's
 // picker) and closes too. Hooks (`testid`): the root, `-search`, `-folders`, `-folder-<key>`, `-loading`, `-empty`,
 // `-error`, `-retry`, `-image-<folder>-<name>`, `-count`, `-more`, `-upload`, `-close`.
-import { EmptyState, InlineFeedback } from '@erplora/ui/components';
+import { EmptyState, InlineFeedback, syncSearchbarInputName } from '@erplora/ui/components';
 import { useLiveClient } from '@erplora/ui/sdk';
 import {
   IonButton,
@@ -25,7 +25,7 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/vue';
-import { computed, ref, shallowRef, watch } from 'vue';
+import { computed, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
 import type { CatalogImage } from '../operations/catalog_images';
@@ -50,8 +50,15 @@ const props = withDefaults(
 const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ pick: [image: CatalogImage]; upload: [] }>();
 
-const { t } = useBaseI18n();
+const { t, locale } = useBaseI18n();
 const client = useLiveClient();
+
+// The search box named by its hint, in the person's language: Ionic names its input «search text» in English.
+// Again when the language changes and when the window, opened again, creates it again.
+const searchToolbar = useTemplateRef<{ $el: Element }>('searchToolbar');
+watch([searchToolbar, locale], ([toolbar]) => syncSearchbarInputName(toolbar?.$el, () => t('base.imageLibrary.search')), {
+  flush: 'post',
+});
 
 const text = ref('');
 const folder = ref<string>(ALL);
@@ -163,7 +170,7 @@ const tid = (part: string) => `${props.testid}-${part}`;
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
-      <ion-toolbar>
+      <ion-toolbar ref="searchToolbar">
         <ion-searchbar
           :data-testid="tid('search')"
           :value="text"
@@ -298,6 +305,7 @@ const tid = (part: string) => `${props.testid}-${part}`;
 }
 .image-library__tile {
   display: grid;
+  align-content: start;
   gap: 6px;
   min-width: 0;
 }
@@ -331,11 +339,9 @@ const tid = (part: string) => `${props.testid}-${part}`;
   margin: 0 auto;
 }
 .image-library__title {
-  overflow: hidden;
   font-size: 0.8rem;
   line-height: 1.2;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .image-library__more {
   display: grid;

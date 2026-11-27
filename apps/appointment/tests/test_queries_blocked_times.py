@@ -3,7 +3,7 @@
 import datetime as dt
 
 from apps.appointment.queries.blocked_times import block_label, blocked_out
-from apps.schedule.queries import day_label
+from apps.schedule.queries.outputs import day_label
 
 from .conftest import HUB_DB, MONDAY, TUESDAY, at, ctx_for, make_block, run
 

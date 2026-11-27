@@ -29,7 +29,7 @@ router = Router(tags=["schedule"])
 
 @bind(router, "schedule.week.get", "/schedule/week")
 async def week_get(request):
-    return await run_operation(request, queries.get_week)
+    return await run_operation(request, queries.week.get_week)
 
 
 @bind(router, "schedule.week.set_day", "/schedule/week/set_day")
@@ -47,7 +47,7 @@ async def week_confirm(request):
 
 @bind(router, "schedule.special_day.list", "/schedule/special_days")
 async def special_day_list(request, params: Query[SpecialDayListIn]):
-    return await run_operation(request, queries.list_special_days, params)
+    return await run_operation(request, queries.lists.list_special_days, params)
 
 
 @bind(router, "schedule.special_day.create", "/schedule/special_days", status=201)
@@ -80,7 +80,7 @@ async def special_day_delete(request, data: SpecialDayRefIn):
 
 @bind(router, "schedule.override.list", "/schedule/overrides")
 async def override_list(request, params: Query[OverrideListIn]):
-    return await run_operation(request, queries.list_overrides, params)
+    return await run_operation(request, queries.lists.list_overrides, params)
 
 
 @bind(router, "schedule.override.create", "/schedule/overrides", status=201)
@@ -103,7 +103,7 @@ async def override_delete(request, data: OverrideRefIn):
 
 @bind(router, "schedule.settings.get", "/schedule/settings")
 async def settings_get(request):
-    return await run_operation(request, queries.get_settings)
+    return await run_operation(request, queries.settings.get_settings)
 
 
 @bind(router, "schedule.settings.update", "/schedule/settings")
@@ -116,9 +116,9 @@ async def settings_update(request, data: SettingsIn):
 
 @bind(router, "schedule.business.is_open", "/schedule/is_open")
 async def business_is_open(request, params: Query[IsOpenIn]):
-    return await run_operation(request, queries.business_is_open, params)
+    return await run_operation(request, queries.is_open.business_is_open, params)
 
 
 @bind(router, "schedule.hours.for_range", "/schedule/hours")
 async def hours_for_range(request, params: Query[HoursRangeIn]):
-    return await run_operation(request, queries.hours_for_range, params)
+    return await run_operation(request, queries.hours.hours_for_range, params)

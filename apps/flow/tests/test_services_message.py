@@ -13,7 +13,7 @@ from live.context import Scope
 from live.errors import InvalidPayload
 
 from apps.flow import queries
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models.conversations import Message
 from apps.whatsapp_inbox.tests.conftest import connect, receive, template
 from apps.whatsapp_inbox.tests.conftest import ctx_for as inbox_ctx_for
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture

@@ -231,13 +231,14 @@ function mediaFailed(): void {
           size="small"
           fill="outline"
           data-testid="file-preview-download"
+          :aria-label="t('base.files.preview.download')"
+          :title="t('base.files.preview.download')"
           @click="emit('download')"
         >
           <HubIcon
-            slot="start"
+            slot="icon-only"
             name="ion:download-outline"
           />
-          {{ t('base.files.preview.download') }}
         </ion-button>
         <ion-button
           size="small"

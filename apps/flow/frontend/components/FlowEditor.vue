@@ -17,6 +17,7 @@ import { computed, effectScope, type EffectScope, onScopeDispose, ref, shallowRe
 
 import { useCatalog } from '../composables/useCatalog';
 import { usePhrasing } from '../composables/usePhrasing';
+import { withAdvice } from '../lib/advice';
 import { wording } from '../lib/refusal';
 import {
   addMessageStep,
@@ -271,7 +272,7 @@ async function run(): Promise<void> {
   problem.value = '';
   try {
     const ran = await runNow.run({ id: props.flow.id });
-    if (ran.status === 'failed') problem.value = t('flow.editor.ranFailed', { message: ran.error_message });
+    if (ran.status === 'failed') problem.value = withAdvice(t('flow.editor.ranFailed', { message: ran.error_message }), ran.error_code, phrasing.value);
     // A run parked on «Ask the assistant» waits for the assistant, not for another system (FLOW-F38).
     else if (ran.status === 'calling' && doc.value.steps[ran.step_index]?.kind === 'assistant') toastSuccess(t('flow.editor.ranThinking'));
     else toastSuccess(t(RAN_NOTICE[ran.status] ?? 'flow.editor.ran'));

@@ -16,7 +16,7 @@ from django.apps import apps
 from live.context import OperationContext, Scope
 from live.operations import get, registry
 
-from apps.schedule.queries import day_label
+from apps.schedule.queries.outputs import day_label
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tests.test_assistant_card_values_references import AN_ID, list_field

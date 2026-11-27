@@ -122,7 +122,7 @@ function previewOf(row: ConversationOut): string {
 }
 
 const actions = computed<DataTableAction<ConversationOut>[]>(() => [
-  { id: 'open', label: t('whatsapp_inbox.inbox.open'), icon: 'ion:chatbubbles-outline', showLabel: true, pinned: true, color: 'primary' },
+  { id: 'open', label: t('whatsapp_inbox.inbox.open'), icon: 'ion:chatbubbles-outline', pinned: true, color: 'primary' },
 ]);
 
 const columns = computed<DataTableColumn<ConversationOut>[]>(() => [

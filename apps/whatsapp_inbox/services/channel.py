@@ -15,7 +15,8 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.whatsapp_inbox import clock, events, gateway
-from apps.whatsapp_inbox.models import Channel, Template
+from apps.whatsapp_inbox.models.channel import Channel
+from apps.whatsapp_inbox.models.templates import Template
 from apps.whatsapp_inbox.queries.reasons import META_RATE_LIMITED
 from apps.whatsapp_inbox.queries.templates import live_templates, templates_of
 from apps.whatsapp_inbox.schemas.channel import (
@@ -278,7 +279,7 @@ def prepare_connect(ctx: OperationContext, data: ChannelPrepareIn) -> dict:
         },
         "description": "Connect the business's WhatsApp number chosen in Meta's window, with the one-time code that "
         "window returned (it lasts 30 seconds). Only Meta's window in Settings gives that code: to connect a "
-        "number, ask the person to press «Connect WhatsApp» in Settings.",
+        "number, ask the person to connect WhatsApp from Settings.",
         "risk": "high",
     },
 )

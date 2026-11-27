@@ -139,10 +139,10 @@ cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
   y, a igual posición, por nombre: INVENTORY-F08; cada una con su nombre entero, en dos líneas si es muy
   largo; si no caben todas, la tira se desliza y, desde que se abre, difumina el borde que esconde más),
   la lupa que abre el buscador («Buscar producto…», por nombre o SKU; con Servicios busca también sus
-  servicios), la tecla «Hablar» y la rejilla: artículos con sus iniciales, su unidad y su precio (lo
-  agotado, en gris con «Agotado»), y al final la baldosa «Precio libre». En «Servicios», cada servicio con
-  sus iniciales, su duración y su precio («Desde», «Por hora», «Variable» o «Gratis» si no es de precio
-  fijo). Con muchos artículos, «Cargar más», al final de la rejilla, trae los siguientes.
+  servicios), la tecla del micrófono («Hablar») y la rejilla: artículos con sus iniciales, su unidad y su
+  precio (lo agotado, en gris con «Agotado»), y al final la baldosa «Precio libre». En «Servicios», cada
+  servicio con sus iniciales, su duración y su precio («Desde», «Por hora», «Variable» o «Gratis» si no es
+  de precio fijo). Con muchos artículos, «Cargar más», al final de la rejilla, trae los siguientes.
 - **Cuenta** (en el móvil, un cajón que abre el botón flotante con el total): arriba, el botón de
   pausa «Aparcar esta cuenta», el de cliente («Asignar cliente» o su nombre), «Cuentas abiertas» con
   su número, y «Cerrar» en el móvil; el título editable («Cuenta nueva») y los chips de cliente,
@@ -151,14 +151,16 @@ cierra tocando fuera, con Esc o con el botón atrás del móvil. Dos zonas:
   cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N», el regalo y el botón ⊗
   «Anular este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie:
   la fila «Descuento del tique» si lo hay, «Total», el botón de descuento, la impresora («Imprimir
-  cuenta») y «Cobrar · <importe>». En el cajón del móvil, la barra de arriba y el pie con «Cobrar» se
+  cuenta»), todos de solo icono, y «Cobrar»: el icono del dinero con el importe, que se llama «Cobrar ·
+  <importe>». En el cajón del móvil, la barra de arriba y el pie con «Cobrar» se
   quedan siempre a la vista, encima de la barra de pestañas, y lo de en medio (título, chips, pestañas y
   líneas) se desplaza. El nombre del botón de cliente ocupa dos líneas como mucho (uno más largo termina
   en «…»); en un teléfono muy estrecho, el botón se queda en su icono y el chip de cliente de la
   cabecera ya lo nombra.
 
 **Hablar** (la tecla del micrófono de la tira; solo a quien puede usar el asistente y en un dispositivo
-que puede grabar): púlsala y habla. Mientras graba se pone roja, se llama «Parar» y debajo sale
+que puede grabar; solo el icono, que se llama «Hablar»): púlsala y habla. Mientras graba se pone roja,
+cambia al icono de parar, se llama «Parar» y debajo sale
 «Escuchando…»; vuelve a pulsarla para terminar (a los dos minutos para sola). Tras «Transcribiendo…»,
 lo entendido cae en el cuadro del asistente, detrás de lo que hubiera escrito, y su panel se abre: la
 persona lee lo que se ha entendido, lo corrige si hace falta y lo envía ella. **Nada se envía solo**, y
@@ -273,7 +275,7 @@ por su dirección, «Sin acceso» (BASE-F118).
 | Error | El aviso con «Reintentar»; un rechazo de una acción sale dentro de su hoja o ventana, junto a su campo. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
-| Hablando (Vender) | La tecla «Hablar», roja, dice «Parar» y debajo sale «Escuchando…»; al parar, «Transcribiendo…». Un aviso dice lo que falla: sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.»; con el micrófono denegado, «El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.» (en la app instalada, que no tiene navegador, «El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.»); demasiado larga, «La grabación es demasiado larga: di algo más corto.»; si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.»; sin conexión, «Sin conexión: para hablar con el asistente hace falta internet.». |
+| Hablando (Vender) | La tecla del micrófono, roja, pasa al icono de parar y se llama «Parar»; debajo sale «Escuchando…»; al parar, «Transcribiendo…». Un aviso dice lo que falla: sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.»; con el micrófono denegado, «El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.» (en la app instalada, que no tiene navegador, «El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.»); demasiado larga, «La grabación es demasiado larga: di algo más corto.»; si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.»; sin conexión, «Sin conexión: para hablar con el asistente hace falta internet.». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». Lo que un responsable puede aprobar con su PIN (anular y devolver una venta, anular una línea enviada, eliminar una cuenta con algo pedido, el precio libre y los descuentos por encima del máximo) sí aparece y, al pulsarlo, pide «Hace falta una aprobación». |
 
 ## Cambios sin guardar en Android
@@ -339,7 +341,7 @@ Pasos:
    busca por nombre o SKU.
 2. Toca el artículo: entra como línea de la cuenta. Tocarlo otra vez (mismo profesional, sin nota ni
    descuento) sube la cantidad; el selector de la línea la sube o la baja, y a 0 la línea se quita.
-3. Pulsa «Cobrar · 18,50 €» al pie de la cuenta (en el móvil, abre antes la cuenta con el botón
+3. Pulsa «Cobrar» al pie de la cuenta, el icono del dinero con «18,50 €» (en el móvil, abre antes la cuenta con el botón
    flotante, que enseña el total). Con el móvil tumbado, la cuenta ocupa toda la pantalla: su barra y
    su pie se quedan fijos, con «Cobrar» a la vista, y las líneas se desplazan entre ellos.
 4. En la hoja **Cobro**, con efectivo elegido, marca en el teclado el importe entregado; el cambio
@@ -361,7 +363,7 @@ cobro (INVOICE-F01): o los dos o ninguno. Ventas avisa de la venta cobrada: Inve
 (INVENTORY-F21) y Clientes suma la compra a la ficha (CUSTOMER-F20). Cada línea guarda la categoría,
 el tipo, el país, la región y la regla de Impuestos con que se cobró.
 Si falla: mientras el negocio no haya dicho todavía su moneda, **Vender** no enseña cifras: el total, las
-líneas, las baldosas, la búsqueda, las cuentas abiertas y el botón flotante dicen «—», y el pie «Cobrar · —»; la
+líneas, las baldosas, la búsqueda, las cuentas abiertas y el botón flotante dicen «—», como el importe de «Cobrar» del pie; la
 hoja **Cobro** se queda en «Calculando el total…», sin teclado y con «Cobrar» en gris. En cuanto el negocio dice
 su moneda, salen las cifras; si no se puede leer, la hoja lo dice con «Reintentar». Si la cuenta no se puede
 valorar (por ejemplo, porque falta una regla de IVA), el pie dice el motivo en vez de «—»: nombra el artículo y su
@@ -383,7 +385,7 @@ Vertical: común
 Actor: empleado, responsable
 Pantalla: Cobro
 Pasos:
-1. Con la cuenta lista, pulsa «Cobrar · 18,50 €».
+1. Con la cuenta lista, pulsa «Cobrar» (el icono del dinero con «18,50 €»).
 2. En la hoja **Cobro**, toca **Tarjeta** (o el medio que sea; salen los medios activos que permiten
    los ajustes).
 3. Se lee «Importe exacto» y «Cobra 18,50 € en el datáfono y confirma.»: cobra en el datáfono
@@ -852,10 +854,10 @@ Pasos:
 1. Con Cocina activa, la cuenta tiene dos pestañas: «Cuenta», con todas sus líneas, y «Comanda actual»,
    con lo que falta por enviar; la pestaña dice cuántos artículos esperan («Comanda actual, 2 artículos por
    enviar»). Sin nada pendiente, «Todo está enviado». Mientras algo espera, las dos pestañas llevan «Enviar
-   comanda (N)» fija encima del total y de «Cobrar».
+   comanda (N)» (el icono de enviar con el número de artículos) fija encima del total y de «Cobrar».
 2. Revisa cantidades y quién atiende («Comanda actual» deja solo lo pendiente) y pulsa «Enviar comanda (N)»
-   desde cualquiera de las dos pestañas. Para que salga urgente, arma antes la llama de su lado: el botón pasa
-   a «Enviar URGENTE (N)». Sale arriba de la pantalla «Comanda N enviada a cocina.», para poder pulsar
+   desde cualquiera de las dos pestañas. Para que salga urgente, arma antes la llama de su lado: el botón se
+   pone rojo y pasa a llamarse «Enviar URGENTE (N)». Sale arriba de la pantalla «Comanda N enviada a cocina.», para poder pulsar
    «Cobrar» sin esperar a que se vaya; las líneas quedan marcadas con su ronda («Comanda N») y la hora de
    envío, y la llama se desarma. Un doble envío no manda nada dos veces. En una pantalla baja, la cuenta se
    desplaza para que se lea al menos una línea entera.
@@ -917,7 +919,9 @@ deja la cuenta marcada como pedida, salga por la impresora de tiques o por el di
 se cobra entera o se elimina; volver a imprimirla, añadir líneas o cobrar una parte no la quita. Pedida al
 asistente («imprime la cuenta de la mesa 4»), solo sale por la impresora de tiques: si ninguna la recibe, no se
 imprime ni se marca, y su recibo dice que no se hizo, con el motivo: «Ninguna impresora de tiques recibe esta
-cuenta: ábrela en Ventas para imprimirla en este dispositivo.».
+cuenta: ábrela en Ventas para imprimirla en este dispositivo.». Si la recibe pero ningún dispositivo encendido imprime
+su cola, el asistente dice que queda en la cola de esa impresora y que saldrá cuando un dispositivo dado de alta la
+imprima, nunca que la ha impreso.
 Si falla: mientras el negocio no haya dicho todavía su moneda, «Cuenta» sigue cargando y la impresora en gris: el
 papel nunca sale con una cifra supuesta; si la moneda no se puede leer, lo dice con «Reintentar», como si falla
 el cálculo de la cuenta. Si no se imprime, «No se pudo imprimir la cuenta»; si la app instalada no abre su
@@ -934,10 +938,10 @@ Pantalla: Vender
 Pasos:
 1. Con dos o más líneas, toca las líneas que paga esta persona (la línea, no sus botones): se marcan
    con un círculo.
-2. Con líneas marcadas, el botón del pie dice lo que va a cobrar: «Cobrar 1 línea · 1,80 €» o
-   «Cobrar 2 líneas · 7,00 €», con lo que el servidor calcula para esas líneas, el mismo importe que
-   cobrará la hoja; mientras llega, una raya. La fila «Total» sigue siendo el de toda la cuenta. Sin
-   nada marcado, el botón vuelve a «Cobrar · 12,00 €».
+2. Con líneas marcadas, el botón del pie enseña lo que va a cobrar, «1,80 €» o «7,00 €», y se llama
+   «Cobrar 1 línea · 1,80 €» o «Cobrar 2 líneas · 7,00 €», con lo que el servidor calcula para esas
+   líneas, el mismo importe que cobrará la hoja; mientras llega, una raya. La fila «Total» sigue siendo
+   el de toda la cuenta. Sin nada marcado, el botón vuelve al total, «Cobrar · 12,00 €».
 3. Pulsa «Cobrar»: la hoja dice «Cobrando 2 líneas de 12,00 €» y cobra solo esas.
 4. Tras cobrar se abre el **Documento de venta** de ese cobro y, detrás, la cuenta sigue abierta con
    lo que falta; lo cobrado ya no vuelve a salir. Cobrar la última línea pendiente cierra la cuenta.
@@ -1178,7 +1182,9 @@ tique»), solo se hace si una impresora de tiques recibe el papel; si no, no se 
 hizo, con el motivo: «Ninguna impresora de tiques recibe el papel de esta venta: abre la venta para imprimirlo en este
 dispositivo.»; con su documento fiscal pendiente, «Su documento fiscal sigue pendiente: abre la venta para
 emitirlo.», y si no se puede leer su registro de VeriFactu, «No se pudo leer su registro de VeriFactu, y su papel
-nunca se imprime sin su QR.».
+nunca se imprime sin su QR.». Si la impresora lo recibe pero ningún dispositivo encendido imprime su cola (ninguno dado
+de alta con ella, o el que la tiene, apagado), el tique queda en esa cola: el asistente dice que queda en la cola de esa
+impresora y que saldrá cuando un dispositivo dado de alta la imprima, nunca que lo ha reimpreso.
 Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F04, INVOICE-F06, INVOICE-F18, INVOICE-F21, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34, BASE-F97
 
 ### SALE-F30 Anular una venta cobrada
