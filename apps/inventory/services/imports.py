@@ -30,7 +30,7 @@ from apps.inventory.schemas.fields import MAX_CENTS
 from apps.inventory.schemas.imports import CategoryImportIn, ImportReportOut, ProductImportIn, ProductImportRowIn
 from apps.inventory.services.movements import _move
 from apps.inventory.services.products import EAN13_TAKEN, PRICING_UNIT_MISMATCH, _created_payload, _save
-from apps.inventory.services.writes import SERVICE_HAS_NO_STOCK, _actor
+from apps.inventory.services.writes import SERVICE_HAS_NO_STOCK, _actor, _next_category_order
 from apps.tax.models import TaxCategory
 from base import allergens
 from base import operations as platform
@@ -165,6 +165,7 @@ def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dic
         tax.key: tax for tax in held(TaxCategory.objects.filter(key__in=keys, is_active=True).order_by("key"))
     }
     taken = {name.casefold() for name in Category.objects.filter(is_deleted=False).values_list("name", flat=True)}
+    position = _next_category_order()
     report = []
     for row in data.rows:
         name, text = _unguarded(row.name.strip()), row.tax_category_key.strip()
@@ -186,10 +187,12 @@ def bulk_create_categories(ctx: OperationContext, data: CategoryImportIn) -> dic
         category = Category.objects.create(
             name=name,
             slug=slug,
+            order=position,
             tax_category=tax_category,
             created_by=_actor(ctx),
             updated_by=_actor(ctx),
         )
+        position += 1
         record_event(ctx, events.CATEGORY_CREATED, {"id": str(category.id), "name": category.name})
         report.append(_row(row.line, name, "created", id=category.id))
     return _report(report, dry_run=False)
