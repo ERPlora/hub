@@ -51,7 +51,7 @@ describe('ZonesPage', () => {
   it('searches, filters and sorts on the server; none at all says how to start', async () => {
     const s = await setup();
     await s.show(page([]));
-    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No zones. Tap «+» to create the first one (Dining room, Terrace, Bar…).');
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No zones. Tap “+” to create the first one (Dining room, Terrace, Bar…).');
     // The filters wait behind the table's funnel, as in the old list: open on a phone they took the screen.
     expect(s.prop('filterable')).toBe(true);
     s.table().vm.$emit('sortChange', { sort: 'name', dir: 'desc' });

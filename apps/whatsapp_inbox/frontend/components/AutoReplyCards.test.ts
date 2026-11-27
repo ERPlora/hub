@@ -235,7 +235,7 @@ describe('turning one on (F14, F15)', () => {
     const page = await mount({ recipes: shelf({ [BOOKING]: { enabled: true }, [BOOKING_NOTICE]: { enabled: true } }), api: api() });
     await click(page.find('whatsapp-inbox-autoreply-tables-on').element);
     expect(mocks.confirm.mock.calls[0][0].consequences).toEqual([
-      'Only one automatic answer can answer on your number: turning this one on turns «Book appointments» off.',
+      'Only one automatic answer can answer on your number: turning this one on turns “Book appointments” off.',
     ]);
     expect(commands(page)).toEqual([
       `disable ${BOOKING_NOTICE}`,

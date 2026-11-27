@@ -135,7 +135,7 @@
     },
     "delete": {
       "title": "Delete",
-      "message": "«{name}» will be deleted. This cannot be undone.",
+      "message": "“{name}” will be deleted. This cannot be undone.",
       "confirm": "Delete"
     },
     "settings": {

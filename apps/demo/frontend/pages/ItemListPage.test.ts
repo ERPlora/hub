@@ -176,7 +176,7 @@ describe('ItemListPage: the live list in a server-side DataTable', () => {
     const empty = s.wrapper.findComponent(EmptyState);
     expect([empty.props('heading'), empty.props('message'), empty.props('icon')]).toEqual([
       'No items yet',
-      'Create the first one with «New item».',
+      'Create the first one with “New item”.',
       'cube-outline',
     ]);
   });

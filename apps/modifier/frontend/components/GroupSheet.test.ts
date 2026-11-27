@@ -230,7 +230,7 @@ describe('GroupSheet', () => {
     const dialog = s.wrapper.findAllComponents(ConfirmDialog).find((d) => d.props('testid') === 'modifier-sheet-link-detach')!;
     expect([dialog.props('title'), dialog.props('message'), dialog.props('confirmLabel')]).toEqual([
       'Stop applying',
-      '«Sauces» will no longer be asked for Burger (BUR-01).',
+      '“Sauces” will no longer be asked for Burger (BUR-01).',
       'Stop applying',
     ]);
     s.answer(200, { id: 'l1' });

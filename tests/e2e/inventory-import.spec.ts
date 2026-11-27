@@ -62,7 +62,7 @@ test('INVENTORY-F09: a CSV is checked first, its unknown tax text is asked for, 
   // Taxes reads its key by itself; the new text is asked for and learned.
   const taxes = dialog(page, 'inventory-import-tax');
   await expect(taxes).toBeVisible();
-  await expect(taxes.locator('[data-testid=inventory-import-tax-text]')).toHaveText([`«${text}»`]);
+  await expect(taxes.locator('[data-testid=inventory-import-tax-text]')).toHaveText([new RegExp(`^(“${text}”|«${text}»)$`)]);
   await pickCombo(page, taxes.locator('[data-testid=inventory-import-tax-category-0]'), 'generic', /(Product — generic|Producto — general)/);
   await page.screenshot({ path: shot('inventory-import-tax-1280') });
   await taxes.locator('[data-testid=inventory-import-tax-submit]').click();
