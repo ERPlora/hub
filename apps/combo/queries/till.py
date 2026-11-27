@@ -6,6 +6,7 @@ from live.operations import operation
 from apps.combo.models import Combo
 from apps.combo.schemas.till import ForSaleIn, SaleComboPage
 from base import images
+from base.text_search import contains_text
 
 from .offers import blockers, offer_status, takeaway_targets
 from .rows import _page, with_tree
@@ -38,7 +39,7 @@ def list_for_sale(ctx: OperationContext, params: ForSaleIn) -> dict:
         Combo.objects.filter(is_active=True).order_by("sort_order", "name", "id")
     )
     if params.search:
-        combos = combos.filter(name__icontains=params.search)
+        combos = combos.filter(contains_text(params.search, "name"))
     targets = takeaway_targets()
     sellable = [combo for combo in combos if not blockers(combo, targets)]
     urls = images.Urls(ctx.scope)

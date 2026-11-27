@@ -9,7 +9,7 @@ from live.outbox import record_event
 
 from apps.appointment import assistant_cards
 from apps.appointment import engine, events
-from apps.appointment.models import BlockedTime
+from apps.appointment.models.blocked_times import BlockedTime
 from apps.appointment.queries.blocked_times import BLOCK_NOT_FOUND, blocked_out
 from apps.appointment.queries.business import read_moment
 from apps.appointment.schemas.blocked_times import BlockedTimeCreateIn, BlockedTimeOut, BlockedTimeRefIn

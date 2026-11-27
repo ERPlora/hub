@@ -99,9 +99,17 @@ describe('MovementsPage', () => {
       'Sale',
       'Void',
       'Count',
-      'Decrease',
+      'Write-off',
       'Refund',
     ]);
+  });
+
+  it('INVENTORY-F15: in Spanish a write-off reads «Baja», the word of its window, never «Descuento» (a price cut)', async () => {
+    const s = await setup({ locale: 'es' });
+    await s.show(page([movement('m1', 'write_off', '-2.000', '94.000', { reason: 'Rotura' })]));
+    expect(s.testid('inventory-movement-type').text()).toBe('Baja');
+    const options = s.testid('inventory-movements-type-filter').findAll('ion-select-option');
+    expect(options.find((o) => (o.element as HTMLElement & { value?: string }).value === 'write_off')?.text()).toBe('Baja');
   });
 
   it('searches on the server, from the first page', async () => {
@@ -128,7 +136,7 @@ describe('MovementsPage', () => {
       'Sale',
       'Void',
       'Count',
-      'Decrease',
+      'Write-off',
       'Refund',
     ]);
     await s.pick('inventory-movements-type-filter', 'count');

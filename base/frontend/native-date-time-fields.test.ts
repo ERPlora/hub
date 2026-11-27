@@ -6,7 +6,7 @@
 // template (`type="date"`, `type=time`) or a bound one that names it (`:type="kind === 'day' ? 'date' : 'text'"`).
 import { describe, expect, it } from 'vitest';
 
-import { findingsByApp, hubFrontends } from './__tests__/frontend-sources';
+import { findingsByApp, hubFrontends, templateLinesWhere } from './__tests__/frontend-sources';
 import { NO_CLOCK } from '../../vitest.load';
 
 const PICK_IT_IN_THE_APP =
@@ -20,15 +20,7 @@ const BOUND = new RegExp(`(?:^|\\s)(?::|v-bind:)type="[^"]*'${NATIVE}'[^"]*"`);
 
 /** The lines of a component's template (its outermost `<template>`) that ask for a native date or time field. */
 export function nativeDateTimeFields(text: string, name: string): number[] {
-  if (!name.endsWith('.vue')) return [];
-  const start = text.indexOf('<template>');
-  const end = text.lastIndexOf('</template>');
-  if (start === -1 || end === -1) return [];
-  const before = text.slice(0, start).split('\n').length;
-  return text
-    .slice(start, end)
-    .split('\n')
-    .flatMap((line, index) => (WRITTEN.test(line) || BOUND.test(line) ? [before + index] : []));
+  return templateLinesWhere(text, name, (line) => WRITTEN.test(line) || BOUND.test(line));
 }
 
 describe('guardrail: no template of the Hub or of @erplora/ui opens the device’s own date or time picker', () => {

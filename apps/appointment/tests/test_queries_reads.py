@@ -5,7 +5,7 @@ import datetime as dt
 import pytest
 from live.errors import NotFound
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.queries.reads import find_appointment
 
 from .conftest import (

@@ -74,8 +74,8 @@ def test_spanish_texts_of_the_workbook():
         assert str(queries.settings.PAGE_DISABLED) == "Este negocio no acepta reservas online ahora mismo."
         assert str(queries.bookings.BOOKING_NOT_FOUND) == "Esa reserva no existe o su enlace ya no es válido."
         assert str(queries.page.DEFAULT_TITLE) == "Reserva tu cita"
-        assert str(services.TIME_TAKEN) == "Esa hora ya no está libre. Elige otra."
-        assert str(services.DEFAULT_CONFIRMED) == "Tu reserva está confirmada. ¡Hasta pronto!"
+        assert str(services.public_booking.TIME_TAKEN) == "Esa hora ya no está libre. Elige otra."
+        assert str(services.public_booking.DEFAULT_CONFIRMED) == "Tu reserva está confirmada. ¡Hasta pronto!"
 
 
 @HUB_DB

@@ -279,7 +279,7 @@ def prepare_connect(ctx: OperationContext, data: ChannelPrepareIn) -> dict:
         },
         "description": "Connect the business's WhatsApp number chosen in Meta's window, with the one-time code that "
         "window returned (it lasts 30 seconds). Only Meta's window in Settings gives that code: to connect a "
-        "number, ask the person to press «Connect WhatsApp» in Settings.",
+        "number, ask the person to connect WhatsApp from Settings.",
         "risk": "high",
     },
 )

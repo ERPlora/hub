@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchFile } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { flush, mountBase } from '../__tests__/mount-base';
+import { accessibleName, flush, mountBase } from '../__tests__/mount-base';
 import { OFFICE_PREVIEW_MAX_BYTES } from '../lib/files';
 import type { FileItem } from '../operations/files';
 import FilePreview from './FilePreview.vue';
@@ -80,6 +80,9 @@ describe('FilePreview', () => {
   it('titles the viewer with the file’s name, with «Download» and «Close»', async () => {
     const m = await show(item('foto.png', 'image', 'image/png'));
     expect(inDoc('file-preview-title')?.textContent).toBe('foto.png');
+    const download = inDoc('file-preview-download')!;
+    // The download icon alone: «Download» is its name and its tooltip.
+    expect([download.textContent?.trim(), accessibleName(download), download.getAttribute('title')]).toEqual(['', 'Download', 'Download']);
     inDoc('file-preview-download')?.click();
     inDoc('file-preview-close')?.click();
     expect(m.wrapper.emitted('download')).toHaveLength(1);
@@ -264,5 +267,14 @@ describe('FilePreview', () => {
     vi.mocked(fetchFile).mockReturnValue(new Promise(() => undefined));
     await show(item('notas.txt', 'text'));
     expect(inDoc('file-preview-loading')?.textContent).toContain('Opening the file');
+  });
+
+  // In Chrome on a tablet or a phone, `vh` also counts the screen under the address bar: a viewer sized by it was taller
+  // than the page, with «Download» and «Close» cut off (measured in base-files-preview-fits-low-screen.spec.ts).
+  it('is never sized by the screen under the address bar', () => {
+    const sfc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'FilePreview.vue'), 'utf8');
+    const style = /<style[^>]*>([\s\S]*)<\/style>/.exec(sfc)?.[1] ?? '';
+    expect(style).toMatch(/\.file-preview\s*\{[^}]*--height:\s*min\(860px,\s*92%\);/);
+    expect(style).not.toMatch(/\d+[dls]?vh/);
   });
 });

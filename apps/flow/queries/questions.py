@@ -109,7 +109,7 @@ def question_row(ctx: OperationContext, question: Question) -> dict[str, Any]:
                 "¿alguna automatización espera mi respuesta?",
             ),
         },
-        "description": "«Waiting for your answer»: the questions automations asked and are waiting on that this person may "
+        "description": "The questions automations asked and are waiting on that this person may "
         "answer (their role's, or all of them for whoever runs the business), the soonest to expire first, "
         "up to 100."
     },
@@ -141,9 +141,9 @@ def list_questions(ctx: OperationContext, data: QuestionListIn) -> dict:
                 "enséñame la pregunta que está esperando",
             ),
         },
-        "description": "One question an automation asked and is waiting on, by its id, as «Waiting for your answer» "
-        "shows it: what it asks, its details, the change of the assistant it waits on, if any, and until when. Only "
-        "the role it was asked of, or whoever runs the business."
+        "description": "One question an automation asked and is waiting on, by its id, as the list of questions "
+        "waiting for an answer shows it: what it asks, its details, the change of the assistant it waits on, if "
+        "any, and until when. Only the role it was asked of, or whoever runs the business."
     },
 )
 def get_question(ctx: OperationContext, data: QuestionRefIn) -> dict:

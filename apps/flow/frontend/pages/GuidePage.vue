@@ -17,7 +17,7 @@ const LIMITS = 4;
     back-href="/flow/automations"
     content-layout="detail"
   >
-    <div class="flow-guide">
+    <div class="flow-guide ep-prose">
       <section data-testid="flow-guide-section-what">
         <h2>{{ $t('flow.guide.what.title') }}</h2>
         <p>{{ $t('flow.guide.what.body') }}</p>

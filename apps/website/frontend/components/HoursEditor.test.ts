@@ -3,6 +3,7 @@ import { TimeField } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import { pick, picked } from '../../../../base/frontend/__tests__/date-time-fields';
+import { iconOnly, iconOnlyNamed } from '../../../../base/frontend/__tests__/icon-only';
 import { ionChecked, mountWebsite, settle } from '../__tests__/mount-website';
 import { defaultHours } from '../lib/hours';
 import type { DayHours } from '../operations';
@@ -53,6 +54,14 @@ describe('HoursEditor', () => {
     expect(last()[6]).toEqual({ day: 'sun', intervals: [{ opens: '09:00', closes: '18:00' }] });
     await ionChecked(wrapper.get('[data-testid="website-hours-open-mon"]').element, false);
     expect(last()[0]).toEqual({ day: 'mon', intervals: [] });
+  });
+
+  it('«Add hours» and «Remove» of a day are their icons alone, named and titled by their labels', async () => {
+    const { wrapper } = await editor();
+    expect([iconOnly(wrapper.get('[data-testid="website-hours-add-mon"]')), iconOnly(wrapper.get('[data-testid="website-hours-mon-0-remove"]'))]).toEqual([
+      iconOnlyNamed('Add hours'),
+      iconOnlyNamed('Remove these hours'),
+    ]);
   });
 
   it('changes a time and adds and removes intervals, three at most', async () => {

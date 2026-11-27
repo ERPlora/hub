@@ -154,12 +154,12 @@ aquí.».
 Se abre con **Añadir plantilla** («Nueva plantilla») o **Editar** («Editar plantilla — nombre»), encima
 de Ajustes. Campos: **Nombre** («Minúsculas, números y guiones bajos. No se puede cambiar después.»),
 **Idioma** y **Categoría** (Utilidad o Marketing), **Tipo de cabecera** (Texto, Foto, Vídeo o Documento) con
-**Cabecera (opcional)** si es de texto o, si lleva archivo, **Elegir archivo** («Ningún archivo elegido»; elegido,
-su nombre y su peso con **Cambiar archivo**, lo que admite, p. ej. «JPEG o PNG, hasta 5 MB.», y «Meta revisa la
+**Cabecera (opcional)** si es de texto o, si lleva archivo, **Elegir archivo** (su nube; «Ningún archivo elegido»;
+elegido, su nombre y su peso con **Cambiar archivo**, la misma nube), lo que admite, p. ej. «JPEG o PNG, hasta 5 MB.», y «Meta revisa la
 plantilla con este archivo.»), **Texto** («Donde va una
 variable, escribe su número entre dobles llaves, empezando por el 1.»), un **Ejemplo de la variable n**
 por cada variable («Meta revisa la plantilla con estos ejemplos.»), **Pie (opcional)** y **Botones**
-(**Añadir botón**: Respuesta rápida, Enlace o Llamada, con su texto y su dirección o su número;
+(**Añadir botón**, su +: Respuesta rápida, Enlace o Llamada, con su texto y su dirección o su número;
 **Quitar botón**). Botón final **Enviar a revisión de Meta** (nueva) o **Guardar y enviar a Meta**
 (editar). Al editar una aprobada avisa: «Hasta que Meta apruebe los cambios, se sigue enviando la
 aprobada.»; la categoría de una que Meta no ha rechazado no se puede tocar («Meta solo deja cambiar la

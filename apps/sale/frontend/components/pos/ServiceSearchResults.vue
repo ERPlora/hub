@@ -2,10 +2,11 @@
 // The services the till's search finds (SALE-F38): Services' offered services whose name holds what is
 // typed (`service.service.list_for_sale`, live, 20 at a time), under «Services», after the products. A
 // row shows the name, the duration (or why it cannot be sold) and the price; a tap hands the service
-// up, where the same rules as a tile apply. Mounted only when the till sells services.
+// up, where the same rules as a tile apply. How many it found goes up (`found`) once Services answers. Mounted only
+// when the till sells services.
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton, IonItem, IonList, IonListHeader } from '@ionic/vue';
-import { computed, useTemplateRef } from 'vue';
+import { computed, useTemplateRef, watch } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
@@ -14,13 +15,18 @@ import { useNativeAriaDisabled } from '../../lib/ariaDisabled';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{ term: string }>();
-const emit = defineEmits<{ pick: [service: ServiceSaleOut] }>();
+const emit = defineEmits<{ pick: [service: ServiceSaleOut]; found: [count: number] }>();
 
 const locale = useLocale();
 const business = useBusinessMoney();
 const taxName = useTaxName();
 const { data } = useLive('service.service.list_for_sale', () => ({ search: props.term, limit: 20, offset: 0 }));
 const rows = computed(() => data.value?.rows ?? []);
+watch(
+  () => data.value?.rows.length,
+  (count) => count !== undefined && emit('found', count),
+  { immediate: true },
+);
 const list = useTemplateRef<{ $el: HTMLElement }>('list');
 useNativeAriaDisabled(() => list.value?.$el);
 </script>

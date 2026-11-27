@@ -3,6 +3,7 @@
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
+from django.utils.translation import gettext_lazy
 from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
 from live.meta import LiveAppConfig, SetupCheck
@@ -29,6 +30,8 @@ LEGAL_IN_PRODUCTION = {
 #: Where a step without ``order`` goes: after every step placed (the old hub's ``DEFAULT_ORDER``).
 DEFAULT_ORDER = 500
 DEFAULT_STEP_ICON = "ion:settings-outline"
+#: The list's title, the Home's own words (``base.setup.title`` of base's catalogue).
+TITLE = gettext_lazy("Finish setting up your business")
 
 
 def applies_to_country(countries: Sequence[str], hub_country: str) -> bool:
@@ -53,9 +56,11 @@ def level_of(key: str, required: bool, row: Mapping[str, Any] | None = None) -> 
 
 
 def document(items: list[dict]) -> dict:
-    """``{total, pending, unavailable, blocking_pending, items}``, the items by ``order`` then ``key``."""
+    """``{title, total, pending, unavailable, blocking_pending, items}`` in the active language, the items by
+    ``order`` then ``key``."""
     ordered = sorted(items, key=lambda item: (item["order"], item["key"]))
     return {
+        "title": str(TITLE),
         "total": len(ordered),
         "pending": sum(item["state"] == STATE_PENDING for item in ordered),
         "unavailable": sum(item["state"] == STATE_UNAVAILABLE for item in ordered),

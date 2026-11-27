@@ -45,27 +45,27 @@ async def booking_get(request, params: Query[BookingRefIn]):
 
 @bind(router, "online_booking.booking.confirm", "/online_booking/bookings/confirm")
 async def booking_confirm(request, data: BookingRefIn):
-    return await run_operation(request, services.confirm_booking, data)
+    return await run_operation(request, services.bookings.confirm_booking, data)
 
 
 @bind(router, "online_booking.booking.complete", "/online_booking/bookings/complete")
 async def booking_complete(request, data: BookingRefIn):
-    return await run_operation(request, services.complete_booking, data)
+    return await run_operation(request, services.bookings.complete_booking, data)
 
 
 @bind(router, "online_booking.booking.no_show", "/online_booking/bookings/no_show")
 async def booking_no_show(request, data: BookingRefIn):
-    return await run_operation(request, services.no_show_booking, data)
+    return await run_operation(request, services.bookings.no_show_booking, data)
 
 
 @bind(router, "online_booking.booking.cancel", "/online_booking/bookings/cancel")
 async def booking_cancel(request, data: CancelIn):
-    return await run_operation(request, services.cancel_booking, data)
+    return await run_operation(request, services.bookings.cancel_booking, data)
 
 
 @bind(router, "online_booking.booking.delete", "/online_booking/bookings/delete")
 async def booking_delete(request, data: BookingRefIn):
-    return await run_operation(request, services.delete_booking, data)
+    return await run_operation(request, services.bookings.delete_booking, data)
 
 
 # Settings
@@ -78,7 +78,7 @@ async def settings_get(request):
 
 @bind(router, "online_booking.settings.update", "/online_booking/settings")
 async def settings_update(request, data: SettingsIn):
-    return await run_operation(request, services.update_settings, data)
+    return await run_operation(request, services.settings.update_settings, data)
 
 
 # The logo's file comes in base64, more than Django's ceiling for any other view.
@@ -113,9 +113,9 @@ async def public_booking(request, params: Query[TokenIn]):
 
 @bind(router, "online_booking.public.book", "/online_booking/public/book")
 async def public_book(request, data: PublicBookIn):
-    return await run_operation(request, services.public_book, data)
+    return await run_operation(request, services.public_booking.public_book, data)
 
 
 @bind(router, "online_booking.public.cancel", "/online_booking/public/cancel")
 async def public_cancel(request, data: PublicCancelIn):
-    return await run_operation(request, services.public_cancel, data)
+    return await run_operation(request, services.links.public_cancel, data)

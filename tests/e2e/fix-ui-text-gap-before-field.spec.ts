@@ -12,13 +12,9 @@ import { expectRoomOverLabel, expectTextClearOfLabel } from './field-labels';
 import { A, capture, hostPage, login, psql, saveSessionForTheSweep, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { presentedDialog } from './inventory-helpers';
 import { bookingOn, cleanUpTagged, guestRowInTheBook, madridDay } from './reservation-helpers';
+import { WINDOW_SIZES as SIZES } from './screen';
 import { post, rowAction } from './service-helpers';
 
-const SIZES = [
-  { label: '375x667', width: 375, height: 667 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '1280x720', width: 1280, height: 720 },
-] as const;
 const DESK = SIZES[2];
 const LANGS = ['en', 'es'] as const;
 type Lang = (typeof LANGS)[number];

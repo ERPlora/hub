@@ -101,7 +101,7 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect([spins(), s.find('staff-settings-saved').exists()]).toEqual([false, true]);
   });
 
-  it('a value the server refuses is said under its field, the typed values stay and the notice sits right above «Save»', async () => {
+  it('a value the server refuses is said once, under its field, and the typed values stay', async () => {
     const s = await setup();
     await s.result('staff.settings.get', PROPOSED);
     s.answer(422, {
@@ -111,7 +111,16 @@ describe('SettingsPage (STAFF-F22)', () => {
     await click(s.save());
     expect(s.field('default_work_end').errorText).toBe('The start time must be before the end time.');
     expect(picked(s.field('default_work_end'))).toBe('06:00');
-    expect(s.find('staff-settings-save-error').text()).toContain('The start time must be before the end time.');
+    expect(s.find('staff-settings-save-error').exists()).toBe(false);
+  });
+
+  it('a refusal no field says sits in the notice right above «Save»', async () => {
+    const s = await setup();
+    await s.result('staff.settings.get', PROPOSED);
+    s.answer(409, { error: { code: 'conflict', message: 'Someone else changed these settings.' } });
+    await pick(s.field('default_work_end'), '19:00');
+    await click(s.save());
+    expect(s.find('staff-settings-save-error').text()).toContain('Someone else changed these settings.');
     expect(between(s.field('default_break_duration'), s.find('staff-settings-save-error').element, s.save())).toBe(true);
   });
 
@@ -138,9 +147,9 @@ describe('SettingsPage (STAFF-F22)', () => {
       return { ...s, ...refusalMarks(s.field, () => s.find('staff-settings-save-error').exists()) };
     }
 
-    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+    it('each field says its reason, not the notice, and a field’s message goes as soon as that field is changed', async () => {
       const s = await refused();
-      expect(s.notice()).toBe(true);
+      expect(s.notice()).toBe(false);
       expect([s.says('default_work_end'), s.says('default_break_duration')]).toEqual([
         'The start time must be before the end time.',
         'Ensure this value is less than or equal to 480.',

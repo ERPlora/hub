@@ -11,7 +11,8 @@ from live.outbox import record_event
 
 from apps.appointment import assistant_cards
 from apps.appointment import engine, events
-from apps.appointment.models import Appointment, Recurring, RecurringService
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.series import Recurring, RecurringService
 from apps.appointment.queries.access import CHANGE_OWN, may_change
 from apps.appointment.queries.agenda import verdict_message
 from apps.appointment.queries.booking import check_member, lines_for, resolve_services

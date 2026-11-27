@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SETTINGS } from '../__tests__/kitchen';
-import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
+import { pressEnter, refusalMarks } from '../../../../base/frontend/__tests__/settings-form';
 import { click, EMPLOYEE, errorFrame, flush, ionChecked, ionValue, type MountOptions, mountKitchen } from '../__tests__/mount-kitchen';
 import SettingsPage from './SettingsPage.vue';
 
@@ -70,6 +70,16 @@ describe('SettingsPage', () => {
     await ionValue(s.field('warning_minutes'), '40', 'ionInput');
     await click(s.field('save'));
     expect(s.field('warning_minutes').errorText).toBe(message);
+    expect(s.field('save-error')).toBeNull();
+  });
+
+  it('a refusal that is of no field goes in the red notice, under its heading', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    const message = 'The kitchen screen is not available on this plan.';
+    s.answer(409, { error: { code: 'conflict', message } });
+    await ionValue(s.field('critical_minutes'), '40', 'ionInput');
+    await click(s.field('save'));
     expect(s.field('save-error')?.textContent).toContain('Could not save the settings.');
     expect(s.field('save-error')?.textContent).toContain(message);
   });
@@ -86,16 +96,12 @@ describe('SettingsPage', () => {
       await ionValue(s.field('warning_minutes'), '40', 'ionInput');
       await ionValue(s.field('critical_minutes'), '20', 'ionInput');
       await click(s.field('save'));
-      /** Whether the red notice is on screen. */
-      const notice = () => s.field('save-error') !== null;
-      const says = (name: string) => s.field(name).errorText ?? '';
-      const marked = (name: string) => s.field(name).classList.contains('ion-invalid');
-      return { ...s, notice, says, marked };
+      return { ...s, ...refusalMarks(s.field, () => s.field('save-error') !== null) };
     }
 
-    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+    it('each field says the reason, not the red notice, and a field’s message goes as soon as that field is changed', async () => {
       const s = await refused();
-      expect(s.notice()).toBe(true);
+      expect(s.notice()).toBe(false);
       expect([s.says('warning_minutes'), s.says('critical_minutes')]).toEqual([AMBER_FIRST, AMBER_FIRST]);
       await ionValue(s.field('critical_minutes'), '60', 'ionInput');
       expect(s.notice()).toBe(false);
