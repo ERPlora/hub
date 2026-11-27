@@ -3,7 +3,7 @@
 import { EmptyState } from '@erplora/ui/components';
 
 import { useLocale } from '../composables/useT';
-import { formatQuantity } from '../lib/format';
+import { quantityWithUnit } from '../lib/format';
 import type { AllDayRowOut } from '../operations';
 
 defineProps<{
@@ -51,7 +51,7 @@ const locale = useLocale();
           {{ dish.station_name || $t('kitchen.display.stationNone') }}
         </td>
         <td class="ep-order-board-totals__num">
-          {{ formatQuantity(dish.quantity, locale) }}
+          {{ quantityWithUnit(dish.quantity, dish.unit, locale) }}
         </td>
       </tr>
     </tbody>

@@ -8,15 +8,15 @@
 // known an amount is a dash, never the euro by default nor a figure with two decimals the currency may not have
 // (hub#936: 1,500 yen painted «15.00»). Its decimals come from the server, never from the browser's Intl (which gives
 // none to the forint). A quantity is written with the platform's `formatQuantity` («2.000» → «2», «1500.000» →
-// «1.500»), as every screen writes it; the field where it is typed shows it ungrouped (QtyStepper).
+// «1.500»), and with its unit by `quantityWithUnit` («0,532 kg»), as every screen writes it; the field where it is
+// typed shows it ungrouped (QtyStepper).
 
-import { formatQuantity } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
 export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';
-export { formatQuantity };
+export { formatQuantity, orderTicketQuantity, quantityWithUnit } from '@erplora/ui/components';
 
 const FALLBACK_LOCALE = 'en';
 const NO_MONEY_DECIMALS = 2;
@@ -83,12 +83,6 @@ export function currencySign(locale: string, money?: Money): string {
 export function formatPercent(value: string | number | null | undefined, locale: string): string {
   if (missing(value)) return '—';
   return formatter(locale, 'percent', { style: 'percent', maximumFractionDigits: 2 }).format(Number(value) / 100);
-}
-
-/** A quantity and its unit («0.532» kg → «0,532 kg», «1500.000» kg → «1.500 kg»); a count of units has no unit. */
-export function quantityWithUnit(value: string | number, unit: string, locale: string): string {
-  const number = formatQuantity(value, locale);
-  return unit && unit !== 'ud' ? `${number} ${unit}` : number;
 }
 
 /** An amount of `money` as typed («12,5», «12.50», 7; «1000» yen) → whole minor units, with at most the decimals

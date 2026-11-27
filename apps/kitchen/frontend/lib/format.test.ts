@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { SETTINGS } from '../__tests__/kitchen';
-import { formatDateTime, formatElapsed, formatMoney, formatQuantity, semaphore } from './format';
+import { formatDateTime, formatElapsed, formatMoney, orderTicketQuantity, quantityWithUnit, semaphore } from './format';
 
 describe('formatElapsed', () => {
   it('is m:ss, then h:mm:ss past the hour, and never negative', () => {
@@ -28,16 +28,16 @@ describe('semaphore', () => {
   });
 });
 
-describe('formatQuantity', () => {
-  it('drops the zeros the server sends and keeps a fraction', () => {
-    expect(formatQuantity('2.000', 'en')).toBe('2');
-    expect(formatQuantity('0.500', 'es')).toBe('0,5');
-    expect(formatQuantity('1.250', 'en')).toBe('1.25');
+describe('orderTicketQuantity', () => {
+  it('drops the zeros the server sends and keeps a fraction, with the unit of a dish sold by measure', () => {
+    expect(orderTicketQuantity('2.000', 'ud', 'en')).toBe('2×');
+    expect(orderTicketQuantity('0.500', 'ud', 'es')).toBe('0,5×');
+    expect(orderTicketQuantity('1.250', 'kg', 'en')).toBe('1.25 kg');
   });
 
   // hub#974: the screen and the ticket write what the till sent as the till writes it.
   it('writes a large order grouped from four digits on', () => {
-    expect([formatQuantity('1500.000', 'es'), formatQuantity(1500, 'en')]).toEqual(['1.500', '1,500']);
+    expect([orderTicketQuantity('1500.000', 'ud', 'es'), quantityWithUnit(1500, 'kg', 'en')]).toEqual(['1.500×', '1,500 kg']);
   });
 });
 

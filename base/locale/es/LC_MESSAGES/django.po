@@ -2936,3 +2936,14 @@ msgstr "Hay una app encendida o un permiso nuevo que aún no llevan: mira lo que
 #: bell.py
 msgid "Review the roles"
 msgstr "Revisar los roles"
+
+#: assistant/card_marks.py
+msgctxt "base"
+msgid "No limit"
+msgstr "Sin límite"
+
+#: assistant/card_marks.py
+#, python-format
+msgctxt "base"
+msgid "%(datum)s per %(unit)s"
+msgstr "%(datum)s por %(unit)s"
