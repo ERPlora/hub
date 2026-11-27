@@ -116,14 +116,15 @@ that does not print… No notice is dismissed: it goes by itself once it is solv
   it goes.
 
 ### The side menu
-<!-- from WORKBOOK.md sha256:28a6376e1cd8 -->
+<!-- from WORKBOOK.md sha256:883276d59037 -->
 On the left (on a phone, from the bar's button): the person at the top and the platform's entries in two groups,
 "Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever holds the
 permission its screen opens with, as in Square or Toast: "System", to whoever runs the business; "API", besides, while
 the API documentation is shown (BASE-F91), and it appears or goes when the switch changes, without reloading. An
 employee sees "Home", "Employees", "Files", "Apps" and "Settings". An entry the person does not have, opened by its
-address, says "No access" (BASE-F118). At the bottom, the QR code, "Upgrade plan" (the owner
-only) and "Manage on erplora.com".
+address, says "No access" (BASE-F118). At the bottom, the QR code to open it on a phone (BASE-F132), "Upgrade plan"
+(the owner only) and "Manage on erplora.com". The entries come before the foot: if the menu is not tall enough for both,
+the code folds into a row that shows it on a tap.
 
 ### "Upgrade plan"
 <!-- from WORKBOOK.md sha256:ead81da17fe8 -->
@@ -397,7 +398,7 @@ On the Employees screens and the API documentation:
 | No permission | Whoever does not run the business has no "API keys" or "Approvals" tabs (their address opens "Staff"), sees nobody's email and does not open a person's page; in Settings, "Only who runs the business can change it.". With the documentation hidden: "The API documentation is hidden in this business.". |
 
 ## Flows
-<!-- from WORKBOOK.md sha256:69c8d20bce7b -->
+<!-- from WORKBOOK.md sha256:e111b10f2051 -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -526,6 +527,7 @@ On the Employees screens and the API documentation:
 | BASE-F129 | Delete a role of your own | done |
 | BASE-F130 | Give a person a role of your own | partial |
 | BASE-F131 | See in the bell the roles to review | done |
+| BASE-F132 | Open the Hub on a phone with the side menu's code | done |
 
 ### BASE-F01 See what the business still has to set up
 <!-- from WORKBOOK.md sha256:ed75c3653f5d -->
@@ -788,7 +790,7 @@ knew: "Could not load notifications" with "Retry".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-<!-- from WORKBOOK.md sha256:62130c1d1cce -->
+<!-- from WORKBOOK.md sha256:523d203421e1 -->
 Status: done
 Actor: owner, administrator, manager
 Screen: The side menu, "Upgrade plan", "Manage on erplora.com"
@@ -818,7 +820,30 @@ account that no longer belongs to this business it says it does not (ACCOUNTS-F2
 a PIN or with the badge and the Google Play app do not have "Manage on erplora.com". Whoever is not the owner has no
 "Upgrade plan" anywhere in the Hub, nor erplora.com's Store: the administrator, the manager and the employee do not buy.
 In ERPlora's own business, which has no plan and buys nothing, its owner has neither; "Manage on erplora.com", yes.
-Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
+Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29, BASE-F132
+
+### BASE-F132 Open the Hub on a phone with the side menu's code
+<!-- from WORKBOOK.md sha256:2502fed09265 -->
+Status: done
+Actor: anyone who has entered the business
+Screen: The side menu, "Open on your phone"
+Operations: none
+Steps:
+  1. At the foot of the side menu, above "Upgrade plan" and "Manage on erplora.com", is the QR code of this business's
+     address, with "Open on your phone" and how to keep it on the phone's home screen. It shows to everyone, with no
+     permission or plan.
+  2. If the menu is not tall enough for its entries and the code at once (a tablet in landscape, a laptop, a phone or
+     the interface at a larger size in My profile), the entries show whole and the code folds into a row, "Open on your
+     phone", with the QR icon. Tapping it shows the code over the page, above the row; it closes with Esc or tapping
+     outside, and the focus goes back to the row.
+  3. With the menu folded to its icons (desktop), only the QR icon stays, which says "Open on your phone" on hover;
+     pressing it unfolds the menu.
+  4. They scan the code with the phone's camera and this business's address opens in its browser.
+In: the business's address.
+Out: nothing saved.
+If it fails: if the code cannot be drawn, the address to type on the phone shows in its place, also over the page when
+the row is tapped.
+Involved: BASE-F11
 
 ### BASE-F12 Ask the assistant to go over the setup
 <!-- from WORKBOOK.md sha256:89d11e47cb24 -->

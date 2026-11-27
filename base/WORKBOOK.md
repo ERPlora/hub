@@ -127,8 +127,9 @@ grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API�
 permiso con el que se abre su pantalla, como en Square o Toast: «Sistema», a quien administra el negocio; «API», además,
 mientras la documentación de la API está mostrada (BASE-F91), y aparece o se va al cambiar el interruptor, sin
 recargar. Un empleado ve «Inicio», «Empleados», «Archivos», «Apps» y «Ajustes». Una entrada que la persona no tiene,
-abierta por su dirección, dice «Sin acceso» (BASE-F118). Abajo, el código QR, «Mejorar plan»
-(solo el propietario) y «Gestionar en erplora.com».
+abierta por su dirección, dice «Sin acceso» (BASE-F118). Abajo, el código QR para abrirlo en el móvil (BASE-F132),
+«Mejorar plan» (solo el propietario) y «Gestionar en erplora.com». Las entradas van antes que el pie: si el menú no tiene
+alto para las dos cosas, el código se pliega a una fila que lo enseña al tocarla.
 
 ### «Mejorar plan»
 Al pie del menú lateral, entre el código QR y «Gestionar en erplora.com». Abre la página del plan de este negocio en
@@ -490,6 +491,7 @@ En la pantalla Archivos:
 | BASE-F129 | Borrar un rol propio | hecho |
 | BASE-F130 | Dar un rol propio a una persona | parcial |
 | BASE-F131 | Ver en la campana los roles por revisar | hecho |
+| BASE-F132 | Abrir el Hub en el móvil con el código del menú lateral | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 Estado: hecho
@@ -772,7 +774,29 @@ que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, u
 y la app de Google Play no tienen «Gestionar en erplora.com». Quien no es el propietario no tiene «Mejorar plan» en
 ningún sitio del Hub, ni la Tienda de erplora.com: el administrador, el encargado y el empleado no compran. En el negocio
 propio de ERPlora, que no tiene plan ni compra nada, tampoco los tiene su propietario; «Gestionar en erplora.com», sí.
-Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
+Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29, BASE-F132
+
+### BASE-F132 Abrir el Hub en el móvil con el código del menú lateral
+Estado: hecho
+Actor: cualquiera que haya entrado en el negocio
+Pantalla: El menú lateral, «Ábrelo en el móvil»
+Operaciones: ninguna
+Pasos:
+  1. Al pie del menú lateral, encima de «Mejorar plan» y «Gestionar en erplora.com», está el código QR de la dirección
+     de este negocio, con «Ábrelo en el móvil» y cómo dejarlo en la pantalla de inicio del móvil. Sale a todo el mundo,
+     sin permiso ni plan.
+  2. Si el menú no tiene alto para sus entradas y el código a la vez (una tableta en horizontal, un portátil, un
+     teléfono o la interfaz a un tamaño mayor en Mi perfil), las entradas se ven enteras y el código se pliega a una
+     fila, «Ábrelo en el móvil», con el icono del QR. Al tocarla, el código sale encima de la página, sobre la fila; se
+     cierra con Esc o tocando fuera, y el foco vuelve a la fila.
+  3. Con el menú plegado a sus iconos (escritorio), queda solo el icono del QR, que dice «Ábrelo en el móvil» al pasar
+     por encima; al pulsarlo, el menú se despliega.
+  4. Escanea el código con la cámara del móvil y se abre la dirección de este negocio en su navegador.
+Entra: la dirección del negocio.
+Sale: nada guardado.
+Si falla: si el código no se puede dibujar, en su lugar sale la dirección para escribirla en el móvil, también encima de
+la página al tocar la fila.
+Implicados: BASE-F11
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
 Estado: hecho
