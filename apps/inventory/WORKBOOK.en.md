@@ -135,12 +135,12 @@ lost, mark it sold out or delete it. Tapping the row opens its card, with the ba
 The table's buttons import and export the catalog as a CSV file.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:26c3f8b6b683 -->
+<!-- from WORKBOOK.md sha256:5fd6448d3fab -->
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
 Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
 "Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
-"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
+"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU, ignoring case and accents ("cafe" finds "Café con leche"); sorting by
 column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
 "Sold out"): an end that cannot be read says so below its field, in the same words as the product's price ("This
 is not an amount…", "This amount cannot be negative.", the two readings of "1.250" or "This is not a
@@ -966,7 +966,7 @@ refund's notice does not bring them; if they go back to the shelf, they are coun
 Involved: SALE-F31
 
 ### INVENTORY-F25 Print the barcode label
-<!-- from WORKBOOK.md sha256:69d5dc301c13 -->
+<!-- from WORKBOOK.md sha256:bb06275d5ffe -->
 Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Product card
@@ -981,7 +981,9 @@ Steps:
    label is waiting in the print queue: no printer has the «Label» function. Give it to one in
    Printing.".
 In: the product's SKU, name and price; the printer with the "Label" function, from Printing. It can also
-be asked for through the assistant ("print the shampoo's label") or through the API.
+be asked for through the assistant ("print the shampoo's label") or through the API. If no device that is on prints
+that queue, the assistant says the label waits in the queue and will come out when a device set up to print it does,
+never that it has printed it.
 Out: a label job in Printing's queue, with the price in the business's currency.
 If it fails: whoever does not reach the print queue (Printing is not active, or they cannot print) sees
 the device's print dialog with the code, the SKU and the name, without a price: the browser's or, in the

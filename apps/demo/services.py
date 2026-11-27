@@ -27,8 +27,8 @@ ITEM_DONE = _("This item is closed: open it to add lines.")
     input=ItemIn,
     output=ItemDetailOut,
     ai={
-        "description": "Creates a demo item with its name (up to 120 characters) and, if given, its status («open» "
-        "or «done») and a note.",
+        "description": "Creates a demo item with its name (up to 120 characters) and, if given, its status (`open` "
+        "or `done`) and a note.",
         "risk": "normal",
         "asks": {
             "en": (
@@ -57,7 +57,7 @@ def create_item(ctx: OperationContext, data: ItemIn) -> Item | None:
     output=ItemDetailOut,
     ai={
         "description": "Changes a demo item, by its id or its name, only in what is sent: its name, its status "
-        "(«done» closes it to new lines, «open» reopens it) or its note.",
+        "(`done` closes it to new lines, `open` reopens it) or its note.",
         "risk": "normal",
         "check": "demo.item.detail",
         "asks": {
