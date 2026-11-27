@@ -6,7 +6,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
-import { click, EMPLOYEE, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
+import { ACCOUNTANT, click, EMPLOYEE, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import { plain } from '../lib/format';
 import type { QueueRowOut } from '../operations';
 import ContingencyPage from './ContingencyPage.vue';
@@ -113,8 +113,15 @@ describe('ContingencyPage', () => {
     expect(toastSuccess).toHaveBeenCalledWith('TICKET-2026-000001 goes out with the next pass.');
   });
 
-  it('the employee looks but does not process nor retry', async () => {
+  it('the employee processes the queue and retries an entry', async () => {
     const s = await setup({ session: EMPLOYEE });
+    await s.result(OP, { rows: [ROW], total: 1, limit: 50, offset: 0 });
+    expect(s.find('verifactu-queue-process').exists()).toBe(true);
+    expect(((s.table().props() as Record<string, unknown>).actions as Array<{ id: string }>).map((a) => a.id)).toEqual(['retry', 'view']);
+  });
+
+  it('who may not send looks but does not process nor retry', async () => {
+    const s = await setup({ session: ACCOUNTANT });
     await s.result(OP, { rows: [ROW], total: 1, limit: 50, offset: 0 });
     expect(s.find('verifactu-queue-process').exists()).toBe(false);
     expect(((s.table().props() as Record<string, unknown>).actions as Array<{ id: string }>).map((a) => a.id)).toEqual(['view']);

@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
-"""The report of the Hub's nightly e2e run (scripts/nightly_e2e.py): lists what came out red, from Playwright's
-JSON report, in its output, and keeps ONE open issue about it: a red night opens it (or comments on it when it is
-already open) and the first green night closes it.
+"""The report of the Hub's e2e run on its own stack: lists what came out red, from Playwright's JSON report, in its
+output, and keeps ONE open issue about the nightly run: a red night opens it (or comments on it when it is already
+open) and the first green night closes it. scripts/nightly_e2e.py runs it after the specs, with the night's folder;
+the nightly workflow (.github/workflows/nightly.yml), once over the reports of all its shards, with the run's URL.
 
-  RESULT=<success|anything else> SHA=<commit of main> RUN_DIR=<the night's folder> [REPORT=<json report>] \
-    [STEP=<the step before the specs that failed>] PUBLISH=true|false GH_REPO=<owner/repo> \
+  RESULT=<success|anything else> SHA=<commit of main> RUN_URL=<the run> | RUN_DIR=<the night's folder> \
+    [REPORT=<json report>] [STEP=<the step before the specs that failed>] PUBLISH=true|false GH_REPO=<owner/repo> \
     python3 scripts/e2e_report.py
 
 Every result other than `success` is red. A missing or unreadable report is said, not hidden: the night stopped before
 or outside the specs, and STEP names where when it is known. Only PUBLISH=true writes issues; otherwise the output is
-all. A gh call that fails fails the report with gh's exit code. RUN_DIR is written from ~ (the Mac's user path never
-reaches GitHub). Optional: DAY (the night's date, default today in local time).
+all. A gh call that fails fails the report with gh's exit code. The log and the traces are named by RUN_URL when it is
+given, else by RUN_DIR written from ~ (the Mac's user path never reaches GitHub). Optional: DAY (the night's date,
+default today in local time).
 
 The report is read with jq's rules, which the output and the issue keep: a value is written as jq writes it (null,
 numbers, objects as compact JSON), a list may also be an object, and a value jq could not index or iterate stops the
-report with jq's exit code, 5. Only the standard library: the Mac runs it with its own python3.
+report with jq's exit code, 5. Only the standard library: a runner or a Mac runs it with its own python3.
 """
 
 from __future__ import annotations
@@ -30,19 +32,18 @@ from dataclasses import dataclass
 from pathlib import Path
 
 TITLE = "Pruebas de navegador del Hub en rojo en la pasada nocturna"
-SETTINGS = ("RESULT", "SHA", "RUN_DIR")
+SETTINGS = ("RESULT", "SHA")
 REFUSED = 5
 COLOUR = re.compile(r"\x1b\[[0-9;]*m")
 BLANK = re.compile(r"[ \t\n\r]*")
 
-STEPPED = "La pasada no llegó a las specs: falló «{step}». Lo que dijo está en `{folder}/night.log`.\n"
+STEPPED = "La pasada no llegó a las specs: falló «{step}». Lo que dijo está en {log}.\n"
 NO_REPORT = (
     "La ejecución terminó en `{result}` sin informe de las pruebas: lo que falló está antes o fuera de las specs"
-    " (servidores, tiempo agotado). Lo dice `{folder}/night.log`.\n"
+    " (servidores, tiempo agotado). Lo dice {log}.\n"
 )
 NOTHING_RED = (
-    "\nEl informe no tiene ninguna prueba en rojo, pero la ejecución terminó en `{result}`: `{folder}/night.log` dice"
-    " por qué.\n"
+    "\nEl informe no tiene ninguna prueba en rojo, pero la ejecución terminó en `{result}`: {log} dice por qué.\n"
 )
 ISSUE_OPENING = (
     "## Qué pasa\n"
@@ -55,18 +56,16 @@ ISSUE_OPENING = (
     " ponerla al día. Esta issue se cierra sola la primera noche en que la pasada salga entera en verde.\n"
     "\n"
     "## Detalle técnico\n"
-    "- Pasada del {day} sobre `main` (commit `{commit}`), en el Mac. El registro de la noche (`night.log`) y las trazas"
-    " y capturas de cada fallo (`test-results/`), en `{folder}`.\n"
+    "- Pasada del {day} sobre `main` (commit `{commit}`). Su registro y las trazas y capturas de cada fallo, en"
+    " {evidence}.\n"
     "- Una spec se repite en una pila propia (`tests/e2e/README.md`, «Varias ejecuciones a la vez») con `CI=1 pnpm e2e"
-    " tests/e2e/<spec>`, o con la misma pila de la noche: `python3 scripts/nightly_e2e.py --no-publish --spec"
-    " tests/e2e/<spec>`.\n"
+    " tests/e2e/<spec>`, o con la misma pila de la noche: `python3 scripts/nightly_e2e.py --spec tests/e2e/<spec>`.\n"
     "\n"
 )
 ISSUE_CLOSING = (
     "\n"
     "## Origen\n"
-    "- Cómo se llegó: la pasada nocturna de las pruebas de navegador del Hub (`scripts/nightly_e2e.py`, que"
-    " lanza launchd en el Mac).\n"
+    "- Cómo se llegó: la pasada nocturna de las pruebas de navegador del Hub (`.github/workflows/nightly.yml`).\n"
     "- Sale de #877\n"
     "- La introdujo una PR: no comprobado — la pasada no sabe qué cambio la rompió; se busca entre los commits desde la"
     " última noche en verde.\n"
@@ -90,10 +89,13 @@ class Refused(Exception):
 
 @dataclass(frozen=True)
 class Night:
+    """A run to report; log and evidence say, already formatted, where its log is and where its log and traces are."""
+
     result: str
     commit: str
     day: str
-    folder: str
+    log: str
+    evidence: str
     publish: bool
 
 
@@ -205,7 +207,7 @@ def listing(night: Night, documents: list) -> str:
     found = "".join(f"{counts(document)}\n" for document in documents) + "\n"
     found += "".join(f"{line}\n" for document in documents for line in red_lines(document))
     if night.result != "success" and not any(line.startswith("- ") for line in found.split("\n")):
-        found += NOTHING_RED.format(result=night.result, folder=night.folder)
+        found += NOTHING_RED.format(result=night.result, log=night.log)
     return found
 
 
@@ -213,10 +215,10 @@ def details(night: Night, step: str, report: str) -> str:
     """What came out red, for the output and the issue: the step that failed before the specs, the report's listing,
     or why there is no report."""
     if step:
-        return STEPPED.format(step=step, folder=night.folder)
+        return STEPPED.format(step=step, log=night.log)
     documents = read_report(report) if report else None
     if documents is None:
-        return NO_REPORT.format(result=night.result, folder=night.folder)
+        return NO_REPORT.format(result=night.result, log=night.log)
     return listing(night, documents)
 
 
@@ -303,17 +305,17 @@ def green(night: Night) -> None:
 
 def red(night: Night, found: str) -> None:
     say(f"## Pruebas de navegador del Hub: en rojo\n\nLa pasada del {night.day}, commit `{night.commit}`, en"
-        f" `{night.folder}`.\n\n{found}")
+        f" {night.evidence}.\n\n{found}")
     if not night.publish:
         say("\nSin publicar: no se escribe ninguna issue.\n")
         return
     number = open_issue()
     if number:
         still = (f"La pasada del {night.day} sigue en rojo, sobre `main` (commit `{night.commit}`); su registro y sus"
-                 f" trazas, en `{night.folder}`.\n\n")
+                 f" trazas, en {night.evidence}.\n\n")
         gh_with_body(["issue", "comment", number], still + found)
         return
-    opening = ISSUE_OPENING.format(day=night.day, commit=night.commit, folder=night.folder)
+    opening = ISSUE_OPENING.format(day=night.day, commit=night.commit, evidence=night.evidence)
     body = opening + found + ISSUE_CLOSING.format(commit=night.commit)
     gh_with_body(["issue", "create", "--title", TITLE, "--label", "prio:P1"], body)
 
@@ -324,6 +326,21 @@ def from_home(folder: str, home: str) -> str:
     return f"~/{folder[len(inside):]}" if folder.startswith(inside) else folder
 
 
+def where(env) -> tuple[str, str] | None:
+    """Where the run's log is, and where its log and traces are: its run on GitHub, or the night's folder from ~.
+    None, after saying so, when neither can be told."""
+    if env.get("RUN_URL"):
+        return f"el registro de {env['RUN_URL']}", env["RUN_URL"]
+    if not env.get("RUN_DIR"):
+        print("e2e_report.py: RUN_URL or RUN_DIR: parameter null or not set", file=sys.stderr)
+        return None
+    if "HOME" not in env:
+        print("e2e_report.py: HOME: unbound variable", file=sys.stderr)
+        return None
+    folder = from_home(env["RUN_DIR"], env["HOME"])
+    return f"`{folder}/night.log`", f"`{folder}`"
+
+
 def main() -> int:
     # The output is UTF-8 whatever the locale says: the issue's text is Spanish, and the night's log keeps it.
     sys.stdout.reconfigure(encoding="utf-8")
@@ -332,14 +349,15 @@ def main() -> int:
         if not env.get(name):
             print(f"e2e_report.py: {name}: parameter null or not set", file=sys.stderr)
             return 1
-    if "HOME" not in env:
-        print("e2e_report.py: HOME: unbound variable", file=sys.stderr)
+    places = where(env)
+    if places is None:
         return 1
     night = Night(
         result=env["RESULT"],
         commit=env["SHA"][:7],
         day=env.get("DAY") or datetime.date.today().isoformat(),
-        folder=from_home(env["RUN_DIR"], env["HOME"]),
+        log=places[0],
+        evidence=places[1],
         publish=env.get("PUBLISH") == "true",
     )
     try:

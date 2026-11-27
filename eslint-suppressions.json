@@ -1,9 +1,4 @@
 {
-  "apps/appointment/frontend/components/AppointmentFormModal.vue": {
-    "vue/max-lines-per-block": {
-      "count": 1
-    }
-  },
   "apps/appointment/frontend/components/DayGrid.vue": {
     "vue/max-lines-per-block": {
       "count": 2
@@ -319,11 +314,6 @@
     }
   },
   "apps/sale/frontend/composables/checkout/useTender.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
-  "apps/sale/frontend/composables/pos/useTill.ts": {
     "max-lines-per-function": {
       "count": 1
     }

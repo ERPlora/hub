@@ -82,7 +82,7 @@ const columns = computed<DataTableColumn<ProjectOut>[]>(() => [
 ]);
 
 const actions = computed<DataTableAction<ProjectOut>[]>(() => [
-  { id: 'open', label: t('task.actions.open'), icon: 'open-outline', color: 'primary', showLabel: true, pinned: true },
+  { id: 'open', label: t('task.actions.open'), icon: 'open-outline', color: 'primary', pinned: true },
 ]);
 
 const sheetProjectId = ref<string | null>(null);

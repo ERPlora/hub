@@ -246,7 +246,7 @@ test('TABLE-F01, F06: the zones of the room in Zones (add, rename, delete an emp
     await expect(view.locator('[data-testid=table-zones-row]', { hasText: `${TAG} Terrace` })).toBeVisible();
     await rowAction(page, 'table-zones', spare.id, 'delete');
     const removal = page.locator('ion-modal[data-testid=table-zones-delete]');
-    await expect(removal).toContainText('0 tables in this zone');
+    await expect(removal).toContainText('The zone leaves the plan and the lists.');
     await flowShots(page, ['TABLE-F06'], async () => {
       await expect(removal.locator('[data-testid=table-zones-delete-submit]')).toBeEnabled();
     });

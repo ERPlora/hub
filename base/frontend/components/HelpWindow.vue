@@ -209,14 +209,15 @@ function go(path: string): void {
         class="help-ask"
         fill="clear"
         data-testid="help-ask-assistant"
+        :aria-label="t('base.help.ask')"
+        :title="t('base.help.ask')"
         :disabled="!help"
         @click="ask"
       >
         <HubIcon
-          slot="start"
+          slot="icon-only"
           name="ion:sparkles-outline"
         />
-        {{ t('base.help.ask') }}
       </ion-button>
       <ion-button
         class="help-close"

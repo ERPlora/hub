@@ -276,7 +276,7 @@ is cancelled and another is recorded.
 Involved: FLOW-F21
 
 ### PAYMENT-F06 Search and review the payments
-<!-- from WORKBOOK.md sha256:0430845da71b -->
+<!-- from WORKBOOK.md sha256:213ceab7fe5c -->
 Status: done
 Actor: manager, administrator, owner, assistant (an employee does not open Payments: by its address, "No access" (BASE-F118))
 Screen: Payments
@@ -291,7 +291,7 @@ Steps:
 In: what the person types.
 Out: nothing; read only. The list updates on its own when another person records or changes a payment.
 Through the assistant, "the payment PAY-20261014-0003" is read whole, with its method, concept, IBAN and
-invoice. Whoever recorded, changed, approved or cancelled a payment shows by their name or, if their account has
+invoice. Whoever recorded, changed, approved or cancelled a payment shows by their name or, if they have
 none, by what goes before the @ of their email, never the whole email, also in earlier payments.
 If it fails: if the list does not load, the table says so ("The payments could not be loaded.") with
 "Retry", never "No payments.". A filter amount that is not a figure does not filter (never "from 0").

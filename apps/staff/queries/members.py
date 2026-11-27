@@ -1,12 +1,10 @@
 """The directory, a record, a person's own, the pay sheet and the staff figures (STAFF-F08, F09, F20, F21, F23)."""
 
-from functools import reduce
-from operator import or_
 
 from django.db.models import Count, Q, QuerySet, Value
 from django.db.models.functions import Concat
 from live.context import OperationContext
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.staff.models import Member, TimeOff
 from apps.staff.schemas.fields import MemberRefIn
@@ -25,6 +23,7 @@ from apps.staff.schemas.members import (
 )
 from base.ordering import list_order_for
 from base.sensitive import VIEW_TEAM_CONTACT
+from base.text_search import contains_text
 
 from .reads import _page, business_today, live_members, own_member, resolve_member
 from .time_off_reads import _away_on, live_time_off
@@ -42,12 +41,10 @@ MEMBER_ORDER = {
     "user_id": ("user_id",),
     "id": (),
 }
-# The model lookup behind each filter of the directory; a filter left out keeps every record.
+# The filters of the directory that search their column's text, and the model lookup behind each of the others; a
+# filter left out keeps every record.
+MEMBER_TEXT_FILTERS = ("first_name", "last_name", "email", "phone")
 MEMBER_FILTERS = {
-    "first_name": "first_name__icontains",
-    "last_name": "last_name__icontains",
-    "email": "email__icontains",
-    "phone": "phone__icontains",
     "status": "status",
     "role_id": "role_id",
     "role_name": "role__name__iexact",
@@ -98,7 +95,10 @@ def filter_members(members: QuerySet[Member], params: MemberListIn, *, contact: 
     members = members.annotate(search_name=Concat("first_name", Value(" "), "last_name"))
     if params.search:
         columns = MEMBER_SEARCH + (CONTACT_SEARCH if contact else ())
-        members = members.filter(reduce(or_, (Q(**{f"{column}__icontains": params.search}) for column in columns)))
+        members = members.filter(contains_text(params.search, *columns))
+    for column in MEMBER_TEXT_FILTERS:
+        if getattr(params, column):
+            members = members.filter(contains_text(getattr(params, column), column))
     given = {name: getattr(params, name) for name in MEMBER_FILTERS}
     return members.filter(**{MEMBER_FILTERS[name]: value for name, value in given.items() if value not in NO_FILTER})
 
@@ -158,6 +158,7 @@ def my_record(ctx: OperationContext, data: MineIn) -> dict:
     return {"member": own_member(ctx)}
 
 
+# Not an assistant tool: the till's own record (the assistant reads it with staff.member.mine).
 @operation(
     "staff.member.current",
     kind="query",
@@ -166,10 +167,7 @@ def my_record(ctx: OperationContext, data: MineIn) -> dict:
     permission=None,
     input=CurrentMemberIn,
     output=CurrentMemberOut,
-    ai={
-        "description": "Returns the id and name of the current user's own staff record: who a sale is "
-        "attributed to when nobody else is named. Empty when the user has no record."
-    },
+    ai=INTERNAL,
 )
 def current_record(ctx: OperationContext, data: CurrentMemberIn) -> dict:
     return {"member": own_member(ctx)}

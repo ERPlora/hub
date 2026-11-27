@@ -115,7 +115,7 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
   **Ordenador** o de **Móvil**, y **Recargar la vista previa**. Se recarga sola tras cada guardado.
 
 #### Compartir y QR
-La dirección de la página web con **Copiar enlace**, su código QR y **Descargar PNG** (para imprimir) y
+La dirección de la página web con **Copiar enlace** (su icono, junto a ella), su código QR y **Descargar PNG** (para imprimir) y
 **Descargar SVG** (para ampliar sin perder calidad). Avisa de que, en el dispositivo donde se ha entrado, la
 dirección abre la app (para ver la página: el móvil o una ventana privada) y, si la página no está en línea, de que
 la dirección aún lleva al acceso del equipo. Si el borrador muestra el catálogo, debajo, separada por una línea, «La
@@ -340,7 +340,7 @@ Actor: propietario, administrador, responsable, API
 Pantalla: Compartir y QR
 Pasos:
 1. En **Página web**, pulsa **Compartir y QR**.
-2. **Copiar enlace** copia la dirección («Enlace copiado»); **Descargar PNG** baja el QR para imprimirlo y
+2. **Copiar enlace**, el icono junto a la dirección, la copia («Enlace copiado»); **Descargar PNG** baja el QR para imprimirlo y
    **Descargar SVG** para ampliarlo sin perder calidad.
 3. Si el borrador muestra el catálogo, debajo está «La dirección de tu catálogo», con su propio
    **Copiar enlace**, **Descargar PNG** y **Descargar SVG**: es el QR para imprimir y dejar en las mesas.

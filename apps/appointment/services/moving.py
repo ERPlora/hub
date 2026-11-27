@@ -9,7 +9,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.operations import operation
 
 from apps.appointment import engine, events
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.queries.access import CHANGE_OWN, may_change
 from apps.appointment.queries.booking import check_member, lines_for, resolve_services
 from apps.appointment.queries.business import read_moment
