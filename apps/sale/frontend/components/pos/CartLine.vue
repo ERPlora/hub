@@ -7,6 +7,7 @@
 // and ×quantity: what is comped is usually what was already served. A line a voucher pays (SALE-F27) says
 // «Already paid · <voucher>» at 0 and offers only its note (until it is sent) and ⊗ to take it off (which
 // gives the session back). Tapping the line itself (never its buttons) marks it. Nothing here works money out.
+import { QuantityStepper } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
@@ -15,7 +16,6 @@ import type { OrderLineOut } from '../../operations';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, formatPercent, formatQuantity, quantityWithUnit, useBusinessMoney } from '../../lib/format';
 import CartLineDetails from './CartLineDetails.vue';
-import QtyStepper from './QtyStepper.vue';
 
 const props = defineProps<{
   line: OrderLineOut;
@@ -199,11 +199,16 @@ function onRow(): void {
           class="pos-line__qty"
         >×{{ quantity }}</span>
       </span>
-      <QtyStepper
+      <QuantityStepper
         v-if="editable"
         :quantity="line.quantity"
         :unit="line.unit"
+        decimals
         :disabled="busy"
+        :label="t('sale.pos.quantity')"
+        :decrease-label="t('sale.pos.decrease')"
+        :increase-label="t('sale.pos.increase')"
+        testid="pos-qty"
         @change="emit('quantity', $event)"
       />
     </div>

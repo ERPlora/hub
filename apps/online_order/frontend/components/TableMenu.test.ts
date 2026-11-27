@@ -1,20 +1,18 @@
-// TableMenu (ONLINE_ORDER-F03): what a customer sees on their phone after scanning their table's QR. The business's
+// TableMenu (ONLINE_ORDER-F03, F04): what a customer sees on their phone after scanning their table's QR. The business's
 // menu by category, each dish with its photo, description, allergens and price, and the set menus; the table and its
 // zone above it. Opening a dish shows its options, read then; opening a set menu, its courses. A QR that is no longer
 // active says so and nothing of the business; a menu that could not be loaded, why, with «Retry».
-import type { SessionMe } from '@erplora/ui/shell';
 import { ApiError, type ApiClient } from '@erplora/ui/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, mountInShell, settle } from '../__tests__/mount-online-order';
+import { click, ionValue, mountInShell, settle } from '../__tests__/mount-online-order';
+import { MONEY, SAUCES, VISITOR } from '../__tests__/table-page';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
-import type { PublicMenuOut, PublicOptionsOut } from '../operations';
+import type { PublicMenuOut, PublicOptionsOut, PublicSentOut } from '../operations';
 import TableMenu from './TableMenu.vue';
 
 const CODE = 'c'.repeat(22);
-const VISITOR: SessionMe = { user: null, permissions: [], menu: [], apps: [], language: 'en' };
-const MONEY = { currency: 'EUR', decimals: 2 };
 const MENU: PublicMenuOut = {
   business_name: 'Casa Pepe',
   table_number: '4',
@@ -42,36 +40,35 @@ const MENU: PublicMenuOut = {
       price: 1350,
       image_url: '',
       courses: [
-        { name: 'Mains', min_choices: 1, max_choices: 1, choices: [{ name: 'Hake', price_delta: 200, allergens: ['fish'] }] },
+        {
+          id: 'k1',
+          name: 'Mains',
+          min_choices: 1,
+          max_choices: 1,
+          allow_repeat: false,
+          choices: [{ id: 'c1', name: 'Hake', price_delta: 200, allergens: ['fish'] }],
+        },
       ],
     },
   ],
 };
-const OPTIONS: PublicOptionsOut = {
-  product_id: 'p1',
-  groups: [
-    {
-      name: 'Sauces',
-      min_choices: 0,
-      max_choices: 2,
-      options: [
-        { name: 'Aioli', price_delta: 50, allergens: ['egg'] },
-        { name: 'Brava', price_delta: 0, allergens: [] },
-      ],
-    },
-  ],
-};
+const OPTIONS: PublicOptionsOut = { product_id: 'p1', groups: [SAUCES] };
 
-type Answer = PublicMenuOut | PublicOptionsOut | ApiError | 'hang' | Promise<PublicOptionsOut>;
+type Answer = PublicMenuOut | PublicOptionsOut | PublicSentOut | ApiError | Error | 'hang' | Promise<PublicOptionsOut>;
+const SENT: PublicSentOut = { id: 'order-1', status: 'pending', total: 1600 };
 
 async function setup(menu: Answer = MENU, options: Answer = OPTIONS, locale: 'en' | 'es' = 'en') {
-  const answers: Record<string, Answer[]> = { 'online_order.public.menu': [menu], 'online_order.public.options': [options] };
+  const answers: Record<string, Answer[]> = {
+    'online_order.public.menu': [menu],
+    'online_order.public.options': [options],
+    'online_order.public.send': [SENT],
+  };
   const call = vi.fn(async (op: string) => {
     const queue = answers[op];
     if (!queue) throw new Error(`Unexpected operation: ${op}`);
     const answer = queue.length > 1 ? queue.shift()! : queue[0];
     if (answer === 'hang') return new Promise<never>(() => {});
-    if (answer instanceof ApiError) throw answer;
+    if (answer instanceof Error) throw answer;
     return answer;
   });
   const mounted = await mountInShell(
@@ -140,8 +137,8 @@ describe('TableMenu', () => {
     expect(words(sheet)).toContain('Six, of ham');
     expect(words(sheet)).toContain('Sauces');
     expect(words(sheet)).toContain('Optional · up to 2');
-    expect(words(s.inDoc('oo-menu-choice-0-0')!)).toBe('Aioli Allergens: Egg +€0.50');
-    expect(words(s.inDoc('oo-menu-choice-0-1')!)).toBe('Brava');
+    expect(words(s.inDoc('oo-pick-o1')!)).toBe('Aioli Allergens: Egg +€0.50');
+    expect(words(s.inDoc('oo-pick-o2')!)).toBe('Brava');
   });
 
   it('says why a dish’s options could not be read, and reads them again', async () => {
@@ -162,7 +159,7 @@ describe('TableMenu', () => {
     await settle();
     expect(s.call).not.toHaveBeenCalledWith('online_order.public.options', expect.anything());
     expect(words(s.inDoc('oo-menu-sheet')!)).toContain('Choose 1');
-    expect(words(s.inDoc('oo-menu-choice-0-0')!)).toBe('Hake Allergens: Fish +€2.00');
+    expect(words(s.inDoc('oo-pick-c1')!)).toBe('Hake Allergens: Fish +€2.00');
   });
 
   it('draws no photo from another site', async () => {
@@ -192,7 +189,16 @@ describe('TableMenu', () => {
     });
     const toppings: PublicOptionsOut = {
       product_id: 'p2',
-      groups: [{ name: 'Toppings', min_choices: 0, max_choices: 0, options: [{ name: 'Olive oil', price_delta: 0, allergens: [] }] }],
+      groups: [
+        {
+          id: 'g2',
+          name: 'Toppings',
+          min_choices: 0,
+          max_choices: 0,
+          allow_repeat: false,
+          options: [{ id: 'o3', name: 'Olive oil', price_delta: 0, allergens: [] }],
+        },
+      ],
     };
     const s = await setup(MENU, OPTIONS);
     s.answers['online_order.public.options'] = [late, toppings];
@@ -239,5 +245,146 @@ describe('TableMenu', () => {
     expect(words(s.inDoc('oo-menu-table')!)).toBe('Mesa 4');
     expect(words(s.inDoc('oo-menu-dish-p1')!)).toContain('Alérgenos: Gluten, Leche');
     expect(s.wrapper.find('[data-testid="oo-menu-group"] ion-list-header').text()).toBe('Menús');
+  });
+
+  it('does not show the late failure of the options of the dish opened before', async () => {
+    let failFirst: (error: Error) => void = () => {};
+    const late = new Promise<PublicOptionsOut>((_resolve, reject) => {
+      failFirst = reject;
+    });
+    const s = await setup(MENU, OPTIONS);
+    s.answers['online_order.public.options'] = [late, OPTIONS];
+    await click(s.inDoc('oo-menu-dish-p1'));
+    await click(s.inDoc('oo-menu-dish-p2'));
+    await settle();
+    failFirst(new ApiError(500, 'server_error', 'boom'));
+    await settle();
+    expect(s.inDoc('oo-menu-options-error')).toBeNull();
+    expect(words(s.inDoc('oo-menu-sheet')!)).toContain('Aioli');
+  });
+});
+
+/** Adds the dish `id` with the options `picks`, `more` times one more unit and `note`, as a customer does. */
+async function addDish(s: Awaited<ReturnType<typeof setup>>, id: string, picks: string[] = [], more = 0, note = '') {
+  await click(s.inDoc(`oo-menu-dish-${id}`));
+  await settle();
+  for (const pick of picks) await ionValue(s.inDoc(`oo-pick-check-${pick}`), true);
+  for (let i = 0; i < more; i++) await click(s.inDoc('oo-dish-qty-plus'));
+  if (note) await ionValue(s.inDoc('oo-dish-note'), note, 'ionInput');
+  await click(s.inDoc('oo-menu-sheet-submit'));
+}
+
+/** Adds a bread and sends the order, which the server answers with `answers` in turn. */
+async function sendFailing(s: Awaited<ReturnType<typeof setup>>, ...answers: Answer[]) {
+  s.answers['online_order.public.send'] = answers;
+  await addDish(s, 'p2');
+  await click(s.inDoc('oo-order-view'));
+  await click(s.inDoc('oo-order-sheet-submit'));
+  await settle();
+}
+
+const disabled = (el: Element | null) => (el as Element & { disabled: boolean }).disabled;
+
+describe('TableMenu: the order', () => {
+  it('adds a dish with an option, its quantity and a note, and shows the order with its total', async () => {
+    const s = await setup();
+    expect(s.inDoc('oo-order-view')).toBeNull();
+    await addDish(s, 'p1', ['o1'], 1, 'No salt');
+    expect(words(s.inDoc('oo-order-view')!)).toBe('View order (2) · €16.00');
+  });
+
+  it('waits to add a dish until each group has what it asks', async () => {
+    const required = { ...OPTIONS, groups: [{ ...OPTIONS.groups[0], min_choices: 1, max_choices: 1 }] };
+    const s = await setup(MENU, required);
+    await click(s.inDoc('oo-menu-dish-p1'));
+    await settle();
+    expect(disabled(s.inDoc('oo-menu-sheet-submit'))).toBe(true);
+    await ionValue(s.inDoc('oo-pick-check-o2'), true);
+    expect(disabled(s.inDoc('oo-menu-sheet-submit'))).toBe(false);
+  });
+
+  it('waits to add a dish whose options could not be read', async () => {
+    const s = await setup(MENU, new ApiError(500, 'server_error', 'boom'));
+    await click(s.inDoc('oo-menu-dish-p1'));
+    await settle();
+    expect(s.inDoc('oo-menu-options-error')).not.toBeNull();
+    expect(disabled(s.inDoc('oo-menu-sheet-submit'))).toBe(true);
+  });
+
+  it('takes from one to twenty of a dish, as the order is taken', async () => {
+    const s = await setup();
+    await click(s.inDoc('oo-menu-dish-p2'));
+    expect(disabled(s.inDoc('oo-dish-qty-minus'))).toBe(true);
+    const field = s.inDoc('oo-dish-qty-field') as HTMLInputElement;
+    field.value = '20';
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+    await settle();
+    expect(disabled(s.inDoc('oo-dish-qty-plus'))).toBe(true);
+    expect(words(s.inDoc('oo-menu-sheet-submit')!)).toBe('Add · €24.00');
+  });
+
+  it('adds a set menu with a dish of each course', async () => {
+    const s = await setup();
+    await click(s.inDoc('oo-menu-combo-m1'));
+    expect(disabled(s.inDoc('oo-menu-sheet-submit'))).toBe(true);
+    await ionValue(s.inDoc('oo-pick-check-c1'), true);
+    await click(s.inDoc('oo-menu-sheet-submit'));
+    expect(words(s.inDoc('oo-order-view')!)).toBe('View order (1) · €15.50');
+  });
+
+  it('sends the order by ids, and says the restaurant will confirm it', async () => {
+    const s = await setup();
+    await addDish(s, 'p1', ['o1'], 1, 'No salt');
+    await click(s.inDoc('oo-menu-combo-m1'));
+    await ionValue(s.inDoc('oo-pick-check-c1'), true);
+    await click(s.inDoc('oo-menu-sheet-submit'));
+    await click(s.inDoc('oo-order-view'));
+    await click(s.inDoc('oo-order-sheet-submit'));
+    await settle();
+    expect(s.call).toHaveBeenCalledWith('online_order.public.send', {
+      code: CODE,
+      lines: [
+        { product_id: 'p1', option_ids: ['o1'], quantity: 2, notes: 'No salt' },
+        { combo_id: 'm1', choices: [{ option_id: 'c1', quantity: 1 }], quantity: 1, notes: '' },
+      ],
+    });
+    expect(words(s.inDoc('oo-order-sent')!)).toContain('Order sent: the restaurant will confirm it shortly.');
+    expect(s.inDoc('oo-order-view')).toBeNull();
+  });
+
+  it('says why the order was refused and keeps it to send again', async () => {
+    const s = await setup();
+    const refusal = 'This is no longer on the menu: take it out of your order and send it again.';
+    await sendFailing(s, new ApiError(409, 'online_order.not_on_menu', refusal), SENT);
+    expect(words(s.inDoc('oo-order-sheet')!)).toContain(refusal);
+    expect(s.inDoc('oo-order-sent')).toBeNull();
+    await click(s.inDoc('oo-order-sheet-submit'));
+    await settle();
+    expect(s.inDoc('oo-order-sent')).not.toBeNull();
+  });
+
+  it('says there is no connection when the order does not get through', async () => {
+    const s = await setup();
+    await sendFailing(s, new TypeError('Failed to fetch'));
+    expect(words(s.inDoc('oo-order-sheet')!)).toContain('No connection. Check it and send the order again.');
+  });
+
+  it('takes a line of one out with one less', async () => {
+    const s = await setup();
+    await addDish(s, 'p2');
+    await click(s.inDoc('oo-order-view'));
+    await click(s.inDoc('oo-order-qty-1-minus'));
+    expect(words(s.inDoc('oo-order-empty')!)).toContain('Your order is empty');
+    expect(s.inDoc('oo-order-view')).toBeNull();
+  });
+
+  it('speaks Spanish when it is sent', async () => {
+    const s = await setup(MENU, OPTIONS, 'es');
+    await addDish(s, 'p2');
+    expect(words(s.inDoc('oo-order-view')!)).toBe('Ver pedido (1) · 1,20 €');
+    await click(s.inDoc('oo-order-view'));
+    await click(s.inDoc('oo-order-sheet-submit'));
+    await settle();
+    expect(words(s.inDoc('oo-order-sent')!)).toContain('Pedido enviado: el local lo confirmará enseguida.');
   });
 });

@@ -1,7 +1,7 @@
 # Workbook — Pedidos online (app)
 Prefijo: ONLINE_ORDER
 Alcance MVP: restaurante (no viene en ninguna plantilla; entra en la tienda cuando el cliente pueda pedir)
-Estado de la app: en construcción — hoy, el código de cada mesa, su regeneración, la hoja de QR y la carta que abre el QR de cada mesa; falta que el cliente pida desde ella
+Estado de la app: en construcción — hoy, el código de cada mesa, su regeneración, la hoja de QR, la carta que abre el QR de cada mesa y el pedido que el cliente envía desde ella, que queda pendiente; falta que el personal lo acepte o lo rechace
 
 > Manual de usuario y especificación de la app `online_order`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor y
@@ -77,7 +77,7 @@ QR** (solo esa mesa) y **Regenerar QR**, que pide confirmación («¿Regenerar e
 
 ### Página de la mesa
 La que ve el cliente en su móvil al escanear el QR de su mesa: la carta del negocio, con la mesa en la que está
-arriba. Solo se mira; pedir desde aquí llega con ONLINE_ORDER-F04.
+arriba. Desde aquí arma su pedido y lo envía al local.
 
 #### Detalle
 Dirección `/p/<negocio>/order/<código>`, sin sesión, en el idioma del móvil (español o inglés). Arriba, el nombre del
@@ -86,14 +86,20 @@ sus platos («Primeros · Segundos · Bebida»), y después cada categoría de I
 ordenados por nombre: la foto (si la tiene), el nombre, la descripción, «Alérgenos: Gluten, Leche» y el precio. Los
 platos sin categoría van al final, en «Otros platos». Tocar un plato abre su ficha con la foto en grande, lo mismo de la
 fila y cada grupo de suplementos con cuántos se eligen («Opcional · hasta 2», «Elige 1») y cada opción con sus
-alérgenos y lo que suma («+0,50 €»); tocar un menú abre sus platos, curso a curso, del mismo modo. **Cerrar** la cierra.
+alérgenos y lo que suma («+0,50 €»); tocar un menú abre sus platos, curso a curso, del mismo modo. En la ficha se marca
+lo que se quiere de cada grupo (en uno de un solo elegido, marcar otro cambia el elegido; uno lleno deja esperando los
+demás; lo que se puede repetir lleva uno menos y uno más con su cuenta), cuántos y una nota para cocina; **Añadir · 8,00 €**
+lo pone en el pedido, y espera mientras un grupo no tiene lo que pide. Abajo, **Ver pedido (3) · 25,50 €** abre el
+pedido: cada línea con lo que lleva, su nota y su importe, uno menos y uno más (uno menos en una línea de uno la quita) y
+el total; **Enviar pedido** lo manda al local. Enviado, la página dice «Pedido enviado: el local lo confirmará
+enseguida.». Los importes son los de la carta; el local vuelve a ponerles precio al recibir el pedido.
 
 ## Estados de cada pantalla
 
 | Pantalla | Cargando | Vacío | Error |
 |---|---|---|---|
 | Códigos QR | La lista en carga; **Imprimir hoja**, apagado hasta tener todas las mesas | «Aún no hay mesas», con **Ir a Mesas** a quien puede añadirlas | El de la lista con «Reintentar»; el de generar o regenerar, en un aviso efímero con su motivo; «No se ha podido imprimir la hoja.» |
-| Página de la mesa | «Cargando la carta…»; en la ficha de un plato, «Cargando sus suplementos…» | «Aún no hay platos en la carta», con «Pregunta al personal qué puedes pedir.» | «No se ha podido cargar la carta.» con «Reintentar»; en la ficha, «No se han podido cargar sus suplementos.» con «Reintentar»; un QR que ya no vale, «Este QR ya no está activo» con «Pide ayuda al personal.», sin nada del negocio |
+| Página de la mesa | «Cargando la carta…»; en la ficha de un plato, «Cargando sus suplementos…»; mientras se envía, **Enviar pedido** espera | «Aún no hay platos en la carta», con «Pregunta al personal qué puedes pedir.»; el pedido sin nada, «Tu pedido está vacío» con «Añade platos de la carta.» | «No se ha podido cargar la carta.» con «Reintentar»; en la ficha, «No se han podido cargar sus suplementos.» con «Reintentar»; un QR que ya no vale, «Este QR ya no está activo» con «Pide ayuda al personal.», sin nada del negocio; un pedido rechazado, su motivo en el pedido, que se queda para enviarlo otra vez; sin conexión, «Sin conexión. Compruébala y vuelve a enviar el pedido.» |
 
 «Reconectando…» mientras se recupera la conexión en vivo (lo pintado se queda).
 
@@ -104,7 +110,7 @@ alérgenos y lo que suma («+0,50 €»); tocar un menú abre sus platos, curso 
 | ONLINE_ORDER-F01 | Generar o regenerar el QR de una mesa | hecho |
 | ONLINE_ORDER-F02 | Ver e imprimir la hoja de QR de las mesas | hecho |
 | ONLINE_ORDER-F03 | El cliente abre la carta desde el QR de su mesa | hecho |
-| ONLINE_ORDER-F04 | El cliente pide desde su mesa | no hecho |
+| ONLINE_ORDER-F04 | El cliente pide desde su mesa | hecho |
 | ONLINE_ORDER-F05 | Aceptar o rechazar el primer pedido de una mesa | no hecho |
 | ONLINE_ORDER-F06 | El cliente ve si su pedido se ha aceptado | no hecho |
 | ONLINE_ORDER-F07 | Configurar los pedidos desde la mesa | no hecho |
@@ -166,36 +172,42 @@ ha podido cargar la carta.» con «Reintentar».
 Implicados: ONLINE_ORDER-F01, INVENTORY-F36, COMBO-F14
 
 ### ONLINE_ORDER-F04 El cliente pide desde su mesa
-Estado: no hecho — falta el pedido
+Estado: hecho
 Actor: cliente (sin sesión)
 Pantalla: Página de la mesa
 Pasos:
-1. Añade productos, con sus suplementos, menús, cantidad y una nota.
-2. Pulsa **Pedir**.
-3. Si la mesa tiene la cuenta abierta, el pedido entra en ella y se manda a cocina con todo lo que la cuenta tenía
-   sin mandar, también lo que el camarero había apuntado en el TPV. Si no la tiene, el pedido queda pendiente hasta
-   que un empleado lo acepte (ONLINE_ORDER-F05).
-Entra: la carta, la cuenta de la mesa (Mesas y Ventas) y el horario del negocio (Horarios).
-Sale: las líneas en la cuenta de la mesa y la comanda en cocina, o el pedido pendiente con su aviso.
-Si falla: no se escribe nada. El negocio cerrado (la carta se sigue viendo, pero dice que ahora no se aceptan
-pedidos); un producto que se ha agotado mientras pedía; demasiados pedidos
-seguidos desde el mismo móvil o en el negocio («Inténtalo dentro de unos minutos o pide ayuda al personal.»); un QR
-que ya no vale.
-Implicados: ONLINE_ORDER-F05, SALE-F20, KITCHEN-F05
+1. En la carta de su mesa, toca un plato o un menú, marca sus suplementos o los platos de cada curso, elige cuántos,
+   escribe si quiere una nota para cocina y pulsa **Añadir**.
+2. Pulsa **Ver pedido**: revisa cada línea y el total, cambia cuántos o quita alguna.
+3. Pulsa **Enviar pedido**: el pedido queda guardado en el local como pendiente, y la página dice «Pedido enviado: el
+   local lo confirmará enseguida.». Lo que pasa después lo dice ONLINE_ORDER-F05.
+Entra: la carta (Inventario y, si están encendidas, Suplementos y Menús) y la mesa (Mesas).
+Sale: el pedido pendiente de la mesa, cada plato con sus suplementos y cada menú con sus platos al precio de la carta, y
+su aviso.
+Si falla: no se guarda nada y el pedido se queda en el móvil para enviarlo otra vez. Un plato o un menú que ya no está
+en la carta (agotado, oculto o quitado mientras pedía: «Esto ya no está en la carta: quítalo de tu pedido y vuelve a
+enviarlo.»); un grupo de suplementos o un curso del menú sin lo que pide, o un plato del menú agotado (el motivo de
+Suplementos o de Menús); demasiados pedidos seguidos desde la misma mesa o en el negocio («Demasiados pedidos seguidos.
+Inténtalo dentro de unos minutos o pide ayuda al personal.»); un QR que ya no vale («Este QR ya no está activo»); sin
+conexión («Sin conexión. Compruébala y vuelve a enviar el pedido.»).
+Implicados: ONLINE_ORDER-F03, ONLINE_ORDER-F05
 
 ### ONLINE_ORDER-F05 Aceptar o rechazar el primer pedido de una mesa
 Estado: no hecho — falta el pedido pendiente y su aviso
 Actor: empleado, responsable, administrador o propietario
 Pantalla: Centro de avisos → Pedidos por aceptar
 Pasos:
-1. El centro de avisos enseña «Pedidos por aceptar» con cada pedido pendiente: la mesa, lo que pide y cuándo.
-2. Pulsa **Aceptar**: se abre la cuenta de la mesa, entran las líneas y se mandan a cocina; o pulsa **Rechazar** y
+1. Si la mesa ya tiene la cuenta abierta, el pedido entra en ella sin esperar y se manda a cocina con todo lo que la
+   cuenta tenía sin mandar, también lo que el camarero había apuntado en el TPV.
+2. Si no la tiene, el centro de avisos enseña «Pedidos por aceptar» con cada pedido pendiente: la mesa, lo que pide y
+   cuándo.
+3. Pulsa **Aceptar**: se abre la cuenta de la mesa, entran las líneas y se mandan a cocina; o pulsa **Rechazar** y
    el cliente lo ve en su página.
-3. Cobrada o anulada la cuenta, el siguiente pedido de esa mesa vuelve a esperar.
+4. Cobrada o anulada la cuenta, el siguiente pedido de esa mesa vuelve a esperar.
 Entra: el pedido pendiente.
 Sale: la cuenta de la mesa con sus líneas y la comanda, o el pedido rechazado.
 Si falla: otro empleado ya lo ha decidido («Este pedido ya está decidido.»).
-Implicados: ONLINE_ORDER-F04, TABLE-F10, TABLE-F18
+Implicados: ONLINE_ORDER-F04, TABLE-F10, TABLE-F18, SALE-F20, KITCHEN-F05
 
 ### ONLINE_ORDER-F06 El cliente ve si su pedido se ha aceptado
 Estado: no hecho — falta el pedido
@@ -210,13 +222,15 @@ Si falla: un QR que ya no vale deja de enseñar el pedido.
 Implicados: ONLINE_ORDER-F05
 
 ### ONLINE_ORDER-F07 Configurar los pedidos desde la mesa
-Estado: no hecho — faltan los ajustes
+Estado: no hecho — faltan los ajustes y pedir solo con el negocio abierto
 Actor: propietario o administrador
 Pantalla: Ajustes
 Pasos:
 1. Enciende o apaga «Aceptar el primer pedido de cada mesa» (encendido de fábrica). Apagado, todo pedido entra solo
    y abre la cuenta de la mesa si no la hay.
 2. Pulsa **Guardar**.
+3. Fuera del horario de Horarios, la página de la mesa sigue enseñando la carta, pero dice que ahora no se aceptan
+   pedidos y no deja enviarlos.
 Entra: los ajustes de la app y el horario del negocio (Horarios), que dicen si hoy se aceptan pedidos.
 Sale: los ajustes guardados.
 Si falla: sin horario del negocio, los ajustes avisan de que no se aceptarán pedidos hasta configurarlo.
@@ -248,14 +262,15 @@ zona.
 | La carta de la mesa de un código: el nombre del negocio, el número y la zona de la mesa, los platos a la venta que se muestran en la carta por categoría y los menús con sus platos | cualquiera con el QR de la mesa, sin sesión | F03 | `online_order.public.menu` |
 | Los grupos de suplementos de un plato de esa carta, con sus opciones | cualquiera con el QR de la mesa, sin sesión | F03 | `online_order.public.options` |
 
-Las dos de la carta son de la página de la mesa: las llama su móvil por la puerta pública del Hub, con el código en el
-cuerpo de la llamada, y no son herramientas del asistente.
+Las dos de la carta y el envío del pedido son de la página de la mesa: las llama su móvil por la puerta pública del Hub,
+con el código en el cuerpo de la llamada, y no son herramientas del asistente.
 
 ### Lo que ofrece: acciones
 
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Da a una mesa un código nuevo; el anterior deja de valer al momento | regenerar los QR de las mesas (+ ver mesas) | F01 | `online_order.qr_code.regenerate` |
+| Guarda como pendiente el pedido de la mesa de un código: cada plato con sus suplementos y cada menú con sus platos, al precio de la carta | cualquiera con el QR de la mesa, sin sesión | F04 | `online_order.public.send` |
 
 Regenerar es de **riesgo alto** para el asistente: el QR impreso deja de valer y no se puede volver atrás, así que su
 tarjeta pide la confirmación antes de hacerlo.
@@ -265,6 +280,7 @@ tarjeta pide la confirmación antes de hacerlo.
 | Aviso | Cuándo | Qué lleva |
 |---|---|---|
 | `online_order.qr_code.regenerated` | Se genera o se regenera el código de una mesa | La mesa (`table_id`); nunca el código |
+| `online_order.order.sent` | Llega el pedido de una mesa | El pedido (`order_id`), la mesa (`table_id`) y su total (`total`) |
 
 ### A qué reacciona
 
@@ -298,7 +314,7 @@ más.
   (`base.qr.public_url`, la misma que usa Página web para su QR). La sirve la puerta pública de `base`
   (`base/public_door.py`), porque la app declara `public_pages = {"order": "online_order.public"}`: el HTML es el mismo
   valga o no el código, y sus llamadas van por `POST /p/<negocio>/api/<operación>` con el código en el cuerpo, nunca en
-  la dirección. La puerta solo corre las dos operaciones cuyo permiso es `online_order.public`.
+  la dirección. La puerta solo corre las tres operaciones cuyo permiso es `online_order.public`.
 - Las dos lecturas de la carta leen las otras apps con `menu_reader(ctx)` (`queries.py`): el contexto del visitante más
   `MENU_READS`, los permisos de ver mesas, productos, categorías, suplementos y menús, y ninguno que escriba. Su salida
   es propia (`schemas.py`): nunca el coste, el SKU, la categoría de impuesto, las existencias ni el nombre de cocina que
@@ -310,6 +326,20 @@ más.
   el negocio no muestra no ocupan sitio. Los alérgenos de los platos de un menú los da `combo.combo.for_sale` con cada
   elección, también los de un plato que no se muestra suelto en la carta. Los suplementos de un plato se leen al
   abrirlo, como hace el TPV, y solo de un plato de la carta (`online_order.not_on_menu` si no lo es).
+- Modelos del pedido (UUIDv7, sin `hub_id`): `Order`, el pedido de una mesa (`table_id`, como `TableCode`), su estado
+  (`pending`, `accepted` o `rejected`; hoy solo se guardan pendientes) y su total; y `OrderLine`, cada línea: un plato
+  (`product_id`) o un menú (`combo_id`), nunca los dos, con su nombre, cuántos, su precio por unidad, su nota y lo que
+  lleva (`picks`: cada suplemento, o cada plato del menú con su curso, por su id y con lo que suma).
+- `online_order.public.send` lee las otras apps con `order_caller(ctx)` (`services.py`): el contexto del visitante más
+  `ORDER_READS`, los permisos de ver mesas, productos, suplementos y menús, y ninguno que escriba. El cliente solo manda
+  ids: el precio de cada plato es el de `inventory.product.list_for_sale` (con «Mostrar en la carta»), Suplementos valora
+  y comprueba los suplementos con `modifier.selection.resolve` y Menús los cursos y sus suplementos con
+  `combo.combo.resolve`. Lo que no está en la carta da el 409 `online_order.not_on_menu` con la línea (`lines.<n>`).
+- El envío bloquea la fila del código de la mesa hasta el COMMIT: una regeneración a la vez espera al pedido, y con
+  una que llegó antes el código viejo ya no abre nada, así que nunca se guarda un pedido de un QR que ya no vale.
+- Límite de envíos con `base.throttle.allow`, como las lecturas públicas de Página web: 10 pedidos por mesa y 120 en el
+  negocio cada 10 minutos, con el 429 `base.rate_limited`. Por mesa y no por móvil, porque los móviles que usan el wifi
+  del local comparten una sola dirección.
 - Las fotos de los productos y las de los menús se sirven sin sesión (`public_media` de Inventario y de Menús), porque
   las enseña esta página.
 - Las mesas borradas en Mesas no salen en la lista; su fila de `TableCode` se queda y no abre nada, porque la página

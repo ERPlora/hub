@@ -8,7 +8,7 @@ from datetime import datetime
 from uuid import UUID
 
 from ninja import Field, Schema
-from pydantic import ConfigDict
+from pydantic import ConfigDict, model_validator
 
 from base.allergens import AllergensOut
 
@@ -64,14 +64,17 @@ class MenuGroupOut(Schema):
 
 
 class MenuChoiceOut(AllergensOut):
+    id: UUID = Field(description="The dish as the set menu offers it: what the order names when it is picked.")
     name: str = Field(description="The dish one picks.")
     price_delta: int = Field(description="What picking it adds to the menu's price.", json_schema_extra=MONEY)
 
 
 class MenuCourseOut(Schema):
+    id: UUID = Field(description="The course.")
     name: str = Field(description="The course («Starters»).")
     min_choices: int = Field(description="Dishes to pick at least.")
     max_choices: int = Field(description="Dishes to pick at most.")
+    allow_repeat: bool = Field(description="Whether one dish may be picked more than once.")
     choices: list[MenuChoiceOut] = Field(description="The dishes on offer, those sold out left out.")
 
 
@@ -92,17 +95,70 @@ class PublicMenuOut(Schema):
 
 
 class OptionOut(AllergensOut):
+    id: UUID = Field(description="The option: what the order names when it is chosen.")
     name: str = Field(description="The option («Aioli»).")
     price_delta: int = Field(description="What it adds to the dish's price.", json_schema_extra=MONEY)
 
 
 class OptionGroupOut(Schema):
+    id: UUID = Field(description="The group.")
     name: str = Field(description="The group («Sauces»).")
     min_choices: int = Field(description="Options to choose at least; 1 or more = required.")
     max_choices: int = Field(description="Options to choose at most; 0 = no ceiling.")
+    allow_repeat: bool = Field(description="Whether one option may be chosen more than once.")
     options: list[OptionOut] = Field(description="Its options, in their order.")
 
 
 class PublicOptionsOut(Schema):
     product_id: UUID = Field(description="The dish.")
     groups: list[OptionGroupOut] = Field(description="Its modifier groups; none while Modifiers is off.")
+
+
+#: The most lines an order sends, and the most options or set-menu dishes a line names.
+MAX_LINES = 50
+MAX_PICKS = 20
+#: The most units of one line.
+MAX_QUANTITY = 20
+ONE_THING = "A line is a dish (product_id, with its option_ids) or a set menu (combo_id, with its choices)."
+
+
+class SendChoiceIn(Schema):
+    model_config = ConfigDict(extra="forbid")
+
+    option_id: UUID = Field(description="A dish of a set menu's course, as the menu names it.")
+    quantity: int = Field(1, ge=1, le=MAX_QUANTITY, description="How many times it is picked in one set menu.")
+
+
+class SendLineIn(Schema):
+    """A dish or a set menu as the customer picked it: by ids only, never a price."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    product_id: UUID | None = Field(None, description="A dish of the menu.")
+    option_ids: list[UUID] = Field(
+        default_factory=list, max_length=MAX_PICKS, description="The dish's options chosen, in the order chosen."
+    )
+    combo_id: UUID | None = Field(None, description="A set menu of the menu.")
+    choices: list[SendChoiceIn] = Field(
+        default_factory=list, max_length=MAX_PICKS, description="The set menu's dishes picked, course by course."
+    )
+    quantity: int = Field(1, ge=1, le=MAX_QUANTITY, description="How many of it.")
+    notes: str = Field("", max_length=200, description="A note for the kitchen («no salt»).")
+
+    @model_validator(mode="after")
+    def _one_thing(self):
+        dish = self.product_id is not None and not self.choices
+        set_menu = self.combo_id is not None and not self.option_ids
+        if (self.product_id is None) == (self.combo_id is None) or not (dish or set_menu):
+            raise ValueError(ONE_THING)
+        return self
+
+
+class PublicSendIn(PublicCodeIn):
+    lines: list[SendLineIn] = Field(min_length=1, max_length=MAX_LINES, description="What the table orders.")
+
+
+class PublicSentOut(Schema):
+    id: UUID = Field(description="The order.")
+    status: str = Field(description="pending: it waits for the staff to confirm it.")
+    total: int = Field(description="What it comes to, as the server priced it.", json_schema_extra=MONEY)

@@ -49,7 +49,7 @@ test.afterAll(cleanTill);
 /** The check's line, whose «+» a real tap reaches, however low the window: the quantity goes up by one. */
 async function tapTheLine(page: Page, where: string): Promise<void> {
   const line = shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
-  const quantity = line.locator('.pos-qty__field');
+  const quantity = line.locator('[data-testid=pos-qty-field]');
   const before = Number(await quantity.inputValue());
   await line.locator('[data-testid=pos-qty-plus]').click(TAP);
   await expect(quantity, `the «+» of the line works at ${where}`).toHaveValue(String(before + 1));

@@ -13,6 +13,7 @@ business.
 from dataclasses import replace
 from typing import Any
 
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import NotFound
@@ -102,9 +103,10 @@ def menu_reader(ctx: OperationContext) -> OperationContext:
     return replace(ctx, permissions=ctx.permissions | MENU_READS)
 
 
-def table_of(reader: OperationContext, code: str):
-    """The table whose QR carries ``code``, as Tables answers it; a code that opens no table's page is not found."""
-    found = TableCode.objects.filter(code=code).first()
+def table_of(reader: OperationContext, code: str, *, codes: QuerySet[TableCode] | None = None):
+    """The table whose QR carries ``code``, as Tables answers it; a code that opens no table's page is not found.
+    ``codes`` is where the code is looked for: a write passes its rows locked."""
+    found = (TableCode.objects.all() if codes is None else codes).filter(code=code).first()
     if found is None:
         raise NotFound(str(QR_NOT_ACTIVE), code=QR_NOT_ACTIVE_CODE)
     try:
@@ -132,11 +134,14 @@ def _combos(reader: OperationContext) -> list[dict]:
             "image_url": combo.image_url,
             "courses": [
                 {
+                    "id": course.id,
                     "name": course.name,
                     "min_choices": course.min_choices,
                     "max_choices": course.max_choices,
+                    "allow_repeat": course.allow_repeat,
                     "choices": [
                         {
+                            "id": choice.id,
                             "name": choice.product_name,
                             "price_delta": choice.price_delta,
                             "allergens": choice.allergens,
@@ -193,11 +198,13 @@ def public_options(ctx: OperationContext, data: PublicOptionsIn) -> dict:
         "product_id": data.product_id,
         "groups": [
             {
+                "id": group.id,
                 "name": group.name,
                 "min_choices": group.min_choices,
                 "max_choices": group.max_choices,
+                "allow_repeat": group.allow_repeat,
                 "options": [
-                    {"name": option.name, "price_delta": option.price_delta, "allergens": option.allergens}
+                    {"id": option.id, "name": option.name, "price_delta": option.price_delta, "allergens": option.allergens}
                     for option in group.options
                 ],
             }

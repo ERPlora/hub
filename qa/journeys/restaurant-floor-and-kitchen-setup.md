@@ -30,4 +30,5 @@ Para qué: dibujar la sala con sus zonas y mesas, repartir la carta por estacion
 15. ONLINE_ORDER-F01 — con Pedidos online encendida, los QR que faltan de golpe y, después, el de la mesa 7 regenerado.
 16. ONLINE_ORDER-F02 — la hoja con el QR de cada mesa para recortar, y la de la mesa 7 sola.
 17. ONLINE_ORDER-F03 — en un móvil sin sesión, el QR nuevo de la mesa 7 abre su carta y un plato; el viejo, ya no.
-18. TABLE-F09 — la sala, lista para el servicio.
+18. ONLINE_ORDER-F04 — desde ese móvil, unas croquetas con un suplemento y un menú del día van al pedido y se envían; el QR viejo no envía nada.
+19. TABLE-F09 — la sala, lista para el servicio.

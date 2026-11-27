@@ -66,6 +66,23 @@
         "between": "Choose {min} to {max}",
         "atLeast": "Choose at least {min}"
       }
+    },
+    "order": {
+      "less": "One less {name}",
+      "more": "One more {name}",
+      "quantity": "Quantity",
+      "note": "Note for the kitchen",
+      "add": "Add · {price}",
+      "view": "View order ({count}) · {total}",
+      "title": "Your order",
+      "send": "Send order",
+      "total": "Total",
+      "remove": "Take {name} out",
+      "empty": "Your order is empty",
+      "emptyMessage": "Add dishes from the menu.",
+      "sent": "Order sent: the restaurant will confirm it shortly.",
+      "offline": "No connection. Check it and send the order again.",
+      "failed": "The order could not be sent."
     }
   }
 }
