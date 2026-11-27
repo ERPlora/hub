@@ -87,8 +87,8 @@ def list_presence(ctx: OperationContext, params: PresenceListIn) -> dict:
                 "número de fichados ahora mismo",
             ),
         },
-        "description": "How many people are clocked in right now («how many are in?»), the Home's «Clocked in "
-        "now». A day waiting for review does not count; for who they are, attendance.presence.list."
+        "description": "How many people are clocked in right now («how many are in?»), as the Home's panel of who "
+        "is in counts them. A day waiting for review does not count; for who they are, attendance.presence.list."
     },
 )
 def count_presence(ctx: OperationContext, params: EmptyIn) -> dict:

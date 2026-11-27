@@ -17,7 +17,7 @@ from base.schemas.access import AccessDoorIn, AccessDoorOut, AccessSettingsIn, A
 from base.throttle import client_key
 
 from .devices import device_of
-from .people import face_name
+from .people import faces_of
 
 
 # ── The way in: devices, PIN, badge, the business's dial and the person's profile ────────────────────────────────
@@ -117,12 +117,7 @@ def _door(ctx: OperationContext) -> dict[str, Any]:
     device = device_of(ctx.request)
     offered = device is not None and access.pin_offered(device.mode, settings.pin_policy)
     wait = access.PIN_ADDRESS_LIMIT.wait(ctx.scope.key, client_key(ctx.request)) if offered else 0
-    people = [] if not offered or wait else pin_people(ctx.scope.key)
-    faces = sorted(
-        ({"id": str(credential.pk), "name": (name := face_name(user)), "initials": access.initials(name)}
-         for credential, user in people),
-        key=lambda face: face["name"].casefold(),
-    )
+    faces = [] if not offered or wait else faces_of(ctx.scope, pin_people(ctx.scope.key))
     return {
         "pin": offered and (bool(faces) or wait > 0),
         "pin_length": settings.pin_length,
@@ -145,11 +140,12 @@ def has_pin(user) -> bool:
     output=AccessSettingsOut,
     ai=AI(
         description=(
-            "Reads how the business asks who is at the till, as the «PIN pad» card of Settings › General names it: "
-            "«Show PIN pad» is off when pin_policy is never; «Ask again after inactivity» is pin_inactivity_minutes "
-            "min when pin_policy is always, and «Until signing out» when it is per_shift (its minutes then do not "
-            "count); and how many digits a PIN has. With the PIN pad on, each person enters with their own PIN and "
-            "every sale carries their name. Say it to the person by those names."
+            "Reads how the business asks who is at the till, as the PIN pad card of Settings › General shows it: "
+            "showing the PIN pad is off when pin_policy is never; asking again after inactivity is "
+            "pin_inactivity_minutes min when pin_policy is always, and until signing out when it is per_shift (its "
+            "minutes then do not count); and how many digits a PIN has. With the PIN pad on, each person enters with "
+            "their own PIN and every sale carries their name. Say it to the person as that card does, in their "
+            "language."
         ),
         asks={
             "en": (

@@ -103,7 +103,7 @@ const shownLines = computed(() => (roundMode.value ? pending.value : lines.value
 const roundLabel = computed(() => {
   const count = pending.value.length;
   if (!count) return t('sale.pos.kitchen.roundTab');
-  return count === 1 ? t('sale.pos.kitchen.roundTabPendingOne') : t('sale.pos.kitchen.roundTabPending', { count });
+  return t('sale.pos.kitchen.roundTabPending', { count });
 });
 
 function onTabChange(event: CustomEvent<{ value?: string | number }>): void {
