@@ -13,26 +13,10 @@
     "issue": "ERPlora/hub#2642"
   },
   {
-    "box": "span.pos-cat__name",
-    "what": "The till: a category's name in the strip ends in «…».",
-    "screens": [
-      "/sale/pos"
-    ],
-    "issue": "ERPlora/hub#2409"
-  },
-  {
     "box": "span.pos-tile__name",
     "what": "The till: a product's name in its tile ends in «…».",
     "screens": [
       "/sale/pos"
-    ],
-    "issue": "ERPlora/hub#2642"
-  },
-  {
-    "box": "span.system-usage-name",
-    "what": "System on the phone: the names of the usage figures go a word or two a line.",
-    "screens": [
-      "/system"
     ],
     "issue": "ERPlora/hub#2642"
   }
