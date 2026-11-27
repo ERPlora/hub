@@ -2537,7 +2537,7 @@ it is not made. What is refused is said in the window itself, which stays open. 
 Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Adjust what a role of your own allows
-<!-- from WORKBOOK.md sha256:784762e39360 -->
+<!-- from WORKBOOK.md sha256:d9e5d0c77ecb -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles · What it allows; Assistant
@@ -2548,7 +2548,9 @@ Steps:
      with its phrase and a switch or, for what a manager can approve with their PIN, "Allowed", "With approval" or "No".
   2. They change what they want and press "Save" at the end: "Role saved.". With nothing changed, "Save" cannot be pressed.
   3. If another person saves it meanwhile, what was not touched here is brought up to date.
-  4. It is also asked of the assistant: "the Cashier role can't void sales", "call the Cashier role Evening till".
+  4. It is also asked of the assistant: "the Cashier role can't take payments or void sales", "call the Cashier role
+     Evening till". Before proposing the change it reads everything the role allows, also with many apps on, so it
+     takes away just what was asked: "Take payments" and "Void a sale", and nothing else of Sales & POS.
      The card says the role, each permission with the same phrase as "What it allows" and what it becomes ("Allowed",
      "With approval" or "No"), and, under "What will happen", how many people have that role. It asks to type CONFIRM,
      and once accepted only what was asked for changes.

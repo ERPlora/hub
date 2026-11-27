@@ -1300,7 +1300,7 @@ what it asks. A record the person confirming cannot see (a run, for whoever only
 question asked of another role) does not show on the card.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:ada15a0332da -->
+<!-- from WORKBOOK.md sha256:08383c8a217e -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
@@ -1317,7 +1317,7 @@ question asked of another role) does not show on the card.
 | The names of the business's secrets, never their value, and whether the server can keep them (live) | manage | F26, F27 | `flow.secret.list` |
 | The questions this person is waiting to answer, those that expire first at the top, up to 100, and of each change by the assistant its action and its data in words, read as that person and in their language (live) | answer | F01, F29, F38 | `flow.question.list` |
 | A question waiting for an answer, as it shows in "Waiting for your answer", only for whoever can answer it | answer (their role) | F29 | `flow.question.get` |
-| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live) | see | F01, F33–F36 | `flow.recipe.list` |
+| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live; the assistant reads on with `offset` where an answer too long to be told at once was cut) | see | F01, F33–F36 | `flow.recipe.list` |
 
 ### What it offers: actions (they change data)
 <!-- from WORKBOOK.md sha256:fc67ed817046 -->
