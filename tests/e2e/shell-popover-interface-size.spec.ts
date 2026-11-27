@@ -16,6 +16,7 @@ import {
   turnOffTurnedOn,
   turnOnMissing,
 } from './helpers';
+import { WINDOW_SIZES } from './screen';
 
 interface Size {
   label: string;
@@ -23,12 +24,8 @@ interface Size {
   height: number;
 }
 
-const SIZES: Size[] = [
-  { label: '375x667', width: 375, height: 667 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '1280x720', width: 1280, height: 720 },
-  { label: '1440x900', width: 1440, height: 900 },
-];
+/** The three window sizes and the desk the interface size was first measured at. */
+const SIZES: Size[] = [...WINDOW_SIZES, { label: '1440x900', width: 1440, height: 900 }];
 
 const SCALES = [80, 100, 110, 120] as const;
 
