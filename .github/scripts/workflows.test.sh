@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the workflows' shape (deploy.yml, test.yml, ci.yml, rollback.yml): one push run of a branch
-# at a time, its tests and image build side by side, and a rollback waits only for a deploy.
+# at a time, its tests and image build side by side, a working branch's pytest narrowed to the apps it
+# changes while main, pre and the merge queue run the whole suite, and a rollback waits only for a deploy.
 #   bash .github/scripts/workflows.test.sh
 # Needs python3 with PyYAML (preinstalled on GitHub's ubuntu runners and on macOS).
 set -euo pipefail
@@ -122,8 +123,9 @@ check("only build and deploy get an OIDC token",
 # --- test.yml: four independent jobs behind the required check "test / test" -------------------
 tjobs = test.get("jobs", {})
 TEST_JOBS = ("python", "frontend", "scripts", "smoke")
-check("test.yml has the jobs python, frontend, scripts, smoke and test", {*TEST_JOBS, "test"} <= set(tjobs))
-check("python, frontend, scripts and smoke wait for nothing", all(not needs(tjobs.get(name, {})) for name in TEST_JOBS))
+check("test.yml has the jobs select, python, frontend, scripts, smoke and test", {"select", *TEST_JOBS, "test"} <= set(tjobs))
+check("frontend, scripts and smoke wait for nothing", all(not needs(tjobs.get(name, {})) for name in TEST_JOBS[1:]))
+check("python waits only for select, which chooses its tests", needs(tjobs.get("python", {})) == ["select"])
 check("test (the required check) needs python, frontend, scripts and smoke",
       set(needs(tjobs.get("test", {}))) == set(TEST_JOBS))
 check("test reports a red or skipped job, not a cancelled run", str(tjobs.get("test", {}).get("if", "")) == "${{ !cancelled() }}")
@@ -182,20 +184,52 @@ check("the cache keeps one entry per runner image and per test.yml (where the pa
 # GitHub gives the job (strategy.job-index, strategy.job-total), so the shards cover the whole suite whatever the size
 # of the matrix; a failing shard cancels none of the others, so every failure shows; and the job's timeout stays where
 # it was, with a warning from the shard before it gets near.
+# A working branch runs only the tests of the apps it changes and of the apps that depend on them, and main and pre the
+# whole suite before they deploy: the job select works it out with scripts/affected_tests.py, from the base test.yml is
+# given (ci.yml gives origin/main, deploy.yml none), and hands python the shards of its matrix and the paths pytest runs.
+on_call = ((test.get("on") or test.get(True) or {}).get("workflow_call") or {}).get("inputs") or {}
+check("test.yml takes the base a branch is compared with, empty by default (the whole suite)",
+      (on_call.get("affected-base") or {}).get("type") == "string" and on_call["affected-base"].get("default") == "")
+# The merge queue tests every change once more, on top of what entered main before it, and runs the whole suite there:
+# its runs come with the event merge_group and give no base. `push && 'origin/main' || ''`, because an empty string is
+# false in an expression: `merge_group && '' || 'origin/main'` would always give origin/main.
+check("ci.yml compares a working branch with origin/main, and gives the merge queue no base (the whole suite)",
+      (ci.get("jobs", {}).get("test") or {}).get("with")
+      == {"affected-base": "${{ github.event_name == 'push' && 'origin/main' || '' }}"})
+check("deploy.yml gives test.yml no base, so main and pre run the whole suite before they deploy",
+      "with" not in jobs.get("test", {}))
+select_job = tjobs.get("select", {})
+select_step = next((step for step in steps(select_job) if "affected_tests.py" in str(step.get("run", ""))), {})
+select_run = str(select_step.get("run", "")).split()
+check("select runs scripts/affected_tests.py with test.yml's base into the step's outputs",
+      select_run[:4] == ["python3", "scripts/affected_tests.py", "--base", '"$AFFECTED_BASE"']
+      and (select_step.get("env") or {}).get("AFFECTED_BASE") == "${{ inputs.affected-base }}"
+      and select_run[6:] == [">>", '"$GITHUB_OUTPUT"'])
+whole_suite = select_run[5] if len(select_run) > 5 and select_run[4] == "--shards" else ""
+check("the whole suite runs in at least 2 shards", whole_suite.isdigit() and int(whole_suite) >= 2)
+check("select hands on the step's paths and shards",
+      select_job.get("outputs") == {name: f"${{{{ steps.{select_step.get('id')}.outputs.{name} }}}}"
+                                    for name in ("paths", "shards")})
+select_checkout = next((step for step in steps(select_job) if "actions/checkout" in str(step.get("uses", ""))), {})
+check("select checks out the whole history, origin/main included, to find where the branch left it",
+      (select_checkout.get("with") or {}).get("fetch-depth") == 0 and select_job.get("permissions") == {"contents": "read"})
 python_job = tjobs.get("python", {})
 strategy = python_job.get("strategy") or {}
 matrix = strategy.get("matrix") or {}
-shards = matrix.get("shard")
-check("python runs as a matrix of at least 2 shards, named 1 to N, and nothing else",
-      isinstance(shards, list) and len(shards) >= 2 and shards == list(range(1, len(shards) + 1)) and set(matrix) == {"shard"})
+check("python's matrix is the shards select chose, and nothing else",
+      matrix == {"shard": "${{ fromJSON(needs.select.outputs.shards) }}"})
 check("a failing shard cancels none of the others (fail-fast: false)", strategy.get("fail-fast") is False)
 check("the python job keeps its 30-minute timeout", python_job.get("timeout-minutes") == 30)
 shard_step = next((step for step in python_steps if "pytest-shard.sh" in str(step.get("run", ""))), {})
 shard_env = shard_step.get("env") or {}
+shard_lines = str(shard_step.get("run", "")).splitlines()
 shard_run = [shard_env.get(word.strip('"')[1:], word) if word.strip('"').startswith("$") else word
-             for word in str(shard_step.get("run", "")).split()]
+             for word in next((line for line in shard_lines if "pytest-shard.sh" in line), "").split()]
 check("pytest runs through pytest-shard.sh with the job's index and total in the matrix",
       shard_run[:4] == ["bash", ".github/scripts/pytest-shard.sh", "${{ strategy.job-index }}", "${{ strategy.job-total }}"])
+check("each shard runs the paths select chose, after the rest of pytest's arguments",
+      shard_env.get("PYTEST_PATHS") == "${{ needs.select.outputs.paths }}"
+      and shard_lines[:1] == ['read -ra paths <<< "$PYTEST_PATHS"'] and shard_run[-1:] == ['"${paths[@]}"'])
 warn_minutes = shard_run[4] if len(shard_run) > 4 else ""
 check("the shard warns before the job's timeout, with room to add a shard",
       warn_minutes.isdigit() and 0 < int(warn_minutes) <= python_job.get("timeout-minutes", 0) * 2 // 3)
@@ -304,12 +338,22 @@ check("a red smoke keeps the run's log and Playwright's traces (NIGHTLY_DIR/runs
       bool(smoke_dir) and any(str(step.get("if", "")) == "failure()"
                               and (step.get("with") or {}).get("path") == f"{smoke_dir}/runs/" for step in uploads))
 
-# --- ci.yml: a newer push supersedes the run of the older one -----------------------------------
+# --- ci.yml: every working branch and the merge queue; a newer push supersedes the run of the older one ---
 check("ci.yml runs test.yml", (ci.get("jobs", {}).get("test") or {}).get("uses") == "./.github/workflows/test.yml")
+check("ci.yml's only job is test, so the check main requires is still «test / test»", list(ci.get("jobs", {})) == ["test"])
+ci_on = ci.get("on") or ci.get(True) or {}
+check("ci.yml runs for the merge queue (merge_group), which waits for «test / test» before it merges",
+      "merge_group" in ci_on)
+# The queue tests each entry on a branch of its own, gh-readonly-queue/<base>/pr-<n>-<sha>, and a push to it would start
+# a second run of the same commit beside the merge_group one.
+check("a push runs ci.yml on every branch but main, pre and the merge queue's own (gh-readonly-queue/**)",
+      (ci_on.get("push") or {}) == {"branches-ignore": ["main", "pre", "gh-readonly-queue/**"]})
+# Each entry of the queue has a ref of its own, so its run is never in the group of another entry's or of a branch's;
+# and only a push cancels: the queue itself stops the runs of the entries it drops.
 ci_lock = ci.get("concurrency") or {}
-check("ci.yml cancels the run of an older push to the same branch",
+check("ci.yml cancels the run of an older push to the same branch, never a run of the merge queue",
       ci_lock.get("group") == "ci-${{ github.repository }}-${{ github.ref_name }}"
-      and ci_lock.get("cancel-in-progress") is True)
+      and ci_lock.get("cancel-in-progress") == "${{ github.event_name == 'push' }}")
 
 print()
 if failures:

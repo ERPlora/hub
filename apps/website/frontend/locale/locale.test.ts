@@ -1,13 +1,12 @@
 // The website editor's UI texts: English source + Spanish, kept by hand next to the pages until Django's `djangojs`
-// catalogues are exported to JSON. This test is their guardrail: same keys and placeholders in both languages, nothing
-// empty, no vue-i18n syntax by accident, and every key a page, a component or a helper uses exists.
+// catalogues are exported to JSON. This test is their guardrail: same keys, placeholders and plural forms in both
+// languages, nothing empty, no other vue-i18n syntax by accident, and every key a page, a component or a helper uses exists.
 import { describe, expect, it } from 'vitest';
 
 import {
   appCatalogues,
   appSources,
   expectInCatalogue,
-  expectSamePlaceholders,
   itChecksAppCatalogues,
   literalKeys,
   usedKeys,
@@ -19,11 +18,10 @@ const CATALOGUES = appCatalogues('website', en, es);
 const { EN, ES } = CATALOGUES;
 
 describe('website catalogues (en source + es)', () => {
-  itChecksAppCatalogues(CATALOGUES, { placeholders: 'own', coverage: 'own' });
+  itChecksAppCatalogues(CATALOGUES, { placeholders: 'and plural forms', coverage: 'own' });
 
-  it('keep the same placeholders in both languages and no other vue-i18n syntax', () => {
-    expectSamePlaceholders(CATALOGUES, { pluralForms: false });
-    for (const [key, message] of [...EN, ...ES]) expect(message, key).not.toMatch(/[@|$]/);
+  it('use no vue-i18n syntax but the plural forms', () => {
+    for (const [key, message] of [...EN, ...ES]) expect(message, key).not.toMatch(/[@$]/);
   });
 
   it('cover every key the pages, components and helpers use', () => {
