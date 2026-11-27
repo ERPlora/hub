@@ -1,7 +1,7 @@
 """Tests of scripts/e2e_report.py: the output of the Hub's nightly e2e run and the one open issue it keeps about it.
 
-The script runs as scripts/nightly_e2e.py runs it, with Playwright JSON reports written here and a fake gh CLI
-on the PATH that answers the open issues and records its calls and the bodies it is given.
+The script runs as scripts/nightly_e2e.py and the nightly workflow run it, with Playwright JSON reports written here
+and a fake gh CLI on the PATH that answers the open issues and records its calls and the bodies it is given.
 """
 
 import datetime
@@ -35,6 +35,7 @@ CREATE = f"gh issue create --title {TITLE} --label prio:P1 --body-file <body>"
 SETTINGS = ("RESULT", "SHA", "RUN_DIR")
 NIGHT = ".erplora/hub-nightly-e2e/runs/20261114-021700"
 FOLDER = f"~/{NIGHT}"
+RUN_URL = "https://github.com/ERPlora/hub/actions/runs/4242"
 
 FAKE_GH = """\
 import os
@@ -138,15 +139,13 @@ ISSUE_BODY = (
     "Mirar cada prueba de la lista: si el fallo es del producto, arreglarlo con su prueba; si la prueba se quedó vieja,"
     " ponerla al día. Esta issue se cierra sola la primera noche en que la pasada salga entera en verde.\n\n"
     "## Detalle técnico\n"
-    "- Pasada del 2026-11-14 sobre `main` (commit `0123456`), en el Mac. El registro de la noche (`night.log`) y las"
-    f" trazas y capturas de cada fallo (`test-results/`), en `{FOLDER}`.\n"
+    "- Pasada del 2026-11-14 sobre `main` (commit `0123456`). Su registro y las trazas y capturas de cada fallo, en"
+    f" `{FOLDER}`.\n"
     "- Una spec se repite en una pila propia (`tests/e2e/README.md`, «Varias ejecuciones a la vez») con `CI=1 pnpm e2e"
-    " tests/e2e/<spec>`, o con la misma pila de la noche: `python3 scripts/nightly_e2e.py --no-publish --spec"
-    " tests/e2e/<spec>`.\n\n"
+    " tests/e2e/<spec>`, o con la misma pila de la noche: `python3 scripts/nightly_e2e.py --spec tests/e2e/<spec>`.\n\n"
     f"{RED_DETAILS}\n"
     "## Origen\n"
-    "- Cómo se llegó: la pasada nocturna de las pruebas de navegador del Hub (`scripts/nightly_e2e.py`, que"
-    " lanza launchd en el Mac).\n"
+    "- Cómo se llegó: la pasada nocturna de las pruebas de navegador del Hub (`.github/workflows/nightly.yml`).\n"
     "- Sale de #877\n"
     "- La introdujo una PR: no comprobado — la pasada no sabe qué cambio la rompió; se busca entre los commits desde la"
     " última noche en verde.\n\n"
@@ -159,7 +158,8 @@ ISSUE_BODY = (
 
 
 def night(result="failure"):
-    return e2e_report.Night(result=result, commit="0123456", day="2026-11-14", folder=FOLDER, publish=False)
+    return e2e_report.Night(result=result, commit="0123456", day="2026-11-14", log=f"`{FOLDER}/night.log`",
+                            evidence=f"`{FOLDER}`", publish=False)
 
 
 class NightCase(unittest.TestCase):
@@ -185,7 +185,8 @@ class NightCase(unittest.TestCase):
         """Runs the script with the night's settings, each overridable; None leaves one out. Returns its exit code."""
         for log in ("calls.log", "bodies.log"):
             (self.work / log).write_text("")
-        env = {key: value for key, value in os.environ.items() if not key.startswith(("GH_", "DAY", "STEP", "REPORT"))}
+        env = {key: value for key, value in os.environ.items()
+               if not key.startswith(("GH_", "DAY", "STEP", "REPORT", "RUN_"))}
         env |= {
             "PATH": f"{self.work / 'bin'}{os.pathsep}{os.environ['PATH']}", "GH_REPO": "ERPlora/hub", "HOME": self.home,
             "SHA": "0123456789abcdef", "RUN_DIR": f"{self.home}/{NIGHT}", "DAY": "2026-11-14", "PUBLISH": "true",
@@ -276,6 +277,47 @@ class RedNightTest(NightCase):
                 self.assertEqual(0, self.report(PUBLISH=publish, OPEN_ISSUES=OPEN))
                 self.assertEqual([], self.calls)
                 self.assertEqual(RED_HEADING + RED_DETAILS + UNPUBLISHED, self.stdout)
+
+
+class ActionsRunTest(NightCase):
+    """On GitHub Actions the night's log and traces are its run's, and the report names the run instead of a folder."""
+
+    def actions(self, **settings):
+        return self.report(RUN_DIR=None, HOME=None, RUN_URL=RUN_URL, **settings)
+
+    def test_a_red_run_opens_the_issue_naming_the_run(self):
+        self.assertEqual(0, self.actions())
+        self.assertEqual([SEARCH, CREATE], self.calls)
+        detail = ISSUE_BODY.replace(f"`{FOLDER}`", RUN_URL)
+        self.assertEqual(detail, self.bodies)
+        self.assertIn(f"Su registro y las trazas y capturas de cada fallo, en {RUN_URL}.\n", self.bodies)
+        heading = RED_HEADING.replace(f"`{FOLDER}`", RUN_URL)
+        self.assertEqual(heading + RED_DETAILS + CREATED, self.stdout)
+
+    def test_a_red_run_comments_on_the_open_issue_naming_the_run(self):
+        self.assertEqual(0, self.actions(OPEN_ISSUES=OPEN))
+        self.assertEqual(
+            "La pasada del 2026-11-14 sigue en rojo, sobre `main` (commit `0123456`); su registro y sus trazas, en"
+            f" {RUN_URL}.\n\n{RED_DETAILS}",
+            self.bodies,
+        )
+
+    def test_without_a_report_or_without_a_red_test_it_points_at_the_runs_log(self):
+        self.assertEqual(0, self.actions(REPORT=None, PUBLISH="false"))
+        self.assertIn(f"tiempo agotado). Lo dice el registro de {RUN_URL}.\n", self.stdout)
+        green = self.write("green.json", suite_of(spec("ok", 1, [{"projectName": "", "status": "expected"}])))
+        self.assertEqual(0, self.actions(REPORT=green, PUBLISH="false"))
+        self.assertIn(f"terminó en `failure`: el registro de {RUN_URL} dice por qué.\n", self.stdout)
+        self.assertNotIn("night.log", self.stdout)
+
+    def test_the_run_wins_over_a_folder(self):
+        self.assertEqual(0, self.report(RUN_URL=RUN_URL, PUBLISH="false"))
+        self.assertIn(f", en {RUN_URL}.\n", self.stdout)
+        self.assertNotIn(FOLDER, self.stdout)
+
+    def test_a_green_run_closes_the_open_issue(self):
+        self.assertEqual(0, self.actions(OPEN_ISSUES=OPEN, RESULT="success"))
+        self.assertEqual(1, sum(call.startswith("gh issue close 42 --reason completed") for call in self.calls))
 
 
 class GreenNightTest(NightCase):

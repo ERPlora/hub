@@ -5,6 +5,7 @@
 // flow: none — the hub's shell.
 import { type Locator, type Page, expect, test } from '@playwright/test';
 
+import { openUserCard } from './access-door';
 import { customersReady } from './customer-helpers';
 import { A, login, MY_APPS_DOOR, record, shot, shown, uniqueName } from './helpers';
 import { createItem, listReady } from './demo-items';
@@ -215,17 +216,8 @@ for (const vp of MENU_VIEWPORTS) {
     await login(page, A);
     await page.goto('/demo/items');
     await listReady(page);
-    if (!(await menu(page).isVisible())) {
-      const opened = page.evaluate(() => new Promise<void>((resolve) => document.addEventListener('ionDidOpen', () => resolve(), { once: true })));
-      await topbar(page).drawer.click();
-      await opened;
-    }
-    const presented = page.evaluate(
-      () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-    );
     // On the name: the click that used to hang the menu from the name, over the email line.
-    await menu(page).locator('[data-testid=user-menu-trigger] .sidebar-user-name').click();
-    await presented;
+    await openUserCard(page);
     const m = await measureUserMenu(page);
     const at = `${vp.label}: ${JSON.stringify(m)}`;
     console.log(`user menu at ${at}`);

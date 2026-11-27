@@ -106,6 +106,9 @@
       "name": "Name",
       "sku": "SKU",
       "skuIdentity": "The SKU is the product's identity: it is not edited",
+      "skuAuto": "Leave it empty to number it automatically (10000, 10001…).",
+      "needsName": "Enter the name to continue.",
+      "needsTax": "Choose the tax category to continue.",
       "price": "Price",
       "cost": "Cost",
       "costIn": "Cost ({currency})",
@@ -212,7 +215,7 @@
         "sale": "Sale",
         "void": "Void",
         "count": "Count",
-        "write_off": "Decrease",
+        "write_off": "Write-off",
         "refund": "Refund"
       },
       "filters": {

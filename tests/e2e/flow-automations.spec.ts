@@ -116,7 +116,7 @@ test('an automation from the gallery and one from scratch, allowed, on, run by h
     const copyId = await copy.getAttribute('data-id');
     if (copyId) created.push(copyId);
     await rowAction(page, 'flow-list', copyId!, 'delete');
-    await confirmDialog(page, `Delete «Copy of ${name}»?`);
+    await confirmDialog(page, `Delete “Copy of ${name}”?`);
     await expect(copy).toHaveCount(0);
 
     // The three viewports.

@@ -6,7 +6,7 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import INTERNAL, operation
 
-from apps.appointment.models import BlockedTime
+from apps.appointment.models.blocked_times import BlockedTime
 from apps.appointment.schemas.blocked_times import (
     BlockedTimeListIn,
     BlockedTimeNamedOut,

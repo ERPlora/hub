@@ -86,17 +86,14 @@ def test_roles():
     }
     for role in ("hub_owner", "hub_admin"):
         assert permissions_for_role([config], role) == set(PERMISSIONS), role
-    # The manager watches and pushes the queue; correcting, cancelling and configuring are the owner's.
-    assert permissions_for_role([config], "hub_manager") == {
-        "verifactu.view_record",
-        "verifactu.add_record",
-        "verifactu.transmit_record",
-    }
-    # The employee looks; recording an issued invoice is what Invoicing asks with the issuer's session.
-    assert permissions_for_role([config], "hub_employee") == {
-        "verifactu.view_record",
-        "verifactu.add_record",
-    }
+    # The manager and the employee watch and push the queue; correcting, cancelling and configuring are the owner's.
+    # Recording an issued invoice is what Invoicing asks with the issuer's session.
+    for role in ("hub_manager", "hub_employee"):
+        assert permissions_for_role([config], role) == {
+            "verifactu.view_record",
+            "verifactu.add_record",
+            "verifactu.transmit_record",
+        }, role
     # The accountancy firm only reads the records: it neither records, sends nor corrects any.
     assert permissions_for_role([config], "hub_accountant") == {"verifactu.view_record"}
 

@@ -498,7 +498,7 @@ close: "Session S-… was due to close by itself at 04:00: open a new session (t
 Involved: CASH_REGISTER-F17
 
 ### CASH_REGISTER-F11 Look up a session and review a discrepancy
-<!-- from WORKBOOK.md sha256:9e37106bfe56 -->
+<!-- from WORKBOOK.md sha256:31675ba8f059 -->
 Status: done
 Vertical: common
 Actor: manager, administrator, employee
@@ -511,7 +511,7 @@ Steps:
    cash in, cash out, comps apart (they are a cost, not cash; whoever does not see the costs sees them as "—"),
    expected, counted, difference and the notes. The figures are the whole drawer's: also what a colleague
    charged while the session was open. Whoever opened, closed, counted or recorded a movement shows by their
-   name or, if their account has none, by what goes before the @ of their email, never the whole email, also in
+   name or, if they have none, by what goes before the @ of their email, never the whole email, also in
    earlier sessions.
 3. Go over Movements: each sale is named by its document ("Ticket …", "Invoice …"), a refund "Refund of …"
    and a void "Void of …"; a movement recorded by hand shows its concept. And go over Counts.

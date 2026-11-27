@@ -435,12 +435,12 @@ Actor: empleado (las suyas), responsable
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Historial** en la fila (en cualquier estado) o abre la ficha de la cita.
-2. Cada cambio con su hora en el reloj del negocio, quién lo hizo (una persona del equipo, por su nombre o, si
-   su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el correo entero; «Lo pidió la clienta» si
-   fue ella; «Lo hizo la plataforma» si no fue una persona: el sistema, una automatización o una recuperación desde
-   una copia aparte; una API key, por su nombre) y qué cambió (de qué profesional o servicio a cuál, y la nueva hora). Una
-   cita borrada que el personal de ERPlora devolvió desde una copia aparte conserva sus líneas y suma «Borrada» y
-   «Recuperada».
+2. Cada cambio con su hora en el reloj del negocio, quién lo hizo (una persona del equipo, por su nombre, el de Mi
+   perfil o, sin él, el de su cuenta, o, si no tiene ninguno, por lo que va antes de la @ de su correo, nunca el
+   correo entero; «Lo pidió la clienta» si fue ella; «Lo hizo la plataforma» si no fue una persona: el sistema,
+   una automatización o una recuperación desde una copia aparte; una API key, por su nombre) y qué cambió (de qué
+   profesional o servicio a cuál, y la nueva hora). Una cita borrada que el personal de ERPlora devolvió desde una
+   copia aparte conserva sus líneas y suma «Borrada» y «Recuperada».
 3. Es solo de lectura: un único botón, **Cerrar**.
 Entra: una cita en cualquier estado.
 Sale: nada (solo lee).
@@ -945,7 +945,7 @@ agenda tuya que enseñar.».
   migración que quite o renombre una de sus columnas cambia también `appointments_in_copy` y su `reads_since`. Las
   series no se leen de la copia (hub#1327). Tests: `tests/test_recovery.py` (también de punta a punta, con la BD del
   negocio y su copia) y `base/tenancy/tests/test_recovery_appointments.py`.
-- Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
+- Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models/`, `migrations/`,
   `schemas/` (un módulo por tema), `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries/`
   (un módulo por tema), `services/` (un módulo por caso de uso), `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`

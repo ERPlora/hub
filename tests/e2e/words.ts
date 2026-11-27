@@ -21,3 +21,13 @@ export function splitWords(target: Locator): Promise<string[]> {
     return broken;
   });
 }
+
+/** How many lines the text inside `target` takes on screen: its drawn boxes grouped by their top. */
+export function linesOf(target: Locator): Promise<number> {
+  return target.evaluate((el) => {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const drawn = [...range.getClientRects()].filter((box) => box.width > 0);
+    return new Set(drawn.map((box) => Math.round(box.top))).size;
+  });
+}

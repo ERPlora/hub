@@ -4,15 +4,12 @@
 # never grows past its number, the number comes down to the file's size as it shrinks, a file leaves the list once it
 # fits its cap, and no path or higher number is ever added.
 449 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
-531 apps/appointment/models.py ERPlora/erplora-next#74
 1114 apps/appointment/tests/test_services.py ERPlora/erplora-next#74
 557 apps/cart_checkout/queries.py ERPlora/erplora-next#74
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
-758 apps/cart_checkout/services.py ERPlora/erplora-next#74
 305 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
 618 apps/cash_register/schemas/__init__.py ERPlora/erplora-next#74
-742 apps/cash_register/services.py ERPlora/erplora-next#74
-542 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
+541 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -43,7 +40,7 @@
 588 apps/verifactu/envelope.py ERPlora/erplora-next#74
 401 apps/verifactu/frontend/operations.d.ts ERPlora/erplora-next#74
 742 apps/verifactu/models.py ERPlora/erplora-next#74
-1978 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
+1956 apps/verifactu/tests/test_services.py ERPlora/erplora-next#74
 529 apps/website/queries.py ERPlora/erplora-next#74
 558 apps/whatsapp_inbox/frontend/components/TemplateFormModal.test.ts ERPlora/erplora-next#74
 430 apps/whatsapp_inbox/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -51,11 +48,9 @@
 475 base/frontend/lib/home.ts ERPlora/erplora-next#74
 550 base/frontend/lib/system-back.test.ts ERPlora/erplora-next#74
 616 base/frontend/pages/FilesPage.test.ts ERPlora/erplora-next#74
-508 base/tenancy/bootstrap.py ERPlora/erplora-next#74
 652 frontend/form-modal-field-names.test.ts ERPlora/erplora-next#74
 617 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74
-514 tests/e2e/base-access.spec.ts ERPlora/erplora-next#74
 638 tests/e2e/base-app-activation.spec.ts ERPlora/erplora-next#74
 624 tests/e2e/base-files.spec.ts ERPlora/erplora-next#74
 624 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
