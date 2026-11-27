@@ -119,7 +119,7 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   por lo que hace», los filtros **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa, un
   horario, una fecha, a mano), el orden (tocadas al final, nombre) y el recuento. Cada fila: casilla
   para elegirla, el nombre, cuándo arranca en palabras («Cuando se cobra una venta», «Todos los días a
-  las 09:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
+  las 9:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
   el interruptor, **Hacer una copia** y **Borrar**. Con varias elegidas, **Encenderlas** y **Ponerlas en
   pausa** (FLOW-F02, FLOW-F03).
 - **La galería**, siempre debajo: «Elige una y pasa a ser tuya, apagada, para que la mires antes de que
@@ -298,7 +298,7 @@ Las diez tarjetas de la galería, con su sector, cuándo arrancan y qué hacen.
 | Revisar la caja al cerrarla | cualquiera | Se cierra una caja | Deja la tarea de revisar el cierre |
 | Enterarte cuando Hacienda rechaza un registro | cualquiera | VeriFactu marca un registro como rechazado | Deja una tarea urgente |
 | Repasar la semana el viernes | cualquiera | Los viernes a las 18:00 | Deja la tarea de repasar la semana |
-| Revisar la agenda cada mañana | peluquería | Todos los días a las 09:00 | Deja la tarea de repasar la agenda |
+| Revisar la agenda cada mañana | peluquería | Todos los días a las 9:00 | Deja la tarea de repasar la agenda |
 | Llamar a quien no vino | peluquería | Una cita se marca como «no vino» | Deja una tarea urgente de llamarle |
 | Preparar las mesas de grupos grandes | restaurante | Entra una reserva | Solo si son seis o más: deja la tarea de prepararla |
 | Avisar de una venta grande | cualquiera | Se cobra una venta | Solo si pasa de 100,00 €: deja una tarea |
