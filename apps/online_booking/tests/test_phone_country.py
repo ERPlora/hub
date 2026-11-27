@@ -4,7 +4,7 @@ Customers saved as +48 512 345 678, never on a new Spanish one, and her bookings
 
 import pytest
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.customer.models import Customer
 from base.models import Hub
 

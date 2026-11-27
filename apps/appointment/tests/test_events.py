@@ -9,7 +9,8 @@ import pytest
 from live.models import OutboxEvent
 
 from apps.appointment import events
-from apps.appointment.models import Appointment, History, Recurring, RecurringService
+from apps.appointment.models.appointments import Appointment, History
+from apps.appointment.models.series import Recurring, RecurringService
 from base import recovery
 from base.tests.actors import RUN
 

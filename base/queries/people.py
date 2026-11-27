@@ -14,7 +14,7 @@ from base.catalog_groups import every_row
 from base.models.access import Credential
 from base.models import Hub, HubUser, Membership
 from base.models.profile import Profile
-from base.permissions import ADMINISTER_HUB, VIEW_HOME, is_a_person
+from base.permissions import ADMINISTER_HUB, INVITATION_ALONE, MANAGE_ROLES, VIEW_HOME, is_a_person
 from base.schemas.people import PersonDetailOut, PersonIn, PersonListIn, PersonListOut
 from base.schemas.sessions import HubUserGetIn, HubUserOut
 
@@ -57,7 +57,7 @@ def people_of(slug: str) -> list[dict[str, Any]]:
         credential = credentials.get(username)
         profile = profiles.get(username)
         own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
-        name = own or without_address(person["name"]) or without_address(person["email"]) or username
+        name = without_address(preferred_name(own, person["name"], person["email"])) or username
         people.append(
             {
                 **person,
@@ -153,7 +153,8 @@ def signed_in_role(ctx: OperationContext) -> str:
 
 
 def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
-    """A person's page: what the hub keeps of their way in and what who asks may change of it."""
+    """A person's page: what the hub keeps of their way in and of their role in this business, and what who asks may
+    change of them."""
     actor, actor_role = signed_in_username(ctx), signed_in_role(ctx)
     credential = person["credential"]
 
@@ -162,12 +163,26 @@ def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str
             actor=actor, actor_role=actor_role, target=person["id"], target_role=person["role"], badge=badge
         ) is None
 
+    manages = ctx.has(MANAGE_ROLES)
+    refused = manages and people_rules.role_refusal(
+        actor=actor, actor_role=actor_role, target=person["id"], target_role=person["role"]
+    )
     return {
         **person_out(ctx, person),
         "pin_set_at": credential.pin_set_at if credential and credential.pin_hash else None,
         "badge_set_at": credential.badge_set_at if credential and credential.badge_digest else None,
-        "may": {"remove_pin": may(False), "set_badge": may(True)},
+        "business_role": _business_role_of(person),
+        "role_refusal": refused or None,
+        "may": {"remove_pin": may(False), "set_badge": may(True), "give_role": manages and not refused},
     }
+
+
+def _business_role_of(person: dict[str, Any]) -> str | None:
+    """The id of the role of the business that rules what ``person`` may do; ``None`` when their invitation's does."""
+    if person["role"] in INVITATION_ALONE:
+        return None
+    held = HubUser.objects.filter(username=person["id"]).values_list("business_role_id", flat=True).first()
+    return str(held) if held else None
 
 
 @operation(
@@ -217,19 +232,32 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     return person_detail_out(ctx, person_of(ctx, data.person))
 
 
+def preferred_name(*names: str) -> str:
+    """The first of ``names`` that is not an address, else the first given; empty without any. erplora.com names an
+    account without a name by its address, and «My profile» starts from the account's name: an address names a person
+    only when nothing else does."""
+    named = [name for name in names if name]
+    return next((name for name in named if "@" not in name), named[0] if named else "")
+
+
 def person_label(user, staff_name: str = "") -> str:
     """How ``user`` is named in this hub: its «My profile» name, else the name of its Staff record (``staff_name``),
-    else its erplora.com account's, else its username. erplora.com names an account without a name by its address, and
-    «My profile» starts from the account's name: an address names them only when nothing else does."""
-    profile = Profile.objects.filter(username=user.get_username()).only("first_name", "last_name").first()
-    own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
-    named = [name for name in (own, staff_name, user.get_full_name()) if name]
-    return next((name for name in named if "@" not in name), named[0] if named else user.get_username())
+    else its erplora.com account's (:func:`preferred_name`), else its username."""
+    return _first_name_of(user, staff_name, user.get_full_name()) or user.get_username()
 
 
 def face_name(user, staff_name: str = "") -> str:
-    """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email."""
-    return without_address(person_label(user, staff_name))
+    """How ``user`` shows to a colleague, on the grid of a till and on what they do: their name as ``person_label``
+    finds it, else what goes before the «@» of their e-mail; never an address."""
+    found = _first_name_of(user, staff_name, user.get_full_name(), getattr(user, "email", ""))
+    return without_address(found or user.get_username())
+
+
+def _first_name_of(user, *others: str) -> str:
+    """``user``'s «My profile» name and ``others``, chosen by :func:`preferred_name`."""
+    profile = Profile.objects.filter(username=user.get_username()).only("first_name", "last_name").first()
+    own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
+    return preferred_name(own, *others)
 
 
 def faces_of(scope: Scope, people: Iterable[tuple[Any, Any]]) -> list[dict[str, str]]:
@@ -266,13 +294,12 @@ def staff_names(scope: Scope, usernames: Iterable[str]) -> dict[str, str]:
 
 
 def actor_name(who) -> str:
-    """Whoever acts as a colleague reads them, kept on what they do (a kitchen ticket, a table's check): their account's
-    name, else what goes before the «@» of their e-mail, never the address; their username only as the last resort;
-    anything else (the platform, an API key) as it is."""
+    """Whoever acts as a colleague reads them, kept on what they do (a note on a card, a kitchen ticket, a table's
+    check): a person by the name their face shows (``face_name``); anything else (the platform, an API key) as it is."""
     if who is None:
         return ""
     if hasattr(who, "get_username"):
-        return without_address(who.get_full_name() or getattr(who, "email", "")) or who.get_username()
+        return face_name(who)
     return str(who)
 
 

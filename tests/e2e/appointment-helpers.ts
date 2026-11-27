@@ -43,12 +43,17 @@ export async function openForACut(
  *  for them in Sales, still without a sale, and their series), and the blocked times, the open day, the services and the
  *  professionals it named the same way. Its customers stay the spec's: it knows what else it left on them. */
 export function salonCleanUp(tag: string): string[] {
-  const customers = `select id from customer_customer where name like '${tag}%'`;
+  return salonCleanUpWhere(`like '${tag}%'`);
+}
+
+/** The same statements for the rows whose name matches `matching` (`like 'E2E Apt%'`, `in ('Lucía Gómez', …)`). */
+export function salonCleanUpWhere(matching: string): string[] {
+  const customers = `select id from customer_customer where name ${matching}`;
   const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
   const orders = `select id from sale_order where appointment_id in (${appointments})`;
   const series = `select id from appointment_recurring where customer_id in (${customers})`;
-  const services = `select id from service_service where name like '${tag}%'`;
-  const members = `select id from staff_member where first_name like '${tag}%'`;
+  const services = `select id from service_service where name ${matching}`;
+  const members = `select id from staff_member where first_name ${matching}`;
   return [
     `delete from sale_orderline where order_id in (${orders})`,
     `delete from sale_order where id in (${orders})`,
@@ -57,11 +62,11 @@ export function salonCleanUp(tag: string): string[] {
     `delete from appointment_appointment where id in (${appointments})`,
     `delete from appointment_recurringservice where recurring_id in (${series})`,
     `delete from appointment_recurring where id in (${series})`,
-    `delete from appointment_blockedtime where title like '${tag}%'`,
-    `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${tag}%')`,
-    `delete from schedule_specialday where name like '${tag}%'`,
+    `delete from appointment_blockedtime where title ${matching}`,
+    `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name ${matching})`,
+    `delete from schedule_specialday where name ${matching}`,
     `delete from service_assignment where service_id in (${services}) or member_id in (${members})`,
-    `delete from service_service where name like '${tag}%'`,
-    `delete from staff_member where first_name like '${tag}%'`,
+    `delete from service_service where name ${matching}`,
+    `delete from staff_member where first_name ${matching}`,
   ];
 }

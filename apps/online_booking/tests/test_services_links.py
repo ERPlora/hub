@@ -3,7 +3,7 @@
 import pytest
 from live.errors import Conflict, NotFound
 
-from apps.appointment.models import Appointment, History
+from apps.appointment.models.appointments import Appointment, History
 
 from .conftest import HUB_DB, booking_data, make_rules, public
 

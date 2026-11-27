@@ -12,7 +12,7 @@ const OWN = '0199aaaa-0000-7000-8000-000000000001';
 const MEMBERS_URL = 'http://localhost:8001/businesses/0199a1b2-0000-7000-8000-000000000001/members';
 
 function basic(key: string, label: string, members: number, permissions: number): HubRoleRow {
-  return { key, label, description: '', origin: 'basic', members, to_review: false, permissions };
+  return { key, label, description: '', origin: 'basic', members, to_review: false, mine: false, permissions };
 }
 
 const ROLES: HubRoleRow[] = [
@@ -132,6 +132,11 @@ describe('RolesList', () => {
     expect(offeredRowActions(m.wrapper, 'hub_employee')).toEqual(['duplicate']);
     expect(offeredRowActions(m.wrapper, OWN)).toEqual(['duplicate', 'edit', 'delete']);
     expect(m.wrapper.find('[data-testid="roles-add"]').text()).toContain('Nuevo rol');
+  });
+
+  it('one’s own role is not one’s to edit: it is only duplicated', async () => {
+    const m = await managed(cashier({ mine: true, members: 1 }));
+    expect(offeredRowActions(m.wrapper, OWN)).toEqual(['duplicate', 'delete']);
   });
 
   it('whoever does not manage them is only shown them', async () => {

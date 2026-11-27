@@ -10,17 +10,12 @@ import { A, api, capture, login, psql, record, shown } from './helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { addToTill, checkAtEachSize, cleanSales, stamp, tillIn, tillReady, zoneWithTable } from './sale-helpers';
+import { WINDOW_SIZES } from './screen';
 
 const RUN = stamp();
 const ZONE = `E2E ChipGap ${RUN}`;
 const NUMBER = RUN;
 const KEY = 'SALE-POS-HEADING-CHIP-ICON-GAP';
-
-const SIZES = [
-  { label: '375', width: 375, height: 667 },
-  { label: '820', width: 820, height: 1180 },
-  { label: '1280', width: 1280, height: 720 },
-] as const;
 
 /** Ionic's margin between a chip's leading icon and its text, and its pull of the icon toward the chip's edge. */
 const IONIC_GAP = 8;
@@ -102,7 +97,7 @@ function chipIcon(chip: Locator): Promise<ChipIcon> {
 
 /** Each chip of `testids` in the check's heading, at each size (on a phone, in its drawer), captured and measured. */
 async function measureChips(page: Page, lang: string, testids: string[]): Promise<void> {
-  await checkAtEachSize(page, SIZES, async (label) => {
+  await checkAtEachSize(page, WINDOW_SIZES, async (label) => {
     const chips = testids.map((testid) => shown(page).locator(`[data-testid=${testid}]`).filter({ visible: true }));
     for (const chip of chips) await expect(chip).toBeVisible();
     await capture(page, `${KEY}-${testids[0]}-${lang}-${label}`);

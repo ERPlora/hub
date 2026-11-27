@@ -1,8 +1,11 @@
 """The online booking app declares its module metadata, its menu, its permissions and what each role gets."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs
+from live.meta import Category, LiveAppConfig, Nav, module_configs
 
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 from base.tests.roles import grants_by_role
 
 PERMISSIONS = [
@@ -82,5 +85,18 @@ def test_navigation_is_the_old_modules_two_entries_with_registered_icons():
     ]
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert online_booking().help == Help()
+def test_its_help_window_has_no_tour_yet():
+    assert online_booking().help.videos == {}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("ONLINE_BOOKING-F07",), "zY4sujWM2k8", "f_w8NuRupjw"),
+    (("ONLINE_BOOKING-F01",), "yeM0K-_rEaY", "msNJQYsx-rg"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("online_booking", language) == help_videos.by_task(TASK_VIDEOS, language)

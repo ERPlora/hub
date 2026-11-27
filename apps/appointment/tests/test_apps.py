@@ -238,6 +238,8 @@ TASK_VIDEOS = [
     (("APPOINTMENT-F04", "APPOINTMENT-F22"), "3iicsBB4OJU", "vti0BeNrB0A"),
     (("APPOINTMENT-F07", "APPOINTMENT-F08"), "SCCcOjjX0-Q", "5RkcBExG2Sc"),
     (("APPOINTMENT-F09",), "lyPRKIKNyzE", "_7B2JQ7NPCM"),
+    (("APPOINTMENT-F27",), "CS_8cW8l4ro", "wF2fyfpId5Q"),
+    (("APPOINTMENT-F19",), "apnOcQN7PlY", "YFmNll_QLbc"),
 ]
 
 

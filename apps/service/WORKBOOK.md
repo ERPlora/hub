@@ -169,7 +169,7 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
   gastada diciendo quién la hizo «Profesional: <nombre>», quién y el motivo. Vacía: «Este bono aún no se ha
   usado.».
 - **Bonos vendidos**: una fila por compra, con **Activo** o **Anulado**, la clienta, la fecha, el
-  importe, «{used} usadas · quedan {remaining}» (o «· sin límite»), «Caduca el …» o «No caduca» y lo
+  importe, «2 usadas · quedan 3» («1 usada · queda 1»; o «· sin límite»), «Caduca el …» o «No caduca» y lo
   regalado o corregido después; en una anulada, «Anulado por {who} el {when}» y el motivo. Botones
   **Gastar una sesión** (en un bono sin anular ni caducar y al que le queda alguna sesión, o sin límite),
   **Ajustar** y **Anular** cuando proceden y para quien puede.
@@ -427,8 +427,8 @@ Estado: hecho (lo hace Ventas, SALE-F38)
 Actor: empleado
 Pantalla: Ventas: Vender
 Pasos:
-1. En la tira de categorías del TPV, **Servicios** enseña cada servicio en oferta con su precio y su
-   duración (también salen en el buscador).
+1. En la tira de categorías del TPV, **Todos** y **Servicios** enseñan cada servicio en oferta con su
+   precio y su duración (también salen en el buscador).
 2. Un servicio **Sin configurar** sale con la marca «Falta el IVA» y no se vende.
 3. Un servicio que no es de precio fijo pide el importe, con su precio como sugerencia.
 Entra: los servicios en oferta, su tarifa y su categoría fiscal.
@@ -590,7 +590,7 @@ Pasos:
    Ventas con una devolución.».
 3. Escribe el Motivo (obligatorio) y pulsa **Anular**.
 Entra: la compra y el motivo.
-Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si su cuenta no tiene,
+Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si no tiene ninguno,
 por lo que va antes de la @ de su correo, nunca el correo entero), cuándo y el motivo (`service.grant.voided`). No mueve dinero ni emite documento. Si una línea de una venta lo pagó, esa parte
 vuelve a contar para quien la vendió, hasta que una devolución diga otra cosa (SALE-F28).
 Si falla: «Ese bono ya se ha usado: no se puede anular.», «Ese bono ya estaba anulado.» o «Indica

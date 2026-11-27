@@ -3,7 +3,7 @@
 from live.context import OperationContext
 from live.operations import get, operation
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.online_booking.queries.bookings import find_booking, load_detail
 from apps.online_booking.schemas import BookingOut, BookingRefIn, CancelIn, DeletedOut
 

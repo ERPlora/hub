@@ -4,14 +4,10 @@ Clientes keeps an amount in cents (``total_revenue`` 360 is 3.60 €) and the mo
 repeated the figure as it read it: «¿cuánto nos han dejado entre todos?» got «360,00 EUR» for the 3.60 € on the screen.
 """
 
-import json
-
 import pytest
-from live import assistant as shared
-from live.operations import get
 
 from apps.customer.models import Customer
-from apps.customer.tests.conftest import HUB_DB, ctx_for, in_business_a
+from apps.customer.tests.conftest import HUB_DB, in_business_a, told_in_a_turn
 from base.models import Hub
 from base.tenancy.tests.business import A
 
@@ -21,27 +17,10 @@ pytestmark = HUB_DB
 ASK = "¿Cuántos clientes tengo ya apuntados, cuántos son VIP y cuánto nos han dejado entre todos?"
 
 
-def turn(messages: list, pending: list, decision: dict | None = None) -> dict:
-    operation = get("base.assistant.turn")
-    data = {"messages": messages, "pending": pending, "decision": decision}
-    return operation(ctx_for("hub_owner", language="es"), operation.input.model_validate(data)).model_dump(mode="json")
-
-
 def told(name: str, *, yes: bool = False, **arguments) -> dict:
     """What the model reads of the tool ``name`` run in a turn of the owner, as the chat runs it; a write, once the
     owner says yes to its card (``yes``)."""
-    call = {"call_id": "c1", "name": shared.tool_name(name), "arguments": json.dumps(arguments)}
-    asked = {
-        "role": "assistant",
-        "content": "",
-        "tool_calls": [{"id": "c1", "type": "function", "function": {"name": call["name"], "arguments": call["arguments"]}}],
-    }
-    messages = [{"role": "user", "content": ASK}, asked]
-    plan = turn(messages, [call])
-    if yes:
-        plan = turn(messages, plan["pending"], {"call_id": "c1", "accepted": True})
-    [result] = plan["append"]
-    return json.loads(result["content"])
+    return told_in_a_turn(name, arguments, ask=ASK, yes=yes)
 
 
 @pytest.fixture

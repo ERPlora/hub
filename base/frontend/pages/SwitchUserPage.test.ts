@@ -1,7 +1,8 @@
+import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/components';
 import { ApiError } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import type { AccessDoor } from '../operations/access';
 import SwitchUserPage from './SwitchUserPage.vue';
 
@@ -32,11 +33,72 @@ beforeEach(() => {
   access.enterWith.mockReset();
   access.replaceWith.mockReset();
   access.announceSwitch.mockReset();
+  vi.stubGlobal('localStorage', memoryStorage());
 });
 
 afterEach(() => {
   document.body.innerHTML = '';
   window.history.replaceState(null, '');
+  installAssistant(undefined);
+  sessionStorage.clear();
+  vi.unstubAllGlobals();
+});
+
+/** Ana, in, with the assistant's panel open on a conversation of hers. */
+function panelOpenForAna() {
+  sessionStorage.setItem(
+    'erplora.assistant.history',
+    JSON.stringify({
+      user: ANA.id,
+      conversation: [{ role: 'user', content: 'Hola' }],
+      bubbles: [{ id: 'b1', role: 'user', text: 'Hola', files: [], notices: [], done: true }],
+      setup: false,
+    }),
+  );
+  const assistant = useAssistant();
+  assistant.forUser(ANA.id);
+  assistant.setOpen(true);
+  return assistant;
+}
+
+/** The assistant of the page the switch reloads, for `person`: what the device kept is all it has. */
+function afterTheReload(person: string) {
+  const assistant = createAssistant({ post: vi.fn(), storage: sessionStorage, openStorage: localStorage });
+  assistant.forUser(person);
+  return assistant.state;
+}
+
+describe('the assistant across «Switch user»', () => {
+  it.each([
+    ['their PIN', BEA.id],
+    ['their badge', BEA.id],
+    ['the same person, again', ANA.id],
+  ])('whoever enters with %s finds the panel closed and empty', async (how, person) => {
+    access.enterWith.mockResolvedValue('/sale/pos');
+    const assistant = panelOpenForAna();
+    expect(assistant.state.thread.bubbles).toHaveLength(1);
+    const { wrapper, press } = await switchUser();
+    if (how === 'their badge') {
+      for (const key of [...'0012345678', 'Enter']) document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      await flush();
+    } else {
+      await wrapper.findAll('[data-testid="pin-face"]')[person === BEA.id ? 1 : 0].trigger('click');
+      await press('9071');
+    }
+    expect(access.replaceWith).toHaveBeenCalledWith('/sale/pos');
+    const reloaded = afterTheReload(person);
+    expect({ open: reloaded.open, bubbles: reloaded.thread.bubbles }).toEqual({ open: false, bubbles: [] });
+  });
+
+  it('a wrong PIN leaves the panel of whoever is in as they left it', async () => {
+    access.enterWith.mockRejectedValue(new ApiError(401, 'base.pin_incorrect', 'Wrong PIN.'));
+    panelOpenForAna();
+    const { wrapper, press } = await switchUser();
+    await wrapper.findAll('[data-testid="pin-face"]')[1].trigger('click');
+    await press('0000');
+    const reloaded = afterTheReload(ANA.id);
+    expect({ open: reloaded.open, bubbles: reloaded.thread.bubbles.map((bubble) => bubble.text) }).toEqual({ open: true, bubbles: ['Hola'] });
+  });
 });
 
 describe('SwitchUserPage', () => {

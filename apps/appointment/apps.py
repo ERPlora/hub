@@ -118,7 +118,9 @@ class AppointmentConfig(LiveAppConfig):
             "APPOINTMENT-F07": {"es": ["SCCcOjjX0-Q"], "en": ["5RkcBExG2Sc"]},
             "APPOINTMENT-F08": {"es": ["SCCcOjjX0-Q"], "en": ["5RkcBExG2Sc"]},
             "APPOINTMENT-F09": {"es": ["lyPRKIKNyzE"], "en": ["_7B2JQ7NPCM"]},
+            "APPOINTMENT-F19": {"es": ["apnOcQN7PlY"], "en": ["YFmNll_QLbc"]},
             "APPOINTMENT-F22": {"es": ["3iicsBB4OJU"], "en": ["vti0BeNrB0A"]},
+            "APPOINTMENT-F27": {"es": ["CS_8cW8l4ro"], "en": ["wF2fyfpId5Q"]},
         },
     )
     # The bell counts the customers' own bookings waiting for confirmation, on the query the agenda's «N to

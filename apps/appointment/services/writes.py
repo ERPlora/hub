@@ -12,14 +12,10 @@ from live.errors import Conflict, PermissionDenied
 from live.outbox import record_event
 
 from apps.appointment import engine, events
-from apps.appointment.models import (
-    Appointment,
-    AppointmentService,
-    Counter,
-    History,
-    Recurring,
-    Settings,
-)
+from apps.appointment.models.appointments import Appointment, AppointmentService, History
+from apps.appointment.models.numbering import Counter
+from apps.appointment.models.series import Recurring
+from apps.appointment.models.settings import Settings
 from apps.appointment.queries.access import by_person, may_book_for
 from apps.appointment.queries.agenda import conflicts_of, load_agenda, verdict_message
 from apps.appointment.queries.booking import check_member, lines_for, resolve_services

@@ -1,13 +1,13 @@
 """- ``Cart`` is a shopping cart of a person (email and name, free text: no link to Customers) or of an
   anonymous visit, told apart by its session code. Its totals (items and amount) are the sum of its
-  lines, kept by services.py. Deleting it is logical (``deleted_at``): its orders keep pointing at it,
+  lines, kept by services/. Deleting it is logical (``deleted_at``): its orders keep pointing at it,
   and its code is unique only among the carts not deleted.
 - ``CartItem`` is one line: a product named in free text (no link to Inventory), a quantity with three
   decimals and a unit price in the minor unit of the cart's currency, with its total.
 - ``Order`` is an order made from a cart, with its number
   ``OS-YYYYMMDD-NNNN``, the cart's total copied when it was initiated and its status: initiated →
   paid or failed → completed. «Paid» is a mark a person sets; nothing here charges.
-- ``OrderCounter`` holds the last number given on a business day; services.py raises it with
+- ``OrderCounter`` holds the last number given on a business day; services/orders.py raises it with
   ``UPDATE … RETURNING`` in the transaction of the order (never a sequence).
 
 A name other apps' catalogues also have and say their way («order» is an «orden» there, a «pedido» here) carries the
@@ -78,7 +78,7 @@ class Cart(Audited):
     # The sum of the lines: their quantities, and their totals in the minor unit of ``currency``.
     total_items = models.DecimalField(pgettext_lazy(OWN, "items"), default=Decimal("0"), **QUANTITY)
     total_amount = models.BigIntegerField(_("total"), default=0)
-    # The business's when it was created (services.py), or the one the customer asked for: never a fixed euro.
+    # The business's when it was created (services/), or the one the customer asked for: never a fixed euro.
     currency = models.CharField(_("currency"), max_length=3)
     expires_at = models.DateTimeField(_("expires at"), null=True, blank=True)
     last_activity_at = models.DateTimeField(_("last activity"), null=True, blank=True)
@@ -170,7 +170,7 @@ class Order(Audited):
     )
     # The cart's total when the order was initiated, in the minor unit of ``currency``.
     total_amount = models.BigIntegerField(_("total"), default=0)
-    # Its cart's (services.py): an order is never in another currency than the cart it was made from.
+    # Its cart's (services/): an order is never in another currency than the cart it was made from.
     currency = models.CharField(_("currency"), max_length=3)
     notes = models.TextField(_("notes"), blank=True)
     failure_reason = models.TextField(_("failure reason"), blank=True)

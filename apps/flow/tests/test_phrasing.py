@@ -4,6 +4,7 @@ the server, hub#2300). What each trigger and each step is called is written once
 that changes on one side fails on the other."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -20,10 +21,15 @@ def _said(shared: dict) -> str:
     return f"{shared['language']}: {shared['said']}"
 
 
+def plain(text: str) -> str:
+    """Babel writes «6:00 PM» with a narrow no-break space where the browsers write a plain one."""
+    return re.sub(r"\s", " ", text)
+
+
 @pytest.mark.parametrize("shared", CASES["triggers"], ids=_said)
 def test_each_way_of_starting_in_words(shared):
     with translation.override(shared["language"]):  # an app is named in the language of the request
-        assert describe_trigger(shared["trigger"], Phrasing(shared["language"])) == shared["said"]
+        assert plain(describe_trigger(shared["trigger"], Phrasing(shared["language"]))) == shared["said"]
 
 
 def test_no_trigger_starts_only_by_hand():
@@ -47,7 +53,7 @@ def test_an_event_without_a_phrase_is_composed_from_its_app_and_what_happened():
 @pytest.mark.parametrize("shared", CASES["steps"], ids=_said)
 def test_each_kind_of_step_in_one_line(shared):
     steps = (*shared.get("steps", ()), shared["step"])
-    assert describe_step(shared["step"], Phrasing(shared["language"], steps)) == shared["said"]
+    assert plain(describe_step(shared["step"], Phrasing(shared["language"], steps))) == shared["said"]
 
 
 def test_a_comparison_names_its_data_its_operator_and_its_value():
@@ -67,4 +73,4 @@ def test_a_path_says_where_it_comes_from():
     assert path_label("input.customer.name", p) == "Customer › Name"
     assert path_label("steps.s1.number", p) == "1. Create a task › Number"
     assert path_label("steps.s9.id", p) == "steps.s9.id"
-    assert path_label("secret.API_KEY", p) == "Secret «API_KEY»"
+    assert path_label("secret.API_KEY", p) == "Secret “API_KEY”"

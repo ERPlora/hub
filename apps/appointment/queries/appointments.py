@@ -4,7 +4,7 @@ from django.db.models import Exists, OuterRef
 from live.context import OperationContext
 from live.operations import INTERNAL, operation
 
-from apps.appointment.models import Appointment, AppointmentService, History
+from apps.appointment.models.appointments import Appointment, AppointmentService, History
 from apps.appointment.schemas.agenda import AppointmentListIn, AppointmentPage
 from apps.appointment.schemas.appointments import (
     AppointmentOut,

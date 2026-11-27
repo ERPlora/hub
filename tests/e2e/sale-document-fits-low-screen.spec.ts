@@ -8,16 +8,9 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { A, capture, shown } from './helpers';
 import { cleanTill, dishForTheTill, stamp, tillIn, TILL_LANGUAGES } from './sale-helpers';
 import type { Product } from './inventory-helpers';
-import { CHROME_LANDSCAPE, expectWindowFitsAt, expectWindowOnScreen, underAddressBar, type WindowFit, windowFit } from './screen';
+import { CHROME_LANDSCAPE, expectWindowFitsAt, expectWindowOnScreen, FIT_SIZES, underAddressBar, type WindowFit, windowFit } from './screen';
 
 const RUN = stamp();
-const SIZES = [
-  { width: 1280, height: 665 },
-  { width: 1280, height: 720 },
-  { width: 1440, height: 900 },
-  { width: 820, height: 1180 },
-  { width: 375, height: 667 },
-] as const;
 /** What always shows inside the ticket's window. */
 const ON_VIEW = ['✕', 'print button'] as const;
 
@@ -81,7 +74,7 @@ for (const till of TILL_LANGUAGES) {
     expectWindowOnScreen(end, ON_VIEW, 'with the ticket scrolled to its end');
 
     await bar.evaluate((style) => (style as Element).remove());
-    await expectWindowFitsAt(page, { sizes: SIZES, measure: () => fitOf(modal), onView: ON_VIEW, name: `SALE-DOCUMENT-FIT-${till.lang}` });
+    await expectWindowFitsAt(page, { sizes: FIT_SIZES, measure: () => fitOf(modal), onView: ON_VIEW, name: `SALE-DOCUMENT-FIT-${till.lang}` });
     await context.close();
   });
 }

@@ -13,6 +13,7 @@
 // flow: BASE-F01 BASE-F11
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 
+import { openUserCard } from './access-door';
 import { actionBell, bellSays, closeActionCenter, featuredNotice, noticeButton, openActionCenter } from './action-center';
 import { A, capture, EMPLOYEE, login, psql, shot, shown, THREE_SIZES as VIEWPORTS, untilStill } from './helpers';
 import { decodeSubs } from './live-streams';
@@ -46,6 +47,14 @@ const sidewaysOverflow = (locator: Locator): Promise<number> =>
 
 const near = (a: number, b: number) => Math.abs(a - b) <= 1;
 
+/** The Home at `vp`'s size, painted: its checklist read, then nothing left loading. */
+async function homeAt(page: Page, vp: { width: number; height: number }): Promise<void> {
+  await page.setViewportSize({ width: vp.width, height: vp.height });
+  await page.goto(`${A}/`);
+  await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
+  await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
+}
+
 test('BASE-F11 — «Upgrade plan» lines up with the QR at the foot of the menu; on the rail, only its icon', async ({ page }) => {
   await login(page, A, '/');
   const menu = page.locator('ion-menu');
@@ -54,12 +63,8 @@ test('BASE-F11 — «Upgrade plan» lines up with the QR at the foot of the menu
   const link = menu.locator('[data-testid="upgrade-plan"]');
 
   for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await page.goto(`${A}/`);
-    // The Home behind it painted (its capture is evidence too): its checklist read, then nothing left loading; then
-    // the drawer slid in whole.
-    await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
-    await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
+    // The Home behind it painted (its capture is evidence too); then the drawer slid in whole.
+    await homeAt(page, vp);
     if (vp.width < PINNED_MIN) await shown(page).locator('ion-menu-button').click();
     await expect(link).toBeVisible();
     await expect(link).toContainText('Upgrade plan');
@@ -170,23 +175,10 @@ test('BASE-F01 — a ⛔ step pending paints nothing between the bar and the con
 
 test('the user menu opens «My account» on erplora.com, in a new tab; «Report a problem» stays in the hub', async ({ page }) => {
   await login(page, A, '/');
-  const trigger = page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name');
   const entries = [{ id: 'account', label: 'My account', address: `${STACK.saas}/dashboard/account` }];
   for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await page.goto(`${A}/`);
-    await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
-    await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
-    if (vp.width < PINNED_MIN) {
-      const opened = page.evaluate(() => new Promise<void>((resolve) => document.addEventListener('ionDidOpen', () => resolve(), { once: true })));
-      await shown(page).locator('ion-menu-button').click();
-      await opened;
-    }
-    const presented = page.evaluate(
-      () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-    );
-    await trigger.click();
-    await presented;
+    await homeAt(page, vp);
+    await openUserCard(page);
     for (const entry of entries) {
       const row = page.locator(`ion-popover [data-testid="user-menu-${entry.id}"]`);
       await expect(row, `${entry.id} at ${vp.label}`).toContainText(entry.label);
@@ -232,10 +224,7 @@ test('BASE-F11 — «Manage on erplora.com», right below «Upgrade plan», open
   const upgrade = menu.locator('[data-testid="upgrade-plan"]');
   const link = menu.locator('[data-testid="menu-manage"]');
   for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await page.goto(`${A}/`);
-    await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
-    await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
+    await homeAt(page, vp);
     if (vp.width < 768) {
       // On a phone «⋮» folds «My apps» and the assistant, and nothing else: the bell stays on the bar.
       await expect(actionBell(page)).toBeVisible();

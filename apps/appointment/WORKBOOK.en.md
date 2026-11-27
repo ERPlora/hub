@@ -98,7 +98,7 @@ it to another time or another professional. The **N to confirm** notice shows yo
 booked that is waiting for your confirmation, whatever its day.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:9fc034ef2d52 -->
+<!-- from WORKBOOK.md sha256:b9b55dc51467 -->
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -111,8 +111,12 @@ professional**, also **Day · Week**.
   still open at the till (then No-show, Cancel and Delete are greyed out).
 - **By professional · Day**: one row per bookable professional and an "Unassigned" row if there are
   appointments without a professional (two appointments that overlap share the row, each in its own lane);
-  the calendar hours run horizontally and what the business has closed
-  or blocked is shaded (what is closed, according to Schedules; there you cannot tap to book). A professional who no longer takes appointments (not bookable, inactive, left)
+  the calendar hours run horizontally, at the scale of the usual agendas, so that the working day fits on the screen
+  (today it opens half an hour before the business's time; another day, at the hour it opens), and what
+  the business has closed or blocked is shaded (what is closed, according to Schedules; there you cannot tap to
+  book). Each appointment puts the customer on one line and the services on another; what does not fit ends in "…"
+  (a half-hour appointment usually keeps the first name) and the whole appointment (time, customer and services)
+  shows on its card when tapping it and, with a mouse, when hovering over it. A professional who no longer takes appointments (not bookable, inactive, left)
   keeps their row, behind the bookable ones, on the days they still have appointments, and above the grid
   a notice "Ana no longer takes new appointments: their appointments for the day stay on their row so you
   can move them to someone else.". Tapping a free slot opens the new appointment with that professional and
@@ -465,18 +469,18 @@ with its check open at the till, "This appointment has a check open in the till:
 Involved: none
 
 ### APPOINTMENT-F10 See an appointment's history
-<!-- from WORKBOOK.md sha256:ac1dd82e7eea -->
+<!-- from WORKBOOK.md sha256:811b4d8d2ddf -->
 Status: done
 Actor: employee (their own), manager
 Screen: Agenda
 Steps:
 1. Tap **History** on the row (in any state) or open the appointment's card.
-2. Each change with its time on the business clock, who made it (a team member, by their name or, if their
-   account has none, by what goes before the @ of their email, never the whole email; "Requested by the customer"
-   if it was them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate
-   copy; an API key, by its name) and what changed (from which professional or service to which, and the new time). A
-   deleted appointment that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted"
-   and "Restored".
+2. Each change with its time on the business clock, who made it (a team member, by their name, the one in My
+   profile or, without it, their account's, or, if they have none, by what goes before the @ of their email, never
+   the whole email; "Requested by the customer" if it was them; "Done by the platform" if no person did: the
+   system, an automation or a recovery from a separate copy; an API key, by its name) and what changed (from which
+   professional or service to which, and the new time). A deleted appointment that ERPlora's staff brought back
+   from a separate copy keeps its lines and adds "Deleted" and "Restored".
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).

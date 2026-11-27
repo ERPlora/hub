@@ -2,8 +2,8 @@
 // dialog: Name, SKU (locked when editing), Price, «Cost (<currency>)», «Initial stock» (create only), «Low
 // stock threshold» (empty = 10), EAN-13, Description, «Type» (create only), «Track stock for this
 // item» with its note, «Unit of measure», «Tax category» (required, none chosen in advance) and
-// «Categories» (when there are any). «Save» / «Save changes» is off while Name, SKU or the tax
-// category are missing; amounts and quantities are read as typed; an edit sends only what changed;
+// «Categories» (when there are any). «Save» / «Save changes» is off while the name or the tax
+// category are missing (ProductFormModal.needs.test.ts); amounts and quantities are read as typed; an edit sends only what changed;
 // a refusal stays in the dialog under its field. «Tax category» and «Categories» are `Combo` fields of
 // @erplora/ui that search the server (TaxCategorySelect, ProductCategoriesField).
 import { afterEach, describe, expect, it } from 'vitest';

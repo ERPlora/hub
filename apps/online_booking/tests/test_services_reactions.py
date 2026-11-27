@@ -3,7 +3,7 @@
 import pytest
 from live.errors import NotFound, PermissionDenied
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.online_booking.models import Booking
 
 from .conftest import HUB_DB, booking_data, ctx_for, public, run

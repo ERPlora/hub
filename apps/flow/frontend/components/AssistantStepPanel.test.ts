@@ -39,7 +39,7 @@ describe('AssistantStepPanel', () => {
     const off = { ...CATALOG, off_apps: [{ app: 'appointment', app_name: 'Appointments' }] };
     const s = await mountFlow(AssistantStepPanel, { props: { step, index: 0, steps: [step], catalog: off, errors: {}, pick: async () => '' } });
     expect(s.find('flow-assistant-tools-off-s1').text()).toBe(
-      '«Cancel an appointment» is from Appointments, which is off in this business: turn it on in Apps, or remove it.',
+      '“Cancel an appointment” is from Appointments, which is off in this business: turn it on in Apps, or remove it.',
     );
     const es = await mountFlow(AssistantStepPanel, {
       locale: 'es',
@@ -79,7 +79,7 @@ describe('AssistantStepPanel', () => {
   it('a change waits for a yes by default, or it makes it on its own', async () => {
     const s = await setup();
     expect(s.find('flow-assistant-modehint-s1').text()).toBe(
-      'A change it wants waits for a yes in Automations, under «Waiting for your answer». What it only looks up never waits.',
+      'A change it wants waits for a yes in Automations, under “Waiting for your answer”. What it only looks up never waits.',
     );
     await ionValue(s.find('flow-assistant-mode-s1').element, 'auto');
     expect(s.emitted().at(-1)).toMatchObject({ mode: 'auto' });
@@ -90,7 +90,7 @@ describe('AssistantStepPanel', () => {
   it('offers cancelling a booking only when it asks first, and says who can say yes to it', async () => {
     const asking = await setup({ ...STEP, tools: ['reservation.reservation.cancel'] });
     expect(asking.find('flow-assistant-askfirst-s1').text()).toBe(
-      'Only after a yes from someone who may do it themselves: «Cancel a reservation».',
+      'Only after a yes from someone who may do it themselves: “Cancel a reservation”.',
     );
     const own = await setup({ ...STEP, mode: 'auto' });
     expect(options(own)).toEqual(['task.task.create']);

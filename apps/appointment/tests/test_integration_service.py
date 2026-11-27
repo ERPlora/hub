@@ -5,7 +5,7 @@ and length) and archiving a service are Services', written by its own operations
 import pytest
 from live.errors import Conflict
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 
 from .conftest import HUB_DB, MONDAY, make_customer, make_member, make_tax, run, wall
 

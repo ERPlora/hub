@@ -14,7 +14,7 @@ import { computed, onMounted, ref, shallowRef } from 'vue';
 import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import { cleanTrigger, type FlowDocument } from '../lib/document';
-import { actionLabel, describeClause, describeDuration, describeStep, eventLabel, fieldLabel } from '../lib/phrasing';
+import { actionLabel, describeClause, describeDuration, describeStep, eventLabel, fieldLabel, quoted } from '../lib/phrasing';
 import type { CatalogOut, PinnedOut, TestOut, TestStepOut } from '../operations';
 
 const props = defineProps<{ document: FlowDocument; flowId: string | null; catalog: CatalogOut | null }>();
@@ -103,7 +103,7 @@ function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
     tool,
     text: phrasing.value.t('flow.test.pinnedEmpty', {
       action: actionLabel(tool, props.catalog, phrasing.value),
-      fields: empty.filter((row) => row.tool === tool).map((row) => `«${fieldLabel(row.field, phrasing.value)}»`).join(', '),
+      fields: empty.filter((row) => row.tool === tool).map((row) => quoted(fieldLabel(row.field, phrasing.value), phrasing.value)).join(', '),
     }),
   }));
 }
