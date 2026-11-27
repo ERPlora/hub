@@ -5,6 +5,7 @@
 // minutes as integers, days `YYYY-MM-DD`, times on the business's clock with its offset (`2026-10-19T10:00:00+02:00`);
 // a time sent without offset is wall clock.
 import type { Page } from '../../../frontend/sdk-types';
+import type { SlotsOut } from './operations-availability';
 
 export type AppointmentStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
 export type AppointmentSource = 'counter' | 'phone' | 'online' | 'whatsapp';
@@ -232,20 +233,6 @@ export interface SlotsIn {
   staff?: string | null;
   exclude_id?: string | null;
   for_customer?: boolean;
-}
-
-export interface SlotOut {
-  start: string;
-  end: string;
-  within_notice: boolean;
-  staff_ids: string[];
-}
-
-export interface SlotsOut {
-  date: string;
-  timezone: string;
-  duration_minutes: number;
-  slots: SlotOut[];
 }
 
 export interface CheckIn extends Omit<SlotsIn, 'date'> {

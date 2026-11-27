@@ -10,7 +10,17 @@ const CASES: UnsavedFormCase[] = [
   { app: 'kitchen', flow: 'KITCHEN-F01', route: '/kitchen/stations', add: 'kitchen-stations-primary-action', form: 'kitchen-station-form', field: 'kitchen-station-form-name' },
   { app: 'customer', flow: 'CUSTOMER-F01', route: '/customer/customers', add: 'customer-list-add', form: 'customer-create', field: 'customer-form-name' },
   { app: 'reservation', flow: 'RESERVATION-F06', route: '/reservation/reservations', add: 'reservation-list-add', form: 'reservation-form', field: 'reservation-form-guest_name' },
-  { app: 'appointment', flow: 'APPOINTMENT-F01', route: '/appointment/agenda', add: 'appointment-list-add', form: 'appointment-form', field: 'appointment-form-minutes', value: '45' },
+  {
+    app: 'appointment',
+    flow: 'APPOINTMENT-F01',
+    route: '/appointment/agenda',
+    add: 'appointment-list-add',
+    form: 'appointment-form',
+    field: 'appointment-form-minutes',
+    value: '45',
+    // «Duration (min)» is typed once «Other» opens its field.
+    prepare: (form) => form.locator('[data-testid=appointment-form-duration-other]').click(),
+  },
   { app: 'staff', flow: 'STAFF-F04', route: '/staff/roles', add: 'staff-roles-add', form: 'staff-role-form', field: 'staff-role-form-name' },
   { app: 'service', flow: 'SERVICE-F07', route: '/service/categories', add: 'service-categories-add', form: 'service-category-form', field: 'service-category-form-name' },
 ];

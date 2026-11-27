@@ -236,11 +236,13 @@ const locked = (row: ConditionRow): boolean => !!row.path && !!props.lockedBy?.p
         fill="clear"
         color="medium"
         :data-testid="`${testid}-remove-${index}`"
+        :aria-label="$t('flow.steps.removeCondition')"
+        :title="$t('flow.steps.removeCondition')"
         @click="remove(index)"
       >
         <HubIcon
+          slot="icon-only"
           name="ion:close-outline"
-          :label="$t('flow.steps.removeCondition')"
         />
       </IonButton>
     </div>

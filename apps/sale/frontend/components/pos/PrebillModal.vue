@@ -126,6 +126,7 @@ async function queued(): Promise<boolean> {
           <ion-button
             data-testid="pos-prebill-print"
             :aria-label="$t('sale.pos.print')"
+            :title="$t('sale.pos.print')"
             :disabled="!valued || !letterhead || !businessMoney || sending"
             @click="print"
           >
@@ -137,6 +138,7 @@ async function queued(): Promise<boolean> {
           <ion-button
             data-testid="pos-prebill-close"
             :aria-label="$t('sale.pos.close')"
+            :title="$t('sale.pos.close')"
             @click="open = false"
           >
             <HubIcon
