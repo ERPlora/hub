@@ -37,7 +37,7 @@ TAX = {"tax_id": "12345678Z", "company_name": "Ruiz Peluqueros", "address": "Cal
 def marta(db):
     card = Customer.objects.create(name="Marta Ruiz", email=EMAIL, phone=PHONE, total_purchases=1, **TAX)
     grant = operation("customer.consent.grant")
-    grant(ctx_for(), grant.input(customer_id=card.id, channel="email", notice_text="Yes, by email."))
+    grant(ctx_for(), grant.input(customer_id=card.id, channel="email"))
     return card
 
 

@@ -12,11 +12,14 @@ HealthTestResult = Literal["", "negative", "positive"]
 
 #: What the assistant reads on every free text of a card it may write: with no tool for health data, a note, the card's
 #: notes, a custom field or an entry of its activity is where it would put an allergy, out of the block and of the
-#: permission it needs.
+#: permission it needs. Only that block is out of its reach: an allergy marked on a dish for the kitchen is no datum of
+#: the card, and «no tool» said of every allergy made it turn that down too.
 NOT_FOR_HEALTH_DATA = (
     "Never for allergies, sensitivity tests or other health data: those go only in the health and allergies block of "
     "the customer's card in Customers (/customer/customers), with the customer's own explicit permission, which only "
-    "that screen records. You have no tool for them: tell the person to do it there."
+    "that screen records. No tool of yours writes that block: tell the person to do it there. An allergy to mark on a "
+    "dish someone will eat is not kept on the card: it goes on that dish's line, with a tool you find by searching for "
+    "it."
 )
 
 

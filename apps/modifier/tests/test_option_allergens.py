@@ -168,7 +168,7 @@ def test_the_assistant_hears_the_refusal_before_any_card_is_drawn(extras):
 def test_the_assistants_card_says_the_allergens_by_their_names_in_spanish(extras):
     cheese = option("Queso")
     fields = fields_of("modifier.option.update", {"id": str(cheese.id), "allergens": ["milk", "gluten"]}, "es")
-    assert (fields["allergens"]["label"], fields["allergens"]["value"]) == ("Alérgenos", ["Leche", "Gluten"])
+    assert (fields["allergens"]["label"], fields["allergens"]["value"]) == ("Alérgenos", ["Gluten", "Leche"])
 
 
 def test_the_assistants_card_of_a_new_option_says_them_too(extras):

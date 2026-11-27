@@ -130,7 +130,7 @@ test('WHATSAPP_INBOX-F29, F30: the template’s sheet shows the thumbnail of its
   await expect(editor(page)).toBeVisible();
   await expect(field(page, 'header-file-preview-image')).toHaveAttribute('src', photoUrl);
   await expect.poll(() => loadedWidth(field(page, 'header-file-preview-image'))).toBe(600);
-  await expect(field(page, 'header-file-choose')).toContainText('Change file');
+  await expect(field(page, 'header-file-choose')).toHaveAttribute('title', 'Change file');
   await shots(page, `${KEY}-edit`, async (p) => {
     await expect.poll(() => loadedWidth(field(p, 'header-file-preview-image'))).toBe(600);
   });

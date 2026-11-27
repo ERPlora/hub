@@ -134,7 +134,7 @@ def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
             data=blueprint.export.export_data(ctx, chosen, purpose=data.purpose),
         )
         # INVENTORY-F33: the rows' own photos travel inside the file; the library's images by their reference.
-        bundle.media = blueprint.photos.export_media(ctx, bundle.data)
+        bundle.media = blueprint.photos.export_media(ctx, bundle.data, blueprint.datasets.every_dataset())
         return {
             "filename": blueprint.archive.file_name(data.name, data.language),
             "content_type": "application/zip",

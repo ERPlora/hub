@@ -1,0 +1,104 @@
+name: nightly
+
+# Every spec of tests/e2e, every night, on main: the required check only runs the tests tagged @smoke (test.yml), so a
+# change that breaks any other spec would stay red unseen until someone ran it for something else. Never part of a
+# check: a red night stops no PR and no deploy. It keeps ONE open issue instead (scripts/e2e_report.py): a red night
+# opens it or comments on it, and the first green night closes it. A schedule only runs from the default branch;
+# `workflow_dispatch` reruns it by hand (writing the issue only from main).
+
+on:
+  schedule:
+    # 01:47 UTC, off the hour (GitHub delays the busy ones), apart from the SaaS's nightly at 03:17.
+    - cron: "47 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One nightly at a time: a dispatch near the cron, or a night that overruns into the next, would otherwise have two
+# reports look for the issue at once and open it twice. The second waits; none is cancelled half way.
+concurrency:
+  group: nightly-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  # The specs run one at a time on a stack they share, and all of them take longer than a job may last: each job of the
+  # matrix runs its share (Playwright's --shard, by spec file) on a stack of its own. max-parallel leaves runners of
+  # the account to the pushes that come in meanwhile. A red shard stops none of the others, so every red test shows.
+  e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    permissions:
+      contents: read
+    steps:
+      # The whole history, as nightly_e2e.py expects of a clone: it fetches origin and checks this commit out in a
+      # worktree of its own, with its submodules.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/e2e-stack
+      # Playwright's own timeout stops the specs before the job's, so the share still writes its report and cleans up.
+      - name: This job's share of the specs
+        env:
+          NIGHTLY_DIR: ${{ runner.temp }}/hub-nightly-e2e
+          NIGHTLY_HUB_REF: ${{ github.sha }}
+          NIGHTLY_MAX_MINUTES: "120"
+          SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}
+        run: python3 scripts/nightly_e2e.py --shard "$SHARD"
+      # Playwright's JSON report, which the job report reads with every other share's.
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-report-${{ matrix.shard }}
+          path: ${{ runner.temp }}/hub-nightly-e2e/runs/*/test-results/results.json
+          if-no-files-found: ignore
+          retention-days: 14
+      # The share's log, both runservers' logs and Playwright's output (each failed test's trace and screenshot).
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-runs-${{ matrix.shard }}
+          path: ${{ runner.temp }}/hub-nightly-e2e/runs/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Whatever the shards' result, a timeout included; not when someone cancels the run by hand. The reports of the
+  # shards are read one after another: a shard that died before writing its own leaves none, and the issue says so.
+  report:
+    needs: e2e
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # The script only: no submodules.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: e2e-report-*
+          path: ${{ runner.temp }}/e2e-reports
+      - name: Report the night
+        env:
+          REPORTS: ${{ runner.temp }}/e2e-reports
+          REPORT: ${{ runner.temp }}/e2e-report.json
+          RESULT: ${{ needs.e2e.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+          PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$REPORTS"
+          find "$REPORTS" -name results.json -exec cat {} + > "$REPORT"
+          python3 scripts/e2e_report.py

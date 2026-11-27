@@ -8,7 +8,12 @@ import { nextTick } from 'vue';
 import { createMemoryHistory, createRouter, type NavigationFailure, type RouteRecordRaw } from 'vue-router';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const sdk = vi.hoisted(() => ({ client: { api: { call: (() => undefined) as (...args: unknown[]) => unknown } } }));
+const sdk = vi.hoisted(() => ({
+  client: {
+    api: { call: (() => undefined) as (...args: unknown[]) => unknown },
+    stream: { subscribe: vi.fn<(op: string, params: object, listener: SubListener) => () => void>(() => () => undefined) },
+  },
+}));
 
 vi.mock('@erplora/ui/shell', () => ({
   createShell: vi.fn(),
@@ -31,7 +36,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 }));
 
 import { createShell, logout, stopNoticeListening } from '@erplora/ui/shell';
-import { ApiError, createLiveClient, provideLiveClient } from '@erplora/ui/sdk';
+import { ApiError, createLiveClient, provideLiveClient, type SubListener } from '@erplora/ui/sdk';
 import { assistantConfig, assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { approvalPass } from '../base/frontend/lib/approval';
 import { HUB_ASSISTANT } from '../base/frontend/lib/assistant-hub';
@@ -291,6 +296,20 @@ describe('main.ts', () => {
       expect(logout).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(60_000);
       expect(stopNoticeListening).toHaveBeenCalledOnce();
+      expect(logout).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // A till open while the business changes «Ask again after inactivity» follows the new minutes without reloading.
+  it('follows the idle minutes the business changes while the till is open', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      await bootWithHome({ name: 'Bar A', access: { credential: 'pin', switch_user: true, idle_minutes: null } });
+      const idle = sdk.client.stream.subscribe.mock.calls.findLast(([op]) => op === 'base.session.idle');
+      idle?.[2]({ type: 'result', data: { idle_minutes: 1 }, rev: 1 });
+      await vi.advanceTimersByTimeAsync(60_000);
       expect(logout).toHaveBeenCalledOnce();
     } finally {
       vi.useRealTimers();

@@ -268,4 +268,13 @@ describe('FilePreview', () => {
     await show(item('notas.txt', 'text'));
     expect(inDoc('file-preview-loading')?.textContent).toContain('Opening the file');
   });
+
+  // In Chrome on a tablet or a phone, `vh` also counts the screen under the address bar: a viewer sized by it was taller
+  // than the page, with «Download» and «Close» cut off (measured in base-files-preview-fits-low-screen.spec.ts).
+  it('is never sized by the screen under the address bar', () => {
+    const sfc = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'FilePreview.vue'), 'utf8');
+    const style = /<style[^>]*>([\s\S]*)<\/style>/.exec(sfc)?.[1] ?? '';
+    expect(style).toMatch(/\.file-preview\s*\{[^}]*--height:\s*min\(860px,\s*92%\);/);
+    expect(style).not.toMatch(/\d+[dls]?vh/);
+  });
 });

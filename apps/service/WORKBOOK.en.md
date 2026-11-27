@@ -148,7 +148,7 @@ its movements, and from there you spend a session outside the checkout, give ses
 mistake. At the top, **Vouchers with no customer** gathers the vouchers whose customer was deleted.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:64a747432988 -->
+<!-- from WORKBOOK.md sha256:aa3393436310 -->
 At the top, **Vouchers with no customer** (manager, owner and administrator only). Table with the search
 box "Search package…", columns **Name, Discount, Closed price, Lines** and **Status** (Active, Archived or
 Deleted). In **Filters**, the Status filter on **Deleted** switches to the view of the vouchers deleted
@@ -172,7 +172,7 @@ and **Load more** with "Showing {shown} of {total}" when there are more:
   **Courtesy**, **Correction**), the service, the date, "Customer: <name>", on a session spent saying who
   did it "Professional: <name>", who and the reason. Empty: "This voucher has not been used yet.".
 - **Sold vouchers**: one row per purchase, with **Active** or **Voided**, the customer, the date, the
-  amount, "{used} used · {remaining} left" (or "· no limit"), "Expires …" or "Never expires" and what
+  amount, "2 used · 3 left" ("1 used · 1 left"; or "· no limit"), "Expires …" or "Never expires" and what
   was given or corrected afterwards; on a voided one, "Voided by {who} on {when}" and the reason.
   **Spend a session** (on a voucher neither voided nor expired and with a session left, or with no limit),
   **Adjust** and **Void** buttons where they apply and for whoever may.
@@ -445,13 +445,13 @@ already and is not filled: what the business took out of it since stays out; if 
 failed halfway, asking for it again from the same copy fills it with what the business keeps untouched)
 
 ### SERVICE-F09 Sell a service at the till
-<!-- from WORKBOOK.md sha256:6a4c836211cc -->
+<!-- from WORKBOOK.md sha256:61c94280c58e -->
 Status: done (Sales does it, SALE-F38)
 Actor: employee
 Screen: Sales: Sell
 Steps:
-1. In the till's strip of categories, **Services** shows each service on offer with its price and its
-   duration (they also show in the search).
+1. In the till's strip of categories, **All** and **Services** show each service on offer with its price
+   and its duration (they also show in the search).
 2. A **Not configured** service shows with the mark "VAT missing" and is not sold.
 3. A service that is not at a fixed price asks for the amount, with its price as a suggestion.
 In: the services on offer, their pricing and their tax category.
@@ -610,7 +610,7 @@ vouchers" with the reason.
 Involved: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Void a voucher sold by mistake
-<!-- from WORKBOOK.md sha256:40ffc7422eff -->
+<!-- from WORKBOOK.md sha256:9b28e73309c6 -->
 Status: done
 Actor: manager, assistant
 Screen: Packages
@@ -622,7 +622,7 @@ Steps:
    with a return.".
 3. Type the Reason (required) and tap **Void**.
 In: the purchase and the reason.
-Out: the voucher can no longer be spent and stays as a trace, with who (by their name or, if their account has
+Out: the voucher can no longer be spent and stays as a trace, with who (by their name or, if they have
 none, by what goes before the @ of their email, never the whole email), when and the reason (`service.grant.voided`). It moves no money and issues no document. If a line of a sale paid for it, that part
 counts for whoever sold it again, until a refund says otherwise (SALE-F28).
 If it fails: "That voucher was already used: it cannot be voided.", "That voucher was already voided." or

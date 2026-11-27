@@ -8,6 +8,8 @@ own in «My profile» goes first; without either, the account's, as before.
 """
 
 import json
+import re
+from pathlib import Path
 
 import pytest
 from django.apps import apps
@@ -17,6 +19,7 @@ from live.operations import get as get_operation
 from apps.staff.models import Member
 from base.models import Membership
 from base.models.profile import Profile
+from base.queries.people import actor_name, face_name
 from base.schemas.approvals import ApproversIn
 from base.schemas.sessions import SessionMeIn
 from base.services import sessions
@@ -140,3 +143,59 @@ class TestTheUserMenuCard:
         sessions.ensure_hub_user(ana)
 
         assert self.me(ana)["label"] == "ana.qa@example.com"
+
+
+class TestWhoActed:
+    """What a person does is signed with the name a colleague reads on the grid: «My profile», else their account's,
+    else what goes before the «@» of their e-mail; never an address (CUSTOMER-F03, APPOINTMENT-F10)."""
+
+    def test_a_name_of_their_own_in_my_profile_signs_what_they_do(self, ana, olga):
+        Profile.objects.create(username=ana.username, first_name="QA", last_name="Empleado")
+        Profile.objects.create(username=olga.username, first_name="Olguita")
+
+        assert [actor_name(ana), actor_name(olga)] == ["QA Empleado", "Olguita"]
+
+    def test_without_one_their_account_s_name_signs(self, olga):
+        assert actor_name(olga) == "Olga Ruiz"
+
+    def test_with_no_name_anywhere_what_goes_before_the_at_signs(self, ana, make_user):
+        email_only = make_user("saas:3", email="luis.qa@example.com")
+
+        assert [actor_name(ana), actor_name(email_only)] == ["ana.qa", "luis.qa"]
+
+    def test_a_profile_that_only_kept_the_address_never_shows_it(self, ana):
+        Profile.objects.create(username=ana.username, first_name="ana.qa@example.com")
+
+        assert actor_name(ana) == "ana.qa"
+
+    def test_whoever_is_not_a_person_is_kept_as_it_comes(self):
+        assert [actor_name(None), actor_name("system"), actor_name("API · Zapier")] == ["", "system", "API · Zapier"]
+
+    def test_they_sign_with_the_name_their_face_shows(self, ana, olga, make_user):
+        Profile.objects.create(username=ana.username, first_name="QA", last_name="Empleado")
+        people = [ana, olga, make_user("saas:3", email="luis.qa@example.com"), make_user("saas:4")]
+
+        assert [actor_name(person) for person in people] == [face_name(person) for person in people]
+
+
+#: The hub's own code: its apps and its platform.
+HUB = Path(__file__).resolve().parents[2]
+#: The one place that names a person of the team from their account.
+THE_PIECE = HUB / "base" / "queries" / "people.py"
+#: A name made from the account itself: ``user.get_full_name() or …`` skips «My profile».
+OWN_NAMING = re.compile(r"get_full_name\(\)\s*(or|if)\b")
+
+
+def test_only_the_common_piece_names_whoever_acts_from_their_account():
+    """An app names whoever acts with ``base.queries.people.actor_name``: its own ``get_full_name() or …`` signs an
+    invited colleague with their address while the rest of the Hub calls them by their «My profile» name."""
+    found = [
+        f"{path.relative_to(HUB)}:{number}"
+        for folder in ("apps", "base")
+        for path in sorted((HUB / folder).rglob("*.py"))
+        if path != THE_PIECE and not {"tests", "migrations"} & set(path.parts)
+        for number, line in enumerate(path.read_text().splitlines(), 1)
+        if OWN_NAMING.search(line)
+    ]
+
+    assert found == []

@@ -86,7 +86,7 @@ describe('StationsPage', () => {
     await s.show([GRILL]);
     await s.act(s.stations(), 'delete', GRILL);
     const dialog = s.wrapper.findAllComponents(ConfirmDialog).find((d) => prop(d, 'testid') === 'kitchen-stations-delete')!;
-    expect(prop(dialog, 'title')).toBe('Delete «Grill»?');
+    expect(prop(dialog, 'title')).toBe('Delete “Grill”?');
     expect(prop(dialog, 'message')).toBe(
       'The station leaves the list and stops receiving tickets. Tickets already sent keep it in their history.',
     );

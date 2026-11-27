@@ -35,7 +35,7 @@ una línea de import; lo que no importa ninguno de ellos está en los demás mó
 | `helpers.ts` | `api`, los hubs `A` y `B`, las cuentas `OWNER` y `EMPLOYEE`, `login` y las páginas que abre (`hostPage`, `signedInSpanish`), el SaaS por el que pasa el login y los pasos del viaje (`SAAS`, `SAAS_SIGN_IN`, `SAAS_CODE`, la carpeta de su correo, `runningTimeout`), la puerta de «Mis apps» (`MY_APPS_DOOR`, `topbarApps`), `collectProblems`, las carpetas `HUB_DIR` y `REPO_DIR`, la página a la vista (`shown`, `testid`, `appRow`), la espera de «nada se mueve» (`settled`, `untilStill`, `painted`), `scrolledTo`, las capturas (`capture`, `shot`, `record`), `horizontalOverflow`, las apps de la spec (`turnOn`, `turnOnMissing`, `turnOffTurnedOn`), `upgradeLandsInside`, el registro del negocio (`registrationOf`, `registerBusinessIn`), `psql` y los elementos de la demo que borran (`clearItems`, `uniqueName`) |
 | `business.ts` | el negocio de la spec, vaciado y devuelto: lo que trae una plantilla (`emptyOfTemplateData`), el plan de su foto (`dropPlanFromPhoto`, `restorePhotoFrom`) y quién ha entrado (`usernameOf`) |
 | `saas-photo.ts` | la foto de erplora.com de `a` para una spec que cambia lo que dice (sus personas, su plan…): guardada antes de la ejecución, enviada más nueva y firmada como la manda el SaaS, y devuelta después (`keepPhotoOfA`) |
-| `screen.ts` | más de la pantalla: el tamaño de la tableta alta, `iconStates`, `settledCapture` y `capturedFitting` |
+| `screen.ts` | más de la pantalla: el tamaño de la tableta alta, la barra de direcciones de Chrome en una tableta en horizontal (`CHROME_LANDSCAPE`, `underAddressBar`), los tamaños en que se mide una ventana que tiene que caber (`FIT_SIZES`), dónde cae una ventana en la página y si cabe con sus partes a la vista (`windowFit`, `expectWindowOnScreen`, `expectWindowFitsAt`), `iconStates`, `settledCapture`, `capturedFitting` y la captura en los tres tamaños de siempre, cada una sin desborde (`THREE_SIZES`, `capturedAtEachSize`) |
 | `table-columns.ts` | cómo reparte su ancho una lista `DataTable`, columna a columna, cuando deja de moverse (`steady`): lo que mide cada una, lo que corta y si la cabecera cae encima de sus celdas |
 | `detectors.ts` | los dos detectores que corren en la página: qué se mueve (`movingInPage`) y si una captura repite su parte de arriba (`repeatedTop`) |
 | `demo-items.ts` | los elementos de la app de demo: crearlos y leerlos por la API, y la lista |
@@ -250,44 +250,55 @@ node tests/e2e/database.ts --drop
 `$(…)` da los dos ids, primero el de `a`, como dos palabras (en bash y en zsh); la misma orden, ya con la BD y el puerto de
 la pila, la escribe `global-setup.ts` si la ejecución arranca sin las cuentas.
 
-## La pasada nocturna (`scripts/nightly_e2e.py`)
+## La pasada nocturna (`.github/workflows/nightly.yml`)
 
-Cada noche, en el Mac, corre todas las specs sobre el `origin/main` recién traído y mantiene **una sola issue**
-(«Pruebas de navegador del Hub en rojo en la pasada nocturna», `prio:P1`, `scripts/e2e_report.py`): una noche en rojo la abre o la
-comenta, y la primera noche en verde la cierra. No es un check: una noche roja no para ninguna PR ni ningún despliegue. Va
-en el Mac y no en GitHub Actions porque, desde la ronda 2026-11-10e de los planes, solo `aws` usa Actions; el SaaS hace lo
-mismo con su pasada.
+Cada noche, en GitHub Actions, corre todas las specs sobre el `main` de ese momento y mantiene **una sola issue**
+(«Pruebas de navegador del Hub en rojo en la pasada nocturna», `prio:P1`, `scripts/e2e_report.py`): una noche en rojo la
+abre o la comenta, y la primera noche en verde la cierra. No es un check: una noche roja no para ninguna PR ni ningún
+despliegue. El SaaS hace lo mismo con su `nightly.yml`.
+
+- **Repartida en trozos**: las specs corren una detrás de otra y todas juntas duran más de lo que GitHub deja durar un
+  job, así que cada job de la matriz corre su parte (`--shard <i>/<n>` de Playwright, por fichero de spec) en una pila
+  propia, con un tope de Playwright por debajo del del job para que el trozo escriba su informe y limpie. `max-parallel`
+  deja máquinas de la cuenta libres para los pushes que entran mientras tanto.
+- **Un informe para todos**: el job `report` junta el informe JSON de cada trozo y corre `scripts/e2e_report.py` una
+  vez, con el enlace de la ejecución. Solo escribe en la issue desde `main`; lanzada a mano desde otra rama
+  (`workflow_dispatch`), lo dice en su registro y no toca la issue.
+- **Lo que deja**: cada trozo sube su `results.json` (`e2e-report-<i>`) y, si sale en rojo, su carpeta de la noche
+  (`e2e-runs-<i>`: `night.log`, los registros de los dos `runserver` y `test-results/`, con las trazas y las capturas de
+  cada fallo), 14 días.
+
+### La pila de la pasada (`scripts/nightly_e2e.py`)
+
+Cada trozo, el humo de navegador (`.github/scripts/smoke-e2e.sh`, README del Hub) y quien quiera correr specs en una
+pila propia usan el mismo script, que **nunca escribe en GitHub**: lo que sale en rojo lo dice en su salida.
 
 - **Monta la pila de la receta de arriba, sola**: worktrees sueltos de `origin/main` del Hub (o del commit que diga
-  `NIGHTLY_HUB_REF`, aunque no esté subido) y del SaaS en
-  `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos solo hace `fetch`), con su `.env`; sus BD `hub_e2e_9770` y
-  `saas_e2e_9771`; la siembra (cuentas de demo con los ids de `a` y `b`, el proveedor falso del asistente y la taxonomía
-  del SaaS, que siembra también cada despliegue y pide la QA maestra, abajo); los dos
-  `runserver` con las variables de la receta, del asistente y de WhatsApp; y `CI=1 pnpm e2e` con el tope global de Playwright
-  (`NIGHTLY_MAX_MINUTES`, 360); con `NIGHTLY_GREP`, solo los tests cuyo título casa con ese patrón (`--grep` de
-  Playwright). Las specs que gastan tokens de verdad (`QA_REAL_PROVIDER`) se quedan fuera. El humo de navegador
-  (`.github/scripts/smoke-e2e.sh`, README del Hub) es esta misma pila con `@smoke`, el commit en el que estás y su tope.
+  `NIGHTLY_HUB_REF`, aunque no esté subido) y del SaaS en `~/.erplora/hub-nightly-e2e/` (de los checkouts compartidos
+  solo hace `fetch`), con su `.env`; sus BD `hub_e2e_9770` y `saas_e2e_9771`; la siembra (cuentas de demo con los ids de
+  `a` y `b`, el proveedor falso del asistente y la taxonomía del SaaS, que siembra también cada despliegue y pide la QA
+  maestra, abajo); los dos `runserver` con las variables de la receta, del asistente y de WhatsApp; y `CI=1 pnpm e2e`
+  con el tope global de Playwright (`NIGHTLY_MAX_MINUTES`, 360); con `NIGHTLY_GREP`, solo los tests cuyo título casa con
+  ese patrón (`--grep` de Playwright), y con `--shard <i>/<n>`, solo esa parte. Las specs que gastan tokens de verdad
+  (`QA_REAL_PROVIDER`) se quedan fuera. El humo es esta misma pila con `@smoke`, el commit en el que estás y su tope.
+- **Lo que necesita alrededor** (en GitHub Actions lo pone la acción `.github/actions/e2e-stack`, la misma para el humo
+  y para la pasada): el SaaS en `../saas`, la librería de imágenes en `../blueprints` y el Postgres de `compose.yaml` en
+  `..`, como en el árbol de erplora-next.
 - **Pase lo que pase**, al acabar para lo que escucha en los puertos de la pila (también un `runserver` que una spec
-  reinició), borra las dos BD y quita los worktrees; al empezar, borra lo que dejó una noche cortada. Un paso previo a las
-  specs que falla (las dependencias, una BD, la siembra, los servidores que no contestan) también es una noche roja, y la
-  issue lo nombra.
-- **Lo que deja**: `~/.erplora/hub-nightly-e2e/runs/<noche>/`, con `night.log`, los registros de los dos `runserver` y
+  reinició), borra las dos BD y quita los worktrees; al empezar, borra lo que dejó una pasada cortada. Un paso previo a
+  las specs que falla (las dependencias, una BD, la siembra, los servidores que no contestan) también es una pasada roja,
+  y su salida lo nombra.
+- **Lo que deja**: `~/.erplora/hub-nightly-e2e/runs/<pasada>/`, con `night.log`, los registros de los dos `runserver` y
   `test-results/` (el `results.json`, las trazas y las capturas de cada fallo). Guarda las 7 últimas (`NIGHTLY_KEEP_RUNS`).
-- **Una noche a la vez**: si otra sigue viva, sale con 3 sin tocar nada.
+- **Una a la vez** por carpeta: si otra sigue viva en el mismo `NIGHTLY_DIR`, sale con 3 sin tocar nada.
 - **Pararla**: `kill <pid>` (el de `~/.erplora/hub-nightly-e2e/lock/pid`) o Ctrl-C. Durante las specs para en el acto y
   limpia; en un paso anterior (dependencias, BD) limpia cuando ese paso termina. Tras un `kill -9` o un apagón no limpia
-  nadie: lo hace la noche siguiente al empezar. `NIGHTLY_DIR` no puede ser una carpeta cuyo `hub/` o `saas/` sea un
-  checkout: la noche borra esas dos carpetas a la fuerza, y se niega.
-- **Programarla**, una vez y desde el checkout principal del Hub (un worktree desaparece con su rama, y se niega):
-  `python3 scripts/nightly_e2e.py install-launchd [--at HH:MM]`, a las 02:17 si no se dice otra hora. El agente de
-  launchd guarda el `PATH` de quien lo instala (uv, pnpm, node, docker y gh, con la sesión de GitHub abierta) y corre el
-  script de ese checkout, que la flota pone al día. `uninstall-launchd` lo quita. Con el Mac dormido, launchd la lanza al
-  despertar; con el Mac apagado, esa noche no hay pasada y nada lo dice.
-- **A mano**: `python3 scripts/nightly_e2e.py --no-publish [--spec tests/e2e/<spec>]…` hace lo mismo sin escribir en
-  GitHub. Su pila va en el `9770`, por debajo de los puertos que la flota da a sus workers (`10000 + 10 × issue` en el
-  SaaS y `20000 + 10 × issue` en el Hub): en uno de esos, la noche pararía los servidores y borraría la BD del worker de
-  esa issue. Otros puertos, con `NIGHTLY_HUB_PORT` (el SaaS en +1, el proveedor falso en +2, los dos Vite en +5 y +6 y el proxy
-  de Meta en +9; sus BD, con esos números).
+  nadie: lo hace la siguiente al empezar. `NIGHTLY_DIR` no puede ser una carpeta cuyo `hub/` o `saas/` sea un checkout:
+  la pasada borra esas dos carpetas a la fuerza, y se niega.
+- **A mano**: `python3 scripts/nightly_e2e.py [--spec tests/e2e/<spec>]…`. Su pila va en el `9770`, por debajo de los
+  puertos que la flota da a sus workers (`10000 + 10 × issue` en el SaaS y `20000 + 10 × issue` en el Hub): en uno de
+  esos, la pasada pararía los servidores y borraría la BD del worker de esa issue. Otros puertos, con `NIGHTLY_HUB_PORT`
+  (el SaaS en +1, el proveedor falso en +2, los dos Vite en +5 y +6 y el proxy de Meta en +9; sus BD, con esos números).
 
 ## La demo (`demo.spec.ts`)
 

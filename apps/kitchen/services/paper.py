@@ -13,6 +13,7 @@ from live.operations import UnknownOperation, get
 from apps.kitchen import allergy
 from apps.kitchen.models import Destination, KitchenSettings, OrderType, Ticket
 from apps.kitchen.queries.reads import STRUCK
+from apps.inventory.models import Unit
 from apps.kitchen.services.writes import logger
 from base.business import paper_time
 from base.queries.people import without_address
@@ -102,10 +103,13 @@ def _sheet(  # noqa: PLR0913
 
 
 def _paper_dish(item, negative: bool) -> dict:
-    """A dish as the printer paints it (``render_kitchen_order`` of the app): the dishes of a menu in a run
-    under its header (``combo_ref``, ``combo_name``), its options one line each and then its note."""
+    """A dish as the printer paints it (``render_kitchen_order`` of the app): one sold by measure with its unit
+    («0.35 kg»), the dishes of a menu in a run under its header (``combo_ref``, ``combo_name``), its options one line
+    each and then its note."""
     quantity = _quantity(item.quantity)
     dish = {"name": item.name, "quantity": -quantity if negative else quantity}
+    if item.unit and item.unit != Unit.UNIT:
+        dish["unit"] = item.unit
     if item.menu_dish:
         dish |= {"combo_ref": str(item.sale_line_id), "combo_name": item.menu_name}
     if item.modifiers:

@@ -1,8 +1,12 @@
 """The website app declares its module metadata, its menu entry, its permissions and what each role gets."""
 
+import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 from live.operations import INTERNAL
+
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 
 def website():
@@ -152,5 +156,22 @@ def test_every_field_of_the_draft_is_described_for_the_assistant():
     assert undescribed == []
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert website().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert website().help.videos == {"es": "c_eaJUp0VQ4", "en": "k1rnkdX9GDU"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("WEBSITE-F01",), "JvaOnGvy-_s", "hLyBTFeITFc"),
+    (("WEBSITE-F02",), "ivAQLYwuqRg", "lrgmUSOaICw"),
+    (("WEBSITE-F03", "WEBSITE-F05"), "LADk7huQV5A", "LvUFTktstI4"),
+    (("WEBSITE-F04", "WEBSITE-F11"), "CpHm3c5LpF8", "CJc3ij7WhNM"),
+    (("WEBSITE-F07", "WEBSITE-F08", "WEBSITE-F10"), "tZQwXZW4fkM", "4PQ6LfGngyg"),
+    (("WEBSITE-F09",), "gUnb_p6mwVc", "_hNFl4jyOLo"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("website", language) == help_videos.by_task(TASK_VIDEOS, language)

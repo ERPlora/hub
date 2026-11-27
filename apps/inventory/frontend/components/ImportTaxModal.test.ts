@@ -34,7 +34,7 @@ describe('ImportTaxModal', () => {
       { text: '', choice: choice('pick', '') },
     ]);
     expect(s.el('inventory-import-tax')?.getAttribute('aria-label')).toBe('CSV tax categories');
-    expect(s.all('inventory-import-tax-text').map((el) => el.textContent?.trim())).toEqual(['«Vino»', 'Rows with no tax category']);
+    expect(s.all('inventory-import-tax-text').map((el) => el.textContent?.trim())).toEqual(['“Vino”', 'Rows with no tax category']);
     expect(s.all('inventory-import-tax-mode').map((el) => el.value)).toEqual(['pick', 'pick']);
     expect(s.all('inventory-import-tax-pick')).toHaveLength(2);
     expect(s.el('inventory-import-tax-submit')?.textContent?.trim()).toBe('Confirm & import');

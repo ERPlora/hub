@@ -11,7 +11,7 @@
 import { expect, test } from '@playwright/test';
 
 import { A, api, EMPLOYEE, psql, shot, shown } from './helpers';
-import { choose, confirmDialog, idFromUrl, manualFlow, openRun, signedIn, workerCalls } from './flow-helpers';
+import { choose, confirmDialog, grantAllAndSwitchOn, idFromUrl, manualFlow, openRun, signedIn, workerCalls } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { pick } from './task-helpers';
 import { toastSaying } from './toast-helpers';
@@ -165,11 +165,11 @@ for (const viewport of VIEWPORTS) {
       await asker.locator('[data-testid=flow-ask-title-s1-text-0]').fill(questionTitle);
       await choose(page, 'flow-ask-role-s1', 'An employee');
       await expect(asker.locator('[data-testid=flow-ask-who-s1]')).toHaveText(
-        'The employees answer it in Automations, under «Waiting for your answer»; whoever runs the business can too.',
+        'The employees answer it in Automations, under “Waiting for your answer”; whoever runs the business can too.',
       );
       await asker.locator('[data-testid=flow-ask-hours-s1] input').fill('24');
       await choose(page, 'flow-ask-ontimeout-s1', 'Carry on with the next steps');
-      await expect(asker.locator('[data-testid=flow-ask-continuehint-s1]')).toContainText('«Approved»');
+      await expect(asker.locator('[data-testid=flow-ask-continuehint-s1]')).toContainText('“Approved”');
       await asker.locator('[data-testid=flow-editor-add-command]').click();
       await pick(page, 'flow-step-action-s2', 'task', 'Create a task');
       await asker.locator('[data-testid=flow-step-param-s2-title-text-0]').fill(answeredTitle);
@@ -178,14 +178,10 @@ for (const viewport of VIEWPORTS) {
       await expect(shown(page).locator('[data-testid=flow-step-open-s1]')).toContainText(`Ask: ${questionTitle}`);
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F28');
-      await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
-      await shown(page).locator('[data-testid=flow-perm-grantall]').click();
-      await shown(page).locator('[data-testid=flow-editor-enabled]').click();
-      await shown(page).locator('[data-testid=flow-editor-save]').click();
-      await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
+      await grantAllAndSwitchOn(page);
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?');
-      await expect(toastSaying(page, 'waiting for an answer in «Waiting for your answer»')).toBeVisible();
+      await expect(toastSaying(page, 'waiting for an answer in “Waiting for your answer”')).toBeVisible();
       expect(await taskTitles(context, answeredTitle)).toEqual([]);
 
       // FLOW-F29: the employee sees only «Waiting for your answer», approves with a note; the run goes on.
@@ -211,7 +207,7 @@ for (const viewport of VIEWPORTS) {
       await expect.poll(() => taskTitles(context, answeredTitle)).toEqual([answeredTitle]);
       await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
       const answered = await openRun(page, 'Finished well');
-      await expect(answered.locator('[data-testid^=flow-run-steps-]')).toContainText('answered yes: «go ahead»');
+      await expect(answered.locator('[data-testid^=flow-run-steps-]')).toContainText('answered yes: “go ahead”');
     } finally {
       await context.close();
     }

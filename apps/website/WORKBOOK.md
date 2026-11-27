@@ -115,7 +115,7 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
   **Ordenador** o de **Móvil**, y **Recargar la vista previa**. Se recarga sola tras cada guardado.
 
 #### Compartir y QR
-La dirección de la página web con **Copiar enlace**, su código QR y **Descargar PNG** (para imprimir) y
+La dirección de la página web con **Copiar enlace** (su icono, junto a ella), su código QR y **Descargar PNG** (para imprimir) y
 **Descargar SVG** (para ampliar sin perder calidad). Avisa de que, en el dispositivo donde se ha entrado, la
 dirección abre la app (para ver la página: el móvil o una ventana privada) y, si la página no está en línea, de que
 la dirección aún lleva al acceso del equipo. Si el borrador muestra el catálogo, debajo, separada por una línea, «La
@@ -340,7 +340,7 @@ Actor: propietario, administrador, responsable, API
 Pantalla: Compartir y QR
 Pasos:
 1. En **Página web**, pulsa **Compartir y QR**.
-2. **Copiar enlace** copia la dirección («Enlace copiado»); **Descargar PNG** baja el QR para imprimirlo y
+2. **Copiar enlace**, el icono junto a la dirección, la copia («Enlace copiado»); **Descargar PNG** baja el QR para imprimirlo y
    **Descargar SVG** para ampliarlo sin perder calidad.
 3. Si el borrador muestra el catálogo, debajo está «La dirección de tu catálogo», con su propio
    **Copiar enlace**, **Descargar PNG** y **Descargar SVG**: es el QR para imprimir y dejar en las mesas.
@@ -512,7 +512,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   imágenes (las del negocio, `/p/media/<hex>/`, y las de la librería compartida que puede llevar un producto,
   `/p/catalog/`), ni `/auth` ni `/api`, así que es otra página, guardada aparte (`page_cache_key(…, own_domain=True)`): **Entrar**
   es la dirección absoluta del negocio (`render_site(hub_address=…)`), `<html data-ep-static>` deja a `catalog.ts` y
-  `reviews.ts` sin pedir nada, su catálogo se lee al pintarla (`queries.live_catalog`, nunca la instantánea de la
+  `reviews.ts` sin pedir nada, su catálogo se lee al pintarla (`queries.public.live_catalog`, nunca la instantánea de la
   publicación) y se guarda un minuto, lo que la API guarda ese catálogo, en vez de una hora; su CSP no lleva `report-uri`,
   porque `/csp-report/` tampoco está. Sin página que enseñar, 404.
 - **La dirección principal** (hub#818, `public_home.main_address`): las dos direcciones llevan en el `<head>` un
@@ -543,7 +543,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   ninguna lectura veía; los originales siguen en la BD de control. Las claves del almacén (`hub-<id>/website/img/…`) y
   de la caché (`website:home:{<slug>}:…`) sí llevan el hub, porque el almacén y la caché son de todos. La e2e
   desconecta la página al terminar para no dejar `/` de `a` con ella (las demás e2e esperan el salto al login).
-- **El catálogo, solo de una app activa**: `queries._source_on` pregunta a
+- **El catálogo, solo de una app activa**: `queries.catalog._source_on` pregunta a
   `base.apps_on.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: una
   app instalada puede estar apagada en el negocio (BASE-F23), y una que nunca encendió no tiene sus tablas. Con la fuente
   apagada, `read_catalog` y `website.catalog.categories` devuelven vacío, nunca un error, y el editor lista la fuente
@@ -554,11 +554,11 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   `/favicon.ico` al hub, que es la SPA de `base` y le dejaba una cookie `csrftoken` al visitante: la página dejaba de
   ser «sin cookies» (lo cazó `website-flows.spec.ts`, WEBSITE-F10).
 - **Una sola guarda para lo público**: `/` (`public_home.is_published`) y la API pública (`website.public.*`) pasan por
-  `queries._live`: el módulo encendido en el hub (`base.apps_on.active_apps`; con él
+  `queries.public._live`: el módulo encendido en el hub (`base.apps_on.active_apps`; con él
   apagado la API responde 404 `app_inactive` y `/` salta al login) y una publicación en línea de ese hub (si no,
   404 `website.not_published`).
 - Anatomía completa: `apps.py`, `models.py`, `schemas.py`, `render.py`, `csp.py`, `public_home.py`, `storage.py`,
-  `qr.py`, `reviews.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `templates/website/`
+  `qr.py`, `reviews.py`, `queries/`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `templates/website/`
   y `frontend/`, con un `tests/test_<fichero>.py` por fichero. **Sin `views.py` ni `urls.py`** (PLAN §29): `/` es de
   `base` y `/p/media/…` también.
 - Modelos: `Site` (una por BD de negocio, `singleton` único: `template`, `theme`, `content` = borrador;
@@ -580,7 +580,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   unidad menor de la moneda, y `render.price_label` lo divide entre `10 ** decimales` de esa moneda: si el país del
   negocio cambia, la clave cambia y la página se repinta en la nueva sin volver a publicar; el día es el del negocio,
   `render.local_day` con la zona horaria del hub o la del despliegue si no tiene (`base.business.zone_of`): el horario resalta hoy, así que cada
-  día tiene su página; la vista previa usa el mismo día, `queries.business_day`): publicar cambia la versión y un
+  día tiene su página; la vista previa usa el mismo día, `queries.editor.business_day`): publicar cambia la versión y un
   despliegue cambia los ficheros del paquete, así que nunca se sirve una página rancia; tras el COMMIT de publicar o
   desconectar se borran las entradas de la versión anterior en la moneda del negocio. `Cache-Control: public, max-age=60`, sin cookies, y `Vary: Accept-Language,
   Cookie`: «Entrar» vuelve a `/` con sesión, y el navegador no puede servirle la página que guardó para el visitante

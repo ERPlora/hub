@@ -207,7 +207,7 @@ for (const viewport of VIEWPORTS) {
       await tables.locator('[data-testid=whatsapp-inbox-autoreply-tables-on]').click();
       await confirmDialog(page, 'Book a table', async () => {
         await expect(page.locator('ion-modal.ep-form-modal').filter({ hasText: 'Book a table' })).toContainText(
-          'Only one automatic answer can answer on your number: turning this one on turns «Book appointments» off.',
+          'Only one automatic answer can answer on your number: turning this one on turns “Book appointments” off.',
         );
       });
       await expect(tables).toContainText('On');

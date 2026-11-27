@@ -152,7 +152,7 @@ describe('MenusPage', () => {
     const dialog = s.wrapper.findComponent(ConfirmDialog);
     expect([dialog.props('title'), dialog.props('message'), dialog.props('confirmLabel')]).toEqual([
       'Withdraw this menu?',
-      '«Menu of the day» stops being on sale, together with its courses and choices. Tickets already issued keep reading it.',
+      '“Menu of the day” stops being on sale, together with its courses and choices. Tickets already issued keep reading it.',
       'Withdraw',
     ]);
     s.answer(200, { id: 'm1' });

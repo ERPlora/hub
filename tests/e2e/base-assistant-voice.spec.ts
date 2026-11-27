@@ -89,7 +89,7 @@ async function answered(page: Page): Promise<void> {
  *  `<KEY>-<shot>-<size>`. */
 async function deviceReadIt(page: Page, shot: string): Promise<void> {
   await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING.es, lang: 'es-ES' }]);
-  await expect(listen(page)).toHaveText('Leer en voz alta');
+  await expect(listen(page)).toHaveAccessibleName('Leer en voz alta');
   await expect(panel(page).locator('[data-testid="assistant-listen-failed"]')).toHaveCount(0);
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
@@ -166,8 +166,8 @@ test('BASE-F93 — the server’s audio plays from a blob: under the Hub’s CSP
   await page.route('**/api/assistant/speak', (route) => route.fulfill({ status: 200, contentType: 'audio/wav', body: silence() }));
 
   await listen(page).click();
-  await expect(listen(page)).toHaveText('Dejar de leer');
-  await expect(listen(page)).toHaveText('Leer en voz alta', { timeout: 10_000 });
+  await expect(listen(page)).toHaveAccessibleName('Dejar de leer');
+  await expect(listen(page)).toHaveAccessibleName('Leer en voz alta', { timeout: 10_000 });
   expect(await deviceSaid(page)).toEqual([]);
   await expect(panel(page).locator('[data-testid="assistant-listen-failed"]')).toHaveCount(0);
   expect(problems).toEqual([]);

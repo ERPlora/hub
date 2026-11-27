@@ -15,7 +15,7 @@ reading (``Bundle.dropped``).
 - Images (``photos``, with ``base.images``): an image of the shared library travels as its reference
   (``catalog:<folder>/<name>``), a photo of a row's own inside the file (:func:`photos.export_media`); loading it
   copies the photo under a new name through the app's own upload, and a row whose image cannot be set loads without
-  it and is told (:func:`photos._load_image`).
+  it and is told (:func:`photos.load_image`).
 - The catalogue (``seeds``): the seeds of ``base/seeds/<vertical>.<language>.json``, one per vertical and language;
   what a seed turns on is its vertical's apps (``base.catalog.verticals.template_apps``), what it brings is its own data.
 - :func:`loading.apply` loads a blueprint app by app, each part on its own: a row an app refuses fails alone and is
@@ -25,7 +25,8 @@ reading (``Bundle.dropped``).
   limit, no right to it) loads nothing and its report says why. A load kept, and the part of it that waits for an
   app being set up, is ``loads``'s.
 - :func:`removal.undo` removes exactly the rows a load created; :func:`removal.reset` every row of the apps chosen;
-  both through the apps' own delete (or archive).
+  both through the apps' own delete (or archive). A part that has no way to be removed (a business's own tax
+  categories) stays, like the rest of the business's settings.
 
 No ORM here: every read and write is an operation of its app, called as the person who asked
 (``live.operations.get``), so its permission, its transaction and its events are the operation's own.

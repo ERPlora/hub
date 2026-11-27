@@ -26,7 +26,7 @@ from apps.modifier.schemas.fields import (
 )
 from apps.modifier.schemas.options import OptionOfCopyIn
 from base.recovery import RecoveredOut
-from base.schemas.assistant import unless_given
+from base.schemas.assistant import no_limit, unless_given
 
 MAX_BELOW_MIN = _("The maximum cannot be below the minimum (0 = no ceiling).")
 
@@ -90,6 +90,7 @@ class GroupIn(_Input):
     max_choices: Choices = Field(
         0,
         description="How many options may be chosen at most; 0 = no ceiling, otherwise not below the minimum.",
+        json_schema_extra=no_limit(),
     )
     allow_repeat: bool = Field(
         False, description="True: the same option may be chosen more than once."
@@ -117,9 +118,7 @@ class GroupPatchIn(GroupRefIn):
     min_choices: Choices | None = Field(
         None, description="New minimum; 1 or more makes it required."
     )
-    max_choices: Choices | None = Field(
-        None, description="New maximum; 0 = no ceiling."
-    )
+    max_choices: Choices | None = Field(None, description="New maximum; 0 = no ceiling.", json_schema_extra=no_limit())
     allow_repeat: bool | None = Field(
         None, description="Whether the same option may be chosen more than once."
     )

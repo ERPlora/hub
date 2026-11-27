@@ -12,8 +12,8 @@ from live.meta import module_configs
 from base import activation
 from base.apps_on import active_apps
 from base.blueprint.archive import PURPOSE_BACKUP, Bundle
-from base.blueprint.calls import Loaded
-from base.blueprint.datasets import DATASETS, Dataset, app_label, datasets_of
+from base.blueprint.calls import Dataset, Loaded
+from base.blueprint.datasets import app_label, datasets_of, every_dataset
 
 # Its lines keep the name they always had, whichever module of the package writes them.
 logger = logging.getLogger("base.blueprint")
@@ -64,21 +64,15 @@ def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None, refus
         known = {config.label for config in module_configs()}
         loads: dict[str, dict] = {}
         created: dict[str, list[str]] = {}
-        for dataset in DATASETS:
+        for dataset in every_dataset():
             rows = bundle.data.get(dataset.key)
             if rows is None or (apps is not None and dataset.app not in apps) or dataset.app not in on:
                 continue
             if dataset.personal and bundle.manifest["purpose"] != PURPOSE_BACKUP:
                 loads[dataset.key] = _dataset_report(dataset, Loaded(), rows, discarded=True)
                 continue
-            loaded = Loaded(media=bundle.media)
-            try:
-                dataset.load(ctx, rows, loaded)
-            except Exception:
-                # Each operation it called rolled its own part back; what committed before stays, and undo has it.
-                logger.exception("blueprint: loading %s failed", dataset.key)
-                loaded.refuse("", str(SOMETHING_WENT_WRONG))
-            if loaded.created:
+            loaded = _load(ctx, dataset, rows, bundle)
+            if loaded.created and dataset.removable:
                 created[dataset.key] = loaded.created
             loads[dataset.key] = _dataset_report(dataset, loaded, rows)
         app_reports = [
@@ -92,6 +86,18 @@ def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None, refus
         if any(app["status"] == WAITING for app in app_reports):
             report[REPORT_LANGUAGE] = ctx.language
     return Applied(report=report, created=created)
+
+
+def _load(ctx: OperationContext, dataset: Dataset, rows: list[dict], bundle: Bundle) -> Loaded:
+    """Load one dataset's ``rows``; a failure stays in it and is told."""
+    loaded = Loaded(media=bundle.media)
+    try:
+        dataset.load(ctx, rows, loaded)
+    except Exception:
+        # Each operation it called rolled its own part back; what committed before stays, and undo has it.
+        logger.exception("blueprint: loading %s failed", dataset.key)
+        loaded.refuse("", str(SOMETHING_WENT_WRONG))
+    return loaded
 
 
 def _load_status(ctx: OperationContext, data: Mapping[str, list[dict]], app_reports: list[dict],

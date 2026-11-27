@@ -121,7 +121,14 @@
       "customerRequired": "Pick the customer.",
       "history": "History",
       "charged": "Charged: it can no longer be changed.",
-      "total": "Total"
+      "total": "Total",
+      "durationSum": "Sum of the services: {n} min",
+      "useSum": "Use the sum",
+      "durationValue": "{n} min",
+      "durationOther": "Other",
+      "durationOtherLabel": "Another length",
+      "optional": "Optional",
+      "otherTime": "Enter another time"
     },
     "slots": {
       "label": "Free times",
@@ -129,7 +136,17 @@
       "loading": "Looking for free times…",
       "empty": "No free times that day for this professional. You can still pick a time.",
       "error": "The free times could not be loaded. You can still pick a time.",
-      "withinNotice": "inside the minimum notice"
+      "withinNotice": "inside the minimum notice",
+      "worksToday": "{name} works today {spans}.",
+      "worksOn": "{name} works on {day} {spans}.",
+      "span": "from {start} to {end}",
+      "offToday": "{name} does not work today.",
+      "offOn": "{name} does not work on {day}.",
+      "offHint": "Pick another day or another professional.",
+      "free": "none free | {n} free | {n} free",
+      "windows": "Spans of the day",
+      "noticeLegend": "Inside the minimum notice",
+      "timeWithinNotice": "{time}, inside the minimum notice"
     },
     "overlap": {
       "title": "Overlapping appointment",
@@ -238,8 +255,8 @@
         "notBooked": "{count} could not be booked | {count} could not be booked",
         "alreadyBooked": "Nothing new to book: its appointment was already booked | Nothing new to book: its {count} appointments were already booked",
         "none": "No appointments booked",
-        "pendingFrom": "The dates from {date} on are not booked yet: tap «Book appointments» on the series to book them.",
-        "upcoming": "Nothing to book yet: the next date of this series, {date}, is further ahead than the maximum advance booking. Tap «Book appointments» on the series when it gets closer.",
+        "pendingFrom": "The dates from {date} on are not booked yet: tap “Book appointments” on the series to book them.",
+        "upcoming": "Nothing to book yet: the next date of this series, {date}, is further ahead than the maximum advance booking. Tap “Book appointments” on the series when it gets closer.",
         "moved": "{count} appointment moved | {count} appointments moved",
         "handed": "{count} appointment now with {staff} | {count} appointments now with {staff}",
         "servicesChanged": "{count} appointment now for {services} | {count} appointments now for {services}",

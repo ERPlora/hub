@@ -71,7 +71,7 @@ test('sale-e2e-wait: after the Sales specs’ wait the till’s «sold out» toa
       await playbackRate(devtools, 0.2);
       // The tile is `aria-disabled` but takes the tap (a touchscreen would swallow a native `disabled`).
       await tile.click({ force: true });
-      const toast = toastSaying(page, `«${croquettes.name}» is sold out.`);
+      const toast = toastSaying(page, `“${croquettes.name}” is sold out.`);
       await expect(toast).toBeVisible();
       await untilStill(page);
       expect(await moving(page), `still moving after the Sales specs’ wait at ${size.label}`).toEqual([]);

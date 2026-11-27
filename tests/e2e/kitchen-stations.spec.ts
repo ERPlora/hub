@@ -172,7 +172,7 @@ test('KITCHEN-F04, F03: «Route» sends a product and a category to a station, �
     // KITCHEN-F03: with routes, «Delete» asks and then says why it cannot.
     await rowAction(page, 'kitchen-stations', grill, 'delete');
     const dialog = page.locator('ion-modal[data-testid=kitchen-stations-delete]');
-    await expect(dialog).toContainText(`Delete «${GRILL}»?`);
+    await expect(dialog).toContainText(`Delete “${GRILL}”?`);
     await capture(page, 'KITCHEN-F03', async () => {
       await expect(dialog.locator('[data-testid=kitchen-stations-delete-submit]')).toBeInViewport();
     });

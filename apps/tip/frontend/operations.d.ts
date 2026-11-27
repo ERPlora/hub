@@ -123,6 +123,54 @@ export interface SettingsPatchIn {
   methods?: { method_id: string; suggestions: Suggestion[] }[];
 }
 
+/** `FiguresOut`: some tips by payment method, in cents, and how many. */
+export interface TipFiguresOut {
+  card: number;
+  cash: number;
+  /** Any other way: transfer, Bizum… */
+  other: number;
+  total: number;
+  count: number;
+}
+
+export type ReportBy = 'person' | 'shift';
+
+export interface ReportIn {
+  by: ReportBy;
+  /** Business days, ISO; without them, today. */
+  date_from?: string;
+  date_to?: string;
+}
+
+/** `ReportRowOut`: a person's tips or, by shift, a clocked working day's; nobody's: unassigned, or outside every day. */
+export interface ReportRowOut extends TipFiguresOut {
+  member_id: string | null;
+  member_name: string;
+  shift_id: string | null;
+  clock_in_at: string | null;
+  /** `null` while the working day is still open. */
+  clock_out_at: string | null;
+}
+
+export interface ReportOut {
+  by: ReportBy;
+  date_from: string;
+  date_to: string;
+  /** By shift, `false` when Time clock is off: no rows. */
+  shifts_available: boolean;
+  rows: ReportRowOut[];
+  totals: TipFiguresOut;
+}
+
+/** `MineOut`: the caller's own tips of today and of the week, from Monday. */
+export interface MineOut {
+  member_name: string;
+  today: string;
+  week_from: string;
+  day: TipFiguresOut;
+  week: TipFiguresOut;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'tip.suggestion.get': { input: SuggestionIn; output: SuggestionOut };
@@ -132,5 +180,7 @@ declare module '@erplora/ui/sdk' {
     'tip.tip.void': { input: TipVoidIn; output: TipOut };
     'tip.settings.get': { input: Record<string, never>; output: SettingsOut };
     'tip.settings.update': { input: SettingsPatchIn; output: SettingsOut };
+    'tip.report.get': { input: ReportIn; output: ReportOut };
+    'tip.report.mine': { input: Record<string, never>; output: MineOut };
   }
 }

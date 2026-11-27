@@ -1,7 +1,9 @@
 // The way in's browser rules. Entering with a PIN or a badge goes through Django's `/auth/pin` and `/auth/badge`, not
 // operations, because they open a session. A USB badge reader types like a keyboard, ten times faster than a person,
 // which is how its burst is told apart from typing.
-import { ApiError, parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
+import { ApiError, parseErrorEnvelope, readCookie, readSpaConfig, type StreamManager } from '@erplora/ui/sdk';
+
+import type { SessionIdle } from '../operations/access';
 
 import { readJsonBlock } from './home';
 import { sessionDoorFetch } from './sign-out';
@@ -150,6 +152,27 @@ export function createIdleLock(minutes: number, onIdle: () => void, target: Even
   return stop;
 }
 
+/** The idle lock of `minutes` (none while null), armed again only when `set` brings other minutes: the same ones
+ *  answered again (the live stream reconnecting) keep counting from the last touch. Once stopped, it stays so. */
+function followIdleLock(minutes: number | null, onIdle: () => void, target?: EventTarget) {
+  let current = minutes;
+  let stopped = false;
+  const arm = (value: number | null) => (value ? createIdleLock(value, onIdle, target) : () => undefined);
+  let disarm = arm(current);
+  return {
+    set(next: number | null): void {
+      if (stopped || next === current) return;
+      current = next;
+      disarm();
+      disarm = arm(next);
+    },
+    stop(): void {
+      stopped = true;
+      disarm();
+    },
+  };
+}
+
 // ── The session's way in, from the HTML ──────────────────────────────────────────────────────────────────────────
 
 /** `hub-home.access` (`base.queries.shell_access`): how this session was opened (`support`: a person of ERPlora's
@@ -233,6 +256,8 @@ export interface WayInDeps {
   label: () => string | undefined;
   storage?: Storage;
   target?: EventTarget;
+  /** The tab's live stream (the client's): `base.session.idle` brings an open till the business's new idle minutes. */
+  stream: Pick<StreamManager, 'subscribe'>;
 }
 
 interface Appearance {
@@ -241,13 +266,20 @@ interface Appearance {
   ui_scale: number;
 }
 
-/** What the session's way in asks of the mounted shell: the idle lock of a till that always asks, the person's own
- *  appearance and, after «Switch user», «Now serving {name}» with the appearance of whoever left forgotten. Returns
- *  the function that disarms the lock. */
+/** What the session's way in asks of the mounted shell: the idle lock of a till that always asks, with the minutes the
+ *  page came with and then those the business changes while it is open, the person's own appearance and, after
+ *  «Switch user», «Now serving {name}» with the appearance of whoever left forgotten. Returns the function that
+ *  disarms the lock. Only a session in the hub follows the minutes: the live stream refuses a page without one. */
 export function startWayIn(doc: Document, deps: WayInDeps): () => void {
-  const access = readAccess(doc);
-  const stop = access.idle_minutes ? createIdleLock(access.idle_minutes, deps.logout, deps.target) : () => undefined;
-  const appearance = readJsonBlock<{ preferences?: Appearance }>('hub-home', doc)?.preferences;
+  const home = readJsonBlock<{ access?: ShellAccess; preferences?: Appearance }>('hub-home', doc);
+  const lock = followIdleLock(readAccess(doc).idle_minutes, deps.logout, deps.target);
+  const leave = home?.access
+    ? deps.stream.subscribe('base.session.idle', {}, (event) => {
+        // A read that fails keeps the minutes the till had.
+        if (event.type === 'result') lock.set((event.data as SessionIdle).idle_minutes);
+      })
+    : () => undefined;
+  const appearance = home?.preferences;
   const switched = takeSwitchAnnouncement(deps.storage);
   if (appearance && (appearance.theme_mode || appearance.palette || appearance.ui_scale !== 100)) {
     deps.paint(appearance.theme_mode || null, appearance.palette || null, appearance.ui_scale);
@@ -255,5 +287,8 @@ export function startWayIn(doc: Document, deps: WayInDeps): () => void {
     deps.reset();
   }
   if (switched !== null) deps.toast(deps.translate('base.switchUser.nowServing', { name: deps.label() || switched }));
-  return stop;
+  return () => {
+    leave();
+    lock.stop();
+  };
 }

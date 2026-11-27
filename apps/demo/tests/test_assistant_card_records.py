@@ -19,7 +19,7 @@ from base import assistant
 from base.tenancy.context import use_hub
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values_references import AN_ID
-from base.tests.test_assistant_yes_for_its_card import unless_marked, yes_to_its_card
+from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, unless_marked, yes_to_its_card
 from base.tests.test_services_assistant import asked, call
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
@@ -299,9 +299,7 @@ def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest
 
     plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, asked_for)
 
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert (plan["executed"][0]["outcome"], plan["executed"][0]["code"]) == ("error", "demo.item_ambiguous")
-    assert json.loads(plan["append"][0]["content"])["error"]["code"] == "demo.item_ambiguous"
+    no_card_but_the_model_hears(plan, "demo.item_ambiguous")
     assert Item.objects.count() == 2
 
 
@@ -309,7 +307,7 @@ def test_a_name_two_items_share_draws_no_card_and_the_model_hears_it(write, rest
 def test_a_name_no_item_has_draws_no_card():
     Item.objects.create(name="Barra")
     plan = turn_of(owner_in(), DELETE_BY_ITS_NAME, call("demo.item.delete", {"called": "Ejemplo QA"}))
-    assert (plan["confirm"], plan["executed"][0]["code"]) == (None, "not_found")
+    no_card_but_the_model_hears(plan, "not_found")
     assert Item.objects.count() == 1
 
 

@@ -176,7 +176,7 @@ describe('ItemListPage: the live list in a server-side DataTable', () => {
     const empty = s.wrapper.findComponent(EmptyState);
     expect([empty.props('heading'), empty.props('message'), empty.props('icon')]).toEqual([
       'No items yet',
-      'Create the first one with «New item».',
+      'Create the first one with “New item”.',
       'cube-outline',
     ]);
   });
@@ -223,7 +223,7 @@ describe('ItemListPage: the live list in a server-side DataTable', () => {
     const s = await setup();
     await s.show(PAGE);
     const add = s.testid('demo-items-add');
-    expect(add.text()).toBe('New item');
+    expect([add.text(), add.attributes('title'), add.attributes('aria-label')]).toEqual(['', 'New item', 'New item']);
     await add.trigger('click');
     await flush();
     expect(s.router.currentRoute.value.path).toBe('/demo/items/new');
@@ -247,7 +247,7 @@ describe('ItemListPage: the live list in a server-side DataTable', () => {
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'Estado', 'Líneas', 'Actualizado']);
     expect(s.wrapper.get('[data-testid="demo-item-lines"]').text()).toBe('sin líneas');
     expect(s.wrapper.get('[data-testid="demo-item-status"]').text()).toBe('Abierto');
-    expect(s.testid('demo-items-add').text()).toBe('Nuevo elemento');
+    expect([s.testid('demo-items-add').text(), s.testid('demo-items-add').attributes('title'), s.testid('demo-items-add').attributes('aria-label')]).toEqual(['', 'Nuevo elemento', 'Nuevo elemento']);
   });
 });
 

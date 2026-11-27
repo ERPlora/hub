@@ -5,19 +5,12 @@
 // «Retry».
 import { ImageUpload, type ImageUploadValue, InlineFeedback, UserAvatar } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
-import {
-  AppPage,
-  applyUserThemePreferences,
-  resetUserThemePreferences,
-  THEME_PALETTES,
-  type ThemeMode,
-  type ThemePalette,
-  type ThemeScale,
-} from '@erplora/ui/shell';
+import { AppPage, THEME_PALETTES, type ThemePalette, type ThemeScale } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonLabel, IonRange, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
 import { computed, getCurrentInstance, ref, watch } from 'vue';
 
 import { sessionChanged } from '../lib/access';
+import { paintAppearance } from '../lib/appearance';
 import { useBaseI18n } from '../lib/i18n';
 import type { Preferences, Profile, ProfileLanguage, ProfileThemeMode } from '../operations/profile';
 
@@ -134,19 +127,6 @@ const LANGUAGES: ProfileLanguage[] = ['', 'es', 'en'];
 const MODES: Exclude<ProfileThemeMode, ''>[] = ['system', 'light', 'dark'];
 const PALETTES = THEME_PALETTES as readonly ThemePalette[];
 
-function paint(value: Preferences): void {
-  if (!value.theme_mode && !value.palette && value.ui_scale === 100) {
-    resetUserThemePreferences();
-    return;
-  }
-  applyUserThemePreferences(
-    (value.theme_mode || null) as ThemeMode | null,
-    (value.palette || null) as ThemePalette | null,
-    undefined,
-    value.ui_scale,
-  );
-}
-
 async function savePrefs(change: Partial<Preferences>): Promise<void> {
   const wanted = { ...prefs.value, ...change };
   prefs.value = wanted;
@@ -155,7 +135,7 @@ async function savePrefs(change: Partial<Preferences>): Promise<void> {
     const answer = await prefsCommand.run(wanted);
     if (answer.language === 'es' || answer.language === 'en') i18n.$i18n.locale = answer.language;
     if ('language' in change) sessionChanged();
-    if ('theme_mode' in change || 'palette' in change || 'ui_scale' in change) paint(wanted);
+    if ('theme_mode' in change || 'palette' in change || 'ui_scale' in change) paintAppearance(wanted);
   } catch (reason) {
     prefsError.value = reason instanceof ApiError && reason.message ? reason.message : t('base.profile.prefs.failed');
   }

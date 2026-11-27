@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 
 import { A, login, shot, shown } from './helpers';
-import { cleanInventory, createProduct, dialog, fill, pickCombo, productBySku, productsReady, shootFlow, stamp } from './inventory-helpers';
+import { cleanInventory, createProduct, dialog, fill, pickCombo, productBySku, productsReady, savedCategoryRow, shootFlow, stamp } from './inventory-helpers';
 import { rowAction } from './service-helpers';
 
 test.afterAll(() => {
@@ -62,7 +62,7 @@ test('INVENTORY-F09: a CSV is checked first, its unknown tax text is asked for, 
   // Taxes reads its key by itself; the new text is asked for and learned.
   const taxes = dialog(page, 'inventory-import-tax');
   await expect(taxes).toBeVisible();
-  await expect(taxes.locator('[data-testid=inventory-import-tax-text]')).toHaveText([`«${text}»`]);
+  await expect(taxes.locator('[data-testid=inventory-import-tax-text]')).toHaveText([new RegExp(`^(“${text}”|«${text}»)$`)]);
   await pickCombo(page, taxes.locator('[data-testid=inventory-import-tax-category-0]'), 'generic', /(Product — generic|Producto — general)/);
   await page.screenshot({ path: shot('inventory-import-tax-1280') });
   await taxes.locator('[data-testid=inventory-import-tax-submit]').click();
@@ -94,11 +94,7 @@ test('INVENTORY-F06/F07/F10: a category is created, edited and deleted; a CSV of
   await pickCombo(page, form.locator('[data-testid=inventory-category-tax]'), 'drink', /(Restaurant — drink|Restauración — bebida|Restaurante — bebida).*10/);
   await page.screenshot({ path: shot('inventory-category-new-1280') });
   await shootFlow(page, 'INVENTORY-F06');
-  await form.locator('[data-testid=inventory-category-form-submit]').click();
-  await expect(form).toBeHidden();
-  await shown(page).locator('[data-testid=inventory-categories-search] input').fill(name);
-  const row = shown(page).locator('[data-testid=inventory-categories-row]', { hasText: name });
-  await expect(row).toBeVisible();
+  const row = await savedCategoryRow(page, form, name);
 
   await row.click();
   await expect(form).toBeVisible();

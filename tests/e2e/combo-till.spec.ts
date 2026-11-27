@@ -208,16 +208,16 @@ test('COMBO-F07, COMBO-F08: the menu goes first in «All», its sheet asks every
   await expect(sheet).not.toContainText('Dessert');
   await expect(sheet.locator(`[data-testid=pos-menu-dish-${picks.STK}]`)).toContainText('+€2.00');
   const add = sheet.locator('[data-testid=pos-menu-add]');
-  await expect(add).toContainText('Choose 1 in «Starters»');
+  await expect(add).toContainText('Choose 1 in “Starters”');
   await sheet.locator(`[data-testid=pos-menu-dish-${picks.LEN}]`).click();
-  await expect(add).toContainText('Choose 1 in «Mains»');
+  await expect(add).toContainText('Choose 1 in “Mains”');
   await sheet.locator(`[data-testid=pos-menu-dish-${picks.STK}]`).click();
   // Two coffees: the course takes the same one twice, a third is refused with the reason.
   await sheet.locator(`[data-testid=pos-menu-dish-${picks.COF}]`).click();
   await sheet.locator(`[data-testid=pos-menu-dish-${picks.COF}]`).click();
   await expect(sheet.locator(`[data-testid=pos-menu-dish-count-${picks.COF}]`)).toHaveText('× 2');
   await sheet.locator(`[data-testid=pos-menu-dish-${picks.COF}]`).click();
-  await expect(sheet).toContainText('«Coffee» is full: take one out to choose another.');
+  await expect(sheet).toContainText('“Coffee” is full: take one out to choose another.');
   // 13,50 + 2,00 (steak) + 2 × 0,50 (coffees).
   await expect(add).toContainText(/16[.,]50/);
   await shots(page, 'COMBO-F07', async () => {

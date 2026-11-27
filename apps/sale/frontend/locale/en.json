@@ -53,7 +53,7 @@
       "notSellableBadge": "{tax} missing",
       "notSellableNoTaxCategory": "Cannot be sold: no tax category. {tax} needs to be set up.",
       "soldOutBadge": "Sold out",
-      "soldOut": "«{name}» is sold out.",
+      "soldOut": "“{name}” is sold out.",
       "catalogBlocked": "{count} item cannot be sold: its {tax} is not set up. | {count} items cannot be sold: their {tax} is not set up.",
       "catalogBlockedFix": "Review the catalogue",
       "catalogAppInactive": "{app} is not active, so there is no product grid. You can still charge open-price sales; turn it on from Apps to sell from a catalogue.",
@@ -121,9 +121,9 @@
       "parkAndOpen": "Park it and open",
       "discardCheckFailed": "The check could not be deleted. It is still open, on screen.",
       "staffPickerTitle": "Who is serving this check",
-      "staffPickerHint": "The sale, the kitchen ticket and the per-person report are attributed to them. Leave it on «Me» and the till uses whoever is signed in.",
+      "staffPickerHint": "The sale, the kitchen ticket and the per-person report are attributed to them. Leave it on “Me” and the till uses whoever is signed in.",
       "lineStaffPickerHint": "Only this line moves. The day's close and the commission are worked out from it, so it is the one that has to be right. The chip at the top keeps deciding who the NEXT line goes to.",
-      "staffUnlinked": "Your account has no record in Staff: left on «Me», this sale counts for nobody.",
+      "staffUnlinked": "Your account has no record in Staff: left on “Me”, this sale counts for nobody.",
       "staffMeOption": "Me (whoever is signed in)",
       "lineStaffTicketOption": "The check's professional",
       "staffSearch": "Search the team…",
@@ -156,7 +156,7 @@
       "discountApply": "Apply",
       "discountApplyValue": "Apply −{value}",
       "ticketDiscountFailed": "That discount could not be saved. The check keeps the discount it had.",
-      "voidLineOf": "Void «{name}»",
+      "voidLineOf": "Void “{name}”",
       "voidLineHint": "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to approve it.",
       "voidReasonMistake": "Ordered by mistake",
       "voidReasonChanged": "Customer changed their mind",
@@ -189,6 +189,7 @@
       "services": "Services",
       "serviceMinutes": "{minutes} min",
       "noServices": "No services.",
+      "searchFoundNothing": "No product or service matches your search.",
       "servicesLoadFailed": "The services could not be loaded.",
       "servicePriceTitle": "Amount of {name}",
       "servicePriceSuggest": "Use {price}",
@@ -226,7 +227,7 @@
         "optional": "Optional",
         "add": "Add · {price}",
         "chooseToContinue": "Choose an option to continue",
-        "full": "«{group}» is full: take one out to choose another.",
+        "full": "“{group}” is full: take one out to choose another.",
         "less": "One less {name}",
         "loadFailed": "The options of this product could not be read. Try again.",
         "chooseRange": "Choose {n} to {max}",
@@ -235,7 +236,7 @@
       },
       "menu": {
         "badge": "Menu",
-        "chooseIn": "Choose {n} in «{course}»",
+        "chooseIn": "Choose {n} in “{course}”",
         "loadFailed": "The menus could not be read. Try again."
       },
       "kitchen": {
@@ -688,7 +689,7 @@
         },
         "receipt_marketing_text": {
           "label": "Promotional QR text",
-          "description": "For example «Scan and leave us a review»."
+          "description": "For example “Scan and leave us a review”."
         }
       }
     }

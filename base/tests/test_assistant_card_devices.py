@@ -72,10 +72,9 @@ def test_with_no_device_unused_for_30_days_there_is_no_card_and_the_model_hears_
     _, in_hand = a_device(days_ago=90)
     a_device(days_ago=0, agent="Chrome · Linux")
     plan = turn(in_hand, call("base.device.prune", {}), language=language)
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    [row] = plan["executed"]
-    assert (row["name"], row["outcome"], row["code"]) == ("base.device.prune", "error", "base.no_unused_devices")
-    assert json.loads(plan["append"][0]["content"])["error"]["message"] == NOTHING_TO_REMOVE[language]
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    told = json.loads(plan["append"][0]["content"])["error"]
+    assert (told["code"], told["message"]) == ("base.no_unused_devices", NOTHING_TO_REMOVE[language])
 
 
 def test_the_yes_removes_the_devices_its_card_showed_and_keeps_the_one_in_hand():

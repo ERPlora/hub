@@ -203,7 +203,7 @@ async function confirmDiscard(): Promise<void> {
         class="failed-events-muted"
         data-testid="failed-events-more"
       >
-        {{ t('base.system.failed.more', { shown: items.length, total }) }}
+        {{ t('base.system.failed.more', { count: items.length, total }) }}
       </p>
     </template>
     <ConfirmDialog

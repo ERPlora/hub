@@ -11,7 +11,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError
 from live.models import OutboxEvent
 from live.outbox import channel_for
 
-from apps.appointment.models import Appointment, History
+from apps.appointment.models.appointments import Appointment, History
 from apps.customer.models import Customer
 from apps.online_booking.models import Booking
 from apps.online_booking.queries.visitors import hash_token, visitor_key

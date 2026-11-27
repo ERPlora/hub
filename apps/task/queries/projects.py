@@ -10,7 +10,7 @@ from live.operations import operation
 from base.ordering import list_order_for
 from base.text_search import contains_text
 from apps.task.models import Project, Task
-from apps.task.queries.reads import VIEW_ALL, Caller, _full_name, _page, resolve_project
+from apps.task.queries.reads import Caller, _full_name, _page, resolve_project
 from apps.task.schemas import ProjectListIn, ProjectOut, ProjectPage, ProjectRefIn
 
 
@@ -30,7 +30,7 @@ PROJECT_ORDER = {
 
 def annotated_projects(projects: QuerySet[Project], caller: Caller) -> QuerySet[Project]:
     """Projects with their owner's name and how many tasks (and open ones) the caller sees in them."""
-    seen = Q() if caller.ctx.has(VIEW_ALL) else caller.own("tasks__")
+    seen = caller.seen("tasks__")
     return projects.annotate(
         owner_name=_full_name("owner"),
         task_count=Count("tasks", filter=seen, distinct=True),

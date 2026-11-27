@@ -31,6 +31,14 @@ def test_each_query_and_its_events():
         "tip.settings.get": ["tip.settings.updated", "sale.payment_method.created", "sale.settings.updated"],
         # What the charge proposes is the settings' suggestions of a payment method.
         "tip.suggestion.get": ["tip.settings.updated", "sale.payment_method.created", "sale.settings.updated"],
+        # By shift, a working day of Time clock moves the tips from one line to another.
+        "tip.report.get": [
+            *TIPS,
+            "attendance.record.clocked_in",
+            "attendance.record.clocked_out",
+            "attendance.record.corrected",
+        ],
+        "tip.report.mine": TIPS,
     }
 
 

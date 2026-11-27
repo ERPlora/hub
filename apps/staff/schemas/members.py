@@ -90,7 +90,10 @@ D_TEAM_PHONE = (
 D_EMPLOYEE_NUMBER = "The business's own employee number; empty for none."
 #: A person of the business by their id in its database: the card names them (``base.hub_user.get``).
 A_PERSON = names("base.hub_user.get")
-D_USER_ID = "Id of the business user (account) the record hangs from; one user, one live record."
+D_USER_ID = (
+    "Id of the business user (account) the record hangs from, the user_id staff.account.list gives; one user, one "
+    "live record."
+)
 D_HIRE_DATE = "Hire date (YYYY-MM-DD)."
 D_BOOKABLE = "Whether the person takes appointments."
 D_BUFFER = "Minutes to leave between two appointments of this person (0 to 240)."
