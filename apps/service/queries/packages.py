@@ -12,6 +12,7 @@ from apps.service.queries.reads import _page, _resolve
 from apps.service.schemas.fields import PackageRefIn
 from apps.service.schemas.packages import PackageListIn, PackageOut, PackagePage
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 PACKAGE_NOT_FOUND = _("That package does not exist in this business.")
 PACKAGE_AMBIGUOUS = _("“%(said)s” matches several packages: %(names)s. Say which one.")
@@ -132,7 +133,7 @@ def list_packages(ctx: OperationContext, params: PackageListIn) -> dict:
             packages = packages.filter(is_active=params.status == "active")
     for text in (params.search, params.name):
         if text:
-            packages = packages.filter(name__icontains=text)
+            packages = packages.filter(contains_text(text, "name"))
     return _page(
         packages.order_by(*list_order_for(params.sort, "sort_order", "name", columns=PACKAGE_ORDER, nulls_last=True)),
         params,
