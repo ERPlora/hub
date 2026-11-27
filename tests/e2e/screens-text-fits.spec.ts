@@ -1,8 +1,10 @@
 // flow: APPOINTMENT-F01, APPOINTMENT-F27 — every screen of the apps the salon's and the restaurant's QA journeys walk
 // (journey-screens.ts), in Spanish and with names as long as real ones (text-fits-seed.ts), at the three sizes, reads
 // its texts whole (text-cut.ts): no text cut by its box with no title to read it whole, no short word split over two
-// lines. The agenda «By professional», day and week, sits behind a switch of its screen and is opened by hand. A site
-// already known is in text-fits-known.json with its issue; anything else fails, with a screenshot of where it showed.
+// lines. A site already known is in text-fits-known.json with its issue; anything else fails, with a screenshot of
+// where it showed. The walk of every screen runs every night with the rest of the e2e; the browser smoke, which
+// stops a merge, runs the agenda «By professional», day and week, which sits behind a switch of its screen.
+// Every step that waits on the browser has a time limit (within-time.ts): a page that never answers fails its test.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, settled, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
@@ -10,6 +12,7 @@ import { journeyApps, registeredRoutes, screensAmong } from './journey-screens';
 import { cutTexts, measureInOneFont } from './text-cut';
 import { KNOWN_SITES, staleScreens } from './text-fits-known';
 import { BOOKED_DAY, removeLongTexts, seedLongTexts } from './text-fits-seed';
+import { withinTime } from './within-time';
 
 const SIZES = [
   { label: '1440', width: 1440, height: 900 },
@@ -28,6 +31,9 @@ const SWITCHED = [
   { screen: 'agenda · by professional · week', open: ['appointment-toolbar-view-staff', 'appointment-toolbar-span-week'] },
 ] as const;
 
+/** How long a step that waits on the browser may take: a navigation, a scan of the page, a screenshot. */
+const STEP_MS = 30_000;
+
 interface Seen {
   screen: string;
   size: string;
@@ -45,17 +51,34 @@ const snapName = (seen: Seen): string => `text-fits-${seen.screen.replace(/[^a-z
 async function measured(page: Page, screen: string): Promise<Seen[]> {
   const out: Seen[] = [];
   for (const size of SIZES) {
-    await page.setViewportSize(size);
-    await settled(page);
+    const where = `${screen} at ${size.label}`;
+    await withinTime(`resizing ${where}`, page.setViewportSize(size), STEP_MS);
+    await withinTime(`settling ${where}`, settled(page), STEP_MS);
     // A page Ionic is still bringing in is painted at opacity 0: measured then, it would show nothing to cut.
-    await expect(shown(page), `${screen} at ${size.label} on view`).not.toHaveClass(/ion-page-invisible/, { timeout: 20_000 });
-    await expect(page.locator(LOADING), `${screen} at ${size.label} still loading`).toHaveCount(0, { timeout: 20_000 });
-    await settled(page);
-    const cuts = (await cutTexts(page)).map((cut) => ({ screen, size: size.label, ...cut }));
-    if (cuts.some((cut) => !known(cut))) await capture(page, snapName(cuts[0]));
+    await expect(shown(page), `${where} on view`).not.toHaveClass(/ion-page-invisible/, { timeout: 20_000 });
+    await expect(page.locator(LOADING), `${where} still loading`).toHaveCount(0, { timeout: 20_000 });
+    await withinTime(`settling ${where}`, settled(page), STEP_MS);
+    const cuts = (await withinTime(`the scan of ${where}`, cutTexts(page), STEP_MS)).map((cut) => ({ screen, size: size.label, ...cut }));
+    if (cuts.some((cut) => !known(cut))) await withinTime(`the screenshot of ${where}`, capture(page, snapName(cuts[0])), STEP_MS);
     out.push(...cuts);
   }
   return out;
+}
+
+/** Opens `address`, with a time limit: Playwright sets none on a navigation in this suite. */
+const opened = (page: Page, address: string): Promise<unknown> =>
+  withinTime(`opening ${address}`, page.goto(address, { timeout: STEP_MS }), STEP_MS + 5_000);
+
+/** The texts cut on the agenda «By professional», by day and by week, on the booked day. */
+async function agendaCuts(page: Page): Promise<Seen[]> {
+  const seen: Seen[] = [];
+  for (const switched of SWITCHED) {
+    await page.setViewportSize(SIZES[0]);
+    await opened(page, addressOf('/appointment/agenda'));
+    for (const testid of switched.open) await page.locator(`[data-testid=${testid}]:visible`).click({ timeout: STEP_MS });
+    seen.push(...(await measured(page, switched.screen)));
+  }
+  return seen;
 }
 
 let context: BrowserContext;
@@ -75,19 +98,19 @@ test.afterAll(async () => {
   await context.close();
 });
 
-test('every screen of the salon and restaurant journeys reads its texts whole, in Spanish, at the three sizes @smoke', async () => {
-  test.setTimeout(900_000);
-  await page.reload();
-  const screens = screensAmong(await registeredRoutes(page), journeyApps());
-  const seen: Seen[] = [];
-  for (const switched of SWITCHED) {
-    await page.setViewportSize(SIZES[0]);
-    await page.goto(addressOf('/appointment/agenda'));
-    for (const testid of switched.open) await page.locator(`[data-testid=${testid}]:visible`).click();
-    seen.push(...(await measured(page, switched.screen)));
-  }
+test('the agenda «By professional», by day and by week, reads its customers and services whole at the three sizes @smoke', async () => {
+  test.setTimeout(180_000);
+  const seen = await agendaCuts(page);
+  expect(seen.filter((cut) => !known(cut)).map(described), 'texts cut where no site is known').toEqual([]);
+});
+
+test('every screen of the salon and restaurant journeys reads its texts whole, in Spanish, at the three sizes', async () => {
+  test.setTimeout(600_000);
+  await opened(page, '/');
+  const screens = screensAmong(await withinTime('reading the routes', registeredRoutes(page), STEP_MS), journeyApps());
+  const seen = await agendaCuts(page);
   for (const screen of screens) {
-    await page.goto(addressOf(screen));
+    await opened(page, addressOf(screen));
     seen.push(...(await measured(page, screen)));
   }
   expect(seen.filter((cut) => !known(cut)).map(described), 'texts cut where no site is known').toEqual([]);
