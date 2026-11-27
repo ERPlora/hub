@@ -2,7 +2,7 @@
 with on its first use.
 """
 
-from django.db.models import Exists, F, OuterRef, Q, QuerySet
+from django.db.models import Exists, F, OuterRef, QuerySet
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -15,6 +15,7 @@ from apps.invoice.platform_series import platform_codes, refuse_platform_series
 from apps.invoice.queries.rows import _page
 from apps.invoice.schemas.series import SeriesDetailOut, SeriesListIn, SeriesPage, SeriesPeekIn, SeriesPeekOut
 from apps.tax.queries.jurisdiction import business_today
+from base.text_search import contains_text
 
 SERIES_NOT_FOUND = _("This numbering series does not exist.")
 
@@ -92,7 +93,7 @@ def list_series(ctx: OperationContext, params: SeriesListIn) -> dict:
     )
     if params.search:
         text = params.search.strip()
-        series = series.filter(Q(code__icontains=text) | Q(name__icontains=text))
+        series = series.filter(contains_text(text, "code", "name"))
     exact = {
         "code": params.code.strip().upper() if params.code else None,
         "invoice_type": params.invoice_type,

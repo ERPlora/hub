@@ -8,6 +8,7 @@ from apps.customer.models import Consent
 from apps.customer.queries.cards import consent_states
 from apps.customer.queries.reads import find_customer, page
 from apps.customer.schemas.consent import ConsentHistoryIn, ConsentPage, ConsentStateIn, ConsentStateOut
+from base.text_search import contains_text
 
 from . import contact
 
@@ -59,10 +60,8 @@ def consent_history(ctx: OperationContext, params: ConsentHistoryIn) -> dict:
     if params.search:
         text = params.search
         facts = facts.filter(
-            Q(purpose__icontains=text)
-            | Q(channel__icontains=text)
-            | (Q(contact_point__icontains=text) if contact.sees_contact(ctx) else Q())
-            | Q(notice_text__icontains=text)
-            | Q(reason__icontains=text)
+            contains_text(text, "purpose", "channel")
+            | (contains_text(text, "contact_point") if contact.sees_contact(ctx) else Q())
+            | contains_text(text, "notice_text", "reason")
         )
     return page(facts.order_by("-occurred_at", "-created_at", "-id"), params)
