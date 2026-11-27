@@ -8,7 +8,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0032_approval_by_role'),
+        ('base', '0033_apps_turned_on_by_a_load_are_chosen'),
     ]
 
     operations = [
