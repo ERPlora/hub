@@ -100,7 +100,7 @@ gallery**, with ready-made automations to start from and the ones other apps bri
 and each row open the editor, and **How does this work?** opens the guide.
 
 #### What it shows, from top to bottom
-<!-- from WORKBOOK.md sha256:ffe93a8a999d -->
+<!-- from WORKBOOK.md sha256:b4b2cd8a2b2c -->
 Menu **Automations**, a single entry. From top to bottom:
 
 - The **New automation** button, top right: only its **+**, with its name on hover.
@@ -113,9 +113,10 @@ Menu **Automations**, a single entry. From top to bottom:
 - **Proposed by the assistant** — only if there are drafts: "The assistant wrote them when you asked it
   for an automation. They do nothing until you review and turn them on.", and for each one its name, the
   "Draft" label, **Review** and an × ("Discard") (FLOW-F18, FLOW-F19).
-- **Your automations** — only if there is some. The search box "Search by name, by what starts it or by
-  what it does", the **Showing** filters (on, paused) and **Starts with** (something that happens, a
-  schedule, a date, by hand), the order (touched last, name) and the count. Each row: a box to pick it,
+- **Your automations** — only if there is some. Under the heading, the count ("Showing 1 of 3"). In the
+  list's bar, as in the other lists: the search box "Search automation…", the order (touched last, name)
+  and the filters button, which opens **Showing** (on, paused) and **Starts with** (something that
+  happens, a schedule, a date, by hand). Each row: a box to pick it,
   the name, when it starts in words ("When a sale is charged", "Every day at 09:00", "Only when you press
   Run"), the last run, the "Active" or "Paused" label, the switch, **Make a copy** and **Delete**. With
   several picked, **Turn them on** and **Pause them** (FLOW-F02, FLOW-F03).
@@ -228,17 +229,20 @@ your answer**, with what an automation asks them.
 Involved: FLOW-F02, FLOW-F04, FLOW-F18
 
 ### FLOW-F02 See, search and sort the automations
-<!-- from WORKBOOK.md sha256:f1ee30a2384a -->
+<!-- from WORKBOOK.md sha256:a5a77530ac5d -->
 Status: done (server and screen)
 Actor: owner, administrator, assistant
 Screen: Automations
 Steps:
 1. In **Your automations** each row says the name, when it starts in words, when it last ran and how it
-   ended, and whether it is "Active" or "Paused". A name that does not fit in its row ends in an ellipsis,
-   never split mid-word: it can be read in full by resting the pointer on it, on the phone's card and when
-   opening it.
-2. Type in the search box (name, the notice that starts it or the actions it does) or filter by
-   **Showing** and **Starts with**; sort by **Last touched** or **Name**.
+   ended, and whether it is "Active" or "Paused". A long name is read in full, never split mid-word: on a
+   tablet and on a desk it takes the lines it needs in its row, broken between words, and it also shows when
+   resting the pointer on it; on the phone's card the title ends in an ellipsis past two lines and the name
+   is read in full below, under "Name", and when opening it.
+2. Type in the search box (name, the notice that starts it or the actions it does) or, with the filters
+   button, filter by **Showing** and **Starts with**; sort by **Last touched** or **Name**. On a desk the
+   search box, the order and the filters button fit on one line; on a phone the search box takes its own
+   line and the rest goes below.
 3. With no results: "Nothing here matches that." and **Show them all again**.
 4. Tap a row to open it in the editor.
 In: the business's automations, in pages of up to 100.
@@ -1296,7 +1300,7 @@ what it asks. A record the person confirming cannot see (a run, for whoever only
 question asked of another role) does not show on the card.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:ada15a0332da -->
+<!-- from WORKBOOK.md sha256:08383c8a217e -->
 
 | What it gives | Who may | Flows | Service |
 |---|---|---|---|
@@ -1313,7 +1317,7 @@ question asked of another role) does not show on the card.
 | The names of the business's secrets, never their value, and whether the server can keep them (live) | manage | F26, F27 | `flow.secret.list` |
 | The questions this person is waiting to answer, those that expire first at the top, up to 100, and of each change by the assistant its action and its data in words, read as that person and in their language (live) | answer | F01, F29, F38 | `flow.question.list` |
 | A question waiting for an answer, as it shows in "Waiting for your answer", only for whoever can answer it | answer (their role) | F29 | `flow.question.get` |
-| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live) | see | F01, F33–F36 | `flow.recipe.list` |
+| The ready-made automations the active apps bring, with what they do, their permissions and why, and the one set up from each (on, "New version", what it would repair); and those the business cannot use, with their reason (live; the assistant reads on with `offset` where an answer too long to be told at once was cut) | see | F01, F33–F36 | `flow.recipe.list` |
 
 ### What it offers: actions (they change data)
 <!-- from WORKBOOK.md sha256:fc67ed817046 -->

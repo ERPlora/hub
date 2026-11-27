@@ -790,7 +790,7 @@ Los papeles llegan del SaaS con prefijo (`hub_owner`, `hub_admin`, `hub_manager`
 
 ## Para quien lo mantiene
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries.py`, `services.py`,
+- Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas/`, `queries/`, `services/`,
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_sale.py` (ventas reales de Ventas) y
   `tests/test_concurrency.py` (sesiones reales en hilos).

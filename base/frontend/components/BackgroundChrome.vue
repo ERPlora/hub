@@ -2,8 +2,9 @@
 // base's pieces beside the pane (`createShell({ chrome: { background } })`, mounted once per signed-in person): the
 // device's notices, the assistant's panel (the shared one of @erplora/ui, configured as
 // the Hub's in main.ts, with base's empty conversation and its setup shortcuts), the business's apps, the person's
-// access and their own language followed live, so the menu follows an app turned on or off on any device and a role
-// changed on erplora.com, and the app speaks the language the person chose wherever they chose it (the assistant's card),
+// access and their own language and appearance followed live, so the menu follows an app turned on or off on any device
+// and a role changed on erplora.com, and the app speaks the language and paints the appearance the person chose wherever
+// they chose it (the assistant's card),
 // the user menu's «Report a problem», the installed app's
 // «Change business?» and its Back button, and the help entry that paints into the visible page's topbar.
 import { AssistantPanel } from '@erplora/ui/components';
@@ -14,7 +15,7 @@ import AssistantSetupEmpty from './AssistantSetupEmpty.vue';
 import ChangeBusinessDialog from './ChangeBusinessDialog.vue';
 import DeviceNotices from './DeviceNotices.vue';
 import HelpEntry from './HelpEntry.vue';
-import LanguageFollower from './LanguageFollower.vue';
+import PreferencesFollower from './PreferencesFollower.vue';
 import ReportProblemDialog from './ReportProblemDialog.vue';
 import SystemBackButton from './SystemBackButton.vue';
 </script>
@@ -31,7 +32,7 @@ import SystemBackButton from './SystemBackButton.vue';
   </AssistantPanel>
   <AppsFollower />
   <AccessFollower />
-  <LanguageFollower />
+  <PreferencesFollower />
   <ReportProblemDialog />
   <ChangeBusinessDialog />
   <SystemBackButton />

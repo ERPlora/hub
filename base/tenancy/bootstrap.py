@@ -51,6 +51,8 @@ from decouple import config
 from django.db import DEFAULT_DB_ALIAS, connections
 from psycopg import sql
 
+from base.tenancy.database_owner import _ensure_database
+
 logger = logging.getLogger(__name__)
 
 #: Longest identifier PostgreSQL keeps (``NAMEDATALEN - 1``).
@@ -320,34 +322,6 @@ def _ensure_signal_backend(conn: psycopg.Connection, role: str) -> str:
         return "exists"
     conn.execute(sql.SQL("GRANT pg_signal_backend TO {}").format(sql.Identifier(role)))
     return "created"
-
-
-def _ensure_database(
-    conn: psycopg.Connection, database: str, owner: str
-) -> tuple[str, str]:
-    row = conn.execute(
-        "SELECT pg_get_userbyid(datdba) FROM pg_database WHERE datname = %s", [database]
-    ).fetchone()
-    if row is None:
-        try:
-            conn.execute(
-                sql.SQL("CREATE DATABASE {} OWNER {}").format(
-                    sql.Identifier(database), sql.Identifier(owner)
-                )
-            )
-        except psycopg.errors.DuplicateDatabase:
-            return _ensure_database(
-                conn, database, owner
-            )  # created meanwhile: converge
-        return "created", f"owner {owner}"
-    if row[0] != owner:
-        conn.execute(
-            sql.SQL("ALTER DATABASE {} OWNER TO {}").format(
-                sql.Identifier(database), sql.Identifier(owner)
-            )
-        )
-        return "updated", f"owner {owner}, was {row[0]}"
-    return "exists", f"owner {owner}"
 
 
 def _ensure_access(

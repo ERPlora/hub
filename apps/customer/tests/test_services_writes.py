@@ -24,7 +24,7 @@ pytestmark = HUB_DB
 
 GRANTS = {
     "customer.consent.grant": lambda customer, at: ConsentGrantIn(
-        customer_id=customer.id, channel="email", notice_text="Yes to the offers.", occurred_at=at
+        customer_id=customer.id, channel="email", occurred_at=at
     ),
     "customer.health.grant": lambda customer, at: HealthGrantIn(
         customer_id=customer.id, notice_text="Yes to keeping my allergies.", occurred_at=at
@@ -71,9 +71,7 @@ def activity_on(customer):
 
 
 def consent_on(customer):
-    return "customer.consent.grant", ConsentGrantIn(
-        customer_id=customer.id, channel="email", notice_text="Yes"
-    )
+    return "customer.consent.grant", ConsentGrantIn(customer_id=customer.id, channel="email")
 
 
 def order_on(customer):
@@ -141,7 +139,7 @@ def test_who_wrote_it_is_the_persons_name_never_their_account_id():
     assert note.actor == "Clara Ruiz"
     fact = run(
         "customer.consent.grant",
-        ConsentGrantIn(customer_id=ana.id, channel="email", notice_text="Yes."),
+        ConsentGrantIn(customer_id=ana.id, channel="email"),
         actor=nameless,
     )
     assert fact.recorded_by == "luis"
