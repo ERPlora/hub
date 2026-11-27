@@ -74,19 +74,19 @@ describe('SettingsCard', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('a refused save says so with the server’s words, and under the role it names', async () => {
+  it('a refused save says so once, with the server’s words, under the role it names', async () => {
     const s = await setup();
     await s.result(OP, FACTORY);
     await s.result(PRINTERS, ACTIVE);
     await ionValue(s.field('kitchen_printer'), 'k1');
     s.answer(422, { error: { code: 'invalid_payload', message: 'That printer is inactive.', fields: { kitchen_printer: 'That printer is inactive.' } } });
     await click(s.inDoc('printing-settings-save'));
-    expect(s.find('printing-settings-save-error').text()).toContain('That printer is inactive.');
     expect(prop(s.field('kitchen_printer'), 'errorText')).toBe('That printer is inactive.');
+    expect(s.inDoc('printing-settings-save-error')).toBeNull();
     expect(prop(s.field('bar_printer'), 'errorText')).toBeUndefined();
   });
 
-  it('after a refused save, another printer for that role lifts its message and the notice; the next refusal says them again', async () => {
+  it('after a refused save, another printer for that role lifts its message; the next refusal says it again, never in the notice', async () => {
     const s = await setup();
     await s.result(OP, FACTORY);
     await s.result(PRINTERS, ACTIVE);
@@ -94,11 +94,11 @@ describe('SettingsCard', () => {
     const says = () => [prop(s.field('kitchen_printer'), 'errorText') ?? '', s.inDoc('printing-settings-save-error') !== null];
     await ionValue(s.field('kitchen_printer'), 'k1');
     await click(s.inDoc('printing-settings-save'));
-    expect(says()).toEqual(['That printer is inactive.', true]);
+    expect(says()).toEqual(['That printer is inactive.', false]);
     await ionValue(s.field('kitchen_printer'), 'k2');
     expect(says()).toEqual(['', false]);
     await click(s.inDoc('printing-settings-save'));
-    expect(says()).toEqual(['That printer is inactive.', true]);
+    expect(says()).toEqual(['That printer is inactive.', false]);
   });
 
   it('a failure the server did not word says the card’s sentence, never the server’s', async () => {
