@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { shallowRef } from 'vue';
 
 import { errorFrame, mountComposable } from '../__tests__/mount-appointment';
-import { type LiveWindows, useLiveWindows, windowsOf } from './useLiveWindows';
+import { type LiveWindows, useLiveWindows, useWholeList, windowsOf } from './useLiveWindows';
 
 const OP = 'appointment.appointment.list';
 
@@ -125,6 +125,29 @@ describe('useLiveWindows: rows planned by the caller (a table)', () => {
     );
     await s.result(OP, { rows: [row('a')], total: 80, limit: 50, offset: 0 });
     expect(s.list().hasMore.value).toBe(true);
+  });
+});
+
+describe('useWholeList: every row, up to a cap (the agenda’s range, the bookings to confirm)', () => {
+  async function whole(max: number) {
+    let list!: LiveWindows<{ id: string }>;
+    const m = await mountComposable(() => {
+      list = useWholeList(OP, () => ({ date_from: '2026-10-19' }), max) as unknown as LiveWindows<{ id: string }>;
+    });
+    await m.live();
+    return { ...m, list: () => list };
+  }
+
+  it('asks one window of 100 and then as many as the total needs, never past the cap', async () => {
+    const s = await whole(250);
+    expect(s.params(OP)).toEqual([{ date_from: '2026-10-19', limit: 100, offset: 0 }]);
+    await s.result(OP, { rows: [row('a')], total: 400, limit: 100, offset: 0 });
+    await s.reopen();
+    expect(s.params(OP).map((params) => [params.offset, params.limit])).toEqual([
+      [0, 100],
+      [100, 100],
+      [200, 50],
+    ]);
   });
 });
 

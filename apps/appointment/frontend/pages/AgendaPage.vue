@@ -3,16 +3,18 @@
 // confirm», «List · By professional · Repeating», «Day · Week») and the view, all live and on the
 // business's clock (its zone comes with the settings). The page follows the range's appointments — every
 // one of them, in windows of 100 —, the agenda's rows (`appointment.agenda.lanes`), the blocks and the
-// bookings to confirm. «Add appointment» and a tapped slot open the booking panel; an appointment opens
-// its panel (or its history once it can no longer move); a drag moves it; the row actions run
-// (`useAgendaActions`). An employee sees her own agenda, and is told when her account has no record. The address
-// may name the day (`?date=YYYY-MM-DD`: a tap on the device's notice of a booking, APPOINTMENT-F28).
+// bookings to confirm, which «N to confirm» lists instead of the view, of every day. «Add appointment» and a
+// tapped slot open the booking panel; an appointment opens its panel (or its history once it can no longer move);
+// a drag moves it; the row actions run (`useAgendaActions`). An employee sees her own agenda, and is told when her
+// account has no record. The address may name the day (`?date=YYYY-MM-DD`: a tap on the device's notice of a
+// booking, APPOINTMENT-F28) or ask for the bookings to confirm (`?to_confirm=1`: the bell's «Confirm the
+// appointments», APPOINTMENT-F03).
 import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import AgendaToolbar, { type AgendaSpan, type AgendaView } from '../components/AgendaToolbar.vue';
 import AppointmentFormModal, { type BookingPreset } from '../components/AppointmentFormModal.vue';
@@ -22,9 +24,10 @@ import DayGrid from '../components/DayGrid.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import PageNotices from '../components/PageNotices.vue';
 import SeriesList from '../components/SeriesList.vue';
+import ToConfirmList from '../components/ToConfirmList.vue';
 import WeekBoard from '../components/WeekBoard.vue';
 import { useAgendaActions } from '../composables/useAgendaActions';
-import { useLiveWindows } from '../composables/useLiveWindows';
+import { useWholeList } from '../composables/useLiveWindows';
 import { useT } from '../composables/useT';
 import { todayIn, wallInput, wallNowIn, weekDays } from '../lib/clock';
 import { allows } from '../lib/states';
@@ -33,8 +36,6 @@ import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 /** The zone until the settings say the business's. */
 const FALLBACK_ZONE = 'Europe/Madrid';
-/** The most appointments a range paints (ten windows of 100). */
-const MAX_ROWS = 1000;
 
 const t = useT();
 const session = useSession();
@@ -81,22 +82,25 @@ watch(
 const view = ref<AgendaView>('list');
 const span = ref<AgendaSpan>('day');
 const status = ref('');
+const onlyToConfirm = ref(false);
+// The bell asks for them by the address, which then lets the request go so that its next tap asks again.
+const router = useRouter();
+watch(
+  () => route.query.to_confirm,
+  (value) => {
+    if (value !== '1') return;
+    onlyToConfirm.value = true;
+    void router.replace({ path: route.path, query: {} });
+  },
+  { immediate: true },
+);
 
 const days = computed(() => (span.value === 'week' ? weekDays(day.value) : [day.value]));
 const range = computed(() => ({ date_from: days.value[0], date_to: days.value[days.value.length - 1] }));
 
-const wanted = ref(100);
-const list = useLiveWindows<'appointment.appointment.list', AppointmentRow>(
+const list = useWholeList<'appointment.appointment.list', AppointmentRow>(
   'appointment.appointment.list',
   () => ({ ...range.value, sort: 'start', ...(status.value ? { status: status.value as AppointmentStatus } : {}) }),
-  100,
-  { start: () => 0, rows: () => wanted.value },
-);
-watch(
-  () => list.total.value,
-  (total) => {
-    wanted.value = Math.min(MAX_ROWS, Math.max(100, total ?? 100));
-  },
 );
 
 const lanes = useLive('appointment.agenda.lanes', range);
@@ -186,6 +190,7 @@ const listError = computed(() => (list.status.value === 'error' ? t('appointment
       :view="view"
       :span="span"
       :status="status"
+      :only-to-confirm="onlyToConfirm"
       :to-confirm="toConfirm?.count ?? 0"
       :today="today"
       :zone="zone"
@@ -193,6 +198,7 @@ const listError = computed(() => (list.status.value === 'error' ? t('appointment
       @update:view="view = $event"
       @update:span="span = $event"
       @update:status="status = $event"
+      @update:only-to-confirm="onlyToConfirm = $event"
     />
     <InlineFeedback
       v-if="notLinked"
@@ -202,7 +208,7 @@ const listError = computed(() => (list.status.value === 'error' ? t('appointment
       {{ $t('appointment.grid.notLinked') }}
     </InlineFeedback>
     <InlineFeedback
-      v-if="(lanes.data.value?.unassigned ?? 0) > 0 && view !== 'series'"
+      v-if="(lanes.data.value?.unassigned ?? 0) > 0 && view !== 'series' && !onlyToConfirm"
       tone="warning"
       data-testid="appointment-agenda-unassigned"
     >
@@ -218,8 +224,15 @@ const listError = computed(() => (list.status.value === 'error' ? t('appointment
       {{ actions.notice.value.text }}
     </InlineFeedback>
 
+    <ToConfirmList
+      v-if="onlyToConfirm"
+      :now="clock"
+      :can-delete="canDelete"
+      @action="actions.run($event.actionId, $event.row)"
+      @back="onlyToConfirm = false"
+    />
     <AppointmentList
-      v-if="view === 'list'"
+      v-else-if="view === 'list'"
       :rows="list.rows.value"
       :now="clock"
       :can-add="canAdd"

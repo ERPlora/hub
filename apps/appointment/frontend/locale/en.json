@@ -63,6 +63,11 @@
       "unassigned": "Unassigned",
       "charged": "Charged"
     },
+    "toConfirm": {
+      "notice": "These are the appointments waiting for your confirmation, whatever their day.",
+      "back": "Back to the agenda",
+      "empty": "No appointments left to confirm."
+    },
     "actions": {
       "charge": "Charge",
       "goToCheck": "Go to the check",

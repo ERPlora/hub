@@ -9,12 +9,10 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.table import queries, services
-from apps.table.schemas import (
+from apps.table.schemas.holds import HoldByReservationIn, HoldPlaceIn, HoldReleaseIn
+from apps.table.schemas.sessions import (
     ByIdIn,
     ByOrderIn,
-    HoldByReservationIn,
-    HoldPlaceIn,
-    HoldReleaseIn,
     LineRefIn,
     SessionCloseIn,
     SessionGuestsIn,
@@ -26,19 +24,11 @@ from apps.table.schemas import (
     SessionRestoreIn,
     SessionSplitIn,
     SessionTransferIn,
-    SettingsIn,
-    TableBulkIn,
-    TableIn,
-    TableListIn,
-    TableMoveIn,
-    TablePatchIn,
-    TableRefIn,
-    WaiterListIn,
-    ZoneIn,
-    ZoneListIn,
-    ZonePatchIn,
-    ZoneRefIn,
 )
+from apps.table.schemas.settings import SettingsIn
+from apps.table.schemas.tables import TableBulkIn, TableIn, TableListIn, TableMoveIn, TablePatchIn, TableRefIn
+from apps.table.schemas.waiters import WaiterListIn
+from apps.table.schemas.zones import ZoneIn, ZoneListIn, ZonePatchIn, ZoneRefIn
 
 router = Router(tags=["table"])
 

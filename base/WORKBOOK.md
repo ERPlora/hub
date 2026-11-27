@@ -1914,6 +1914,9 @@ Pasos:
   3. En una caja con pinpad vuelve a **Acceso**, lista para la siguiente persona. En otro dispositivo, erplora.com
      pregunta «¿Cerrar la sesión de erplora.com?»: «Cerrar sesión» la cierra también y erplora.com pide entrar de
      nuevo; «Seguir conectado» la deja abierta y enseña los negocios de la cuenta.
+  4. Si se lo pide al asistente («ciérrame la sesión en esta tableta»), le dice que se cierra con «Cerrar sesión» de
+     la tarjeta de usuario: ninguna herramienta cierra la sesión, y quitar el dispositivo (BASE-F70) es para uno
+     perdido.
 Entra: la sesión.
 Sale: la sesión cerrada en el negocio; la de erplora.com, solo si la persona lo confirma.
 Si falla: si el negocio no contesta, la sesión caduca sola.
@@ -2110,7 +2113,9 @@ Pasos:
      era el suyo, sale del negocio.
   4. Desde el asistente («quita el móvil que perdí esta tarde»), la tarjeta pide escribir CONFIRMAR y, bajo
      «Lo que va a pasar», dice cuándo se usó por última vez («Último uso: 22 nov 2026, 16:18»): dos dispositivos sin
-     nombre se llaman igual («Chrome · Linux») y solo su último uso los distingue.
+     nombre se llaman igual («Chrome · Linux») y solo su último uso los distingue. Si es el que está usando, lo avisa
+     como la pantalla: «Es el dispositivo que estás usando: al quitarlo se cerrará tu sesión y tendrás que volver a
+     entrar.».
 Entra: el dispositivo.
 Sale: el dispositivo olvidado y sus sesiones cerradas: se corta el dispositivo, no la persona, que puede volver a
 entrar en él con su cuenta.

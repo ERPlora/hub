@@ -116,7 +116,8 @@
       "cancel": "Cancelar",
       "done": "Arqueo registrado · total contado {total}",
       "failed": "No se pudo registrar el arqueo",
-      "loading": "Cargando los billetes y monedas…"
+      "loading": "Cargando los billetes y monedas…",
+      "nothing": "Cuenta el cajón: indica los billetes y monedas o el total."
     },
     "close": {
       "title": "Cerrar sesión · {number}",

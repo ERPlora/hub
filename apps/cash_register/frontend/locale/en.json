@@ -116,7 +116,8 @@
       "cancel": "Cancel",
       "done": "Count recorded · total counted {total}",
       "failed": "Could not record the count",
-      "loading": "Loading the notes and coins…"
+      "loading": "Loading the notes and coins…",
+      "nothing": "Count the drawer: give its notes and coins or its total."
     },
     "close": {
       "title": "Close session · {number}",

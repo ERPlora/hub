@@ -160,10 +160,11 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
       await expect(confirmThem).toBeVisible();
       await capturedFitting(page, `${KEY}-${label}`, label);
 
-      // Its button leads to the agenda.
+      // Its button leads to the agenda's list of every booking to confirm, whatever its day (hub#2640).
       await confirmThem.click();
       await expect(page).toHaveURL(`${A}/appointment/agenda`);
-      await expect(shown(page).locator('[data-testid="appointment-toolbar"]')).toBeVisible();
+      await expect(shown(page).locator('[data-testid="appointment-to-confirm-notice"]')).toBeVisible();
+      await expect(shown(page).locator(`[data-testid=appointment-list-row][data-id="${booked.id}"]`).first()).toBeVisible();
 
       // Confirmed elsewhere: the bell, in the agenda's bar too, takes it away without a reload.
       await post(context, '/appointment/appointments/confirm', { id: booked.id }, 200);

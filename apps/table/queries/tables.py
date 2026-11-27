@@ -14,7 +14,7 @@ from apps.table.models import Table
 from .floor import live_sessions, table_rows, tables_now
 from .lookups import find_table, find_zone
 from .paging import _page
-from apps.table.schemas import TableListIn, TableRefIn
+from apps.table.schemas.tables import TableListIn, TableRefIn
 from apps.table.schemas.floor import TableOut, TablePage
 from base.ordering import list_order_for
 from base.text_search import contains_text

@@ -53,7 +53,7 @@ describe('AgendaToolbar', () => {
     expect(s.find('appointment-toolbar-next').attributes('aria-label')).toBe('Next week');
   });
 
-  it('switches views and spans, filters by status, and leads to the bookings to confirm', async () => {
+  it('switches views and spans and filters by status', async () => {
     const s = await setup({ toConfirm: 3 });
     await ionValue(s.find('appointment-toolbar-view').element, 'staff');
     expect(s.last('update:view')).toEqual(['staff']);
@@ -61,9 +61,22 @@ describe('AgendaToolbar', () => {
     expect(s.last('update:span')).toEqual(['week']);
     await ionValue(s.find('appointment-toolbar-status').element, 'no_show');
     expect(s.last('update:status')).toEqual(['no_show']);
-    expect(s.find('appointment-toolbar-to-confirm').text()).toBe('3 to confirm');
-    await click(s.find('appointment-toolbar-to-confirm').element);
-    expect(s.last('update:status')).toEqual(['pending']);
+  });
+
+  // hub#2640: the bookings to confirm are of any day, so «N to confirm» shows them all instead of filtering the day's.
+  it('«N to confirm» shows every booking to confirm, where the day, the filter and the views do not apply', async () => {
+    const s = await setup({ toConfirm: 3 });
+    const button = () => s.find('appointment-toolbar-to-confirm');
+    expect([button().text(), button().attributes('aria-pressed')]).toEqual(['3 to confirm', 'false']);
+    await click(button().element);
+    expect(s.last('update:onlyToConfirm')).toEqual([true]);
+    expect(s.last('update:status')).toBeUndefined();
+
+    await s.wrapper.setProps({ onlyToConfirm: true });
+    expect(button().attributes('aria-pressed')).toBe('true');
+    for (const part of ['date', 'calendar', 'status', 'span', 'view']) expect(s.find(`appointment-toolbar-${part}`).exists(), part).toBe(false);
+    await click(button().element);
+    expect(s.last('update:onlyToConfirm')).toEqual([false]);
   });
 
   it('the view switch changes on the click, not as a finger lifts, so the click lands on the tapped view', async () => {

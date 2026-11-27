@@ -7,7 +7,7 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.table.models import Hold
-from apps.table.schemas import HoldByReservationIn, HoldOut
+from apps.table.schemas.holds import HoldByReservationIn, HoldOut
 
 HOLD_NOT_FOUND = _(
     "That hold is not there any more: it was released, it expired, or that booking never held a table."

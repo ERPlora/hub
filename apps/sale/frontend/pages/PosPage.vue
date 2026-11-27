@@ -10,15 +10,14 @@
 // services: a fixed price goes straight to the check, any other asks its amount (ServicePriceSheet).
 // With Tables on (SALE-F19) the check's bar has «Choose table» and the heading the check's table, both
 // through Tables' operations only (Sales does not require Tables).
-// `/sale/pos?order=<id>` (Appointments' «Charge», APPOINTMENT-F17) puts that check on the till as
-// resuming it from «Open checks» does; one no longer open is said and the till carries on as it was.
+// `/sale/pos?order=<id>` (Appointments' «Charge», APPOINTMENT-F17) puts that check on the till as resuming it from
+// «Open checks» does; until it is there with its customer the till only says it is opening it, and one that cannot be
+// opened is said in its place (`useLinkedCheck`).
 // Nothing about money is decided here.
-import { InlineFeedback, type AllergenCode } from '@erplora/ui/components';
-import { ApiError, type OutputOf, useCommand, useLive } from '@erplora/ui/sdk';
+import type { AllergenCode } from '@erplora/ui/components';
+import { type OutputOf, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, toast, toastError, toastSuccess, toastWarning, useSession } from '@erplora/ui/shell';
-import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, shallowRef, useTemplateRef, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
 
 import CustomerSearch, { type CustomerSnapshot, snapshotOf } from '../../../customer/frontend/components/CustomerSearch.vue';
 import CheckoutSheet from '../components/checkout/CheckoutSheet.vue';
@@ -34,6 +33,7 @@ import OpenPriceSheet from '../components/pos/OpenPriceSheet.vue';
 import ParkSheet from '../components/pos/ParkSheet.vue';
 import PosCart from '../components/pos/PosCart.vue';
 import PosCatalog from '../components/pos/PosCatalog.vue';
+import PosLoadState from '../components/pos/PosLoadState.vue';
 import PrebillModal from '../components/pos/PrebillModal.vue';
 import ServicePriceSheet from '../components/pos/ServicePriceSheet.vue';
 import StaffPicker from '../components/pos/StaffPicker.vue';
@@ -45,6 +45,7 @@ import VoidLineSheet from '../components/pos/VoidLineSheet.vue';
 import { useAppOn } from '../composables/pos/useAppOn';
 import { useCheckStaff } from '../composables/pos/useCheckStaff';
 import { useDrawerFocus } from '../composables/pos/useDrawerFocus';
+import { useLinkedCheck } from '../composables/pos/useLinkedCheck';
 import { useStaffNames } from '../composables/pos/useStaffNames';
 import { useSystemBack } from '../composables/pos/useSystemBack';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
@@ -76,6 +77,8 @@ const loadError = computed(() => {
 
 // ── The check ────────────────────────────────────────────────────────────────────────────────────
 const customer = shallowRef<CustomerSnapshot | null>(null);
+/** The check whose customer was read back (or found to have none). */
+const customerRead = shallowRef<string | null>(null);
 const choosingCustomer = shallowRef(false);
 const marks = shallowRef<string[]>([]);
 const preview = shallowRef<PreviewOut | undefined>();
@@ -84,7 +87,11 @@ const charging = shallowRef(false);
 
 const till = useTill({
   settings: () => settings.value,
-  onOpened: (id) => customer.value && void linkCustomer(id, customer.value),
+  // A check opened here has the customer the screen shows: there is nothing to read back.
+  onOpened: (id) => {
+    customerRead.value = id;
+    if (customer.value) void linkCustomer(id, customer.value);
+  },
   // The check on screen was joined with another (TABLE-F16, SALE-F24): the till shows that one, as switching to it does.
   onJoined: (id) => {
     clearScreen();
@@ -135,6 +142,7 @@ watch(charging, (now) => {
 /** The screen starts afresh: no check, no customer, «me» serving, nothing marked. */
 function clearScreen(): void {
   customer.value = null;
+  customerRead.value = null;
   serving.clear();
   marks.value = [];
 }
@@ -172,6 +180,8 @@ async function loadCustomer(orderId: string): Promise<void> {
     if (till.orderId.value === orderId) customer.value = snapshotOf(card, locale.value);
   } catch (error) {
     toastError(wordsOf(error, 'sale.pos.customerLoadFailed'));
+  } finally {
+    if (till.orderId.value === orderId) customerRead.value = orderId;
   }
 }
 
@@ -415,6 +425,12 @@ function resume(row: Pick<OrderRow, 'id'>): void {
   else switchTo(row);
 }
 
+/** «Cancel» on «You have a check in progress»: it stays on screen, and a check its address named is not opened. */
+function keepCurrent(): void {
+  switchingTo.value = null;
+  dismissLinked();
+}
+
 function leaveCurrent(choice: 'park' | 'discard'): void {
   const target = switchingTo.value;
   if (!target) return;
@@ -428,35 +444,18 @@ function leaveCurrent(choice: 'park' | 'discard'): void {
 }
 
 // ── A check opened by its address (/sale/pos?order=<id>) ─────────────────────────────────────────
-const route = useRoute();
-const router = useRouter();
-const checkOf = useCommand('sale.order.get');
-
-/** Puts the check `id` on the till, as «Open checks» does; one no longer open is said. */
-async function openLinked(id: string): Promise<void> {
-  void router.replace({ path: route.path, query: {} });
-  if (id === till.orderId.value) return;
-  try {
-    const linked = await checkOf.run({ order_id: id });
-    if (linked.status === 'open') resume(linked);
-    else toastError(t('sale.pos.linkedCheckGone'));
-  } catch (error) {
-    const gone = error instanceof ApiError && error.status === 404;
-    toastError(gone ? t('sale.pos.linkedCheckGone') : wordsOf(error, 'sale.pos.linkedCheckGone'));
-  }
-}
-
-/** The till's own address: Ionic keeps this page alive behind others, whose `order` may mean a sort. */
-const POS_PATH = '/sale/pos';
-
-// Once the till can show it (its settings read): on arriving and whenever its address names a check.
-watch(
-  () => (settings.value && route.path === POS_PATH ? route.query.order : undefined),
-  (id) => {
-    if (typeof id === 'string' && id) void openLinked(id);
+const {
+  pending: linkedPending,
+  error: linkedError,
+  dismiss: dismissLinked,
+} = useLinkedCheck({
+  ready: () => !!settings.value,
+  shown: () => (till.order.value && customerRead.value === till.order.value.id ? customerRead.value : null),
+  open: (check) => {
+    resume(check);
+    if (till.orderId.value === check.id) till.follow(check);
   },
-  { immediate: true },
-);
+});
 
 // ── Charging ─────────────────────────────────────────────────────────────────────────────────────
 const documentOpen = shallowRef(false);
@@ -593,30 +592,13 @@ onBeforeUnmount(() => {
     :tabs="tabs"
     :tabs-label="$t('sale.tabs.label')"
   >
-    <InlineFeedback
-      v-if="loadError"
-      tone="danger"
-      data-testid="pos-load-error"
-    >
-      {{ loadError }}
-      <template #actions>
-        <ion-button
-          size="small"
-          fill="outline"
-          data-testid="pos-load-retry"
-          @click="settingsLive.refresh()"
-        >
-          {{ $t('sale.live.retry') }}
-        </ion-button>
-      </template>
-    </InlineFeedback>
-    <div
-      v-else-if="!settings"
-      class="pos-loading"
-      data-testid="pos-loading"
-    >
-      <ion-spinner />
-    </div>
+    <PosLoadState
+      v-if="!settings"
+      :error="loadError"
+      :action="$t('sale.live.retry')"
+      testid="pos-settings"
+      @act="settingsLive.refresh()"
+    />
     <div
       v-else
       ref="tillBox"
@@ -625,7 +607,18 @@ onBeforeUnmount(() => {
       data-testid="pos-till"
       @keydown.esc="cartOpen = false"
     >
-      <div class="pos-till__body">
+      <PosLoadState
+        v-if="linkedPending"
+        :error="linkedError"
+        :action="$t('sale.pos.linkedCheckContinue')"
+        :loading="$t('sale.pos.linkedCheckOpening')"
+        testid="pos-linked"
+        @act="dismissLinked"
+      />
+      <div
+        v-else
+        class="pos-till__body"
+      >
         <PosCatalog
           :show-products="settings.show_products"
           :show-services="showServices"
@@ -810,7 +803,7 @@ onBeforeUnmount(() => {
         :can-discard="session.can('sale.add_sale')"
         :pending="sheetPending"
         :error="sheetError"
-        @update:open="(open) => !open && (switchingTo = null)"
+        @update:open="(open) => !open && keepCurrent()"
         @choose="leaveCurrent"
       />
       <StaffPicker
@@ -855,12 +848,6 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.pos-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
 /* The box the shell lays the till out in: every sheet and the drawer are anchored to it. */
 .pos-till {
   position: relative;

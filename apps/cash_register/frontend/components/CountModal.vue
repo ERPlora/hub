@@ -4,12 +4,13 @@
 // («Coins») of the business's currency, labelled as money, and «Total counted» adding up as it is typed —
 // the server adds them up again with the currency's decimals. Without a table for the currency, the total
 // is typed by hand, in the platform's money field (`MoneyInput`), read with its `parseMoney` as every amount of the Hub
-// (hub#1160). A count closes nothing: a closing one tells the page (`counted`), which opens the close.
-import { FormModal, type FormModalError, MoneyInput, parseMoney } from '@erplora/ui/components';
+// (hub#1160). Nothing counted in the boxes is said under them, not sent. A count closes nothing: a closing one
+// tells the page (`counted`), which opens the close.
+import { FormModal, type FormModalError, InlineFeedback, MoneyInput, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
-import { computed, ref, shallowRef, watch } from 'vue';
+import { type ComponentPublicInstance, computed, nextTick, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
@@ -33,6 +34,8 @@ const type = shallowRef<CountType>('closing');
 const notes = shallowRef('');
 const boxes = ref<Record<string, string>>({});
 const typedTotal = shallowRef('');
+const tried = shallowRef(false);
+const nothingNotice = useTemplateRef<ComponentPublicInstance>('nothingNotice');
 
 watch(
   open,
@@ -42,6 +45,7 @@ watch(
     notes.value = '';
     boxes.value = {};
     typedTotal.value = '';
+    tried.value = false;
     command.error.value = null;
   },
   { immediate: true },
@@ -63,6 +67,8 @@ const total = computed<number | null>(() => {
   return typedRead.value?.ok ? typedRead.value.cents : null;
 });
 
+const nothingCounted = computed(() => hasTable.value && total.value === 0);
+
 function counted(kind: 'bills' | 'coins'): Record<string, number> {
   const out: Record<string, number> = {};
   for (const face of table.value?.[kind] ?? []) {
@@ -77,6 +83,12 @@ const error = computed<FormModalError | null>(() => refusal(command.error.value,
 async function confirm(): Promise<void> {
   const session = props.session;
   if (!session || !table.value || total.value === null) return;
+  if (nothingCounted.value) {
+    tried.value = true;
+    await nextTick();
+    nothingNotice.value?.$el.scrollIntoView({ block: 'nearest' });
+    return;
+  }
   const sent = total.value;
   const kind = type.value;
   try {
@@ -192,6 +204,14 @@ const canDismiss = useUnsavedFormOnOpen(
         >
           {{ $t('cash_register.count.total', { total: formatMoney(total, locale, table) }) }}
         </p>
+        <InlineFeedback
+          v-if="tried && nothingCounted"
+          ref="nothingNotice"
+          tone="danger"
+          data-testid="cash-register-count-nothing"
+        >
+          {{ $t('cash_register.count.nothing') }}
+        </InlineFeedback>
       </template>
       <template v-else>
         <p
