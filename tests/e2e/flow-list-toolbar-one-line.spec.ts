@@ -11,14 +11,10 @@ import { cutLabels } from './field-labels';
 import { deleteFlowsNamed, filterList, manualFlow, signedIn } from './flow-helpers';
 import { capture, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 import { noHorizontalScroll } from './schedule-helpers';
+import { WINDOW_SIZES } from './screen';
 
 const TAG = 'E2E FlowBar';
-const SIZES = [
-  { label: '375', width: 375, height: 667 },
-  { label: '820', width: 820, height: 1180 },
-  { label: '1280', width: 1280, height: 720 },
-] as const;
-type Size = (typeof SIZES)[number];
+type Size = (typeof WINDOW_SIZES)[number];
 const WORDS = {
   es: { paused: 'Solo las que están en pausa', noMatch: 'Aquí no hay nada que encaje con eso.' },
   en: { paused: 'Only the paused ones', noMatch: 'Nothing here matches that.' },
@@ -114,7 +110,7 @@ async function runAt(page: Page, size: Size, name: string, lang: keyof typeof WO
   await expectFilters(page, size, name, WORDS[lang]);
 }
 
-for (const size of SIZES) {
+for (const size of WINDOW_SIZES) {
   test(`FLOW-F02 the list's search, «Order» and filters button fit side by side, in Spanish at ${size.label}`, async ({ browser }) => {
     test.setTimeout(120_000);
     const name = `${TAG} es ${size.label} ${Date.now().toString(36)}`;
