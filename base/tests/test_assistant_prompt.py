@@ -217,6 +217,7 @@ def test_a_write_a_manager_approves_is_said_to_ask_for_that_approval():
 
 def test_the_setup_block_carries_what_is_pending_and_who_does_it():
     status = {
+        "title": "Termina de configurar tu negocio",
         "total": 3,
         "pending": 2,
         "unavailable": 0,

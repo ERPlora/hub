@@ -201,7 +201,7 @@ def restore_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
             ),
         },
         "description": "Repair a ready-made automation built from an older version that started in more cases than "
-        "its app meant: only the conditions of «Only when…» its app added since are added; its name, steps, "
+        "its app meant: only the conditions on when it starts that its app added since are added; its name, steps, "
         "permissions and switch stay. Nothing changes when there is nothing to repair.",
         "risk": "normal",
     },

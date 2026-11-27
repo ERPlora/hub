@@ -646,9 +646,11 @@ def test_every_tool_asked_for_at_once_past_the_last_round_hears_that_it_did_not_
 
 
 def test_in_setup_the_turn_reads_the_checklist_again_for_the_model():
+    """In Spanish the list is named as the Home names it in Spanish, never by its English title."""
     plan = run("base.assistant.turn", messages=[ASK], setup=True)
-    assert "Finish setting up your business" in plan["instructions"]
-    assert "Finish setting up" not in run("base.assistant.turn", messages=[ASK])["instructions"]
+    assert "«Termina de configurar tu negocio»" in plan["instructions"]
+    assert "Finish setting up" not in plan["instructions"]
+    assert "Termina de configurar" not in run("base.assistant.turn", messages=[ASK])["instructions"]
 
 
 # ── The gateway's doors ──────────────────────────────────────────────────────────────────────────────────────────
