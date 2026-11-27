@@ -757,7 +757,7 @@ texts). The other customers' runs carry on.
 Involved: FLOW-F03, FLOW-F07, FLOW-F11, FLOW-F16, CUSTOMER-F16
 
 ### FLOW-F24 Resume a run from the step that failed
-<!-- from WORKBOOK.md sha256:3917331922d1 -->
+<!-- from WORKBOOK.md sha256:9843e8426ee8 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -767,9 +767,12 @@ Steps:
    system to answer.
 2. Press the button and confirm: "Resume it from the step that failed?" with **Yes, resume it** or
    **Cancel**.
-3. "Resumed: it finished well." appears (or "…it is waiting"); if it fails again, "It was resumed and stopped
-   by an error again: …" next to the run, which can be resumed again. Its steps keep "Resumed here, from the
-   step that had failed".
+3. The notice says what the run is doing at that moment, as the one of **Run now** does: "Resumed: it finished
+   well.", "…it finished, the condition was not met.", "…it is waiting", "…it is calling another system", "…it is
+   waiting for an answer in “Waiting for your answer”." or "…the assistant is on it"; never "finished well" of
+   one that is still going on. If it fails again, at once or when the other system does not answer, "It was
+   resumed and stopped by an error again: …" next to the run, which can be resumed again. Its steps keep
+   "Resumed here, from the step that had failed".
 In: the run stopped by an error (by voice, by its reference: "resume the welcome one that failed"). The
 assistant's card names it "Automation run: Welcome · 15 Oct 2026, 21:00", as History does and with its
 automation in front, never by its code.

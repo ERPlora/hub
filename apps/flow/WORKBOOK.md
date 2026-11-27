@@ -753,7 +753,10 @@ Pasos:
    paso que falló**. Antes, arregla la causa: concede el permiso que faltaba, vuelve a encender la app o
    espera a que el otro sistema responda.
 2. Pulsa el botón y confirma: «¿Reanudarla desde el paso que falló?» con **Sí, reanúdala** o **Cancelar**.
-3. Sale «Reanudada: terminó bien.» (o «…está esperando»); si vuelve a fallar, «Se reanudó y volvió a
+3. El aviso dice lo que hace la ejecución en ese momento, como el de **Ejecutar ahora**: «Reanudada: terminó
+   bien.», «…terminó, no se cumplía la condición.», «…está esperando», «…está llamando a otro sistema», «…espera
+   una respuesta en «Esperan tu respuesta».» o «…el asistente está en ello»; nunca «terminó bien» de una que
+   sigue en marcha. Si vuelve a fallar, en el acto o cuando el otro sistema no responde, «Se reanudó y volvió a
    pararse por un error: …» junto a la ejecución, que se puede reanudar otra vez. En sus pasos queda
    «Reanudada aquí, desde el paso que había fallado».
 Entra: la ejecución parada por un error (por voz, por su referencia: «reanuda la de bienvenida que falló»). La
