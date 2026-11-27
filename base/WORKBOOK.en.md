@@ -272,7 +272,7 @@ which starts at "Files" (the very top), with the open folder highlighted; on a n
 folder" and "Upload file" (its cloud alone). Below, what the open folder holds: tapping a file opens it.
 
 #### The open folder
-<!-- from WORKBOOK.md sha256:3e9218268628 -->
+<!-- from WORKBOOK.md sha256:8ce6d0f48f6d -->
 On top, the folder's path, with ⋮ beside it to rename, move or delete that folder; "Space", with what is used and the
 plan's limit ("{used} of {limit}") or "{used} used · No limit"; and what the folder holds: the folders first and then
 the files, each with its icon, its name, its size (in the list, also when it changed) and its ⋮: "Open", "Download",
@@ -2233,7 +2233,7 @@ If it fails: "Could not remove the unused devices. Check the connection and try 
 Involved: BASE-F70, BASE-F98
 
 ### BASE-F72 See the business's files
-<!-- from WORKBOOK.md sha256:efc654bc9574 -->
+<!-- from WORKBOOK.md sha256:a490fba06472 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Files

@@ -34,7 +34,7 @@
     },
     "setup": {
       "title": "Finish setting up your business",
-      "progress": "{done} of {total} done",
+      "progress": "{done} of {total} done | {done} of {total} done",
       "viewAll": "View all",
       "viewLess": "Show less",
       "configure": "Set up",
@@ -514,7 +514,7 @@
         "retry": "Resend",
         "discard": "Discard",
         "retryAll": "Resend all",
-        "more": "Showing the {shown} most recent of {total}.",
+        "more": "Showing the most recent of {total}. | Showing the {count} most recent of {total}.",
         "empty": {
           "heading": "All in order",
           "body": "No failed events. The queue of events lives in the database: a restart never loses it."
@@ -606,7 +606,7 @@
           "of": "{used} of {limit}",
           "perMonth": "{used} of {limit} a month",
           "noLimit": "{used} · No limit",
-          "connections": "{used} of {limit} connections",
+          "connections": "{used} of {limit} connection | {used} of {limit} connections",
           "connectionsOpen": "{used} connection | {used} connections",
           "notIncluded": "Your plan does not include {name}",
           "notIncludedAssistant": "Your plan does not include the assistant",
@@ -704,7 +704,7 @@
     "pinSetup": {
       "title": "Create your PIN",
       "why": "With it you will enter this till without your password.",
-      "choose": "Choose a {n}-digit PIN",
+      "choose": "Choose a {n}-digit PIN | Choose a {n}-digit PIN",
       "confirm": "Confirm your PIN",
       "mismatch": "The PINs do not match, try again",
       "later": "Not now",
@@ -784,7 +784,7 @@
         "change": "Change PIN",
         "set": "Set PIN",
         "saved": "PIN updated",
-        "length": "The PIN must have {n} digits.",
+        "length": "The PIN must have {n} digit. | The PIN must have {n} digits.",
         "mismatch": "The two PINs do not match."
       },
       "roles": {
@@ -819,7 +819,7 @@
       "again": "Ask again after inactivity",
       "untilSignOut": "Until signing out",
       "minutes": "{n} min",
-      "againMinutes": "A till nobody touches for {n} minutes closes the session and shows the PIN pad: the next sale carries the name of the next person.",
+      "againMinutes": "A till nobody touches for {n} minute closes the session and shows the PIN pad: the next sale carries the name of the next person. | A till nobody touches for {n} minutes closes the session and shows the PIN pad: the next sale carries the name of the next person.",
       "againShift": "The PIN pad asks again when the session ends: at the end of the shift or when someone signs out.",
       "digits": "PIN digits",
       "four": "4 digits",
@@ -852,10 +852,8 @@
       "removeBody": "Its session closes at once. To use it again, someone has to enter on it with their account.",
       "removeYours": "It is the device you are using: removing it will close your session and you will have to enter again.",
       "removeFailed": "Could not remove this device. Check the connection and try again.",
-      "pruneOne": "Remove the device unused for 30 days",
-      "pruneMany": "Remove the {n} devices unused for 30 days",
-      "pruneAsk": "Remove {n} devices nobody has used for 30 days?",
-      "pruneAskOne": "Remove the device nobody has used for 30 days?",
+      "prune": "Remove the device unused for 30 days | Remove the {n} devices unused for 30 days",
+      "pruneAsk": "Remove the device nobody has used for 30 days? | Remove {n} devices nobody has used for 30 days?",
       "pruneBody": "They stop showing here and, to use one again, someone will have to enter on it with their account. Those used in the last 30 days and the one you are using stay.",
       "pruneConfirm": "Remove",
       "pruneFailed": "Could not remove the unused devices. Check the connection and try again.",
@@ -1303,9 +1301,9 @@
           "heading": "The file could not be opened",
           "body": "The file's content did not arrive. Check the connection and try again."
         },
-        "pdfPages": "Showing the first {shown} of {total} pages. Download the file to read it all.",
+        "pdfPages": "Showing the first page of {total}. Download the file to read it all. | Showing the first {count} of {total} pages. Download the file to read it all.",
         "textCut": "Showing the beginning of the file. Download it to read it all.",
-        "tableCut": "Showing the first {shown} rows. Download the file to see them all.",
+        "tableCut": "Showing the first row. Download the file to see them all. | Showing the first {count} rows. Download the file to see them all.",
         "damaged": {
           "heading": "The file could not be read",
           "body": "It may be damaged or saved in another format. Download it to open it with an app on your device."
@@ -1320,11 +1318,9 @@
         "yes": "TRUE",
         "no": "FALSE",
         "json": {
-          "oneItem": "1 item",
-          "items": "{count} items",
-          "oneField": "1 field",
-          "fields": "{count} fields",
-          "more": "{count} more. Download the file to see them all.",
+          "items": "{count} item | {count} items",
+          "fields": "{count} field | {count} fields",
+          "more": "{count} more. Download the file to see it. | {count} more. Download the file to see them all.",
           "broken": "This file is not valid JSON: it is shown as it is."
         }
       },
