@@ -33,7 +33,7 @@ def aeat_row(row: AeatRecord) -> dict:
     input=AeatRecordListIn,
     output=Page[AeatRecordOut],
     ai={
-        "description": "The last photo of what the AEAT holds (from the last «Query AEAT»), the newest first: "
+        "description": "The last photo of what the AEAT holds (from the last query to the AEAT), the newest first: "
         "search by invoice number, fingerprint or CSV; filter by its state at the AEAT (Correcto, "
         "AceptadoConErrores, Anulado) and issue date.",
         "asks": {
