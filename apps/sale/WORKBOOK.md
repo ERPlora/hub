@@ -758,8 +758,8 @@ Entra: el equipo de Personal (fichas activas), la ficha de quien tiene la sesió
 de cada línea.
 Sale: la venta y cada línea atribuidas a esa persona, para el cierre por profesional y las comisiones de
 Personal (STAFF-F21). Con «Yo», la venta es de la ficha de quien cobra; sin ficha, no cuenta para nadie.
-La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía o, si su
-cuenta no tiene nombre, lo que va antes de la @ de su correo, nunca el correo entero (BASE-F119). En
+La comanda de cocina que se envíe lleva su nombre (KITCHEN-F18); con «Yo», el de quien la envía o, si no
+tiene ningún nombre, lo que va antes de la @ de su correo, nunca el correo entero (BASE-F119). En
 Mesas, la ventana de la mesa y el plano dicen que la atiende esa persona (TABLE-F09).
 Si falla: «No se ha podido cargar el equipo. La venta se sigue atribuyendo a quien tenga la sesión.»;
 «No se ha podido cambiar quién atiende la cuenta. Se queda con quien la atendía.»;

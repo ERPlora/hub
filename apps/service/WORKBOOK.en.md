@@ -610,7 +610,7 @@ vouchers" with the reason.
 Involved: SERVICE-F17, SERVICE-F18, SERVICE-F21
 
 ### SERVICE-F17 Void a voucher sold by mistake
-<!-- from WORKBOOK.md sha256:40ffc7422eff -->
+<!-- from WORKBOOK.md sha256:9b28e73309c6 -->
 Status: done
 Actor: manager, assistant
 Screen: Packages
@@ -622,7 +622,7 @@ Steps:
    with a return.".
 3. Type the Reason (required) and tap **Void**.
 In: the purchase and the reason.
-Out: the voucher can no longer be spent and stays as a trace, with who (by their name or, if their account has
+Out: the voucher can no longer be spent and stays as a trace, with who (by their name or, if they have
 none, by what goes before the @ of their email, never the whole email), when and the reason (`service.grant.voided`). It moves no money and issues no document. If a line of a sale paid for it, that part
 counts for whoever sold it again, until a refund says otherwise (SALE-F28).
 If it fails: "That voucher was already used: it cannot be voided.", "That voucher was already voided." or
