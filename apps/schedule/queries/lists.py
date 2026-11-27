@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from django.db.models import Q, QuerySet
+from django.db.models import QuerySet
 from live.context import OperationContext
 from live.operations import operation
 
@@ -10,6 +10,7 @@ from apps.schedule.schemas.fields import PageIn
 from apps.schedule.schemas.overrides import OverrideListIn, OverridePage
 from apps.schedule.schemas.special_days import SpecialDayListIn, SpecialDayPage
 from base.ordering import list_order
+from base.text_search import contains_text
 
 from .outputs import override_out, special_day_out
 from .rows import overrides, special_days
@@ -65,11 +66,9 @@ def _page(rows: QuerySet[Any], params: PageIn, out: Any) -> dict:
 def list_special_days(ctx: OperationContext, params: SpecialDayListIn) -> dict:
     rows = special_days()
     if params.search:
-        rows = rows.filter(
-            Q(name__icontains=params.search) | Q(notes__icontains=params.search)
-        )
+        rows = rows.filter(contains_text(params.search, "name", "notes"))
     if params.name:
-        rows = rows.filter(name__icontains=params.name)
+        rows = rows.filter(contains_text(params.name, "name"))
     if params.date_from:
         rows = rows.filter(date__gte=params.date_from)
     if params.date_to:
@@ -111,9 +110,9 @@ def list_special_days(ctx: OperationContext, params: SpecialDayListIn) -> dict:
 def list_overrides(ctx: OperationContext, params: OverrideListIn) -> dict:
     rows = overrides()
     if params.search:
-        rows = rows.filter(reason__icontains=params.search)
+        rows = rows.filter(contains_text(params.search, "reason"))
     if params.reason:
-        rows = rows.filter(reason__icontains=params.reason)
+        rows = rows.filter(contains_text(params.reason, "reason"))
     for field, lookup in (
         ("start_from", "start_date__gte"),
         ("start_to", "start_date__lte"),

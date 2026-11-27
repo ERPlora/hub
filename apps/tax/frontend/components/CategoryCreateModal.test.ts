@@ -69,14 +69,14 @@ describe('CategoryCreateModal (TAX-F02)', () => {
     expect(s.field('key').value).toBe('Bad Key');
   });
 
-  it('a key that exists (409) is said under Key with the server’s words, and on top', async () => {
+  it('a key that exists (409) is said once, under Key, with the server’s words', async () => {
     const s = await setup();
     const message = 'There is already a tax category with that key.';
     s.answer(409, { error: { code: 'tax.category_exists', message, fields: { key: message } } });
     await s.fill({ key: 'restaurant.food', name: 'Food' });
     await click(s.add());
     expect(s.field('key').errorText).toBe(message);
-    expect(s.inDoc('tax-category-form-error')?.textContent).toContain(message);
+    expect(s.inDoc('tax-category-form-error')).toBeNull();
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 

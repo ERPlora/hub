@@ -18,6 +18,7 @@ from apps.printing.schemas.fields import Page
 from apps.printing.schemas.jobs import JobDetailOut, JobListIn, JobOut, JobRefIn
 from base.ordering import list_order
 from base.queries.people import actor_name
+from base.text_search import contains_text
 
 #: Hand-outs a job gets before it fails (the old hub's ``MAX_ATTEMPTS``).
 MAX_ATTEMPTS = 5
@@ -122,7 +123,7 @@ def find_job(job_id: uuid.UUID | None, reference: str | None, *, lock: bool = Fa
 def list_jobs(ctx: OperationContext, params: JobListIn) -> dict:
     jobs = PrintJob.objects.select_related("printer")
     if params.search:
-        jobs = jobs.filter(reference__icontains=params.search)
+        jobs = jobs.filter(contains_text(params.search, "reference"))
     if params.status:
         jobs = jobs.filter(status=params.status)
     if params.usage:
