@@ -186,7 +186,7 @@ def test_a_photo_that_is_gone_from_the_store_is_exported_without_it(ctx, library
 
     data = blueprint.export.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
 
-    assert blueprint.photos.export_media(ctx, data) == {}
+    assert blueprint.photos.export_media(ctx, data, blueprint.datasets.every_dataset()) == {}
     assert "image" not in data["inventory.product"][0]
 
 
@@ -196,7 +196,7 @@ def test_a_photo_that_is_gone_from_the_store_is_exported_without_it(ctx, library
 def test_loading_the_file_in_another_business_copies_each_photo_under_a_new_name(ctx, library, hub_files, hub_b):  # noqa: F811
     reference, kept = photo_of(ctx)
     data = blueprint.export.export_data(ctx, {"inventory": ["inventory.product"]}, purpose="template")
-    media = blueprint.photos.export_media(ctx, data)
+    media = blueprint.photos.export_media(ctx, data, blueprint.datasets.every_dataset())
     content = blueprint.archive.write_zip(bundle(data["inventory.product"], media))
 
     with use_hub(hub_b):

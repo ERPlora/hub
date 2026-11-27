@@ -65,6 +65,13 @@ class ComboConfig(LiveAppConfig):
         },
     )
 
+    def blueprint_datasets(self) -> list:
+        """What of Menus and combos travels in an export of the business (BASE-F35): its menus, each with its courses,
+        their choices and its photo."""
+        from apps.combo import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS
+
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114, COMBO-F15):
         each menu the business no longer has, made again by ``combo.combo.recover``; each course its menu no longer has,

@@ -3,6 +3,7 @@ row's own inside the file, and loading it copies the photo through the app's own
 """
 
 import base64
+from collections.abc import Iterable
 
 import pydantic
 from django.utils.translation import gettext_lazy as _
@@ -10,23 +11,19 @@ from live.context import OperationContext
 from live.errors import OperationError
 
 from base import images
-from base.blueprint.calls import ROW_REFUSED, Loaded, call, reason
+from base.blueprint.calls import ROW_REFUSED, Dataset, Loaded, call, reason
 
 PHOTO_MISSING = _("«%(row)s»: its photo is not in the file, so it loads without it.")
 
-#: The datasets whose rows show an image, and the operations that set one of the library and upload a photo.
-IMAGE_OPERATIONS = {
-    "inventory.product": ("inventory.product.set_image", "inventory.product.upload_image"),
-    "service.service": ("service.service.set_image", "service.service.upload_image"),
-}
-
-
-def export_media(ctx: OperationContext, data: dict[str, list[dict]]) -> dict[str, bytes]:
-    """The photos of its own that the rows of ``data`` show, by name, read from ``ctx``'s hub; a row whose photo the
-    store no longer has travels without it (its ``image`` dropped), never with a reference the file cannot keep."""
+def export_media(ctx: OperationContext, data: dict[str, list[dict]], parts: Iterable[Dataset]) -> dict[str, bytes]:
+    """The photos of its own that the rows of ``data`` show, of the ``parts`` whose rows show an image, by name, read
+    from ``ctx``'s hub; a row whose photo the store no longer has travels without it (its ``image`` dropped), never
+    with a reference the file cannot keep."""
     media = {}
-    for key in IMAGE_OPERATIONS:
-        for row in data.get(key, []):
+    for part in parts:
+        if part.images is None:
+            continue
+        for row in data.get(part.key, []):
             name = images.own_name(row.get("image", ""))
             if name is None:
                 continue
@@ -38,14 +35,15 @@ def export_media(ctx: OperationContext, data: dict[str, list[dict]]) -> dict[str
     return media
 
 
-def _load_image(ctx: OperationContext, loaded: Loaded, dataset_key: str, pk: str, row: dict, label: str) -> None:  # noqa: PLR0913, PLR0917
+def load_image(ctx: OperationContext, loaded: Loaded, operations: tuple[str, str], pk: str, row: dict, label: str) -> None:  # noqa: PLR0913, PLR0917
     """Show on the row just created the image its file names: one of the library through the app's ``set_image``, a
-    photo the file carries through its ``upload_image`` (a copy under a new name, within the plan's space). One that
-    cannot be set leaves the row without an image, and the report says why (INVENTORY-F33)."""
+    photo the file carries through its ``upload_image`` (a copy under a new name, within the plan's space), the two
+    ``operations`` of its dataset. One that cannot be set leaves the row without an image, and the report says why
+    (INVENTORY-F33)."""
     image = row.get("image")
     if not isinstance(image, str) or not image.strip():
         return
-    set_image, upload_image = IMAGE_OPERATIONS[dataset_key]
+    set_image, upload_image = operations
     name = images.own_name(image)
     try:
         if name is None:
