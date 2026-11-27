@@ -1958,6 +1958,8 @@ Pasos:
      preferencias personales en este negocio.» y su rol.
   2. En «Datos de la cuenta» cambia «Nombre», «Apellidos» o «Correo electrónico» («Solo para contactarte: no es el
      correo con el que entras.») y pulsa «Guardar mis datos»: «Perfil guardado», y el menú lateral ya dice el nombre nuevo, sin recargar.
+     Si su cuenta de erplora.com no tiene nombre, «Nombre» trae lo que va antes de la @ de su correo, nunca el correo
+     entero.
   3. «Elegir imagen» sube una foto JPG, PNG o WebP de hasta 2 MB («Foto actualizada»); «Quitar» la borra («Foto
      quitada»).
   4. En «Preferencias», «Idioma» («Usar el idioma del negocio», «Español», «English») y «Apariencia» («Paleta de
@@ -3921,7 +3923,8 @@ Pasos:
      durar varios días.
   3. Cualquiera del negocio ve en la tarjeta si está encendido, quién lo cambió por última vez y cuándo («Último
      cambio: Ana, 24/11/2026, 10:30.») y, en «Últimas entradas de soporte», las 10 últimas entradas de soporte (quién y
-     cuándo), la más reciente primero; lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
+     cuándo; una cuenta de soporte sin nombre, por lo que va antes de la @ de su correo), la más reciente primero;
+     lo mismo da la API. Mientras nadie de soporte haya entrado, dice «Nadie del
      soporte de ERPlora ha entrado todavía.». A quien no administra el negocio el interruptor le sale desactivado, con
      «Solo quien administra el negocio puede cambiarlo.».
   4. Con el acceso encendido, una persona del soporte de ERPlora entra en el negocio con «Entrar como soporte», en el

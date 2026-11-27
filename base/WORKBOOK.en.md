@@ -2046,7 +2046,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:5fca4faf21e2 -->
+<!-- from WORKBOOK.md sha256:85c3e858853b -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2055,6 +2055,8 @@ Steps:
      and your personal preferences in this business." and their role.
   2. In "Account details" they change "First name", "Last name" or "Email" ("Only to contact you: it is not the
      email you sign in with.") and tap "Save my details": "Profile saved", and the side menu already says the new name, without reloading.
+     If their erplora.com account has no name, "First name" brings what goes before the @ of their email, never the
+     whole address.
   3. "Choose image" uploads a JPG, PNG or WebP photo of up to 2 MB ("Photo updated"); "Remove" deletes it
      ("Photo removed").
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
@@ -4058,7 +4060,7 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:63af2ec5f10c -->
+<!-- from WORKBOOK.md sha256:a610db0844f3 -->
 Status: done
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
@@ -4071,8 +4073,8 @@ Steps:
      support can come in." or "Support access is off: ERPlora support can no longer come in.". It does not expire: it
      stays on until someone of the business turns it off, because getting started can take several days.
   3. Anyone of the business sees in the card whether it is on, who changed it last and when ("Last changed by Ana,
-     11/24/2026, 10:30 AM.") and, under "Latest support visits", the last 10 entries of support (who and when), the
-     most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
+     11/24/2026, 10:30 AM.") and, under "Latest support visits", the last 10 entries of support (who and when; a
+     support account without a name, by what goes before the @ of its email), the most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
      support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
      business can change it.".
   4. With the access on, a person of ERPlora's support comes into the business with "Enter as support", in erplora.com's
