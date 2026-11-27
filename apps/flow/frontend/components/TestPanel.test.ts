@@ -154,6 +154,24 @@ describe('TestPanel: what each kind of step would do', () => {
     expect(text).not.toContain('Hours');
   });
 
+  it('a question says its hours in the singular or the plural', async () => {
+    const question = { id: 's5', kind: 'ask' as const, title: 'Refund?', details: '', role: 'manager' as const, hours: 1, on_no: 'stop' as const, on_timeout: 'no' as const };
+    const said = async (hours: number, locale: 'en' | 'es') => {
+      const step = { ...ANSWER.steps[2], id: 's5', kind: 'ask', outcome: 'would_ask' as const, operation: '', empty: [], errors: {}, params: { title: 'Refund?', details: '', role: 'manager', hours } };
+      const m = await mountFlow(TestPanel, {
+        locale,
+        props: { document: { ...DOC, steps: [{ ...question, hours }] }, flowId: 'f1', catalog: CATALOG },
+        answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [step] }] },
+      });
+      await settle();
+      return m.find('flow-test-step-s5').element.querySelector('.flow-test__verdict')?.textContent;
+    };
+    expect(await said(1, 'en')).toBe('Would ask the managers and wait up to 1 hour');
+    expect(await said(2, 'en')).toBe('Would ask the managers and wait up to 2 hours');
+    expect(await said(1, 'es')).toBe('Preguntaría a los responsables y esperaría hasta 1 hora');
+    expect(await said(2, 'es')).toBe('Preguntaría a los responsables y esperaría hasta 2 horas');
+  });
+
   // FLOW-F37: the data a step fixes, each with the value it would have, and the tool that would not be used because
   // one would be empty.
   it('an assistant step says each fixed datum with its value, and which tool would not be used', async () => {

@@ -63,7 +63,7 @@ def settings_row(settings: Settings) -> dict:
             "es": ("enséñame los ajustes de las propinas", "¿qué propinas sugiere el cobro con tarjeta?"),
         },
         "description": "The tip settings: whether a tip is asked for at the charge (off from the factory), which of the "
-        "three suggestions comes chosen (0: «No tip»), whether another amount is allowed, and each active payment "
+        "three suggestions comes chosen (0: no tip), whether another amount is allowed, and each active payment "
         "method's three suggestions, each a percentage of the check's total before discounts or an amount in cents.",
     },
 )
@@ -92,7 +92,7 @@ def _tip_of(suggestion: dict, total: int) -> dict:
         },
         "description": "The tips the charge proposes for a payment method and the check's total before discounts, in "
         "cents: its three suggestions, each with the tip it comes to (a percentage rounded half up), which one comes "
-        "chosen (0: «No tip») and whether another amount is allowed. With tips off, none.",
+        "chosen (0: no tip) and whether another amount is allowed. With tips off, none.",
     },
 )
 def get_suggestions(ctx: OperationContext, params: SuggestionIn) -> dict:

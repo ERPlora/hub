@@ -281,7 +281,7 @@ def sessions_by_order(ctx: OperationContext, params: ByOrderIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one line of the check of Sales of a table check by its id: its name and quantity, as "
-        "«Split check» lists it.",
+        "splitting the check lists it.",
         "asks": {
             "en": (
                 "what is that line on the table's check?",

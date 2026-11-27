@@ -77,7 +77,7 @@ function outcome(step: TestStepOut): string {
   if (step.outcome === 'would_ask_assistant') return phrasing.value.t('flow.test.outcomes.would_ask_assistant', { prompt: String(step.params.prompt ?? '') });
   if (step.outcome === 'would_ask') {
     const who = phrasing.value.t(`flow.ask.roles.${String(step.params.role || 'admin')}`);
-    return phrasing.value.t('flow.test.outcomes.would_ask', { who, hours: Number(step.params.hours ?? 72) });
+    return phrasing.value.t('flow.test.outcomes.would_ask', { who, n: Number(step.params.hours ?? 72) });
   }
   if (step.outcome === 'waits') return phrasing.value.t('flow.test.outcomes.waits', { duration: describeDuration(step.seconds ?? 0, phrasing.value) });
   return phrasing.value.t(`flow.test.outcomes.${step.outcome}`, { action });

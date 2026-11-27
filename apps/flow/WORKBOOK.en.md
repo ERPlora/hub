@@ -584,7 +584,7 @@ with unsaved changes it is disabled: "Save it first: "Run now" runs what is save
 Involved: FLOW-F14, FLOW-F16, FLOW-F21
 
 ### FLOW-F16 See what it did and why it failed
-<!-- from WORKBOOK.md sha256:7060399034ec -->
+<!-- from WORKBOOK.md sha256:19e90f35d472 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -597,9 +597,10 @@ Steps:
    "Waiting", "Cancelled"), the day and the time, **Copy the reference** and ▾ to see its steps in words
    ("Did: Create a task", "Found 3", "Found nothing, and carried on", "Waited 1 hour", "It stopped here
    because this was not met: Total greater than 10000").
-4. One stopped by an error says what happened and what to do, in your language even if the automation was
-   saved in another ("It tried to do something you have not allowed it to do ("…"), so it stopped. Open
-   Permissions and allow what it needs."); if the error is from the app that did the action, its sentence
+4. One stopped by an error says what happened and, under it and only once, what to do, in your language even
+   if the automation was saved in another ("It tried to do something you have not allowed it to do ("Create
+   a task"), so it stopped." and "Open Permissions and allow what it needs."), with the action named as in
+   Permissions and in Try it; if the error is from the app that did the action, its sentence
    comes out as it is, in the automation's language, with the technical text folded.
 In: that automation's runs of the last 90 days, and all those still waiting.
 Out: nothing. The history keeps each finished run **90 days** and then forgets it; one that is waiting or

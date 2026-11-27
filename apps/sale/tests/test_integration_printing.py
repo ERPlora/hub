@@ -9,15 +9,17 @@ refusal of Printing never spoils the charge.
 
 import dataclasses
 import datetime as dt
+import json
 
 import pytest
 from django.test import RequestFactory
 from live.errors import Conflict
-from live.operations import registry
+from live.operations import get, registry
 
 from apps.printing.models import PrintJob
 from apps.sale.models import Order, Sale
 from apps.sale.tests.conftest import HUB_DB, confirmed_by_the_assistant, ctx_for, run
+from base import assistant
 from base.business import paper_date
 from base.models.profile import Profile
 from apps.sale.tests.test_integration_invoice import ISSUER
@@ -91,7 +93,7 @@ def account(make_user):
 def test_the_receipt_prints_at_checkout_inside_the_charge(bar, till):
     out = charge()
     (job,) = jobs()
-    assert out.printed.model_dump() == {"queued": True, "job_id": job.id, "printer": "Till"}
+    assert out.printed.model_dump() == {"queued": True, "job_id": job.id, "printer": "Till", "waits_for_device": True}
     assert (job.document_type, job.source_app, job.reference, job.job_key, job.printer.name) == (
         "receipt",
         "sale",
@@ -298,6 +300,35 @@ def test_from_the_assistant_a_reprint_and_a_bill_a_printer_took_are_done(bar, ti
         )
     ] == [("ok", "", {}), ("ok", "", {})]
     assert [job.document_type for job in jobs()][1:] == ["receipt", "prebill"]
+
+
+# hub#2563: with a receipt printer and no device to print its queue, the assistant said «I reprinted the ticket» and
+# nothing came out. A paper queued for a printer no device that is on prints says it waits, and the assistant hears it.
+
+
+def test_a_reprint_and_a_bill_no_device_prints_wait_in_the_queue_of_their_printer(bar, till):
+    out, order = charge(), open_check()
+    reprint = run("sale.sale.print", {"sale_id": str(out.id)})
+    bill = run("sale.order.print_bill", {"order_id": str(order.id)})
+    assert [(paper.queued, paper.printer, paper.waits_for_device) for paper in (reprint, bill)] == [
+        (True, "Till", True),
+        (True, "Till", True),
+    ]
+
+
+def test_a_reprint_and_a_bill_a_device_on_prints_do_not_wait(bar, till):
+    run("printing.device.register", {"name": "Counter", "printers": [str(till.id)]}, at_the_till("counter"))
+    out, order = charge(), open_check()
+    assert run("sale.sale.print", {"sale_id": str(out.id)}).waits_for_device is False
+    assert run("sale.order.print_bill", {"order_id": str(order.id)}).waits_for_device is False
+
+
+def test_from_the_assistant_a_reprint_no_device_prints_is_heard_as_waiting_for_one(bar, till):
+    out = charge()
+    heard = assistant.tools.run(ctx_for(language="es"), get("sale.sale.print"), json.dumps({"sale_id": str(out.id)}))
+    assert heard.outcome == "ok", heard.content
+    said = json.loads(heard.content)
+    assert (said["queued"], said["printer"], said["waits_for_device"]) == (True, "Till", True)
 
 
 def test_the_bill_of_a_check_prints_with_its_lines(bar, till):

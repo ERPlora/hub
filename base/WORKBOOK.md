@@ -734,7 +734,7 @@ Pasos:
      caídos», con «Una app no recibió lo que otra le mandó: lo que tenía que hacer sigue sin hacerse hasta que lo
      reenvíes.», llega como tarjeta y se recoge en ella.
   3. «Revisar los eventos» abre «Sistema» en «Eventos caídos», donde se reenvían o se descartan (BASE-F43).
-  4. Cuando no queda ninguno, el aviso desaparece.
+  4. Cuando no queda ninguno (reenviados, descartados o ya hechos por otro camino), el aviso desaparece.
 Entra: cuántos avisos de este negocio quedaron sin entregar, solo para quien administra el negocio.
 Sale: nada.
 Si falla: un empleado o un responsable no ve el aviso. Si no se puede preguntar, la campana se queda con
@@ -781,7 +781,8 @@ Pantalla: Inicio · Resumen
 Pasos:
   1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente» (o pregúntaselo desde su panel).
   2. El asistente lee la misma lista del Inicio, con lo que esa persona puede ver, y le dice qué falta y
-     dónde se hace; cada paso sigue teniendo su «Configurar» en la lista.
+     dónde se hace; cada paso sigue teniendo su «Configurar» en la lista. Si nombra la lista, la llama como sale
+     en el Inicio, en el idioma de esa persona: «Te faltan 4 pasos de Termina de configurar tu negocio».
   3. De un paso hecho dice que está hecho, sin sacar una cifra, un nombre ni un ajuste de su texto, que dice lo que
      pide el paso y no lo que tiene el negocio: «Tu catálogo» está hecho porque ya hay productos, nunca «tienes uno».
      Si se le pregunta cuántos o cuál, lo lee en la app del paso (los productos activos, en Inventario).
@@ -907,7 +908,8 @@ Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en 
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
 límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para el propietario en el
-navegador (en la app instalada no sale). Una app de pago sin contratar no ofrece «Activar». Una app que
+navegador (en la app instalada no sale). El límite nunca frena una app que el país del negocio exige (VeriFactu en
+España): se activa aunque el plan esté en su límite. Una app de pago sin contratar no ofrece «Activar». Una app que
 este negocio no puede usar tampoco: sale «No disponible» y, para quien administra, el motivo debajo («VeriFactu solo
 es para negocios de España.»). Cualquier otro fallo sale en un aviso con el nombre de la app y el
 motivo, que se queda hasta cerrarlo.
@@ -1186,10 +1188,13 @@ Pasos:
      duplica ni se sobrescribe. Si una app de la plantilla aún se está preparando, lo suyo entra solo en
      cuanto queda lista, sin volver ni pulsar nada.
 Entra: la plantilla o el fichero y las apps marcadas.
-Sale: las apps marcadas que estaban desactivadas, activadas antes de cargar, con las que necesitan y dentro
-del tope de apps del plan, como si se activaran en Apps (`base.app.enabled`); en cada app marcada, lo que
-trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus categorías, productos, servicios,
-zonas, mesas y, desde una copia de seguridad, clientes), y el informe guardado (`base.blueprint.imported`).
+Sale: las apps marcadas que estaban desactivadas, activadas antes de cargar y dentro del tope de apps del plan,
+cada una elegida por el negocio como si se activara en Apps (`base.app.enabled`): cuentan para el límite de
+apps del plan y desactivar otra no se las lleva; las que necesitan y no se marcaron llegan con ellas, e Impuestos,
+que el país exige, llega con las que la necesitan sin contar para el plan, como al darse de alta. En cada app
+marcada, lo que trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus categorías, productos,
+servicios, zonas, mesas y, desde una copia de seguridad, clientes), y el informe guardado
+(`base.blueprint.imported`).
 Si falla: «La importación falló:» con el motivo y se queda en la revisión; sin ninguna app marcada, «Elige al
 menos una app.» y no se puede importar; si ninguna de sus apps se puede activar aquí, «Nada de este fichero
 puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una app que no se pudo activar (el
@@ -1210,7 +1215,8 @@ Pasos:
      copiar», «Descartado», «App desactivada», «No está en este negocio», «No elegida», «Preparándose» o «No se ha
      podido preparar». «Ya lo tenías» sale solo cuando todo lo que trae la app ya estaba en el negocio; una app de la
      que no trae nada, como las que la plantilla solo activa, dice «Nada que copiar». Debajo, por cada parte, «12
-     creadas · 3 ya estaban · 2 fallaron» y, de lo que falló, su nombre y el motivo.
+     filas nuevas · 3 ya estaban · 2 con error» y, de lo que falló, su nombre y el motivo; cada cifra va en singular
+     con una sola fila («1 fila nueva · 1 ya estaba · 1 con error»).
   3. Lo dejado fuera a propósito sale en «Se ha dejado fuera a propósito».
   4. «Ver las plantillas» vuelve al catálogo; «Ir al inicio» lleva al Inicio.
   5. Cuando la app queda lista, lo suyo se carga solo y el informe se pone al día sin recargar, esté en esta pantalla
@@ -1523,7 +1529,9 @@ Pasos:
      Arriba, «Reenviar todos». Si la app a la que iba ya no está activa, la tarjeta dice que no se puede reenviar
      hasta activarla, sin «Reenviar».
   4. Salen los 100 más recientes; con más, la pantalla dice cuántos se ven de cuántos.
-  5. La lista y la campana se ponen al día solas cuando un aviso cae, se reenvía o se descarta.
+  5. La lista y la campana se ponen al día solas cuando un aviso cae, se reenvía o se descarta, y también cuando la
+     app a la que iba hace por otro camino lo que pedía: si Facturación emite con «Emitir ahora» el documento de una
+     venta, el aviso de esa venta se va solo.
   6. Sin ninguno: «Todo en orden» — «No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio
      nunca la pierde.».
 Entra: los avisos entre apps de este negocio que agotaron sus reintentos, nunca los de otro.
@@ -1747,7 +1755,9 @@ Pantalla: Acceso
 Pasos:
   1. En un dispositivo compartido de un negocio que pide PIN, **Acceso** abre en la pestaña «PIN»: «Introduce tu
      PIN», «…o pasa tu placa: no hace falta elegir tu nombre antes.» y «Elige tu usuario» con una cara por
-     persona (iniciales y nombre; nunca su correo). Con una sola persona, ya sale elegida.
+     persona (iniciales y nombre; nunca su correo). El nombre es el de su perfil en este negocio; sin él, el de su
+     ficha de Personal vinculada (STAFF-F03), y si tampoco la tiene, el de su cuenta. Con una sola persona, ya sale
+     elegida.
   2. Toca tu nombre: sale «PIN de {name}» y el teclado con tantos círculos como dígitos tenga el PIN del negocio.
      La flecha («Cambiar usuario») vuelve a las caras. El teclado se ve entero, hasta el 0 y el de borrar, sin
      desplazar la pantalla: en una tablet en horizontal (también dentro de su navegador), un portátil o un móvil
@@ -1765,7 +1775,7 @@ Un dispositivo en el que nunca se entró con una cuenta, o que un administrador 
 todavía no funciona el PIN. Entra una vez con tu cuenta aquí y a partir de entonces sí funcionará.». Sin
 conexión, «No se pudo entrar. Comprueba la conexión e inténtalo de nuevo.»; si no se puede leer quién trabaja
 aquí, «No se pudo cargar el pinpad. Puedes entrar con tu cuenta.».
-Implicados: BASE-F54, BASE-F67
+Implicados: BASE-F54, BASE-F67, STAFF-F03
 
 ### BASE-F56 Entrar pasando la placa
 Estado: hecho
@@ -1934,7 +1944,8 @@ Pasos:
      paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
      aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo.
 Entra: el perfil de quien tiene la sesión.
-Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»), su foto, su idioma
+Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»; sin él, el menú
+lateral y las caras dicen el de su ficha de Personal vinculada, STAFF-F03), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
 su placa o su cuenta. Con «Usar el idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su
 cuenta de erplora.com (BASE-F51). El correo es solo de contacto: no cambia la cuenta de erplora.com.
@@ -2860,7 +2871,11 @@ Pasos:
      y 17 más»); las filas de un fichero que se importa (productos, categorías o clientes), por el nombre de cada una,
      como lo guarda la importación («Filas del fichero: Cucharas, Guisos»; una fila sin nombre cuenta entre los «más»,
      nunca por otra de sus celdas) y, en Inventario, las categorías fiscales que llevan, una vez cada una, por su nombre y su tipo
-     de hoy («Categoría fiscal: Restauración — comida · 10 %»);
+     de hoy («Categoría fiscal: Restauración — comida · 10 %»); las filas de un alta de golpe que dicta la persona,
+     igual, por el nombre de cada una: cada persona de Personal por su nombre y apellidos («Crear en Personal:
+     Carla Ruiz, Diego Martín, Elena Sanz»; una sin nombre o sin apellidos cuenta entre los «más») y cada servicio por
+     su nombre («Servicios: Corte, Tinte»), con las categorías y las categorías fiscales que llevan aparte, una vez cada
+     una;
      una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
@@ -4313,15 +4328,18 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   enciende sola, con sus filas escritas al nacer (Impuestos, hub#997); un hub sin filas lo tiene todo apagado; los hubs
   anteriores a la migración `base/0017` conservan todo encendido con sus raíces elegidas, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
   ERPlora y el ámbito del worker lo tienen todo encendido siempre, `activation.is_platform`; `base/activation.py`).
-  `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto (sus raíces, elegidas, por
-  `base.app.enable`: tope, derechos y evento); la que no puede encender sale `inactive` con su `reason` en el
+  `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto, cada una elegida, por
+  `base.app.enable` y primero lo que necesita cada una (tope, derechos y evento), salvo las que la plataforma enciende
+  al darse de alta (`activation.born_on`: Impuestos), que van al final y llegan sin elegir con las que las necesitan;
+  la que ya estaba encendida se queda como estaba, y los negocios montados antes con una plantilla o una copia las
+  tienen elegidas desde la migración `base/0033`. La que no puede encender sale `inactive` con su `reason` en el
   informe. La que nunca se enciende en este negocio (`can_enable`) no se promete en la revisión (`inactive`, no `turns_on`)
   y, sin filas suyas en el blueprint, no deja la carga a medias ni ofrece un reintento que no cambiaría nada (hub#694). `base.app.enable`/`base.app.disable`
   (`POST /api/apps/enable|disable`, `base.administer_hub`: cierre de `requires`, 409 `base.app_required`, negativas
   `can_disable` y `can_enable` del `LiveAppConfig` → 409 `base.app_vetoed`, que `base.app.list` adelanta en el `refusal`
   de cada fila, con cada gancho una sola vez por lista (hub#618, hub#694), y la de una app que otra en marcha necesita
-  dice el motivo de esa otra, nunca «Desactiva antes» (`app_off_refusal`, hub#619), 402 `base.app_limit_reached` con `max_apps`/`enabled`;
-  bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
+  dice el motivo de esa otra, nunca «Desactiva antes» (`app_off_refusal`, hub#619), 402 `base.app_limit_reached` con `max_apps`/`enabled`,
+  nunca para una app que el país del negocio exige, `mandatory_in`; bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
   (caché `base.apps_off:<host>`, olvidada al COMMIT). Una app cuyas tablas la BD del hub aún no tiene (`Hub.schema_apps`;
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
   `creating` (el OpenAPI documenta 200 y 202 con el mismo esquema, hub#705): el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,

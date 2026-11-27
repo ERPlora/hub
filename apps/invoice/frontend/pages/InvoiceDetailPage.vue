@@ -233,13 +233,14 @@ function onSubstituted(full: InvoiceOut): void {
           <ion-button
             :disabled="sending || waitingRecord"
             data-testid="invoice-detail-print"
+            :aria-label="$t('invoice.detail.print')"
+            :title="$t('invoice.detail.print')"
             @click="print"
           >
             <HubIcon
-              slot="start"
-              name="ion:download-outline"
+              slot="icon-only"
+              name="ion:receipt-outline"
             />
-            {{ $t('invoice.detail.print') }}
           </ion-button>
           <ExportButton
             testid="invoice-detail-pdf"
@@ -253,13 +254,14 @@ function onSubstituted(full: InvoiceOut): void {
             v-if="canAdd"
             fill="outline"
             data-testid="invoice-detail-email"
+            :aria-label="$t('invoice.detail.emailButton')"
+            :title="$t('invoice.detail.emailButton')"
             @click="emailOpen = true"
           >
             <HubIcon
-              slot="start"
+              slot="icon-only"
               name="ion:mail-outline"
             />
-            {{ $t('invoice.detail.emailButton') }}
           </ion-button>
           <ion-button
             fill="outline"
