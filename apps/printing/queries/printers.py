@@ -19,6 +19,7 @@ from apps.printing.models import Printer, PrintJob
 from apps.printing.schemas.fields import Page
 from apps.printing.schemas.printers import PrinterListIn, PrinterOut, PrinterRefIn, PrinterStatusOut
 from base.ordering import list_order
+from base.text_search import contains_text
 
 from .settings import DEFAULT_FIELDS, current_settings
 from .waiting import PENDING
@@ -150,7 +151,7 @@ _PRINTER_SORT = {"name": Lower("name"), "usage": "usage", "kind": "kind", "creat
 def list_printers(ctx: OperationContext, params: PrinterListIn) -> dict:
     printers = Printer.objects.all()
     if params.search:
-        printers = printers.filter(Q(name__icontains=params.search) | Q(address__icontains=params.search))
+        printers = printers.filter(contains_text(params.search, "name", "address"))
     if params.usage:
         printers = printers.filter(usage=params.usage)
     if params.kind:

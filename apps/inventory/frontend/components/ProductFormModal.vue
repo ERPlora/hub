@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // The product form (WORKBOOK «Productos», INVENTORY-F01/F02/F05/F08/F20/F26), the old table's side
-// panel as a dialog (FormModal; UI-REQUESTS.md asks for DataTable's side panel). New: Name, SKU,
+// panel as a dialog (FormModal; UI-REQUESTS.md asks for DataTable's side panel). New: Name, SKU (left empty, numbered),
 // Price, «Cost (<currency>)», «Initial stock», «Low stock threshold» (empty = 10), EAN-13, Description, «Allergens», «Type»,
 // «Track stock for this item» (physical only; follows the hub until touched), «Unit of measure»,
 // «Tax category» (required, none chosen in advance), «Categories» (when there are any; both search
-// the server, TaxCategorySelect and ProductCategoriesField) and «Show on website» (INVENTORY-F36), saved in one go. «Save» waits in grey until the business
+// the server, TaxCategorySelect and ProductCategoriesField) and «Show on website» (INVENTORY-F36), saved in one go. While
+// a name or a tax category is missing, «Save» is off and says which. «Save» also waits in grey until the business
 // has answered its money (the price and the cost are read in it; hub#918), and says so with «Retry» if that read fails
 // (hub#938). Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
 // (the stock is never edited here: it is received or counted). Amounts and quantities are read as
@@ -172,7 +173,12 @@ const title = computed(() =>
 );
 /** No tax category, or still the one Taxes deactivated (a «Not configured» product keeps it until changed). */
 const taxMissing = computed(() => !form.value.tax || (!!props.product?.needs_tax_setup && form.value.tax === original.value.tax));
-const complete = computed(() => !!business.value && !!form.value.name.trim() && !!form.value.sku.trim() && !taxMissing.value);
+const complete = computed(() => !!business.value && !!form.value.name.trim() && !taxMissing.value);
+/** What «Save» waits for, one thing at a time, or `''`; the business's money says its own. */
+const needs = computed(() => {
+  if (!form.value.name.trim()) return t('inventory.form.needsName');
+  return taxMissing.value ? t('inventory.form.needsTax') : '';
+});
 const tracksNow = computed(() => form.value.track ?? (props.product ? props.product.tracks_stock : props.hubTracksStock));
 const step = computed(() => props.units.find((unit) => unit.code === form.value.unit)?.increment);
 /** Each unit by the name the API gives it, which already carries its code («Unit (ud)»). */
@@ -289,6 +295,7 @@ function retryPhoto(): void {
     :pending="pending"
     :error="error"
     :submit-disabled="!complete || !!photo.failure.value"
+    :submit-hint="needs"
     :can-dismiss="canDismiss"
     @submit="save"
   >
@@ -336,7 +343,7 @@ function retryPhoto(): void {
         mode="md"
         :maxlength="64"
         :disabled="editing"
-        :helper-text="editing ? $t('inventory.form.skuIdentity') : undefined"
+        :helper-text="editing ? $t('inventory.form.skuIdentity') : $t('inventory.form.skuAuto')"
         :error-text="fields.sku"
         :class="invalid('sku')"
         @update:model-value="set('sku', text($event))"

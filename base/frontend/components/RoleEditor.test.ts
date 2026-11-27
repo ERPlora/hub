@@ -25,6 +25,7 @@ function cashier(fields: Partial<RoleDetail> = {}): RoleDetail {
     origin: 'own',
     members: 2,
     to_review: false,
+    mine: false,
     apps: [
       { app: 'base', name: 'El negocio', permissions: [line('base.view_home', 'on')] },
       {
@@ -53,6 +54,7 @@ const answerOf = (fields: Partial<HubRoleRow> = {}): HubRoleRow => ({
   origin: 'own',
   members: 2,
   to_review: false,
+  mine: false,
   permissions: 12,
   ...fields,
 });

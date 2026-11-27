@@ -148,7 +148,6 @@ def test_product_in_strips_the_texts():
     [
         ({"name": ""}, "name"),
         ({"name": "x" * 201}, "name"),
-        ({"sku": "  "}, "sku"),
         ({"sku": "x" * 65}, "sku"),
         ({"price": -1}, "price"),
         ({"cost": -1}, "cost"),
@@ -171,8 +170,10 @@ def test_product_in_rejects(fields, field):
     assert invalid_fields(ProductIn, **product(**fields)) == {field}
 
 
-def test_product_in_requires_name_sku_price_and_tax_category():
-    assert invalid_fields(ProductIn) == {"name", "sku", "price", "tax_category_key"}
+def test_product_in_requires_name_price_and_tax_category():
+    """The SKU is not required: left empty, the product is numbered (test_skus.py)."""
+    assert invalid_fields(ProductIn) == {"name", "price", "tax_category_key"}
+    assert ProductIn(**product(sku="  ")).sku == ""
 
 
 def test_product_patch_carries_only_what_was_sent():
@@ -233,7 +234,7 @@ def test_category_in_defaults():
         "description": "",
         "icon": "ion:cube-outline",
         "color": "#3880ff",
-        "order": 0,
+        "order": None,
         "tax_category_key": None,
     }
     assert invalid_fields(CategoryIn, name="") == {"name"}

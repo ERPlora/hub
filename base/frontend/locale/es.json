@@ -345,7 +345,11 @@
         "complete": "Todo ha entrado.",
         "partial": "No todo entró.",
         "failed": "No ha entrado nada.",
-        "counts": "{created} creadas · {already} ya estaban · {failed} fallaron",
+        "counts": {
+          "created": "{n} fila nueva | {n} filas nuevas",
+          "already": "{n} ya estaba | {n} ya estaban",
+          "failed": "{n} con error"
+        },
         "dropped": "Se ha dejado fuera a propósito",
         "unfinished": "Este es el informe de tu última importación de {name} ({date}). No todo entró.",
         "retry": "Reintentar lo que falta",
@@ -432,7 +436,7 @@
       },
       "copies": {
         "title": "Copias de los datos",
-        "intro": "Antes de cada restablecimiento, ERPlora hace una copia completa de los datos del negocio y la guarda 90 días. Sirve para recuperar el negocio entero tal como estaba (formato de PostgreSQL, se restaura con pg_restore). Para llevar tus productos, servicios o ajustes a otro negocio, usa «Exportar».",
+        "intro": "Antes de cada restablecimiento, y al eliminar el negocio, ERPlora hace una copia completa de todos los datos del negocio tal como estaban y la guarda 90 días. Puedes descargarla para guardarla tú; no se carga en «Importar». Para llevar tus productos, servicios o ajustes a otro negocio, usa «Exportar».",
         "loading": "Leyendo las copias…",
         "loadError": "No se han podido leer las copias.",
         "empty": "Todavía no hay copias: se hace una antes de cada restablecimiento.",
@@ -966,7 +970,8 @@
       },
       "save": "Guardar",
       "saved": "Rol guardado.",
-      "saveError": "No se pudo guardar el rol"
+      "saveError": "No se pudo guardar el rol",
+      "mine": "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
     },
     "person": {
       "title": "Persona",
@@ -976,9 +981,10 @@
       "retry": "Reintentar",
       "data": {
         "heading": "Sus datos",
-        "managed": "El nombre, el email y el rol se cambian en erplora.com.",
+        "managed": "El nombre, el email y el rol de la invitación se cambian en erplora.com.",
         "open": "Abrir en erplora.com",
-        "notEntered": "Aún no ha entrado en este hub: su PIN y su placa se guardan para cuando entre."
+        "notEntered": "Aún no ha entrado en este hub: su PIN y su placa se guardan para cuando entre.",
+        "invitation": "Rol de la invitación"
       },
       "pin": {
         "heading": "PIN",
@@ -1013,6 +1019,26 @@
       "refused": {
         "ownerOnly": "Solo el propietario cambia el acceso del propietario.",
         "ownBadge": "Nadie da de alta su propia placa: pídeselo a otro administrador."
+      },
+      "role": {
+        "heading": "Rol en este negocio",
+        "intro": "Manda sobre el rol de su invitación: lo que ve y puede hacer aquí cambia al momento, sin volver a entrar.",
+        "label": "Rol",
+        "invitation": "El de la invitación ({role})",
+        "given": "{name} tiene ahora el rol {role}.",
+        "failed": "No se pudo cambiar el rol.",
+        "loading": "Cargando los roles…",
+        "loadError": "No se pudieron cargar los roles.",
+        "retry": "Reintentar",
+        "none": "Este negocio aún no tiene roles propios: se crean en Empleados › Roles, a partir de cualquier rol.",
+        "make": "Crear un rol",
+        "refused": {
+          "owner": "El propietario siempre es el propietario: nadie le da otro rol.",
+          "accountant": "La gestoría solo lee y no ocupa plaza del plan: se queda con el rol de su invitación.",
+          "own": "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.",
+          "above": "Solo puedes dar un rol a quien está por debajo de ti en el negocio.",
+          "beyond": "Un rol no puede permitir más de lo que puedes hacer tú."
+        }
       }
     },
     "apiKeys": {

@@ -4,17 +4,20 @@ the screens: a hand-written phrase for the known events and actions, composed fr
 and verbs for the rest, and the raw words for what nobody wrote down yet."""
 
 import dataclasses
+import datetime as dt
 import functools
 import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from babel.dates import format_time
 from django.apps import apps
 from live.operations import Operation, registry
 
 from apps.flow.document import TEMPLATE_RE, is_path, literal_origin
 from base import assistant as hub_assistant
+from base.business import babel_locale
 
 #: The words of the app's screens, by language.
 LOCALES = Path(__file__).resolve().parent / "frontend" / "locale"
@@ -41,7 +44,7 @@ class Phrasing:
         return screen_words(self.language)
 
 
-def _fill(text: str, **values: Any) -> str:
+def _fill(text: str, /, **values: Any) -> str:
     for name, value in values.items():
         text = text.replace("{" + name + "}", str(value))
     return text
@@ -53,6 +56,21 @@ def _humanize(text: str) -> str:
 
 def _capitalize(text: str) -> str:
     return text[:1].upper() + text[1:]
+
+
+def _quoted(text: str, p: Phrasing) -> str:
+    """``text`` between the quotation marks of ``p``'s language: “Big sale”, «Venta grande»."""
+    return _fill(p.words["quoted"], text=text)
+
+
+def _clock(time: str, p: Phrasing) -> str:
+    """A wall-clock ``HH:MM`` as ``p``'s language writes it, «6:00 PM», «18:00» (``formatTimeOfDay`` of the
+    screens); what is no time, as it came."""
+    try:
+        moment = dt.time.fromisoformat(time)
+    except (TypeError, ValueError):
+        return str(time)
+    return format_time(moment, "short", locale=babel_locale(p.language))
 
 
 def action_label(op: Operation, language: str) -> str:
@@ -110,10 +128,10 @@ def _schedule(trigger: dict, p: Phrasing) -> str:
     every = trigger.get("every")
     if every == "week":
         weekday = p.words["trigger"]["weekdays"][trigger.get("weekday") or 0]
-        return _fill(said["week"], weekday=weekday, time=trigger["time"])
+        return _fill(said["week"], weekday=weekday, time=_clock(trigger["time"], p))
     if every == "month":
-        return _fill(said["month"], day=trigger.get("day") or 1, time=trigger["time"])
-    return _fill(said["day"], time=trigger["time"])
+        return _fill(said["month"], day=trigger.get("day") or 1, time=_clock(trigger["time"], p))
+    return _fill(said["day"], time=_clock(trigger["time"], p))
 
 
 def field_label(name: str, p: Phrasing) -> str:
@@ -167,14 +185,14 @@ def describe_clause(path: str, op: str, value: Any, p: Phrasing) -> str:
 
 
 def _templated(text: Any, p: Phrasing) -> str:
-    """A text with ``{{…}}`` data, each datum by its words between «»."""
+    """A text with ``{{…}}`` data, each datum by its words between the quotation marks of its language."""
     if text is None:
         return ""
     if not isinstance(text, str):
         return json.dumps(text, ensure_ascii=False) if isinstance(text, dict) else str(text)
     if is_path(text):
-        return f"«{path_label(text, p)}»"
-    return TEMPLATE_RE.sub(lambda match: f"«{path_label(match[1], p)}»", text).strip()
+        return _quoted(path_label(text, p), p)
+    return TEMPLATE_RE.sub(lambda match: _quoted(path_label(match[1], p), p), text).strip()
 
 
 def _delay(step: dict, p: Phrasing) -> str:

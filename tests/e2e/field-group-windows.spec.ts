@@ -68,10 +68,10 @@ const WINDOWS: readonly GroupedWindow[] = [
     inTheApp: true,
   },
   {
-    key: 'api-key-modes',
+    key: 'api-key-scopes',
     path: '/employees#apikeys',
     dialog: 'api-key-form',
-    group: '.api-key-modes',
+    group: '.api-key-scopes',
     layout: { display: 'flex', rowGap: '8px' },
     open: tap('api-keys-new'),
   },

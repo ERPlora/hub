@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// «Import CSV» of the customer list's toolbar (CUSTOMER-F08): opens the file picker for a CSV and
+// «Import CSV» of the customer list's toolbar (CUSTOMER-F08), the upload icon alone: opens the file picker for a CSV and
 // hands the file up; the page imports it (`useCustomerImport`). Off while an import runs.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
@@ -25,13 +25,14 @@ function onChange(): void {
     fill="outline"
     data-testid="customer-import"
     :disabled="busy"
+    :aria-label="$t('customer.importCsv.button')"
+    :title="$t('customer.importCsv.button')"
     @click="input?.click()"
   >
     <HubIcon
-      slot="start"
+      slot="icon-only"
       name="ion:cloud-upload-outline"
     />
-    {{ $t('customer.importCsv.button') }}
   </ion-button>
   <input
     ref="input"

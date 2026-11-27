@@ -80,8 +80,6 @@ class TestCustomersComeBack:
             "customer.consent.grant",
             customer_id=ana,
             channel="email",
-            notice_text="I want offers.",
-            notice_version="v1",
         )
         run_in(hub, "customer.purchase.record", customer_id=ana, sale_id=uuid.uuid7(), total=2500, currency="EUR")
         copy = recoveries.copy_of(hub)

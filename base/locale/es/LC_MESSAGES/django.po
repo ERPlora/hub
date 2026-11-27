@@ -327,6 +327,10 @@ msgstr "%(app)s es obligatoria para los negocios de %(country)s: no se puede des
 msgid "Your team"
 msgstr "Tu equipo"
 
+#: home/setup_steps.py:34
+msgid "Finish setting up your business"
+msgstr "Termina de configurar tu negocio"
+
 #: queries.py:180
 msgid "Add the people who will use the till, each with their own way in."
 msgstr "Añade a las personas que usarán el TPV, cada una con su forma de entrar."
@@ -2889,6 +2893,14 @@ msgstr "El propietario siempre es el propietario: nadie le da otro rol."
 #: people.py
 msgid "Nobody changes their own role: ask somebody above you."
 msgstr "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
+
+#: people.py
+msgid ""
+"The accountancy firm only reads and takes no place of the plan: it keeps the "
+"role of its invitation."
+msgstr ""
+"La gestoría solo lee y no ocupa plaza del plan: se queda con el rol de su "
+"invitación."
 
 #: people.py
 msgid "You may only give a role to people below you in the business."

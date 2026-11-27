@@ -180,8 +180,8 @@ async function confirmPrune(): Promise<void> {
               @click="askRemove(device)"
             >
               <HubIcon
+                slot="icon-only"
                 name="ion:trash-outline"
-                aria-hidden="true"
               />
             </ion-button>
           </div>

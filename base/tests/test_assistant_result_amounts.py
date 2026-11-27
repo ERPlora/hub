@@ -82,8 +82,9 @@ class FiguresOut(Schema):
     price_list: PriceListOut
 
 
-def told() -> dict:
-    """What the model reads of a read that answers an amount of the business and one of a price list in yen."""
+def told(language: str = "es") -> dict:
+    """What the model reads, asked in ``language``, of a read that answers an amount of the business and one of a price
+    list in yen."""
     figures = Operation(
         name="demo.item.figures",
         kind="query",
@@ -92,22 +93,28 @@ def told() -> dict:
         output=FiguresOut,
         expose_api=False,
         ai={"description": "A read with amounts."},
-        fn=lambda ctx, data: {"revenue": 360, "price_list": {"currency": "JPY", "price": 1250}},
+        fn=lambda ctx, data: {"revenue": 360, "price_list": {"currency": "JPY", "price": 950}},
     )
-    ctx = OperationContext(scope=A, actor="ana", permissions=frozenset({"demo.view"}), language="es")
+    ctx = OperationContext(scope=A, actor="ana", permissions=frozenset({"demo.view"}), language=language)
     outcome = assistant.tools.run(ctx, figures, "{}")
     assert outcome.outcome == "ok"
     return json.loads(outcome.content)
 
 
 @HUB_DB
-@pytest.mark.parametrize(("country", "revenue"), [("ES", "3.60 EUR"), ("JP", "360 JPY")])
-def test_an_amount_is_told_in_the_business_currency_and_one_of_a_record_in_its_own(country, revenue):
+@pytest.mark.parametrize(
+    ("country", "language", "revenue", "price"),
+    [("ES", "es", "3,60\xa0€", "950\xa0JPY"), ("ES", "en", "€3.60", "¥950"), ("JP", "es", "360\xa0JPY", "950\xa0JPY")],
+)
+def test_an_amount_is_told_as_the_screens_write_it_in_the_business_currency_or_its_records(country, language, revenue, price):
+    """hub#2603: a bar in Spanish heard «1.50 EUR» for the «1,50 €» on Inventory: the model repeats an amount as it reads
+    it, so it reads it as the screens write it in the person's language, in the currency of its record or else the
+    business's."""
     Hub.objects.update_or_create(slug=A.key, defaults={"name": "Bar A", "country": country})
-    assert told() == {"revenue": revenue, "price_list": {"currency": "JPY", "price": "1250 JPY"}}
+    assert told(language) == {"revenue": revenue, "price_list": {"currency": "JPY", "price": price}}
 
 
 @HUB_DB
 def test_without_its_business_on_the_registry_an_amount_is_told_in_euros_as_its_card_paints_it():
     Hub.objects.filter(slug=A.key).delete()
-    assert told()["revenue"] == "3.60 EUR"
+    assert told()["revenue"] == "3,60\xa0€"

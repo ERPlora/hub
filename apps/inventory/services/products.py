@@ -28,6 +28,7 @@ from apps.inventory.schemas.products import (
 )
 from apps.inventory.services.movements import _move
 from apps.inventory.services.product_images import _change_image
+from apps.inventory.services.skus import save_with_sku
 from apps.inventory.services.writes import (
     SYSTEM,
     _actor,
@@ -118,7 +119,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
     )
-    _save(product)
+    save_with_sku(product, _save)
     _link(product, categories)
     record_event(ctx, events.PRODUCT_CREATED, _created_payload(product, categories))
     for category in sorted(categories, key=lambda category: category.id):

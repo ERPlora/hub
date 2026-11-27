@@ -17,7 +17,7 @@ from live.assistant.running import run_tool
 from live.executor import Stream, Subscription, executor
 from live.operations import get as operation
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.flow.tests.test_api import get, post
 from base.operations import HubContextBuilder
 from base.sensitive import VIEW_CUSTOMER_CONTACT

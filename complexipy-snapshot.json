@@ -30,16 +30,6 @@
     ]
   },
   {
-    "path": "apps/attendance/queries/days.py",
-    "file_name": "days.py",
-    "functions": [
-      {
-        "name": "scoped_records",
-        "complexity": 18
-      }
-    ]
-  },
-  {
     "path": "apps/cart_checkout/tests/test_integration_assistant.py",
     "file_name": "test_integration_assistant.py",
     "functions": [
@@ -228,16 +218,6 @@
       {
         "name": "update_printer",
         "complexity": 19
-      }
-    ]
-  },
-  {
-    "path": "apps/printing/services/queueing.py",
-    "file_name": "queueing.py",
-    "functions": [
-      {
-        "name": "create_job",
-        "complexity": 24
       }
     ]
   },
@@ -766,16 +746,6 @@
       {
         "name": "app_activation_settle",
         "complexity": 16
-      }
-    ]
-  },
-  {
-    "path": "base/services/apps.py",
-    "file_name": "apps.py",
-    "functions": [
-      {
-        "name": "_enable",
-        "complexity": 18
       }
     ]
   },

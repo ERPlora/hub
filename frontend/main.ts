@@ -33,6 +33,7 @@ import { openReportProblem } from '../base/frontend/lib/report-problem';
 import { shellSidebar, SIDEBAR } from '../base/frontend/lib/sidebar';
 import { beforeSignOut } from '../base/frontend/lib/sign-out';
 import { OPERATION_ROUTES } from './generated/operation-routes';
+import './icon-buttons.css';
 
 /**
  * base's pieces of the chrome: the assistant's sparkles at the end of the topbar, «Upgrade plan» and «Manage on

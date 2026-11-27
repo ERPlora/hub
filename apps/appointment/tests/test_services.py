@@ -9,8 +9,12 @@ import pytest
 from django.utils import timezone
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
+from live.operations import get
 
-from apps.appointment.models import Appointment, BlockedTime, Counter, History, Settings
+from apps.appointment.models.appointments import Appointment, History
+from apps.appointment.models.blocked_times import BlockedTime
+from apps.appointment.models.numbering import Counter
+from apps.appointment.models.settings import Settings
 from base.api_keys import KeyCaller
 
 from .conftest import HUB_DB, MADRID, MONDAY, TESTER, assign, at, ctx_for, make_appointment, make_customer, make_day
@@ -457,8 +461,6 @@ def test_an_employee_books_for_themselves_only(salon, make_user):
     salon.bea.user = user.person
     salon.bea.save()
     ctx = ctx_for("hub_employee", actor=user)
-    from live.operations import get
-
     op = get("appointment.appointment.create")
     data = {
         "customer_id": str(salon.lucia.id),
@@ -704,8 +706,6 @@ def test_the_customer_moves_only_her_own_appointment_and_keeps_the_notice(salon)
 
 
 def test_on_the_customers_behalf_an_employee_still_changes_only_her_own_agenda(salon, make_user):
-    from live.operations import get
-
     user = make_user("bea", role="hub_employee")
     salon.bea.user = user.person
     salon.bea.save()
