@@ -119,6 +119,7 @@ async function turnOn(card: Card): Promise<void> {
     title: name(card),
     message: t(`whatsapp_inbox.autoReplies.${card.key}.confirm`),
     consequences: rival && isOn(rival) ? [t('whatsapp_inbox.autoReplies.exclusive', { other: name(rival) })] : undefined,
+    tone: 'primary',
     confirmLabel: t('whatsapp_inbox.autoReplies.turnOn'),
     cancelLabel: t('whatsapp_inbox.autoReplies.notNow'),
   });
@@ -171,6 +172,7 @@ async function update(card: Card): Promise<void> {
   const yes = await confirm({
     title: t('whatsapp_inbox.autoReplies.updateTitle'),
     message: t('whatsapp_inbox.autoReplies.updateConfirm'),
+    tone: 'primary',
     confirmLabel: t('whatsapp_inbox.autoReplies.update'),
     cancelLabel: t('whatsapp_inbox.cancel'),
   });
