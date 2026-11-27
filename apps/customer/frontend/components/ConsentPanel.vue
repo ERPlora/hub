@@ -2,9 +2,9 @@
 // «Marketing consent» of a card (CUSTOMER-F14, F15), as the product's panel: a line per channel —
 // Email, WhatsApp and SMS always («never asked» is a state, not a blank), plus any other channel with
 // something recorded — with its last decision, date and address. Giving consent is an informed act:
-// «Record consent» shows the exact sentence to read out and «They said yes» stores THAT sentence,
-// word for word, as the proof. Withdrawing is one tap, as easy as giving (GDPR art. 7.3). The state
-// comes with the card (live); below, the whole history (`customer.consent.history`, live).
+// «Record consent» shows the business's sentence to read out, as the card's read sends it, and the
+// server stores that same sentence as the proof. Withdrawing is one tap, as easy as giving (GDPR art.
+// 7.3). The state comes with the card (live); below, the whole history (`customer.consent.history`, live).
 import { formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -18,13 +18,13 @@ const props = defineProps<{
   customerId: string;
   /** The card's consent: the last decision per purpose and channel. */
   consent: ConsentStateRow[];
+  /** The sentence read out before a yes, in the person's language: the one the server stores. */
+  notice: string;
   editable: boolean;
 }>();
 
 /** The channels the business can reach somebody through: always on screen. */
 const ALWAYS: ConsentChannel[] = ['email', 'whatsapp', 'sms'];
-/** Bump it when `customer.consent.notice` changes: who consented to WHICH wording (EDPB 05/2020). */
-const NOTICE_VERSION = 'counter-v1';
 const PURPOSE = 'marketing';
 
 const { t, locale } = useCustomerI18n();
@@ -57,15 +57,7 @@ function ask(channel: ConsentChannel): void {
 
 async function record(channel: ConsentChannel): Promise<void> {
   try {
-    await grant.run({
-      customer_id: props.customerId,
-      channel,
-      purpose: PURPOSE,
-      // The words travel as shown, not as a key: the proof is what the customer heard.
-      notice_text: t('customer.consent.notice'),
-      notice_version: NOTICE_VERSION,
-      source: 'counter',
-    });
+    await grant.run({ customer_id: props.customerId, channel, purpose: PURPOSE, source: 'counter' });
   } catch {
     return;
   }
@@ -148,7 +140,7 @@ const when = (occurredAt: string, extra: string | null): string =>
         :data-testid="`customer-consent-${channel}-ask`"
       >
         <p class="customer-consent__notice">
-          {{ $t('customer.consent.notice') }}
+          {{ notice }}
         </p>
         <p class="customer-consent__muted">
           {{ $t('customer.consent.askHint') }}
