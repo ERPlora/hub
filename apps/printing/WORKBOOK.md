@@ -389,8 +389,8 @@ Entra: las decisiones del negocio.
 Sale: los ajustes de impresión, una sola fila (avisa: `printing.settings.updated`). Sin guardar
 nunca valen los de fábrica: tique al cobrar encendido, cajón apagado, una copia, sin impresora elegida.
 Si falla: «No se pudieron guardar los ajustes.» con el motivo; si nombra la impresora de una función
-(desactivada, borrada o pasada a otra función mientras se elegía), el motivo sale también debajo de esa
-función. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de
+(desactivada, borrada o pasada a otra función mientras se elegía), el motivo sale solo debajo de esa
+función, una vez: el aviso de encima de «Guardar ajustes» no lo repite. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de
 una función en cuanto se elige otra impresora para ella; los dos vuelven si el siguiente intento también
 se rechaza. Un rechazo sin campo se queda hasta el siguiente intento. Si la lectura falla, la
 pantalla no enseña valores y ofrece «Reintentar». Sin permiso, «Sin acceso».

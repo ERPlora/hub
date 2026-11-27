@@ -598,8 +598,8 @@ Pantalla: Ventas: Vender
 Pasos:
 1. En **Ventas → Vender**, con la cuenta abierta, abre la pestaña «Comanda actual»: lo que falta por
    enviar. Al añadir el primer producto, que abre la cuenta, el TPV se queda en esa pestaña.
-2. Si la ronda corre prisa, toca la llama: el botón pasa a «Enviar URGENTE (N)». Cada toque la arma o
-   la desarma.
+2. Si la ronda corre prisa, toca la llama: el botón se pone rojo y pasa a llamarse «Enviar URGENTE (N)». Cada
+   toque la arma o la desarma.
 3. Pulsa «Enviar comanda (N)» (o «Enviar URGENTE (N)»): sale «Comanda N enviada a cocina.» y la llama
    se desarma.
 4. Ventas marca las líneas pendientes con una ronda nueva (SALE-F20) y Cocina abre la comanda
