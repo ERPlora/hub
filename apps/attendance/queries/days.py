@@ -27,6 +27,7 @@ from live.errors import NotFound, PermissionDenied
 from apps.attendance.models import Break, Correction, Record
 from apps.attendance.schemas import RecordListIn
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 from .people import actor_user, find_member
 from .reads import READS_ANY_DAY, VIEW_ALL, _own_days, _reads_any, review_hours
@@ -187,5 +188,5 @@ def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.dateti
         records = records.filter(work_date__lte=params.date_to)
     records = annotated(records)
     if params.search:
-        records = records.filter(member_name__icontains=params.search)
+        records = records.filter(contains_text(params.search, "member_name"))
     return records.order_by(*list_order_for(params.sort))

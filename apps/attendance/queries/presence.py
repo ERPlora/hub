@@ -10,6 +10,7 @@ from live.operations import operation
 from apps.attendance.models import Record
 from apps.attendance.schemas import EmptyIn, PresenceCountOut, PresenceListIn, PresencePage
 from apps.staff.models import Member
+from base.text_search import contains_text
 
 from .days import annotated
 from .reads import VIEW_ALL, _page, review_hours
@@ -51,7 +52,7 @@ def present_records() -> QuerySet:
 def list_presence(ctx: OperationContext, params: PresenceListIn) -> dict:
     records = annotated(present_records())
     if params.search:
-        records = records.filter(member_name__icontains=params.search)
+        records = records.filter(contains_text(params.search, "member_name"))
     records = records.order_by("member_name", "id")
     rows = [
         {

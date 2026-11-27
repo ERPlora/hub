@@ -8,6 +8,7 @@ from live.context import OperationContext
 
 from apps.customer.queries.contact import sees_contact
 from apps.reservation.models import BlockedDate
+from base.text_search import contains_text
 
 MAX_CANDIDATES = 5
 DIGITS = re.compile(r"\D")
@@ -38,10 +39,10 @@ def _page(queryset, params, row) -> dict:
 def _phone_matches(said: str) -> Q:
     """Part of the guest's phone, as typed or by its digits alone (spaces, dashes, a prefix)."""
     text = said.strip()
-    match = Q(guest_phone__icontains=text)
+    match = contains_text(text, "guest_phone")
     digits = DIGITS.sub("", text)
     if len(digits) >= 3:
-        match |= Q(guest_phone__icontains=digits)
+        match |= contains_text(digits, "guest_phone")
     return match
 
 
@@ -49,8 +50,8 @@ def _guest_matches(ctx: OperationContext, said: str) -> Q:
     """The guest by part of the name and, for whoever sees the customers' contact details, of the email or the phone
     (however typed: spaces, prefix): a search by them would tell whose they are."""
     text = said.strip()
-    named = Q(guest_name__icontains=text)
-    return (named | Q(guest_email__icontains=text) | _phone_matches(text)) if sees_contact(ctx) else named
+    named = contains_text(text, "guest_name")
+    return (named | contains_text(text, "guest_email") | _phone_matches(text)) if sees_contact(ctx) else named
 
 
 def _when(day: dt.date, at: dt.time) -> str:
