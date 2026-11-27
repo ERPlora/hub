@@ -88,17 +88,17 @@ Besides, Appointments puts the **Visit history** block at the end of a customer'
 10 appointments, the most recent first, with services, professional, state and notes (the internal one first).
 
 ### Agenda
-<!-- from WORKBOOK.md sha256:9436bad1c4b3 -->
+<!-- from WORKBOOK.md sha256:0e6b68ff1df2 -->
 Here is the business's agenda, always on its clock. Change the day with the arrows or with **Today** and choose how
 to see it: as a **List**, **By professional** (one row per professional, by day or by week) or the **Repeating**
 appointments. With **Add appointment** you pick the customer, the services, the professional and one of the free
 times; on the grid, tapping a slot books at that time with that professional. Tap an appointment to see its card
 and, from its row, confirm it, start it, complete it, charge it at the till, move it or cancel it; you can also drag
-it to another time or another professional. The **N to confirm** notice takes you to the appointments customers have
-booked that are waiting for your confirmation.
+it to another time or another professional. The **N to confirm** notice shows you every appointment customers have
+booked that is waiting for your confirmation, whatever its day.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:e9ea0160aecc -->
+<!-- from WORKBOOK.md sha256:b9b55dc51467 -->
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -111,8 +111,12 @@ professional**, also **Day · Week**.
   still open at the till (then No-show, Cancel and Delete are greyed out).
 - **By professional · Day**: one row per bookable professional and an "Unassigned" row if there are
   appointments without a professional (two appointments that overlap share the row, each in its own lane);
-  the calendar hours run horizontally and what the business has closed
-  or blocked is shaded (what is closed, according to Schedules; there you cannot tap to book). A professional who no longer takes appointments (not bookable, inactive, left)
+  the calendar hours run horizontally, at the scale of the usual agendas, so that the working day fits on the screen
+  (today it opens half an hour before the business's time; another day, at the hour it opens), and what
+  the business has closed or blocked is shaded (what is closed, according to Schedules; there you cannot tap to
+  book). Each appointment puts the customer on one line and the services on another; what does not fit ends in "…"
+  (a half-hour appointment usually keeps the first name) and the whole appointment (time, customer and services)
+  shows on its card when tapping it and, with a mouse, when hovering over it. A professional who no longer takes appointments (not bookable, inactive, left)
   keeps their row, behind the bookable ones, on the days they still have appointments, and above the grid
   a notice "Ana no longer takes new appointments: their appointments for the day stay on their row so you
   can move them to someone else.". Tapping a free slot opens the new appointment with that professional and
@@ -122,19 +126,32 @@ professional**, also **Day · Week**.
   appointments in order. Tapping an appointment opens its card; dragging it to another day or another row
   moves it keeping the time.
 - **Repeating**: see the [Repeating](#repeating) screen.
-- **Add appointment** button → **New appointment**: Customer (search "Search by name, phone, email…"; if they
-  are not there, **+ New customer** creates them with name and phone without leaving), Services (one or
-  more, in order), Professional (only those who perform all those services), Day, Time (with the **Free
-  times** as buttons), "Duration (min)" (the sum of the durations, changeable), Notes for the customer and
-  Internal notes. "Duration (min)" and the **Total** come with the professional's own duration and price for
+- **To confirm**: when you tap **N to confirm** (or "Confirm the appointments" in the bell), the list shows, instead
+  of the day, every pending appointment that has not started yet, whatever its day, the soonest first and each with
+  its date and time, under the notice "These are the appointments waiting for your confirmation, whatever their day."
+  with **Back to the agenda**. They are the same ones the notice counts. The day, the status filter and the views do
+  not apply and are hidden; tapping **N to confirm** again or **Back to the agenda** brings the day back. With none:
+  "No appointments left to confirm.".
+- **Add appointment** button → **New appointment**, a wide panel in two columns (on a phone, the whole screen in
+  one column, with Professional and Day side by side). On the left, who and what: Customer (search "Search by name,
+  phone, email…"; if they are not there, **+ New customer** creates them with name and phone without leaving),
+  Services (one or more, in order, with their **Total**), Professional (only those who perform all those services)
+  and, folded until asked for, Notes for the customer and Internal notes. On the right, when: Day, "Duration (min)"
+  and the **Free times**. "Duration (min)" is one-tap buttons (15, 30, 45, 60, 90 and 120) and **Other** to type it;
+  by default it marks the sum of the durations and, once changed, **Use the sum** goes back to it. The free times
+  are big buttons split into one tab per span of the professional's shift that day, each with how many free times
+  it has left, under the sentence of the shift ("Pablo Serrano works today from 10:00 AM to 2:00 PM and from 4:00 PM
+  to 8:00 PM."); below, **Enter another time**. The foot sums up what is chosen beside the buttons: "12:00 PM –
+  12:30 PM · 30 min" and, under it, the day and the professional. "Duration (min)" and the **Total** come with the professional's own duration and price for
   each service (Services, "Professionals who perform it"), or the catalogue's if they have none; it is what the
   appointment books. Amounts are in the business's currency, its country's, with its decimals (BASE-F50:
   "65,00 zł" in a business in Poland; "—" while the business has not answered, never in euros or with guessed
   decimals) and are grouped from four digits ("1.234,56 €"; in English, "€1,234.56").
   Notices: "This appointment starts in the past. It will be saved at that time." and the professional who
   does not perform a service.
-- **Edit** → **Edit appointment**: Day, Time, "Duration (min)", Services, Professional, the notes and **Save
-  changes**; below, the history. The customer is not changed.
+- **Edit** → **Edit appointment**: the same panel, with the customer, the number and the status of the appointment
+  on top (the customer is not changed); Services, Professional, Day, "Duration (min)", Time and the notes (those
+  with text come open) and **Save changes**; below, folded, the history.
 - Dialogs: **Overlapping appointment** (**Book anyway** / **Pick another time**), **Edit repeating
   appointment** (**This appointment only** / **This and all following appointments**), **Cancel the
   appointment** (optional reason) and **Delete the appointment** (confirmation).
@@ -177,13 +194,13 @@ limit)", "Allow overlapping appointments (the front desk is warned first)",
 automatically"; **Save** button.
 
 ## States of each screen
-<!-- from WORKBOOK.md sha256:9b7f72d53474 -->
+<!-- from WORKBOOK.md sha256:95e831c0d7a7 -->
 
 | State | What the person sees |
 |---|---|
-| Loading | "Loading…" while the first result arrives; under Services and Professional, "Loading services…" / "Loading professionals…". |
-| Empty | "No appointments for this day.", "No repeating appointments yet."; with no bookable professionals, "No bookable professionals yet."; in the new appointment, "There are no bookable services yet. Add them in Services.". |
-| Error | The notice of the table or the grid with "Retry". A refusal of a form shows inside the form, each reason under its field, without losing what was typed, and each refused field loses its reason as soon as that field is corrected, even if another one says the same (hub#888), the pickers too (**Services**, when one is added, and **Professional**, when another one is chosen). A conflict (409) shows above the button and in a notice. |
+| Loading | "Loading…" while the first result arrives; under Services and Professional, "Loading services…" / "Loading professionals…"; in the free times of the appointment panel, "Looking for free times…" over grey buttons. |
+| Empty | "No appointments for this day.", "No repeating appointments yet."; with no bookable professionals, "No bookable professionals yet."; in the new appointment, "There are no bookable services yet. Add them in Services.". In the free times: while services, professional or day are missing, "Pick the services, a professional and a day to see the free times."; with no times, "No free times that day for this professional. You can still pick a time."; if the professional does not work that day, that they do not work and "Pick another day or another professional.". |
+| Error | The notice of the table, the grid or the free times with "Retry". A refusal of a form shows inside the form, each reason under its field, without losing what was typed, and each refused field loses its reason as soon as that field is corrected, even if another one says the same (hub#888), the pickers too (**Services**, when one is added, and **Professional**, when another one is chosen). A conflict (409) shows above the button and in a notice. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if it arrives through another door, "You do not have permission". |
@@ -243,7 +260,7 @@ for those of any professional, just as the customer books with whoever she likes
 they do not do (APPOINTMENT-F01 and F04).
 
 ### APPOINTMENT-F01 Book an appointment from the agenda
-<!-- from WORKBOOK.md sha256:efd52a8dace5 -->
+<!-- from WORKBOOK.md sha256:668d280ddb2e -->
 Status: done
 Actor: employee (for themselves), manager, assistant
 Screen: Agenda
@@ -252,9 +269,10 @@ Steps:
 2. Pick the customer (searched by name, phone or email, and by phone or email only by whoever sees the customers'
    contact details; if they are not there, **+ New customer** creates them with name and phone), one or more services and the professional. With services picked, only the
    professionals who are **Active and Bookable and perform all of them** show; if a service has nobody
-   assigned, for that service the whole bookable team counts. "Duration (min)" is filled in with the sum of the
-   durations (the professional's own if they have one, otherwise the catalogue's).
-3. Pick the day and tap one of the **Free times** (or pick another time).
+   assigned, for that service the whole bookable team counts. "Duration (min)" marks the sum of the
+   durations (the professional's own if they have one, otherwise the catalogue's); one tap or **Other** changes it.
+3. Pick the day and tap one of the **Free times**, in the tab of the span of the shift you want, or pick another
+   time in **Enter another time**.
 4. Tap **Add appointment**. If the business allows overlaps and that time clashes with another appointment
    of the professional, answer "Overlapping appointment".
 5. The appointment shows as **Confirmed** with its number (for example, APT-20261116-0001).
@@ -280,45 +298,58 @@ BASE-F114 (ERPlora's staff recovers from a separate copy the appointments the bu
 booking; a deleted one comes back the same, APPOINTMENT-F11)
 
 ### APPOINTMENT-F02 See which times are still free
-<!-- from WORKBOOK.md sha256:feb760542985 -->
+<!-- from WORKBOOK.md sha256:f0085c26a4fd -->
 Status: done
 Actor: employee, assistant, customer
 Screen: Agenda (new appointment and editing)
 Steps:
-1. With services, professional and day picked, the **Free times** appear as buttons.
+1. With services, professional and day picked, the **Free times** appear as big buttons, in one tab per span of
+   the day the professional works, each with how many free times it has left (with a single span there are no
+   tabs), under the sentence of the shift ("Pablo Serrano works today from 10:00 AM to 2:00 PM and from 4:00 PM to
+   8:00 PM."; another day, with its date). The tab of the chosen time opens or, if none, the first with free times.
+   While something is missing, in their place: "Pick the services, a professional and a day to see the free
+   times.".
 2. The candidate times come every "Slot interval (minutes)" inside the calendar window ("Calendar starts
    at (hour)", "Calendar ends at (hour)"). Only the one that fits whole shows: inside the business's
    opening hours (Schedules: that day's stretch or the small hours of the day before), inside the
    professional's shift and outside their time off (Staff), with no block and no other appointment of
    theirs; with overlaps allowed, a taken time also shows. The appointment can end exactly at closing time.
-3. From the front desk the times inside the minimum notice show too (marked), never those already past; to
+3. With the times come the **spans of the day** the professional works, in order: the business's opening
+   hours crossed with their shift and without their time off, inside the calendar window (without a shift,
+   the day minus their time off). Blocks and appointments do not split them (the free times already say
+   that) and two spans back to back are one. With no spans, they do not work that day.
+4. From the front desk the times inside the minimum notice show too (marked), never those already past; to
    the customer, only those that respect the minimum notice.
-4. Without a professional (the assistant: "what times are free tomorrow for a haircut?"), each time says
-   which professionals have it free.
-5. When asking whether a specific time can be booked, the answer says why not; which appointments it
+5. Without a professional (the assistant: "what times are free tomorrow for a haircut?"), each time says
+   which professionals have it free, and the spans are the business's opening hours: there is no shift to
+   show.
+6. When asking whether a specific time can be booked, the answer says why not; which appointments it
    clashes with is told only to whoever can see that agenda (to an employee, about a colleague, only
    "already has an appointment").
 In: the business's opening hours, the shift and the time off, the blocks, the appointments and the
 settings.
-Out: the list of times; it saves nothing.
+Out: the list of times and the spans of the day the professional works; it saves nothing.
 If it fails: "The free times could not be loaded. You can still pick a time." with
 **Retry**; the picked time is judged when saving. With no times: "No free times that day for this
-professional. You can still pick a time.".
+professional. You can still pick a time.". If they do not work that day: "Pablo Serrano does not work on Thursday,
+November 26." and "Pick another day or another professional.", with no times and no **Enter another time**,
+because any time of that day would be refused when saving.
 Involved: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirm a pending appointment
-<!-- from WORKBOOK.md sha256:25b3b1b7df07 -->
+<!-- from WORKBOOK.md sha256:f495da635756 -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda
 Steps:
-1. Come in from the **N to confirm** notice (you tap it and the list filters the pending ones), from the
-   bell in the top bar (its notice "N appointments to confirm", "Customers are waiting for you to confirm their
-   bookings before they start.", opens the Agenda with "Confirm the appointments", and its deadline is the start of
-   the soonest one) or search for the **Pending** appointment.
+1. Come in from the **N to confirm** notice (you tap it and see every appointment to confirm, whatever its day,
+   each with its date: the same ones the notice counts), from the bell in the top bar (its notice "N appointments to
+   confirm", "Customers are waiting for you to confirm their bookings before they start.", opens that same list with
+   "Confirm the appointments", and its deadline is the start of the soonest one) or search for the **Pending**
+   appointment.
 2. Tap **Confirm** on its row.
-3. The appointment becomes **Confirmed**, the history says "Confirmed" and the **N to confirm** notice
-   goes down; the bell too, at once, and it stops counting it.
+3. The appointment becomes **Confirmed**, leaves the list of those to confirm, the history says "Confirmed" and the
+   **N to confirm** notice goes down; the bell too, at once, and it stops counting it.
 In: a pending appointment (the one the customer booked with automatic confirmation turned off).
 Out: the confirmed appointment, its history line and the `appointment.appointment.confirmed` event.
 If it fails: "This appointment can no longer be confirmed: it is not pending any more."; nothing is
@@ -326,16 +357,18 @@ written.
 Involved: none
 
 ### APPOINTMENT-F04 Move an appointment or change its professional or services
-<!-- from WORKBOOK.md sha256:e2e4fc352ef5 -->
+<!-- from WORKBOOK.md sha256:9bb7faf793d9 -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda
 Steps:
-1. Tap **Edit** (or tap the appointment in "By professional"): "Edit appointment" opens.
+1. Tap **Edit** (or tap the appointment in "By professional"): "Edit appointment" opens, with the professional's
+   free times that day (the appointment's own time counts as free).
 2. Change Day, Time, "Duration (min)", Services or Professional and tap **Save changes**. If the appointment belongs
    to a series, choose **This appointment only** or **This and all following appointments**.
    From the front desk it can be taken to a time already past (to note down what
-   already happened).
+   already happened). An appointment booked with another length than its services' sum opens with **Use the
+   sum**, which takes it to that sum.
 3. Shortcut: in "By professional" drag it to another time, another day or another row. Dragging does not
    take it to a time already past (that, from the panel).
 4. The appointment keeps its number and the history says "Time changed", "Professional changed" or
@@ -436,18 +469,18 @@ with its check open at the till, "This appointment has a check open in the till:
 Involved: none
 
 ### APPOINTMENT-F10 See an appointment's history
-<!-- from WORKBOOK.md sha256:ac1dd82e7eea -->
+<!-- from WORKBOOK.md sha256:811b4d8d2ddf -->
 Status: done
 Actor: employee (their own), manager
 Screen: Agenda
 Steps:
 1. Tap **History** on the row (in any state) or open the appointment's card.
-2. Each change with its time on the business clock, who made it (a team member, by their name or, if their
-   account has none, by what goes before the @ of their email, never the whole email; "Requested by the customer"
-   if it was them; "Done by the platform" if no person did: the system, an automation or a recovery from a separate
-   copy; an API key, by its name) and what changed (from which professional or service to which, and the new time). A
-   deleted appointment that ERPlora's staff brought back from a separate copy keeps its lines and adds "Deleted"
-   and "Restored".
+2. Each change with its time on the business clock, who made it (a team member, by their name, the one in My
+   profile or, without it, their account's, or, if they have none, by what goes before the @ of their email, never
+   the whole email; "Requested by the customer" if it was them; "Done by the platform" if no person did: the
+   system, an automation or a recovery from a separate copy; an API key, by its name) and what changed (from which
+   professional or service to which, and the new time). A deleted appointment that ERPlora's staff brought back
+   from a separate copy keeps its lines and adds "Deleted" and "Restored".
 3. It is read-only: a single button, **Close**.
 In: an appointment in any state.
 Out: nothing (it only reads).
@@ -847,7 +880,7 @@ name; a time, as the business's wall-clock date and time ("2026-10-15 10:00"). I
 which ones and asks to choose.
 
 ### What it offers: queries (they read, they change nothing)
-<!-- from WORKBOOK.md sha256:856d9410d08b -->
+<!-- from WORKBOOK.md sha256:cba85d5c7532 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -859,7 +892,7 @@ which ones and asks to choose.
 | How many customers' bookings are waiting for confirmation | see appointments | F03, F18 | `appointment.appointment.count_to_confirm` |
 | What the customer booked or cancelled by themselves in the last 24 hours, the newest first | see appointments (all or their own) | F28 | `appointment.appointment.notices` |
 | The rows of the agenda (bookable professionals and those who keep appointments) | see appointments | F01, F04, F25, F27 | `appointment.agenda.lanes` |
-| The free times of a day | see availability | F02, F18 | `appointment.availability.slots` |
+| The free times of a day and the spans the professional works | see availability | F02, F18 | `appointment.availability.slots` |
 | Whether a specific time can be booked and why not | see availability | F02 | `appointment.availability.check` |
 | The blocks of a range | see availability | F16 | `appointment.blocked_time.list` |
 | The series, with search and filters | see appointments | F12–F15 | `appointment.recurring.list` |

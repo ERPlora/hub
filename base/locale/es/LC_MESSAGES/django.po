@@ -2732,6 +2732,13 @@ msgstr[2] "%(n)s personas tienen este rol. Dales otro antes de borrarlo."
 msgid "Last used"
 msgstr "Último uso"
 
+msgid "It is the device you are using"
+msgstr "Es el dispositivo que estás usando"
+
+#. Translators: it follows «It is the device you are using:» on the same line.
+msgid "removing it will close your session and you will have to enter again."
+msgstr "al quitarlo se cerrará tu sesión y tendrás que volver a entrar."
+
 msgid "Devices to remove"
 msgstr "Dispositivos que se quitan"
 
@@ -2895,6 +2902,14 @@ msgid "Nobody changes their own role: ask somebody above you."
 msgstr "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
 
 #: people.py
+msgid ""
+"The accountancy firm only reads and takes no place of the plan: it keeps the "
+"role of its invitation."
+msgstr ""
+"La gestoría solo lee y no ocupa plaza del plan: se queda con el rol de su "
+"invitación."
+
+#: people.py
 msgid "You may only give a role to people below you in the business."
 msgstr "Solo puedes dar un rol a quien está por debajo de ti en el negocio."
 
@@ -2921,3 +2936,14 @@ msgstr "Hay una app encendida o un permiso nuevo que aún no llevan: mira lo que
 #: bell.py
 msgid "Review the roles"
 msgstr "Revisar los roles"
+
+#: assistant/card_marks.py
+msgctxt "base"
+msgid "No limit"
+msgstr "Sin límite"
+
+#: assistant/card_marks.py
+#, python-format
+msgctxt "base"
+msgid "%(datum)s per %(unit)s"
+msgstr "%(datum)s por %(unit)s"

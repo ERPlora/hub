@@ -27,7 +27,7 @@ describe('useBaseI18n', () => {
   it('translates with the shell catalogue, placeholders included', () => {
     const { api } = harness('es');
     expect(api().t('base.home.title')).toBe('Inicio');
-    expect(api().t('base.setup.progress', { done: 1, total: 3 })).toBe('1 de 3 hechos');
+    expect(api().t('base.setup.progress', { done: 1, total: 3, n: 3 })).toBe('1 de 3 hechos');
   });
 
   it('picks the plural form («a | b») by the placeholder `n`, with no count of its own', () => {

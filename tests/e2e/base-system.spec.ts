@@ -278,7 +278,7 @@ for (const { label, ...viewport } of THREE_SIZES) {
         await expect(testid(page, 'system-usage-verdict')).toContainText('You do not need to upgrade: you already have the maximum capacity, but it sometimes falls short.');
         await expect(testid(page, 'system-usage-verdict-retry')).toHaveCount(0);
         await expect(testid(page, 'system-usage-row-capacity')).toContainText(/[1-6] of 6 connections/);
-        await expect(testid(page, 'system-usage-row-capacity')).toContainText('You already have the maximum capacity: tell us in «Report a problem».');
+        await expect(testid(page, 'system-usage-row-capacity')).toContainText('You already have the maximum capacity: tell us in “Report a problem”.');
         await expect(testid(page, 'system-usage-row-capacity').locator('.usage-meter')).toHaveAttribute('data-tone', 'success');
         await snap(page, 'BASE-F40-neutral-capacity', width);
 

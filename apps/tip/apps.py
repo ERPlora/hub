@@ -32,6 +32,8 @@ class TipConfig(LiveAppConfig):
     assistant_settings = ("tip.settings.get",)
     # The «Tip» row of the charge sheet, which Sales mounts without knowing Tips (frontend/components/TipStep.vue).
     checkout = [CheckoutStep(key="tip", component="TipStep", permission="tip.add_tip")]
+    # The report's views as its screen names them, so the assistant never says the code (tip.report.get).
+    choices = {"by": (("person", _("By person")), ("shift", _("By shift")))}
     permissions = {
         "tip.view_tip": _("View tips (an employee, their own)"),
         "tip.add_tip": _("Record tips"),
@@ -46,8 +48,10 @@ class TipConfig(LiveAppConfig):
         "hub_employee": ["tip.view_tip", "tip.add_tip"],
     }
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =` as the
-    # module's own icon. Whoever only records tips opens neither entry; a manager reads the settings blocked.
+    # module's own icon. Whoever only records tips opens «My tips» alone; a manager reads the settings blocked.
     navigation = [
         Nav("tips", _("Tips"), "ion:wallet-outline", "/tip/tips", permission="tip.manage"),
+        Nav("report", _("Report"), "ion:list-outline", "/tip/report", permission="tip.manage"),
         Nav("settings", _("Settings"), "ion:settings-outline", "/tip/settings", permission="tip.manage"),
+        Nav("mine", _("My tips"), "ion:person-outline", "/tip/mine", permission="tip.view_tip"),
     ]

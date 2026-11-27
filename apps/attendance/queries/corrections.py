@@ -8,6 +8,7 @@ from live.operations import operation
 
 from apps.attendance.models import Correction, Record
 from apps.attendance.schemas import CorrectionListIn, CorrectionPage
+from base.only_theirs import only_theirs
 
 from .days import visible_record
 from .reads import VIEW_ALL, _own_days, _page
@@ -70,6 +71,7 @@ def list_corrections(ctx: OperationContext, params: CorrectionListIn) -> dict:
     if params.record_id is not None:
         trails = trails.filter(record=visible_record(ctx, params.record_id))
     elif not ctx.has(VIEW_ALL):
+        only_theirs()
         own = _own_days(ctx)
         trails = (
             trails.filter(record__in=Record.objects.filter(own))

@@ -4,6 +4,7 @@
 // a card whose apps are missing is hidden and named below; a link can open one.
 import { describe, expect, it } from 'vitest';
 
+import { business } from '../../../../base/frontend/__tests__/business';
 import type { CatalogOut, FlowOut } from '../operations';
 import { click, mountFlow, settle } from '../__tests__/mount-flow';
 import FlowGallery from './FlowGallery.vue';
@@ -24,6 +25,8 @@ const catalog = (events = ALL_EVENTS, actions = ['task.task.create', 'customer.n
   actions: actions.map((name) => ({ name, kind: 'command', app: name.split('.')[0], app_name: name.split('.')[0], description: '', fields: [], outputs: [] })),
 });
 const CREATED = { id: 'f9', name: 'Welcome a new customer', enabled: false } as FlowOut;
+/** A text with its spaces plain: `Intl` writes «100,00 €» and «6:00 PM» with a no-break space. */
+const plain = (text: string): string => text.replace(/\s/g, ' ');
 
 async function setup(props: Record<string, unknown> = {}, answer: [number, unknown] = [201, CREATED]) {
   return mountFlow(FlowGallery, { props: { catalog: catalog(), flows: [], openCard: null, ...props }, answers: { '/api/flow/flows': answer } });
@@ -71,7 +74,7 @@ describe('Gallery', () => {
     const m = await setup({ flows: [mine] });
     expect(m.find('flow-card-open-welcome').text()).toContain('Unfinished');
     await click(m.find('flow-card-open-welcome').element);
-    expect(m.find('flow-card-panel-welcome').text()).toContain('Careful: «Mine» already starts with the same thing.');
+    expect(m.find('flow-card-panel-welcome').text()).toContain('Careful: “Mine” already starts with the same thing.');
     // «Use this one» stays, second to «See it», and makes a second one.
     expect((m.find('flow-card-use-welcome').element as unknown as { fill?: string }).fill).toBe('outline');
     expect(m.find('flow-card-panel-welcome').exists()).toBe(true);
@@ -83,6 +86,29 @@ describe('Gallery', () => {
     const m = await setup({ catalog: catalog(ALL_EVENTS, ['customer.note.add']) });
     expect(m.wrapper.findAll('[data-testid^="flow-card-open-"]').map((el) => el.attributes('data-testid'))).toEqual(['flow-card-open-bigSaleNote']);
     expect(m.find('flow-gallery-hidden').text()).toBe('Some automations are hidden: they need Tasks.');
+  });
+
+  it("says the amounts in the business's money and the times on the clock of English", async () => {
+    const m = await mountFlow(FlowGallery, { props: { catalog: catalog(), flows: [], openCard: null }, business: business() });
+    await m.live();
+    expect(plain(m.find('flow-card-open-bigSaleNote').text())).toContain('When a sale of €100.00 or more has a customer');
+    expect(plain(m.find('flow-card-open-bigSaleTask').text())).toContain('When a sale over €100.00 is charged');
+    expect(plain(m.find('flow-card-open-weekReview').text())).toContain('Every Friday at 6:00 PM');
+    expect(plain(m.find('flow-card-open-morning').text())).toContain('Every day at 9:00 AM');
+    await click(m.find('flow-card-open-bigSaleNote').element);
+    const panel = plain(m.find('flow-card-panel-bigSaleNote').text());
+    expect(panel).toContain("is €100.00 or more, it writes “Big sale” on the customer's card");
+    expect(panel).toContain('€100.00 is 10000: money is in cents.');
+    expect(panel).not.toMatch(/[«»]|100,00/);
+  });
+
+  it('says them in Spanish as Spanish writes them', async () => {
+    const m = await mountFlow(FlowGallery, { props: { catalog: catalog(), flows: [], openCard: null }, business: business(), locale: 'es' });
+    await m.live();
+    expect(plain(m.find('flow-card-open-bigSaleNote').text())).toContain('Cuando una venta de 100,00 € o más tiene cliente');
+    expect(plain(m.find('flow-card-open-weekReview').text())).toContain('Todos los viernes a las 18:00');
+    await click(m.find('flow-card-open-bigSaleNote').element);
+    expect(plain(m.find('flow-card-panel-bigSaleNote').text())).toContain('es de 100,00 € o más, escribe «Venta grande» en la ficha del cliente');
   });
 
   it('a link opens its card; the guide button asks for the guide', async () => {

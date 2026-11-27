@@ -1,12 +1,18 @@
 """The app's settings: lengths, notice, cancellation and the calendar's hours."""
 
+from typing import Annotated
+
 from django.utils.translation import gettext_lazy as _
 from ninja import Field, Schema
 from pydantic import model_validator
 
 from apps.appointment.schemas.fields import In, Minutes
+from base.schemas.assistant import no_limit
 
 CALENDAR_UPSIDE_DOWN = _("The calendar has to end after it starts.")
+
+#: Days ahead one may book, up to a year; 0 is no limit.
+AdvanceDays = Annotated[int, Field(ge=0, le=365, json_schema_extra=no_limit())]
 
 
 class SettingsIn(In):
@@ -19,10 +25,8 @@ class SettingsIn(In):
         le=10080,
         description="Minutes ahead the customer must book (the front desk books for now).",
     )
-    max_advance_booking: int | None = Field(
+    max_advance_booking: AdvanceDays | None = Field(
         None,
-        ge=0,
-        le=365,
         description="Days ahead one may book (up to a year); 0 = no limit (a series then books 90 days).",
     )
     allow_overlapping: bool | None = Field(

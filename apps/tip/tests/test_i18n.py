@@ -59,3 +59,6 @@ def test_spanish_texts():
         assert str(tip_services.SALE_VOIDED) == "Esa venta está anulada: no admite propina."
         assert str(schemas.SAY_REASON) == "Escribe el motivo."
         assert str(schemas.SAME_SUGGESTION) == "Esa sugerencia ya está."
+        assert str(queries.MEMBER_NOT_LINKED) == (
+            "Tu usuario no está vinculado a ninguna ficha de Personal: pide a un responsable que la vincule en Personal."
+        )

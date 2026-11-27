@@ -36,6 +36,7 @@ export const DETAIL: CustomerDetailOut = {
   consent: [],
   marketing_consent: false,
   consent_date: null,
+  consent_notice: 'I want to receive offers and news from this business through this channel. I can unsubscribe whenever I want.',
 };
 
 /** A row of `customer.customer.list`. */

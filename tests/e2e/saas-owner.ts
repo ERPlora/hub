@@ -67,3 +67,19 @@ export async function businessOnSaas(owner: SaasOwner, business: { name: string;
     .toBe('ready');
   return made;
 }
+
+/** `person` joins `business` as an employee: the owner invites them and they accept, through the SaaS's API. Gives the
+ *  invitation's id. */
+export async function joinsAsEmployee(owner: SaasOwner, person: SaasOwner, business: SaasBusiness): Promise<string> {
+  const invited = await saasPost(owner.context, '/hubs/members/invite', {
+    hub_id: business.id,
+    email: person.credentials.email,
+    role: 'hub_employee',
+    message: '',
+  });
+  expect(invited.status(), await invited.text()).toBe(200);
+  const { id } = (await invited.json()) as { id: string };
+  const accepted = await saasPost(person.context, '/hubs/invitations/accept', { id });
+  expect(accepted.status(), await accepted.text()).toBe(200);
+  return id;
+}

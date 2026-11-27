@@ -1,4 +1,4 @@
-import { ApiError } from '@erplora/ui/sdk';
+import { ApiError, type SubListener } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { memoryStorage } from '../__tests__/mount-base';
@@ -201,17 +201,18 @@ describe('createIdleLock', () => {
   });
 });
 
-describe('readAccess', () => {
-  function withHome(home: unknown): Document {
-    const doc = document.implementation.createHTMLDocument('hub');
-    const block = doc.createElement('script');
-    block.id = 'hub-home';
-    block.type = 'application/json';
-    block.textContent = JSON.stringify(home);
-    doc.body.append(block);
-    return doc;
-  }
+/** A page of the hub whose `hub-home` block is `home`. */
+function withHome(home: unknown): Document {
+  const doc = document.implementation.createHTMLDocument('hub');
+  const block = doc.createElement('script');
+  block.id = 'hub-home';
+  block.type = 'application/json';
+  block.textContent = JSON.stringify(home);
+  doc.body.append(block);
+  return doc;
+}
 
+describe('readAccess', () => {
   it('reads the session’s way in from hub-home', () => {
     const access = { credential: 'pin', switch_user: true, idle_minutes: 5 };
     expect(readAccess(withHome({ name: 'Bar', access }))).toEqual(access);
@@ -246,14 +247,13 @@ describe('startWayIn — what the shell does with the session’s way in, once m
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  function page(home: unknown): Document {
-    const doc = document.implementation.createHTMLDocument('hub');
-    const block = doc.createElement('script');
-    block.id = 'hub-home';
-    block.type = 'application/json';
-    block.textContent = JSON.stringify(home);
-    doc.body.append(block);
-    return doc;
+  /** The tab's live stream, with `answer` sending what `base.session.idle` re-runs to. */
+  function liveStream() {
+    let listener: SubListener = () => undefined;
+    const leave = Object.assign(vi.fn(), { id: 'idle' });
+    const subscribe = vi.fn((_op: string, _params: unknown, heard: SubListener) => ((listener = heard), leave));
+    const answer = (idle_minutes: number | null) => listener({ type: 'result', data: { idle_minutes }, rev: 1 });
+    return { subscribe, answer, fail: () => listener({ type: 'error', error: new ApiError(500, 'internal', '') }), leave };
   }
 
   function deps(storage = memoryStorage()) {
@@ -266,6 +266,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
       label: () => 'Bea',
       storage,
       target: window,
+      stream: liveStream(),
     };
   }
 
@@ -274,7 +275,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
 
   it('a till that always asks signs out after its idle minutes', () => {
     const d = deps();
-    const stop = startWayIn(page({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    const stop = startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
     vi.advanceTimersByTime(5 * 60_000);
     expect(d.logout).toHaveBeenCalledOnce();
     stop();
@@ -282,22 +283,89 @@ describe('startWayIn — what the shell does with the session’s way in, once m
 
   it('anywhere else nothing is armed', () => {
     const d = deps();
-    const stop = startWayIn(page({ access: ACCOUNT, preferences: NONE }), d);
+    const stop = startWayIn(withHome({ access: ACCOUNT, preferences: NONE }), d);
     vi.advanceTimersByTime(60 * 60_000);
     expect(d.logout).not.toHaveBeenCalled();
     stop();
   });
 
+  // A till already open when the business changes «Ask again after inactivity» (BASE-F59, F67), without reloading.
+  it('an open till follows the business’s new idle minutes from the moment they are saved', () => {
+    const d = deps();
+    const stop = startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin' }, preferences: NONE }), d);
+    expect(d.stream.subscribe).toHaveBeenCalledWith('base.session.idle', {}, expect.any(Function));
+    d.stream.answer(null);
+    d.stream.answer(1);
+    vi.advanceTimersByTime(60_000 - 1);
+    expect(d.logout).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('back to «Until sign out», the open till stops locking', () => {
+    const d = deps();
+    const stop = startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    d.stream.answer(null);
+    vi.advanceTimersByTime(60 * 60_000);
+    expect(d.logout).not.toHaveBeenCalled();
+    stop();
+  });
+
+  it('back to the minutes it had before «Until sign out», the open till locks again', () => {
+    const d = deps();
+    const stop = startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    d.stream.answer(null);
+    d.stream.answer(5);
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('the same minutes answered again (the stream reconnecting) keep counting from the last touch', () => {
+    const d = deps();
+    const stop = startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    vi.advanceTimersByTime(4 * 60_000);
+    d.stream.answer(5);
+    vi.advanceTimersByTime(60_000);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('a live read that fails keeps the minutes the till had', () => {
+    const d = deps();
+    const stop = startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin', idle_minutes: 5 }, preferences: NONE }), d);
+    d.stream.fail();
+    vi.advanceTimersByTime(5 * 60_000);
+    expect(d.logout).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('stopped, it leaves the live query and nothing it answers locks', () => {
+    const d = deps();
+    startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin' }, preferences: NONE }), d)();
+    expect(d.stream.leave).toHaveBeenCalledOnce();
+    d.stream.answer(1);
+    vi.advanceTimersByTime(10 * 60_000);
+    expect(d.logout).not.toHaveBeenCalled();
+  });
+
+  it('a page without a session in the hub (no way in) follows nothing: the stream would refuse it', () => {
+    const d = deps();
+    startWayIn(withHome({ name: 'Bar', preferences: NONE }), d)();
+    expect(d.stream.subscribe).not.toHaveBeenCalled();
+  });
+
   it('paints the person’s own appearance', () => {
     const d = deps();
-    startWayIn(page({ access: ACCOUNT, preferences: { theme_mode: 'dark', palette: 'forest', ui_scale: 120 } }), d)();
+    startWayIn(withHome({ access: ACCOUNT, preferences: { theme_mode: 'dark', palette: 'forest', ui_scale: 120 } }), d)();
     expect(d.paint).toHaveBeenCalledWith('dark', 'forest', 120);
     expect(d.reset).not.toHaveBeenCalled();
   });
 
   it('paints a personal interface scale even without a mode or palette override', () => {
     const d = deps();
-    startWayIn(page({ access: ACCOUNT, preferences: { ...NONE, ui_scale: 120 } }), d)();
+    startWayIn(withHome({ access: ACCOUNT, preferences: { ...NONE, ui_scale: 120 } }), d)();
     expect(d.paint).toHaveBeenCalledWith(null, null, 120);
     expect(d.reset).not.toHaveBeenCalled();
   });
@@ -306,7 +374,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
     const storage = memoryStorage();
     announceSwitch('Bea', storage);
     const d = deps(storage);
-    startWayIn(page({ access: { ...ACCOUNT, credential: 'pin' }, preferences: NONE }), d)();
+    startWayIn(withHome({ access: { ...ACCOUNT, credential: 'pin' }, preferences: NONE }), d)();
     expect(d.reset).toHaveBeenCalledOnce();
     expect(d.toast).toHaveBeenCalledWith('base.switchUser.nowServing {"name":"Bea"}');
     expect(takeSwitchAnnouncement(storage)).toBeNull();
@@ -314,7 +382,7 @@ describe('startWayIn — what the shell does with the session’s way in, once m
 
   it('without a switch, no toast and the browser’s own appearance stays', () => {
     const d = deps();
-    startWayIn(page({ access: ACCOUNT, preferences: NONE }), d)();
+    startWayIn(withHome({ access: ACCOUNT, preferences: NONE }), d)();
     expect([d.toast.mock.calls.length, d.paint.mock.calls.length, d.reset.mock.calls.length]).toEqual([0, 0, 0]);
   });
 });

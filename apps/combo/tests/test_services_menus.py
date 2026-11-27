@@ -70,7 +70,7 @@ def test_a_menu_eaten_in_without_a_tax_category_is_refused_on_the_field():
 
 def test_an_unknown_tax_category_is_refused_on_the_field():
     with pytest.raises(InvalidPayload) as caught:
-        run("combo.combo.create", {"name": "x", "tax_category_key": "nope.nope"})
+        run("combo.combo.create", {"name": "x", "price": 1350, "tax_category_key": "nope.nope"})
     assert caught.value.fields == {
         "tax_category_key": "That tax category does not exist in Taxes."
     }
@@ -88,7 +88,7 @@ def test_only_a_manager_builds_menus():
     with pytest.raises(PermissionDenied):
         run(
             "combo.combo.create",
-            {"name": "x", "supply_kind": "goods"},
+            {"name": "x", "price": 600, "supply_kind": "goods"},
             ctx_for("hub_employee"),
         )
 

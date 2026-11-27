@@ -545,7 +545,7 @@ the device's error.
 Involved: PRINTING-F06, PRINTING-F07, PRINTING-F22
 
 ### PRINTING-F14 Get a print job unstuck
-<!-- from WORKBOOK.md sha256:e5ac51e3dc4e -->
+<!-- from WORKBOOK.md sha256:b74db612c271 -->
 Status: done
 Actor: owner, administrator
 Screen: Queue
@@ -555,7 +555,7 @@ Steps:
 2. "Try again" sends it back to the queue with the attempts at zero, towards whichever printer fits now:
    "Sent back to the queue: the next device to connect will print it.".
 3. "Cancel" asks for a reason (optional) and withdraws it: "Job cancelled. It will not be printed.". It stays in
-   the queue with who (by their name or, if their account has none, by what goes before the @ of their email,
+   the queue with who (by their name or, if they have none, by what goes before the @ of their email,
    never the whole email), when and why.
 In: the job and, when cancelling, the reason.
 Out: the job waiting again or cancelled (announces: `printing.job.retried`, `printing.job.cancelled`); nobody

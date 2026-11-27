@@ -172,6 +172,19 @@ class TestWhoIsInTheBusiness:
         client.force_login(olga)
         assert row(people(client), "saas:3")["name"] == "Eva María Ruiz"
 
+    def test_a_name_of_my_profile_holding_an_address_never_reaches_an_employee(self, client, olga, eva, make_user):
+        from base.models.profile import Profile
+
+        nora = "nora.ruiz+bar@example.com"
+        make_user("saas:6", host=A.key, role=Membership.Role.MANAGER, first_name=nora, email=nora)
+        Profile.objects.create(username="saas:1", first_name="olga.ruiz+bar@example.com")
+        Profile.objects.create(username="saas:6", first_name=nora)
+        client.force_login(eva)
+        answer = people(client)
+        # An address names a person only when nothing else does, and then by what goes before its «@».
+        assert (row(answer, "saas:1")["name"], row(answer, "saas:6")["name"]) == ("Olga", "nora.ruiz+bar")
+        assert "@" not in json.dumps(answer)
+
     def test_nobody_without_a_session(self, client, olga):
         assert get(client, "/people").status_code in (401, 403)
 
@@ -206,11 +219,11 @@ class TestOnePerson:
         answer = get(client, "/people/detail", person="saas:3").json()
         assert answer["id"] == "saas:3" and answer["ways"] == {"account": True, "pin": True, "badge": False}
         assert answer["pin_set_at"] is not None and answer["badge_set_at"] is None
-        assert answer["may"] == {"remove_pin": True, "set_badge": True}
+        assert answer["may"] == {"remove_pin": True, "set_badge": True, "give_role": True}
         owner = get(client, "/people/detail", person="saas:1").json()
-        assert owner["may"] == {"remove_pin": False, "set_badge": False}
+        assert owner["may"] == {"remove_pin": False, "set_badge": False, "give_role": False}
         mine = get(client, "/people/detail", person="saas:2").json()
-        assert mine["may"] == {"remove_pin": True, "set_badge": False}
+        assert mine["may"] == {"remove_pin": True, "set_badge": False, "give_role": False}
 
     def test_a_person_of_another_business_or_nobody_is_not_found(self, client, adam, make_user):
         make_user("saas:9", host=B.key, role=Membership.Role.EMPLOYEE)

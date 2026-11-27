@@ -78,6 +78,12 @@ def test_a_new_service_needs_a_name_and_whole_non_negative_cents():
     )
 
 
+def test_a_new_service_needs_its_price_said_and_free_is_said_as_zero():
+    assert set(errors(ServiceIn, name="Corte y peinado")) == {"price"}
+    assert ServiceIn.model_validate({"name": "Consulta", "price": 0}).price == 0
+    assert set(errors(ServiceBulkIn, services=[{"name": "Corte", "price": 1500}, {"name": "Tinte"}])) == {"services.1.price"}
+
+
 def test_a_service_takes_time_and_serves_someone():
     assert "duration_minutes" in errors(ServiceIn, name="Cut", duration_minutes=0)
     assert "max_capacity" in errors(ServiceIn, name="Cut", max_capacity=0)
@@ -90,6 +96,7 @@ def test_a_pricing_type_is_one_of_the_five_and_its_minimum_is_not_above_its_maxi
         ServiceIn,
         name="Highlights",
         pricing_type="from",
+        price=6500,
         min_price=6500,
         max_price=5000,
     )

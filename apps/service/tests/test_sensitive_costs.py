@@ -54,9 +54,9 @@ def test_an_employee_adds_a_service_without_a_cost_and_is_refused_one_with_it(ha
     employee = ctx_for("hub_employee")
     tax = haircut.tax_category.key
     with pytest.raises(PermissionDenied):
-        operation("service.service.create")(employee, ServiceIn(name="Colour", tax_category_key=tax, cost=900))
+        operation("service.service.create")(employee, ServiceIn(name="Colour", tax_category_key=tax, price=3500, cost=900))
     assert not Service.objects.filter(name="Colour").exists()
-    operation("service.service.create")(employee, ServiceIn(name="Colour", tax_category_key=tax))
+    operation("service.service.create")(employee, ServiceIn(name="Colour", tax_category_key=tax, price=3500))
     assert Service.objects.get(name="Colour").cost == 0
 
 

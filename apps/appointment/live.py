@@ -41,6 +41,7 @@ live(
     on=[*APPOINTMENT_EVENTS, "service.service.archived"],
 )
 live("appointment.appointment.count_to_confirm", on=APPOINTMENT_EVENTS)
+live("appointment.appointment.list_to_confirm", on=APPOINTMENT_EVENTS)
 # What the customer did herself; an erased card empties the name it shows.
 live("appointment.appointment.notices", on=[*APPOINTMENT_EVENTS, *CUSTOMER_GONE])
 # A professional kept on the agenda, or a new one taking bookings, changes its rows.

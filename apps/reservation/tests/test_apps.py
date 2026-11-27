@@ -3,6 +3,7 @@
 import pytest
 from django.apps import apps
 from live.meta import Category, LiveAppConfig, Nav, module_configs
+from live.operations import INTERNAL
 
 from base import assistant
 from base.tenancy.tests.business import HUB_DB
@@ -71,7 +72,12 @@ OPERATIONS = {
     "reservation.settings.update",
     "reservation.customer.reassign",
     "reservation.customer.erase",
+    "reservation.reservation.check",
 }
+#: What only the assistant's card reads before it is shown: no tool, no route (``ai=INTERNAL``).
+INTERNAL_READS = {"reservation.reservation.check"}
+#: The writes the assistant's card checks first by a read of the app (``ai["check"]``).
+CHECKED = {"reservation.reservation.create": "reservation.reservation.check"}
 
 
 def reservation():
@@ -176,28 +182,44 @@ def test_the_operations_are_the_workbook_ones():
     assert {name for name in registry if name.startswith("reservation.")} == OPERATIONS
 
 
+def declared_to_the_assistant(op) -> set[str]:
+    """What an operation of reservation declares to the assistant: a command says its risk; a read has none."""
+    expected = {"description", "risk"} if op.kind == "command" else {"description"}
+    if assistant.tools.is_tool(op):  # what a person types to ask for it (live.E020: reservation is listed)
+        expected = expected | {"asks"}
+    if op.name in IN_PERSON:
+        expected = expected | {"in_person"}
+    if op.name in SUMMARISED:
+        expected = expected | {"summary"}
+    if op.name in CHECKED:
+        expected = expected | {"check"}
+    return expected
+
+
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
-    # permission is its only door. A command says its risk; a read has none.
+    # permission is its only door.
     from live.operations import registry
 
     operations = [
-        op for name, op in registry.items() if name.startswith("reservation.")
+        op for name, op in registry.items() if name.startswith("reservation.") and name not in INTERNAL_READS
     ]
-    assert len(operations) == len(OPERATIONS)
+    assert len(operations) == len(OPERATIONS - INTERNAL_READS)
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
-        expected = {"description", "risk"} if op.kind == "command" else {"description"}
-        if assistant.tools.is_tool(op):  # what a person types to ask for it (live.E020: reservation is listed)
-            expected = expected | {"asks"}
-        if op.name in IN_PERSON:
-            expected = expected | {"in_person"}
-        if op.name in SUMMARISED:
-            expected = expected | {"summary"}
-        assert set(op.ai) == expected, op.name
+        assert set(op.ai) == declared_to_the_assistant(op), op.name
         assert op.ai.get("in_person", False) is (op.name in IN_PERSON), op.name
+        assert op.ai.get("check") == CHECKED.get(op.name), op.name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, op.name
+
+
+def test_what_only_the_assistants_card_reads_is_no_tool_and_has_no_route():
+    from live.operations import registry
+
+    internal = {name for name, op in registry.items() if name.startswith("reservation.") and op.ai is INTERNAL}
+    assert internal == INTERNAL_READS
+    assert not any(registry[name].expose_api for name in internal)
 
 
 def test_cancelling_marking_a_no_show_and_deleting_are_high_risk():

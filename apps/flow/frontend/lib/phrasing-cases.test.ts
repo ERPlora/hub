@@ -10,6 +10,9 @@ import cases from './phrasing-cases.json';
 
 type Language = 'en' | 'es';
 
+/** ICU versions differ on the space before «PM»; the server's Babel writes a narrow no-break one. */
+const plain = (text: string): string => text.replace(/\s/g, ' ');
+
 /** The apps the server names by itself, as the catalog names them to the screens. */
 function catalog(language: Language): CatalogOut {
   const events = Object.entries(cases.apps[language]).map(([app, app_name]) => ({ name: `${app}.x.y`, app, app_name }));
@@ -18,12 +21,12 @@ function catalog(language: Language): CatalogOut {
 
 describe('the cases the screens share with the server', () => {
   it.each(cases.triggers)('$language: a trigger is «$said»', ({ language, trigger, said }) => {
-    expect(describeTrigger(trigger as Trigger, catalog(language as Language), phrasingIn(language as Language))).toBe(said);
+    expect(plain(describeTrigger(trigger as Trigger, catalog(language as Language), phrasingIn(language as Language)))).toBe(said);
   });
 
   it.each(cases.steps)('$language: a step is «$said»', (shared) => {
     const step = shared.step as unknown as Step;
     const steps = [...((shared as { steps?: unknown[] }).steps ?? []), step] as Step[];
-    expect(describeStep(step, steps, catalog(shared.language as Language), phrasingIn(shared.language as Language))).toBe(shared.said);
+    expect(plain(describeStep(step, steps, catalog(shared.language as Language), phrasingIn(shared.language as Language)))).toBe(shared.said);
   });
 });

@@ -3,17 +3,23 @@
 - «Remove the unused» says, under «What will happen», how many devices it removes and which ones, never the one in
   hand; with none to remove there is no card, and the model hears why.
 - «Remove this device» says when the device was last used: two devices without a name read the same («Chrome ·
-  Linux») and only their last use tells them apart.
+  Linux») and only their last use tells them apart; and, for the one in hand, what «Devices» says of it: removing it
+  closes the person's session.
 """
 
 import datetime as dt
 import json
+from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.test import RequestFactory
 from django.utils import timezone
 from live import assistant as shared
 from live.context import OperationContext
+from live.errors import PermissionDenied
+from live.live_registry import live_registry
+from live.ninja import operation_ids
 from live.operations import get
 
 from base import access
@@ -21,6 +27,7 @@ from base.models.access import TrustedDevice
 from base.tenancy.tests.business import HUB_DB, A, in_business_a
 from base.tests import card_turn
 from base.tests.card_turn import call
+from config.api import api
 
 __all__ = ["in_business_a"]
 
@@ -34,6 +41,12 @@ NOTHING_TO_REMOVE = {
     "es": "Ningún dispositivo lleva 30 días sin usarse, así que no hay nada que quitar.",
 }
 LAST_USE = {"en": ("Last used", "Nov 22, 2026, 4:18\u202fPM"), "es": ("Último uso", "22 nov 2026, 16:18")}
+FRONTEND = Path(apps.get_app_config("base").path) / "frontend/locale"
+#: What «Devices» says before removing the device in hand, in each language.
+REMOVE_YOURS = {
+    language: json.loads((FRONTEND / f"{language}.json").read_text())["base"]["devices"]["removeYours"]
+    for language in ("en", "es")
+}
 
 
 def a_device(days_ago: float = 0, **fields) -> tuple[TrustedDevice, str]:
@@ -72,10 +85,9 @@ def test_with_no_device_unused_for_30_days_there_is_no_card_and_the_model_hears_
     _, in_hand = a_device(days_ago=90)
     a_device(days_ago=0, agent="Chrome · Linux")
     plan = turn(in_hand, call("base.device.prune", {}), language=language)
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    [row] = plan["executed"]
-    assert (row["name"], row["outcome"], row["code"]) == ("base.device.prune", "error", "base.no_unused_devices")
-    assert json.loads(plan["append"][0]["content"])["error"]["message"] == NOTHING_TO_REMOVE[language]
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    told = json.loads(plan["append"][0]["content"])["error"]
+    assert (told["code"], told["message"]) == ("base.no_unused_devices", NOTHING_TO_REMOVE[language])
 
 
 def test_the_yes_removes_the_devices_its_card_showed_and_keeps_the_one_in_hand():
@@ -99,8 +111,33 @@ def test_removing_one_of_two_devices_with_the_same_name_says_when_it_was_last_us
     assert preview_lines(card) == [("last_entry_at", label, when)]
 
 
-def test_the_read_behind_the_card_is_not_a_tool_of_the_assistant():
-    assert not shared.is_tool(get("base.device.unused"))
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_removing_the_device_in_hand_says_as_devices_does_that_it_closes_the_persons_session(language):
+    here, in_hand = a_device(days_ago=0, name="Bar")
+    card = turn(in_hand, call("base.device.remove", {"id": str(here.pk)}), language=language)["confirm"]
+    [last_use, yours] = card["preview"]
+    assert last_use["name"] == "last_entry_at"
+    assert yours["titled"] is True
+    assert f"{yours['label']}: {yours['value']}" == REMOVE_YOURS[language]
+
+
+@pytest.mark.parametrize("read", ["base.device.unused", "base.device.removal"])
+def test_the_read_behind_the_card_is_not_a_tool_of_the_assistant(read):
+    assert not shared.is_tool(get(read))
+
+
+@pytest.mark.parametrize("read", ["base.device.unused", "base.device.removal"])
+def test_the_read_behind_the_card_is_only_for_who_administers_the_business_and_only_on_the_card(read):
+    """It says which devices the business has and when they were used: no route of the API and no live query serve
+    it, and run as someone who cannot administer the business it refuses."""
+    op = get(read)
+    assert read not in operation_ids(api)
+    assert not live_registry.is_subscribable(read)
+    device, _ = a_device(days_ago=90)
+    data = {"id": device.pk} if "id" in op.input.model_fields else {}
+    someone = OperationContext(scope=A, actor="leo", permissions=frozenset({"base.view_home"}))
+    with pytest.raises(PermissionDenied):
+        op(someone, op.input(**data))
 
 
 def test_a_yes_to_a_card_whose_devices_changed_removes_nothing_and_draws_the_card_again():

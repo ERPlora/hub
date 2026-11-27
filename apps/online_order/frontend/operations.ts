@@ -56,15 +56,19 @@ export interface MenuGroupOut {
 
 /** One of the things a customer picks: an option of a dish or a dish of a set menu's course. */
 export interface ChoiceOut {
+  /** What the order names when it is picked. */
+  id: string;
   name: string;
   price_delta: number;
   allergens: string[];
 }
 
 export interface MenuCourseOut {
+  id: string;
   name: string;
   min_choices: number;
   max_choices: number;
+  allow_repeat: boolean;
   choices: ChoiceOut[];
 }
 
@@ -85,10 +89,12 @@ export interface PublicMenuOut {
 }
 
 export interface OptionGroupOut {
+  id: string;
   name: string;
   min_choices: number;
   /** 0 = no ceiling. */
   max_choices: number;
+  allow_repeat: boolean;
   options: ChoiceOut[];
 }
 
@@ -97,11 +103,33 @@ export interface PublicOptionsOut {
   groups: OptionGroupOut[];
 }
 
+/** A dish with its options, or a set menu with its dishes, by their ids: never a price, which is the server's. */
+export interface SendLineIn {
+  product_id?: string;
+  option_ids?: string[];
+  combo_id?: string;
+  choices?: { option_id: string; quantity: number }[];
+  quantity: number;
+  notes: string;
+}
+
+export interface PublicSendIn extends PublicCodeIn {
+  lines: SendLineIn[];
+}
+
+export interface PublicSentOut {
+  id: string;
+  /** `pending`: it waits for the staff to confirm it. */
+  status: string;
+  total: number;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'online_order.qr_code.list': { input: TableCodeListIn; output: TableCodePage };
     'online_order.qr_code.regenerate': { input: TableRefIn; output: TableCodeOut };
     'online_order.public.menu': { input: PublicCodeIn; output: PublicMenuOut };
     'online_order.public.options': { input: PublicOptionsIn; output: PublicOptionsOut };
+    'online_order.public.send': { input: PublicSendIn; output: PublicSentOut };
   }
 }

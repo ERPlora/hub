@@ -51,12 +51,13 @@ def test_the_operations_of_the_app():
         "online_order.qr_code.regenerate": ("command", "online_order.change_qr_code"),
         "online_order.public.menu": ("query", "online_order.public"),
         "online_order.public.options": ("query", "online_order.public"),
+        "online_order.public.send": ("command", "online_order.public"),
     }
     # Both are assistant tools; regenerating cannot be undone, so its card asks to type the confirmation.
     assert operations["online_order.qr_code.list"].ai_spec().risk == "normal"
     assert operations["online_order.qr_code.regenerate"].ai_spec().risk == "high"
-    # The table's page reads are the customer's, not the team's assistant's tools.
-    assert not operations["online_order.public.menu"].ai and not operations["online_order.public.options"].ai
+    # The table's page reads and its order are the customer's, not the team's assistant's tools.
+    assert not any(operations[f"online_order.public.{name}"].ai for name in ("menu", "options", "send"))
 
 
 def test_its_table_page_is_served_by_base_s_public_door():

@@ -161,3 +161,16 @@ export function useLiveWindows<Op extends OpName, Row = unknown>(
 
   return { rows, total, hasMore, windows, status, error, loadMore, refresh: () => first.refresh() };
 }
+
+/** The most rows a whole list follows: ten windows of 100. */
+export const WHOLE_LIST_MAX = 1000;
+
+/** Every row of the list, up to `max`: one window of 100, then as many as its total needs. */
+export function useWholeList<Op extends OpName, Row = unknown>(op: Op, query: () => object, max = WHOLE_LIST_MAX): LiveWindows<Row> {
+  const wanted = shallowRef(MAX_WINDOW);
+  const list = useLiveWindows<Op, Row>(op, query, MAX_WINDOW, { start: () => 0, rows: () => wanted.value });
+  watch(list.total, (total) => {
+    wanted.value = Math.min(max, Math.max(MAX_WINDOW, total ?? MAX_WINDOW));
+  });
+  return list;
+}

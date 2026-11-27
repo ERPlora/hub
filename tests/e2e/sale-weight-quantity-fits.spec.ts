@@ -64,7 +64,7 @@ const line = (): Locator => shown(page).locator('[data-testid^=pos-line-]').filt
 /** `typed` into the line's field and confirmed. On a phone the line scrolls under «Send order»: brought into view. */
 async function confirm(typed: string): Promise<Locator> {
   await openTillCart(page);
-  const field = line().locator('.pos-qty__field');
+  const field = line().locator('[data-testid=pos-qty-field]');
   await field.scrollIntoViewIfNeeded();
   await field.fill(typed);
   await field.press('Enter');
@@ -84,9 +84,9 @@ async function weigh(weight: (typeof WEIGHTS)[number]): Promise<void> {
 /** The field's figure whole inside it, the unit after it, and the selector inside its line. */
 async function quantityReadsWhole(weight: (typeof WEIGHTS)[number], where: string): Promise<void> {
   const fit = await line().evaluate((row) => {
-    const field = row.querySelector('.pos-qty__field') as HTMLInputElement;
+    const field = row.querySelector('[data-testid=pos-qty-field]') as HTMLInputElement;
     const unit = row.querySelector('[data-testid=pos-qty-unit]') as HTMLElement;
-    const stepper = row.querySelector('.pos-qty') as HTMLElement;
+    const stepper = field.parentElement as HTMLElement;
     const label = row.querySelector('.pos-line__label') as HTMLElement;
     const box = (el: Element) => el.getBoundingClientRect();
     return {
@@ -110,7 +110,7 @@ async function quantityReadsWhole(weight: (typeof WEIGHTS)[number], where: strin
 }
 
 test('SALE-F10: a one-figure quantity keeps the field as wide as it always was', async () => {
-  const field = line().locator('.pos-qty__field');
+  const field = line().locator('[data-testid=pos-qty-field]');
   await expect(field).toHaveValue('1');
   const rem = await field.evaluate(
     (el) => el.getBoundingClientRect().width / Number.parseFloat(getComputedStyle(document.documentElement).fontSize),

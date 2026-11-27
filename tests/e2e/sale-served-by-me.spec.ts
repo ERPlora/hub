@@ -8,19 +8,14 @@
 // and linked back after it.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, shown, untilStill } from './helpers';
+import { A, api, capture, login, psql, shown, THREE_SIZES, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, newestSaleOf, openTillCart, stamp } from './sale-helpers';
 
 const RUN = stamp();
 const TAG = `E2E Me ${RUN}`;
-const VIEWPORTS = [
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
-] as const;
-const UNLINKED = 'Your account has no record in Staff: left on «Me», this sale counts for nobody.';
+const UNLINKED = 'Your account has no record in Staff: left on “Me”, this sale counts for nobody.';
 
 let product: Product;
 /** The owner's person in the business's database (`base.HubUser`), as `/api/me` says it. */
@@ -83,7 +78,7 @@ async function closePicker(page: Page): Promise<void> {
 test('SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo»): without a record in Staff, «Me» warns the sale counts for nobody', async ({ page }) => {
   await login(page, A, '/sale/pos');
   await expect(shown(page).locator('[data-testid=pos-staff-chip]')).toContainText('Served by me');
-  for (const viewport of VIEWPORTS) {
+  for (const viewport of THREE_SIZES) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await openPicker(page);
     const warning = page.locator('[data-testid=pos-staff-unlinked]:visible');

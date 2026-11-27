@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from django.apps import apps
+from live import assistant as shared
 from live.operations import get, registry
 
 from apps.combo.tests.conftest import HUB_DB, ctx_for, make_combo
@@ -36,6 +37,16 @@ def test_no_datum_of_a_write_of_combo_reaches_a_spanish_card_by_its_technical_na
     writes = combo_writes()
     assert len(writes) > 10  # positive control: the registry has combo's writes
     assert technical_names(writes) == {}
+
+
+def test_a_new_menu_called_without_its_closed_price_draws_no_card_and_the_model_hears_which_datum_is_missing():
+    """As the price of a new product: the assistant asks it before the card, and the menu is free only if said so."""
+    create = get("combo.combo.create")
+    assert "price" in shared.tool_spec(create)["parameters"]["required"]
+    refused = shared.invalid_arguments(create, {"name": "Menú del día"})
+    assert (refused.outcome, refused.code) == ("error", "invalid_payload")
+    assert set(json.loads(refused.content)["error"]["fields"]) == {"price"}
+    assert shared.invalid_arguments(create, {"name": "Menú del día", "price": 0}) is None
 
 
 @HUB_DB

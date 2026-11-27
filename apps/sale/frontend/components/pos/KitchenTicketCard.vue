@@ -8,7 +8,7 @@ import type { OutputOf } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatQuantity } from '../../lib/format';
+import { orderTicketQuantity } from '../../lib/format';
 
 type Ticket = OutputOf<'kitchen.ticket.by_order'>['tickets'][number];
 
@@ -38,7 +38,7 @@ const dishes = computed(() =>
     id: item.id,
     status: item.status,
     voided: item.status === 'voided',
-    text: `${formatQuantity(item.quantity, locale.value)}× ${item.name}`,
+    text: `${orderTicketQuantity(item.quantity, item.unit, locale.value)} ${item.name}`,
   })),
 );
 </script>

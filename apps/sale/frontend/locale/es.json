@@ -188,18 +188,15 @@
       "removeLine": "Quitar esta línea",
       "services": "Servicios",
       "serviceMinutes": "{minutes} min",
-      "servicePrice": {
-        "hourly": "{price} / hora",
-        "from": "Desde {price}",
-        "variable": "Variable · {price}",
-        "free": "Gratis"
-      },
       "noServices": "Sin servicios.",
+      "searchFoundNothing": "Ningún producto ni servicio coincide con la búsqueda.",
       "servicesLoadFailed": "No se han podido cargar los servicios.",
       "servicePriceTitle": "Importe de {name}",
       "servicePriceSuggest": "Usar {price}",
       "serviceCount": "{count} servicio | {count} servicios",
-      "linkedCheckGone": "Esa cuenta ya no está abierta (se cobró, se anuló o no existe): el TPV sigue como estaba.",
+      "linkedCheckGone": "Esa cuenta ya no está abierta: se cobró, se anuló o no existe.",
+      "linkedCheckOpening": "Abriendo la cuenta…",
+      "linkedCheckContinue": "Continuar",
       "table": {
         "assign": "Asignar mesa",
         "assignedTo": "Asignar mesa: {table}",

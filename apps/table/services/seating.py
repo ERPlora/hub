@@ -14,7 +14,7 @@ from apps.sale.models import Order
 from apps.table import events
 from apps.table.models import SessionMove, TableSession
 from apps.table.queries.sessions import session_out
-from apps.table.schemas import SessionCloseIn, SessionOpenIn, SessionOut, SessionTransferIn
+from apps.table.schemas.sessions import SessionCloseIn, SessionOpenIn, SessionOut, SessionTransferIn
 from apps.table.services.writes import (
     BILL_MISMATCH,
     S,

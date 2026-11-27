@@ -249,6 +249,10 @@ class CustomerDetailOut(CustomerRow):
     consent_date: datetime | None = Field(
         description="When the latest marketing consent in force was given."
     )
+    consent_notice: str = Field(
+        description="The words read out to the customer before a marketing consent is given, in the reader's language: "
+        "a new consent stores them as its proof."
+    )
 
 
 class CustomerStatsOut(Schema):

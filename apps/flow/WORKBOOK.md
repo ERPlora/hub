@@ -114,11 +114,12 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
   pediste una automatización. No hacen nada hasta que las revises y las actives.», y por cada uno su
   nombre, la etiqueta «Borrador», **Revisar** y una × («Descartar») (FLOW-F18, FLOW-F19).
-- **Tus automatizaciones** — solo si hay alguna. El buscador «Busca por nombre, por lo que la arranca o
-  por lo que hace», los filtros **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa, un
-  horario, una fecha, a mano), el orden (tocadas al final, nombre) y el recuento. Cada fila: casilla
+- **Tus automatizaciones** — solo si hay alguna. Bajo el título, el recuento («Se ven 1 de 3»). En la barra
+  de la lista, como en las demás listas: el buscador «Buscar automatización…», el orden (tocadas al final,
+  nombre) y el botón de filtros, que abre **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa,
+  un horario, una fecha, a mano). Cada fila: casilla
   para elegirla, el nombre, cuándo arranca en palabras («Cuando se cobra una venta», «Todos los días a
-  las 09:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
+  las 9:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
   el interruptor, **Hacer una copia** y **Borrar**. Con varias elegidas, **Encenderlas** y **Ponerlas en
   pausa** (FLOW-F02, FLOW-F03).
 - **La galería**, siempre debajo: «Elige una y pasa a ser tuya, apagada, para que la mires antes de que
@@ -232,11 +233,15 @@ Actor: propietario, administrador, asistente
 Pantalla: Automatizaciones
 Pasos:
 1. En **Tus automatizaciones** cada fila dice el nombre, cuándo arranca en palabras, cuándo se ejecutó
-   por última vez y cómo acabó, y si está «Activa» o «En pausa». Un nombre que no cabe en su fila acaba
-   en puntos suspensivos, nunca partido a media palabra: se lee entero al dejar el puntero encima, en la
-   tarjeta del teléfono y al abrirla.
-2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o filtra por
-   **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**.
+   por última vez y cómo acabó, y si está «Activa» o «En pausa». Un nombre largo se lee entero, nunca
+   partido a media palabra: en la tableta y en el escritorio ocupa en su fila las líneas que necesita,
+   cortadas entre palabras, y sale también al dejar el puntero encima; en la tarjeta del teléfono, el
+   título acaba en puntos suspensivos pasadas dos líneas y el nombre se lee entero debajo, en «Nombre», y
+   al abrirla.
+2. Escribe en el buscador (nombre, el aviso que la arranca o las acciones que hace) o, con el botón de
+   filtros, filtra por **Ver** y **Arranca con**; ordena por **Últimas tocadas primero** o **Nombre**. En
+   el escritorio el buscador, el orden y el botón de filtros caben en una línea; en el teléfono el buscador
+   va en su propia línea y lo demás debajo.
 3. Sin resultados: «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas**.
 4. Toca una fila para abrirla en el editor.
 Entra: las automatizaciones del negocio, en páginas de hasta 100.
@@ -297,7 +302,7 @@ Las diez tarjetas de la galería, con su sector, cuándo arrancan y qué hacen.
 | Revisar la caja al cerrarla | cualquiera | Se cierra una caja | Deja la tarea de revisar el cierre |
 | Enterarte cuando Hacienda rechaza un registro | cualquiera | VeriFactu marca un registro como rechazado | Deja una tarea urgente |
 | Repasar la semana el viernes | cualquiera | Los viernes a las 18:00 | Deja la tarea de repasar la semana |
-| Revisar la agenda cada mañana | peluquería | Todos los días a las 09:00 | Deja la tarea de repasar la agenda |
+| Revisar la agenda cada mañana | peluquería | Todos los días a las 9:00 | Deja la tarea de repasar la agenda |
 | Llamar a quien no vino | peluquería | Una cita se marca como «no vino» | Deja una tarea urgente de llamarle |
 | Preparar las mesas de grupos grandes | restaurante | Entra una reserva | Solo si son seis o más: deja la tarea de prepararla |
 | Avisar de una venta grande | cualquiera | Se cobra una venta | Solo si pasa de 100,00 €: deja una tarea |
@@ -392,7 +397,9 @@ Pasos:
    - **Pasa algo**: en «Elige qué pasa», los avisos de las apps activas del negocio, dichos en palabras
      («se cobra una venta», «se crea una ficha de cliente», «una cita se marca como no vino»…), con la
      palabra de la app que los tiene («se crea un cambio temporal», como en Horarios), con el nombre de
-     esa app debajo de cada uno y nunca su código, y con buscador. Debajo, **Solo cuando…**: condiciones
+     esa app debajo de cada uno y nunca su código, y con buscador. No salen los que solo anota la
+     plataforma, que no arrancan nada: la limpieza de las impresiones antiguas y lo que devuelve una
+     recuperación desde una copia aparte («se recupera una cita»). Debajo, **Solo cuando…**: condiciones
      sobre los datos del aviso («el total es mayor que 10000»); sin ellas arranca sola con cada aviso.
    - **Según un horario**: «Cada cuánto» (todos los días, todas las semanas, todos los meses), el día de
      la semana o del mes si toca, y la hora, en la hora del negocio. Un día del mes que no existe (el 31
@@ -753,7 +760,10 @@ Pasos:
    paso que falló**. Antes, arregla la causa: concede el permiso que faltaba, vuelve a encender la app o
    espera a que el otro sistema responda.
 2. Pulsa el botón y confirma: «¿Reanudarla desde el paso que falló?» con **Sí, reanúdala** o **Cancelar**.
-3. Sale «Reanudada: terminó bien.» (o «…está esperando»); si vuelve a fallar, «Se reanudó y volvió a
+3. El aviso dice lo que hace la ejecución en ese momento, como el de **Ejecutar ahora**: «Reanudada: terminó
+   bien.», «…terminó, no se cumplía la condición.», «…está esperando», «…está llamando a otro sistema», «…espera
+   una respuesta en «Esperan tu respuesta».» o «…el asistente está en ello»; nunca «terminó bien» de una que
+   sigue en marcha. Si vuelve a fallar, en el acto o cuando el otro sistema no responde, «Se reanudó y volvió a
    pararse por un error: …» junto a la ejecución, que se puede reanudar otra vez. En sus pasos queda
    «Reanudada aquí, desde el paso que había fallado».
 Entra: la ejecución parada por un error (por voz, por su referencia: «reanuda la de bienvenida que falló»). La
@@ -1268,7 +1278,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Los nombres de los secretos del negocio, nunca su valor, y si el servidor puede guardarlos (en vivo) | gestionar | F26, F27 | `flow.secret.list` |
 | Las preguntas que espera contestar esta persona, las que caducan antes primero, hasta 100, y de cada cambio del asistente su acción y sus datos en palabras, leídos como esa persona y en su idioma (en vivo) | contestar | F01, F29, F38 | `flow.question.list` |
 | Una pregunta que espera respuesta, como sale en «Esperan tu respuesta», solo para quien puede contestarla | contestar (su rol) | F29 | `flow.question.get` |
-| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo) | ver | F01, F33–F36 | `flow.recipe.list` |
+| Las automatizaciones hechas que traen las apps activas, con lo que hacen, sus permisos y por qué, y la que se montó de cada una (encendida, «Versión nueva», qué repararía); y las que el negocio no puede usar, con su motivo (en vivo; el asistente sigue leyendo con `offset` donde se cortó una respuesta que no le cabía de una vez) | ver | F01, F33–F36 | `flow.recipe.list` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -1400,7 +1410,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   se reanuda (FLOW-F25).
 - **Una consulta trae como mucho 100 filas**, el tope de toda lista del Hub.
 - **Catálogo sin inventar nombres**: los avisos son los `events.ALL` de las apps activas (todas declaran
-  el suyo); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
+  el suyo), menos los de su `events.SYSTEM_ONLY`, que solo anota la plataforma y no arrancan nada (la limpieza de
+  cada hora de Impresión y lo que trae de vuelta una recuperación, que nunca arranca una automatización); cada
+  aviso ofrecido tiene su frase `flow.events.*` en `en` y en `es` (`test_event_words.py`); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
   declara su app (las de «solo la plataforma» quedan fuera) **y que no necesitan a una persona delante**:
   toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) o que
   se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`;

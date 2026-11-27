@@ -123,7 +123,7 @@ export async function expectTitleCentred(page: Page, label: string): Promise<{ t
 }
 
 /** On a phone, the title's words whole and as centred as the buttons let them: on the centre of its bar, or right beside
- *  «⋮», the first of them, once the help and the bell grown into a pill take the room they need. */
+ *  «⋮», the first of them, once the help and the bell take the room they need. */
 export async function expectTitleWhole(page: Page, label: string): Promise<void> {
   const { words, cut } = await titleOnTheBar(page);
   const toolbar = (await topbar(page).locator('ion-toolbar').boundingBox())!;

@@ -99,7 +99,7 @@ export interface ServiceIn {
   name: string;
   tax_category_key?: string | null;
   pricing_type?: PricingType;
-  price?: number;
+  price: number;
   min_price?: number | null;
   max_price?: number | null;
   cost?: number;

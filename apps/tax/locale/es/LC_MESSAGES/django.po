@@ -135,6 +135,9 @@ msgstr "categoría fiscal"
 msgid "tax categories"
 msgstr "categorías fiscales"
 
+msgid "Own tax categories"
+msgstr "Categorías fiscales propias"
+
 msgid "VAT"
 msgstr "IVA"
 

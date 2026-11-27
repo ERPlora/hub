@@ -63,6 +63,11 @@
       "unassigned": "Sin asignar",
       "charged": "Cobrada"
     },
+    "toConfirm": {
+      "notice": "Estas son las citas que esperan tu confirmación, sean del día que sean.",
+      "back": "Volver a la agenda",
+      "empty": "No quedan citas por confirmar."
+    },
     "actions": {
       "charge": "Cobrar",
       "goToCheck": "Ir a la cuenta",
@@ -121,7 +126,14 @@
       "customerRequired": "Elige la clienta.",
       "history": "Historial",
       "charged": "Cobrada: ya no se puede cambiar.",
-      "total": "Total"
+      "total": "Total",
+      "durationSum": "Suma de los servicios: {n} min",
+      "useSum": "Usar la suma",
+      "durationValue": "{n} min",
+      "durationOther": "Otra",
+      "durationOtherLabel": "Otra duración",
+      "optional": "Opcional",
+      "otherTime": "Introducir otra hora"
     },
     "slots": {
       "label": "Horas libres",
@@ -129,7 +141,17 @@
       "loading": "Buscando horas libres…",
       "empty": "No quedan horas libres ese día para este profesional. Puedes elegir una hora igualmente.",
       "error": "No se han podido cargar las horas libres. Puedes elegir una hora igualmente.",
-      "withinNotice": "dentro de la antelación mínima"
+      "withinNotice": "dentro de la antelación mínima",
+      "worksToday": "{name} trabaja hoy {spans}.",
+      "worksOn": "{name} trabaja el {day} {spans}.",
+      "span": "de {start} a {end}",
+      "offToday": "{name} no trabaja hoy.",
+      "offOn": "{name} no trabaja el {day}.",
+      "offHint": "Elige otro día u otro profesional.",
+      "free": "ninguna libre | {n} libre | {n} libres",
+      "windows": "Tramos del día",
+      "noticeLegend": "Dentro de la antelación mínima",
+      "timeWithinNotice": "{time}, dentro de la antelación mínima"
     },
     "overlap": {
       "title": "Cita solapada",

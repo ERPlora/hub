@@ -57,7 +57,7 @@ export interface ComboListIn extends PageIn {
 export interface ComboIn {
   name: string;
   kitchen_name?: string;
-  price?: number;
+  price: number;
   supply_kind?: SupplyKind;
   tax_category_key?: string | null;
   sort_order?: number;

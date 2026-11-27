@@ -2,6 +2,7 @@
 // professional underneath; the discount, note and gift buttons and the quantity selector. A line sent
 // to the kitchen only shows its quantity, «Order N», the gift button and ⊗ «Void this item». Tapping the
 // line (not its buttons) marks it for a partial charge (SALE-F22). The amount is the server's `line_total`.
+import { QuantityStepper } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import type { AllergenCode } from '@erplora/ui/components';
@@ -11,7 +12,6 @@ import { click, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { line } from './__tests__/fixtures';
 import CartLine from './CartLine.vue';
-import QtyStepper from './QtyStepper.vue';
 
 async function setup(over: Parameters<typeof line>[0] = {}, props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const mounted = await mountSale(CartLine, {
@@ -88,7 +88,7 @@ describe('CartLine: what it shows', () => {
     expect(row.find('h3').text()).toBe('Café con leche');
     expect(plain(row.find('.pos-line__price').text())).toBe('1,50 €');
     expect(plain(row.find('.pos-line__amount').text())).toBe('3,00 €');
-    expect(m.wrapper.findComponent(QtyStepper).props()).toMatchObject({ quantity: '2.000', unit: 'ud' });
+    expect(m.wrapper.findComponent(QuantityStepper).props()).toMatchObject({ quantity: '2.000', unit: 'ud', decimals: true, testid: 'pos-qty' });
   });
 
   it('a price by weight says its unit', async () => {
@@ -161,7 +161,7 @@ describe('CartLine: actions', () => {
     await click(m.find('pos-line-l1-note').element);
     await click(m.find('pos-line-l1-gift').element);
     await click(m.find('pos-line-l1-staff').element);
-    m.wrapper.findComponent(QtyStepper).vm.$emit('change', '3');
+    m.wrapper.findComponent(QuantityStepper).vm.$emit('change', '3');
     expect(Object.keys(m.wrapper.emitted())).toEqual(expect.arrayContaining(['discount', 'note', 'gift', 'staff', 'quantity']));
     expect(m.wrapper.emitted('quantity')).toEqual([['3']]);
     expect(m.wrapper.emitted('mark')).toBeUndefined();
@@ -217,7 +217,7 @@ describe('CartLine: sent to the kitchen', () => {
     const row = m.find('pos-line-l1');
     expect(row.find('.pos-line__round').text()).toBe('Comanda 2');
     expect(row.find('.pos-line__qty').text()).toBe('×3');
-    expect(m.wrapper.findComponent(QtyStepper).exists()).toBe(false);
+    expect(m.wrapper.findComponent(QuantityStepper).exists()).toBe(false);
     for (const id of ['discount', 'note']) expect(m.find(`pos-line-l1-${id}`).exists()).toBe(false);
     expect((m.find('pos-line-l1-staff').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
     const voiding = m.find('pos-line-l1-void');
@@ -256,7 +256,7 @@ describe('CartLine: a line a voucher pays (SALE-F27)', () => {
     expect(plain(row.find('.pos-line__amount').text())).toBe('0,00 €');
     expect(m.find('pos-line-l1-discount').exists()).toBe(false);
     expect(m.find('pos-line-l1-gift').exists()).toBe(false);
-    expect(m.wrapper.findComponent(QtyStepper).exists()).toBe(false);
+    expect(m.wrapper.findComponent(QuantityStepper).exists()).toBe(false);
     expect(m.find('pos-line-l1-note').exists()).toBe(true);
     await click(m.find('pos-line-l1-remove').element);
     expect(m.wrapper.emitted('quantity')).toEqual([['0']]);
@@ -266,6 +266,6 @@ describe('CartLine: a line a voucher pays (SALE-F27)', () => {
     const m = await setup({ service_id: 's1', is_service: true });
     expect(m.find('pos-line-l1-voucher').exists()).toBe(false);
     expect(m.find('pos-line-l1-remove').exists()).toBe(false);
-    expect(m.wrapper.findComponent(QtyStepper).exists()).toBe(true);
+    expect(m.wrapper.findComponent(QuantityStepper).exists()).toBe(true);
   });
 });

@@ -91,8 +91,12 @@ live(
     ),
 )
 live("base.device.list", on=sorted(_DEVICES))
-live("base.device.current", on=sorted({events.DEVICE_MODE_CHANGED, events.DEVICE_REMOVED, events.DEVICES_PRUNED}))
+# What this device is: shared or personal, or gone.
+_THIS_DEVICE = [events.DEVICE_MODE_CHANGED, events.DEVICE_REMOVED, events.DEVICES_PRUNED]
+live("base.device.current", on=sorted(_THIS_DEVICE))
 live("base.access.settings", on=[events.ACCESS_SETTINGS_CHANGED])
+# An open till's idle lock follows the business's «Ask again after inactivity» and this device's own mode.
+live("base.session.idle", on=sorted({events.ACCESS_SETTINGS_CHANGED, *_THIS_DEVICE}))
 live("base.profile.get", on=sorted({events.PROFILE_UPDATED, events.PIN_SET, events.ACCESS_SETTINGS_CHANGED}))
 
 # ── People and permissions ─────────────────────────────────────────────────────────────────────────────────────────

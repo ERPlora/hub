@@ -410,6 +410,19 @@ def cards(salon: dict, ctx: OperationContext | None, language: str = "es") -> di
     }
 
 
+#: What a card says that nobody sent and names no record: the duration a new service takes from the Settings.
+TAKEN = {("service.service.create", "duration_minutes")}
+
+
+def referred(shown: dict, said: str = "value") -> dict:
+    """What each card of ``shown`` says (``said``: the value or the label of each datum) but for ``TAKEN``: every other
+    datum has to be a record its write names (``NAMED``)."""
+    return {
+        write: {field["name"]: field[said] for field in card["fields"] if (write, field["name"]) not in TAKEN}
+        for write, card in shown.items()
+    }
+
+
 def named_as_the_screens(language: str = "es") -> dict:
     names = said(language)
     return {write: {datum: names[kind] for datum, kind in data.items()} for write, data in NAMED.items()}
@@ -621,7 +634,7 @@ def test_a_write_of_services_names_each_record_as_its_screens_do(language, hub_a
     customer, voucher or session by its name, in the person's language, never by its id."""
     with use_hub(hub_a):
         shown = cards(a_salon(), person(hub_a, language=language), language)
-    assert {write: values(card) for write, card in shown.items()} == named_as_the_screens(language)
+    assert referred(shown) == named_as_the_screens(language)
     assert [write for write, card in shown.items() if not no_id(card)] == []
 
 
@@ -632,7 +645,7 @@ def test_each_record_is_titled_as_the_screens_title_it(language, hub_a):
     field."""
     with use_hub(hub_a):
         shown = cards(a_salon(), person(hub_a, language=language), language)
-    assert {write: {field["name"]: field["label"] for field in card["fields"]} for write, card in shown.items()} == {
+    assert referred(shown, "label") == {
         write: {datum: TITLES[language][kind] for datum, kind in data.items()} for write, data in NAMED.items()
     }
 
@@ -721,7 +734,7 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id(hub_a):
     gone = {kind: uuid.uuid7() for kind in TITLES["es"]}
     with use_hub(hub_a):
         shown = cards(gone, person(hub_a))
-    assert {write: values(card) for write, card in shown.items()} == left_out_of_every_card()
+    assert referred(shown) == left_out_of_every_card()
     assert all(no_id(card) for card in shown.values())
 
 
@@ -733,10 +746,10 @@ def test_a_record_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b):
         named_in_b = cards(theirs, person(hub_b))
     with use_hub(hub_a):
         shown = cards(theirs, person(hub_a))
-    assert {write: values(card) for write, card in shown.items()} == left_out_of_every_card()
+    assert referred(shown) == left_out_of_every_card()
     assert all(no_id(card) for card in shown.values())
     # Positive control: in hub B the same cards name them.
-    assert {write: values(card) for write, card in named_in_b.items()} == named_as_the_screens()
+    assert referred(named_in_b) == named_as_the_screens()
 
 
 @HUB_DB

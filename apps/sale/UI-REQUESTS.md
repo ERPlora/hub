@@ -104,8 +104,6 @@ Lo que pide la pantalla **Vender** (`pages/PosPage.vue`, `frontend/components/po
   (marcada: `ion:checkmark-circle`).
 - `ion:flame` — cabecera **Enviado** de las líneas que ya están en cocina. Hoy:
   `ion:checkmark-circle-outline`.
-- **Selector de cantidad** (− n +) en `@erplora/ui/components`: hoy `components/pos/QtyStepper.vue`
-  (el mismo pedido que Devolver).
 - **Hoja del TPV** (`ion-modal` del alto de su contenido: tarjeta de 24rem en escritorio y hoja desde
   abajo en el móvil, con la cifra grande arriba y el pie fijo) en `@erplora/ui/components`: hoy
   `components/pos/PosSheet.vue`.

@@ -22,6 +22,7 @@ from base.schemas.devices import (
     DeviceListOut,
     DeviceOut,
     DevicePruneIn,
+    DeviceRemovalOut,
     DeviceUnusedOut,
 )
 
@@ -115,10 +116,33 @@ def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
 )
 def device_detail(ctx: OperationContext, data: DeviceByIdIn) -> dict[str, Any]:
     """One device of «Devices», as its row: what the assistant's card names a device by."""
-    device = TrustedDevice.objects.filter(pk=data.id).first()
+    return _device_rows(ctx, [_registered(data.id)])[0]
+
+
+@operation(
+    "base.device.removal",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=DeviceByIdIn,
+    output=DeviceRemovalOut,
+    ai=INTERNAL,  # What «Remove this device» will do, on its assistant card.
+)
+def device_removal(ctx: OperationContext, data: DeviceByIdIn) -> dict[str, Any]:
+    """When the device was last used and, for the one in hand, what «Devices» warns before removing it."""
+    device = _registered(data.id)
+    here = device_of(ctx.request)
+    yours = ""
+    if here is not None and here.pk == device.pk:
+        # Translators: it follows «It is the device you are using:» on the same line.
+        yours = gettext("removing it will close your session and you will have to enter again.")
+    return {"last_entry_at": device.last_entry_at, "yours": yours}
+
+
+def _registered(device_id) -> TrustedDevice:
+    device = TrustedDevice.objects.filter(pk=device_id).first()
     if device is None:
         raise NotFound(gettext("That device is no longer registered here. Refresh the list."))
-    return _device_rows(ctx, [device])[0]
+    return device
 
 
 def _device_rows(ctx: OperationContext, devices: list[TrustedDevice]) -> list[dict[str, Any]]:

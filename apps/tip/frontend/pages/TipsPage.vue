@@ -16,26 +16,23 @@ import {
 } from '@erplora/ui/components';
 import { useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonSelect, IonSelectOption } from '@ionic/vue';
-import { computed, onMounted, ref, shallowRef } from 'vue';
+import { computed, ref, shallowRef } from 'vue';
 
 import ListNotices, { blockingError } from '../../../sale/frontend/components/backoffice/ListNotices.vue';
-import { periodBounds } from '../../../sale/frontend/components/sales/period';
-import { useBusinessDay } from '../../../sale/frontend/components/sales/useBusinessDay';
 import { useServerTable } from '../../../sale/frontend/composables/useServerTable';
 import { useLocale, useT } from '../../../sale/frontend/composables/useT';
 import { formatMoney } from '../../../sale/frontend/lib/format';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 import { useBusinessMoney } from '../../../../base/frontend/lib/money';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
+import PeriodSelect from '../components/PeriodSelect.vue';
 import TipAdjustModal from '../components/TipAdjustModal.vue';
 import TipFormModal from '../components/TipFormModal.vue';
 import TipVoidModal from '../components/TipVoidModal.vue';
+import { usePeriod } from '../composables/usePeriod';
 import { teamFilter } from '../lib/team';
 import type { MethodType, TipListIn, TipOut, TipStatus } from '../operations';
 
-const PERIODS = ['today', 'week', 'month'] as const;
-type Period = (typeof PERIODS)[number];
 const METHOD_TYPES: readonly MethodType[] = ['cash', 'card', 'transfer', 'other'];
 const STATUSES: readonly TipStatus[] = ['active', 'voided'];
 /** The longest search the list takes (`TipListIn.search`). */
@@ -51,14 +48,7 @@ const client = useLiveClient();
 const canAdd = computed(() => session.can('tip.add_tip'));
 const canManage = computed(() => session.can('tip.manage'));
 
-const day = useBusinessDay();
-onMounted(() => void day.read());
-const period = shallowRef<Period>('today');
-function pickPeriod(value: unknown): void {
-  if (!PERIODS.includes(value as Period)) return;
-  period.value = value as Period;
-  void day.read();
-}
+const { period, bounds, pick } = usePeriod();
 
 /** The table's filters as the list takes them: a filter not in use is absent. */
 const filters = ref<DataTableFilters>({});
@@ -73,7 +63,7 @@ const filterQuery = computed<Partial<TipListIn>>(() => {
 
 const table = useServerTable('tip.tip.list', {
   maxSearch: MAX_SEARCH,
-  filters: () => ({ ...periodBounds(period.value, day.today.value), ...filterQuery.value }),
+  filters: () => ({ ...bounds.value, ...filterQuery.value }),
   narrowed: () => Object.keys(filterQuery.value).length > 0,
 });
 const { data: result, status, error, refresh } = table;
@@ -178,21 +168,11 @@ function onAction({ actionId, row }: { actionId: string; row: TipOut }): void {
       @retry="refresh()"
     >
       <template #toolbar>
-        <ion-select
-          data-testid="tip-list-period"
-          interface="popover"
+        <PeriodSelect
+          testid="tip-list-period"
           :value="period"
-          :aria-label="$t('tip.list.period.label')"
-          @ion-change="pickPeriod($event.detail.value)"
-        >
-          <ion-select-option
-            v-for="value in PERIODS"
-            :key="value"
-            :value="value"
-          >
-            {{ $t(`tip.list.period.${value}`) }}
-          </ion-select-option>
-        </ion-select>
+          @pick="pick"
+        />
       </template>
       <template #status="{ row }">
         <StatusPill

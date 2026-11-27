@@ -4,6 +4,7 @@
 // operation (ninja's parity): no path parameters. Times come on the business's clock with their offset
 // (`2030-03-05T10:00:00+01:00`); days are `YYYY-MM-DD`.
 import type { Page } from '../../../frontend/sdk-types';
+import type { PricingType } from '../../service/frontend/operations';
 
 export type SortDir = 'asc' | 'desc';
 export type BookingStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show';
@@ -159,6 +160,7 @@ export interface PublicServiceOut {
   description: string;
   category: string;
   price: number | null;
+  pricing_type: PricingType | null;
   duration_minutes: number | null;
   professionals: ProfessionalOut[];
 }

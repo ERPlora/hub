@@ -5,7 +5,7 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
 give them the Hub's own: what a turn offers (``relevance``), the tools (``tools``), the card of a write (``cards``), the
 checks at start of what the operations declare for it (``checks``), the system message (``prompt``) with what it knows of
 the business (``business_facts``) and of its apps not on that do what was asked (``apps_not_on``), why a write failed,
-for its receipt (``failure_reason``), an edit with nothing to change (``edits``), the files attached for a tool
+for its receipt (``failure_reason``), an edit and what the model hears once its card is answered (``edits``), the files attached for a tool
 (``attachments``), the files a read hands the person (``handed_files``), and erplora.com's gateway with the turn's
 answer as it comes (``gateway``). Importing the package loads them all, and with them their checks.
 """

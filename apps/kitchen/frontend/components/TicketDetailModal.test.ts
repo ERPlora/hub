@@ -36,6 +36,20 @@ describe('TicketDetailModal', () => {
     }
   });
 
+  it('says a dish sold by measure with its unit and one sold by units with its times sign', async () => {
+    const m = await setup('es');
+    await m.result(
+      'kitchen.ticket.get',
+      ticket('t1', {
+        items: [item('i1', { name: 'Gambas', quantity: '0.350', unit: 'kg' }), item('i2', { name: 'Burger', quantity: '2.000' })],
+      }),
+    );
+    await flush();
+    const body = m.inDoc('kitchen-ticket-detail-body')?.textContent ?? '';
+    expect(body).toContain('0,35 kg Gambas');
+    expect(body).toContain('2× Burger');
+  });
+
   it('says the menu of a dish and the options chosen for it (KITCHEN-F06, F07)', async () => {
     const m = await setup();
     await m.result(

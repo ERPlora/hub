@@ -28,7 +28,7 @@ from apps.table.models import TableSession
 from .floor import ENDED, _customers, table_label
 from .lookups import find_session
 from .paging import _page
-from apps.table.schemas import (
+from apps.table.schemas.sessions import (
     ByOrderIn,
     LineOut,
     LineRefIn,

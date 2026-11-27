@@ -126,8 +126,9 @@ dispositivo. Debajo, una rejilla de tarjetas de columnas iguales, tantas como qu
 desplazamiento lateral). Cada tarjeta: a la izquierda, el tipo en un icono, la etiqueta («Mesa 4»; sin etiqueta, el
 tipo) y «Camarero: <nombre>»; a la derecha, el reloj, la espera en palabras con su icono («En tiempo», «Aviso» o
 «Retraso») y el número corto «#0012»; debajo, el estado («Por preparar», «En preparación» o «Lista») y las marcas
-«Urgente», «VIP», «Alergia» y «Ronda N» (desde la segunda). Los platos con la cantidad grande («2×»), el nombre, la
-alergia del cliente en un bloque rojo, sus suplementos en negrita, la nota en cursiva, en «Todas» la estación con su
+«Urgente», «VIP», «Alergia» y «Ronda N» (desde la segunda). Los platos con la cantidad grande («2×»; uno al peso,
+con su unidad: «0,35 kg»), el nombre, la alergia del cliente en un bloque rojo, sus suplementos en negrita, la nota
+en cursiva, en «Todas» la estación con su
 color, «Solo papel» si la estación es solo de papel y, a la derecha, un icono con su estado (por preparar, en
 preparación, listo o anulado); los platos de un menú, junto a una raya bajo la cabecera del menú, que dice cuántos
 platos lleva («2 platos») y al tocarla marca listos sus platos. Un plato listo sale tachado y atenuado. Un plato
@@ -350,7 +351,7 @@ Pasos:
    que envía Ventas sola llega a Cocina un momento después, sin que nadie haga nada.
 2. Cocina abre una comanda con el número del día (`AAAAMMDD-NNNN`, el día del negocio, en su
    zona horaria), la ronda de la cuenta, la etiqueta de la cuenta («Mesa 4»), el tipo, la prioridad y el
-   camarero: su nombre o, si su cuenta no tiene, lo que va antes de la @ de su correo, nunca el correo
+   camarero: su nombre o, si no tiene ninguno, lo que va antes de la @ de su correo, nunca el correo
    entero (BASE-F119); una comanda guardada antes con el correo también se lee así.
 3. Cada línea que no es un servicio es un plato, en el orden de la cuenta, mandado a su estación
    (KITCHEN-F04); un menú, un plato por cada plato elegido (KITCHEN-F06). Las líneas de servicio no se
@@ -429,9 +430,9 @@ Pasos:
    estación no nombra una impresora concreta), no pide hoja: esos platos se ven solo en la pantalla.
    Vale igual para la ronda que envía el camarero (KITCHEN-F18) y para la que Ventas envía sola, que se
    imprime cuando llega a Cocina.
-2. La hoja lleva la etiqueta, el número, la ronda, el camarero y cada plato con su cantidad, sus
-   suplementos (uno por renglón) y su nota, y los platos de un menú sangrados bajo su cabecera
-   (KITCHEN-F06, F07); si la ronda va urgente, `!! URGENTE !!`.
+2. La hoja lleva la etiqueta, el número, la ronda, el camarero y cada plato con su cantidad («2x»; uno al
+   peso, con su unidad: «0.35 kg»), sus suplementos (uno por renglón) y su nota, y los platos de un menú
+   sangrados bajo su cabecera (KITCHEN-F06, F07); si la ronda va urgente, `!! URGENTE !!`.
 Entra: los platos con el destino y la impresora congelados al recibir.
 Sale: un trabajo por impresora en la cola de Impresión, una sola vez aunque se pida dos veces: la ronda
 que envió Cocina no vuelve a imprimirse cuando le llega el aviso de Ventas.
@@ -549,8 +550,8 @@ Estado: hecho
 Actor: empleado, responsable
 Pantalla: Pantalla (también el asistente: «qué hay pendiente en plancha»)
 Pasos:
-1. Pulsa «Resumen»: cada plato y la cantidad que falta por hacer sumando todas las comandas que se
-   cocinan, de más a menos; en «Todas», con su estación.
+1. Pulsa «Resumen»: cada plato y la cantidad que falta por hacer (con su unidad si se vende al peso, «0,35 kg»)
+   sumando todas las comandas que se cocinan, de más a menos; en «Todas», con su estación.
 2. Con una estación elegida, solo lo suyo.
 Entra: los platos por hacer de las comandas Por preparar y En preparación.
 Sale: nada.
@@ -625,7 +626,7 @@ Pasos:
 2. Se abre la hoja «Comandas de la cuenta»: una tarjeta por ronda, la más reciente primero, con
    «Comanda N», la hora de envío (la del negocio), su estado con las mismas palabras que la cocina
    («Por preparar», «En preparación», «Lista», «Servida», «Cancelada»), «Urgente» si lo es y sus platos
-   (uno anulado, tachado con «Anulado»).
+   con su cantidad, como en la cocina («2×»; uno al peso, «0,35 kg»; uno anulado, tachado con «Anulado»).
 3. La hoja se actualiza sola mientras está abierta: lo que la cocina marca se ve sin recargar.
 Entra: las comandas de esa cuenta, también las que llegaron de una cuenta unida a ella.
 Sale: nada; solo enseña.
@@ -1049,9 +1050,9 @@ que no tiene ningún papel: solo el sistema (`*`).
   antes del cierre pasa a Servida; la de papel o con la cocina en papel desde antes del cierre, a
   Servida con sus platos).
 - **Quién envió y quién hizo cada cosa** (BASE-F119): la comanda guarda el camarero como texto y el Historial el
-  usuario de quien actúa, que se nombra al leer; los dos salen de `person_label` de Ventas
-  (`apps/sale/queries/people.py`), que da el nombre de la cuenta o, sin él, lo que va antes de la @ de su correo
-  (`without_address` de `base.queries.people`): el correo de un compañero solo llega a quien ve el contacto del
+  usuario de quien actúa, que se nombra al leer; los dos salen de `actor_name` de `base.queries.people` (al leer, por
+  `person_names` de Ventas, `apps/sale/queries/people.py`), que da el nombre de Mi perfil o el de la cuenta o, sin
+  ninguno, lo que va antes de la @ de su correo: el correo de un compañero solo llega a quien ve el contacto del
   equipo, y la comanda en papel la lee cualquiera. Una comanda guardada antes con un correo se lee sin él en la vista
   de la comanda (`queries/views.py`: tablero, detalle, por cuenta, avisos, vivo y asistente) y en su papel
   (`services/paper.py`, la reimpresión), para todos: el nombre de quien la envió no es un dato de contacto.

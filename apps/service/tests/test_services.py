@@ -128,7 +128,7 @@ def test_what_a_new_service_does_not_say_comes_from_the_settings(tax):
         allow_online_booking=False,
         default_tax_category=tax,
     )
-    out = run("service.service.create", {"name": "Beard"})
+    out = run("service.service.create", {"name": "Beard", "price": 1200})
     assert (
         out.duration_minutes,
         out.buffer_before,
@@ -139,7 +139,7 @@ def test_what_a_new_service_does_not_say_comes_from_the_settings(tax):
     plain = run(
         "service.service.create",
         {
-            "name": "Shave",
+            "name": "Shave", "price": 1000,
             "duration_minutes": 20,
             "buffer_before": 0,
             "allow_online_booking": True,
@@ -156,7 +156,7 @@ def test_what_a_new_service_does_not_say_comes_from_the_settings(tax):
 def test_without_settings_a_new_service_lasts_an_hour_with_no_buffer_and_online_booking(
     tax,
 ):
-    out = run("service.service.create", {"name": "Cut", "tax_category_key": tax.key})
+    out = run("service.service.create", {"name": "Cut", "price": 2000, "tax_category_key": tax.key})
     assert (out.duration_minutes, out.buffer_before, out.allow_online_booking) == (
         60,
         0,
@@ -166,7 +166,7 @@ def test_without_settings_a_new_service_lasts_an_hour_with_no_buffer_and_online_
 
 def test_a_service_without_a_tax_category_is_refused_under_the_field():
     with pytest.raises(InvalidPayload) as refused:
-        run("service.service.create", {"name": "Cut"})
+        run("service.service.create", {"name": "Cut", "price": 2000})
     assert refused.value.code == "service.tax_category_required"
     assert refused.value.fields == {
         "tax_category_key": "Pick a tax category: without one the service cannot be charged."
@@ -178,7 +178,7 @@ def test_an_unknown_or_deactivated_tax_category_is_refused(tax):
     off = make_tax("test.off", "Off", is_active=False)
     for key in ("nope.key", off.key):
         with pytest.raises(InvalidPayload) as refused:
-            run("service.service.create", {"name": "Cut", "tax_category_key": key})
+            run("service.service.create", {"name": "Cut", "price": 2000, "tax_category_key": key})
         assert refused.value.fields == {
             "tax_category_key": "That tax category does not exist in Taxes or is deactivated."
         }
@@ -189,7 +189,7 @@ def test_a_deleted_category_is_not_available(tax):
     with pytest.raises(InvalidPayload) as refused:
         run(
             "service.service.create",
-            {"name": "Cut", "tax_category_key": tax.key, "category_id": str(gone.id)},
+            {"name": "Cut", "price": 2000, "tax_category_key": tax.key, "category_id": str(gone.id)},
         )
     assert refused.value.code == "service.category_unavailable"
     assert refused.value.fields == {
@@ -200,7 +200,7 @@ def test_a_deleted_category_is_not_available(tax):
 def test_an_employee_creates_a_service_but_does_not_edit_it(tax):
     out = run(
         "service.service.create",
-        {"name": "Cut", "tax_category_key": tax.key},
+        {"name": "Cut", "price": 2000, "tax_category_key": tax.key},
         role="hub_employee",
     )
     with pytest.raises(PermissionDenied):
@@ -305,7 +305,7 @@ def test_a_bulk_create_creates_all_of_them_with_the_settings_and_an_event_each(t
         {
             "services": [
                 {"name": "Cut", "price": 2000, "category": "Hair"},
-                {"name": "Beard", "duration_minutes": 15},
+                {"name": "Beard", "price": 1200, "duration_minutes": 15},
             ]
         },
     )
@@ -326,8 +326,8 @@ def test_a_bulk_create_with_one_bad_line_creates_nothing_and_names_the_line(tax)
             "service.service.bulk_create",
             {
                 "services": [
-                    {"name": "Cut", "tax_category_key": tax.key},
-                    {"name": "Beard", "tax_category_key": "nope"},
+                    {"name": "Cut", "price": 2000, "tax_category_key": tax.key},
+                    {"name": "Beard", "price": 1200, "tax_category_key": "nope"},
                 ]
             },
         )

@@ -98,7 +98,7 @@ test('Vouchers: create, sold, adjusted, voided, movements, orphans and delete; s
     await page.locator('[data-testid=service-settings-save]').click();
     await expect(page.locator('[data-testid=service-settings-saved]')).toContainText('Settings saved.');
     await page.screenshot({ path: shot('service-settings-desktop') });
-    const created = await post<{ duration_minutes: number }>(context, '/service/services', { name: named('Beard'), tax_category_key: 'service.generic' });
+    const created = await post<{ duration_minutes: number }>(context, '/service/services', { name: named('Beard'), price: 1200, tax_category_key: 'service.generic' });
     expect(created.duration_minutes).toBe(45);
   } finally {
     await api(context, A, 'POST', '/service/settings', { default_duration: settings.data.default_duration });

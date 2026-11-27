@@ -14,7 +14,7 @@ import {
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { dayOf, formatShortDay, formatTime, timeOf } from '../lib/clock';
+import { dayOf, formatShortDate, formatShortDay, formatTime, timeOf } from '../lib/clock';
 import { ACTIONS, type AgendaAction, allows, customerLabel, hasOpenCheck, STATUS_TONE } from '../lib/states';
 import type { AppointmentRow } from '../operations';
 
@@ -28,9 +28,11 @@ const props = withDefaults(
     error?: string;
     /** The rows span several days (a week): the time says its day too. */
     withDay?: boolean;
+    /** The rows may be of any day (the bookings to confirm): the time says its whole date. */
+    withDate?: boolean;
     emptyMessage?: string;
   }>(),
-  { loading: false, error: undefined, withDay: false, emptyMessage: undefined },
+  { loading: false, error: undefined, withDay: false, withDate: false, emptyMessage: undefined },
 );
 
 const emit = defineEmits<{ action: [event: { actionId: string; row: AppointmentRow }]; add: []; retry: [] }>();
@@ -62,11 +64,13 @@ const COLORS: Partial<Record<AgendaAction, string>> = {
 
 const when = (row: AppointmentRow): string => {
   const time = formatTime(timeOf(row.start), locale.value);
+  if (props.withDate) return `${formatShortDate(dayOf(row.start), locale.value)} · ${time}`;
   return props.withDay ? `${formatShortDay(dayOf(row.start), locale.value)} · ${time}` : time;
 };
+const timeWidth = computed(() => (props.withDate ? '12rem' : props.withDay ? '9rem' : '6rem'));
 
 const columns = computed<DataTableColumn<AppointmentRow>[]>(() => [
-  { key: 'start', label: t('appointment.list.columns.time'), priority: 'high', width: props.withDay ? '9rem' : '6rem', format: (_, row) => when(row) },
+  { key: 'start', label: t('appointment.list.columns.time'), priority: 'high', width: timeWidth.value, format: (_, row) => when(row) },
   { key: 'number', label: t('appointment.list.columns.number'), width: '11rem' },
   { key: 'customer_name', label: t('appointment.list.columns.customer'), priority: 'high', format: (_, row) => customerLabel(row, t) },
   { key: 'service_names', label: t('appointment.list.columns.service') },

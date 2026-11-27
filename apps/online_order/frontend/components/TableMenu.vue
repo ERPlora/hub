@@ -1,20 +1,24 @@
 <script setup lang="ts">
-// The menu a customer reads on their phone after scanning their table's QR (ONLINE_ORDER-F03): the business and the
-// table with its zone above it, the set menus and then each category with its dishes. Opening a dish reads its options;
-// opening a set menu shows its courses. Its calls go through base's public door, with the table's code in their body.
-import { EmptyState, InlineFeedback, type Money } from '@erplora/ui/components';
+// The menu a customer reads on their phone after scanning their table's QR (ONLINE_ORDER-F03) and orders from
+// (ONLINE_ORDER-F04): the business and the table with its zone above it, the set menus and then each category with its
+// dishes. Opening a dish reads its options; opening a set menu shows its courses; either is added to the order, which
+// the page's footer opens and sends. Its calls go through base's public door, with the table's code in their body.
+import { EmptyState, type FormModalError, formatMoney, InlineFeedback, type Money } from '@erplora/ui/components';
 import { type ApiClient, ApiError } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
-import { IonButton, IonCol, IonGrid, IonList, IonListHeader, IonRow, IonSpinner, IonText } from '@ionic/vue';
+import { IonButton, IonCol, IonGrid, IonList, IonListHeader, IonRow, IonSpinner, IonText, IonToolbar } from '@ionic/vue';
 import { computed, onMounted, ref } from 'vue';
 
 import { useBaseI18n } from '../../../../base/frontend/lib/i18n';
+import { addLine, type BasketLine, basketTotal, setQuantity, toSend } from '../lib/basket';
 import type { MenuComboOut, MenuItemOut, PublicMenuOut } from '../operations';
-import DishSheet, { type ChoiceGroup, type OpenedDish } from './DishSheet.vue';
+import BasketSheet from './BasketSheet.vue';
+import type { PickGroup } from './ChoicePicker.vue';
+import DishSheet, { type Added, type OpenedDish } from './DishSheet.vue';
 import MenuDish from './MenuDish.vue';
 
 const props = defineProps<{ api: ApiClient; money: Money | undefined; code: string }>();
-const { t } = useBaseI18n();
+const { t, locale } = useBaseI18n();
 
 const menu = ref<PublicMenuOut | null>(null);
 const loading = ref(true);
@@ -37,7 +41,9 @@ async function load(): Promise<void> {
 
 const sheetOpen = ref(false);
 const opened = ref<OpenedDish>({ name: '', description: '', price: 0, image_url: '', allergens: [] });
-const groups = ref<ChoiceGroup[]>([]);
+const groups = ref<PickGroup[]>([]);
+/** What the open sheet adds: a dish or a set menu, by its id. */
+let adding: Pick<BasketLine, 'kind' | 'ref'> = { kind: 'dish', ref: '' };
 const optionsLoading = ref(false);
 const optionsFailed = ref(false);
 let openedDish = '';
@@ -49,7 +55,7 @@ async function loadOptions(): Promise<void> {
   try {
     const read = await props.api.call('online_order.public.options', { code: props.code, product_id: dish });
     if (dish !== openedDish) return;
-    groups.value = read.groups.map((group) => ({ ...group, choices: group.options }));
+    groups.value = read.groups;
   } catch {
     if (dish === openedDish) optionsFailed.value = true;
   } finally {
@@ -61,14 +67,16 @@ function openDish(dish: MenuItemOut): void {
   opened.value = dish;
   groups.value = [];
   openedDish = dish.id;
+  adding = { kind: 'dish', ref: dish.id };
   sheetOpen.value = true;
   void loadOptions();
 }
 
 function openCombo(combo: MenuComboOut): void {
   opened.value = { ...combo, description: '', allergens: [] };
-  groups.value = combo.courses;
+  groups.value = combo.courses.map((course) => ({ ...course, options: course.choices }));
   openedDish = '';
+  adding = { kind: 'menu', ref: combo.id };
   optionsLoading.value = false;
   optionsFailed.value = false;
   sheetOpen.value = true;
@@ -76,6 +84,41 @@ function openCombo(combo: MenuComboOut): void {
 
 function courses(combo: MenuComboOut): string {
   return combo.courses.map((course) => course.name).join(' · ');
+}
+
+const lines = ref<BasketLine[]>([]);
+const basketOpen = ref(false);
+const sending = ref(false);
+const sendError = ref<FormModalError | null>(null);
+const sent = ref(false);
+const units = computed(() => lines.value.reduce((sum, line) => sum + line.quantity, 0));
+const total = computed(() => formatMoney(basketTotal(lines.value), locale.value, props.money));
+
+function add(added: Added): void {
+  const { name, price } = opened.value;
+  lines.value = addLine(lines.value, { ...adding, name, price, ...added });
+  sheetOpen.value = false;
+}
+
+function changeQuantity(key: number, quantity: number): void {
+  lines.value = setQuantity(lines.value, key, quantity);
+}
+
+async function send(): Promise<void> {
+  sending.value = true;
+  sendError.value = null;
+  try {
+    await props.api.call('online_order.public.send', { code: props.code, lines: toSend(lines.value) });
+    lines.value = [];
+    basketOpen.value = false;
+    sent.value = true;
+  } catch (error) {
+    // A refusal says why; anything else never reached the restaurant.
+    const answered = error instanceof ApiError && error.status > 0;
+    sendError.value = answered ? error : { message: t('online_order.order.offline') };
+  } finally {
+    sending.value = false;
+  }
 }
 
 onMounted(load);
@@ -127,6 +170,14 @@ onMounted(load);
             </template>
           </InlineFeedback>
           <template v-else-if="menu">
+            <InlineFeedback
+              v-if="sent"
+              tone="success"
+              role="status"
+              data-testid="oo-order-sent"
+            >
+              {{ t('online_order.order.sent') }}
+            </InlineFeedback>
             <header>
               <h2
                 v-if="menu.business_name"
@@ -198,10 +249,34 @@ onMounted(load);
               :loading="optionsLoading"
               :error="optionsFailed"
               @retry="loadOptions"
+              @add="add"
+            />
+            <BasketSheet
+              v-model:open="basketOpen"
+              :lines="lines"
+              :money="money"
+              :pending="sending"
+              :error="sendError"
+              @quantity="changeQuantity"
+              @send="send"
             />
           </template>
         </ion-col>
       </ion-row>
     </ion-grid>
+    <template
+      v-if="lines.length"
+      #footer
+    >
+      <ion-toolbar>
+        <ion-button
+          expand="block"
+          data-testid="oo-order-view"
+          @click="basketOpen = true"
+        >
+          {{ t('online_order.order.view', { count: units, total }) }}
+        </ion-button>
+      </ion-toolbar>
+    </template>
   </AppPage>
 </template>

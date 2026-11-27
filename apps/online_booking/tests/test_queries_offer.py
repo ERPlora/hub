@@ -42,6 +42,13 @@ def test_the_page_offers_the_services_booked_online_with_who_does_them(salon):
     ]
 
 
+def test_each_service_says_how_it_is_priced(salon):
+    make_service("Highlights", price=6500, duration=120, pricing_type="from")
+    rows = {row["name"]: row for row in public("services").model_dump()["rows"]}
+    assert (rows["Highlights"]["price"], rows["Highlights"]["pricing_type"]) == (6500, "from")
+    assert rows["Haircut"]["pricing_type"] == "fixed"
+
+
 def test_the_page_hides_prices_durations_and_professionals_when_the_business_does(
     salon,
 ):
@@ -50,7 +57,7 @@ def test_the_page_hides_prices_durations_and_professionals_when_the_business_doe
     ServiceSettings.objects.create(show_prices=False, show_duration=False)
     make_page(allow_staff_selection=False)
     cut = public_services(public_ctx(), PublicServicesIn(search="hair")).rows[0]
-    assert (cut.price, cut.duration_minutes, cut.professionals) == (None, None, [])
+    assert (cut.price, cut.pricing_type, cut.duration_minutes, cut.professionals) == (None, None, None, [])
 
 
 def test_the_free_times_are_the_diarys_for_the_customer(salon):

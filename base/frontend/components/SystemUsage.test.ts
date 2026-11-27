@@ -445,7 +445,7 @@ describe('SystemUsage', () => {
       );
       expect(m.part('verdict').text()).not.toContain('Your plan is enough');
       expect(m.part('verdict-retry').exists()).toBe(false);
-      expect(m.row('capacity').text()).toContain('You already have the maximum capacity: tell us in «Report a problem».');
+      expect(m.row('capacity').text()).toContain('You already have the maximum capacity: tell us in “Report a problem”.');
       expect(m.row('capacity').text()).toContain('6 of 6 connections');
       expect(m.row('capacity').get('.usage-meter').attributes('data-tone')).toBe('success');
       expect(m.row('capacity').find('a').exists()).toBe(false);

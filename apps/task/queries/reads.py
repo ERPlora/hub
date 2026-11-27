@@ -16,6 +16,7 @@ from live.errors import Conflict, NotFound
 from apps.staff.queries.reads import actor_user_id, own_member
 from base.business import business_zone
 from base.models import HubUser
+from base.only_theirs import only_theirs
 from base.text_search import contains_text
 from apps.task.models import Project, Task
 from apps.task.schemas import PageIn
@@ -59,8 +60,16 @@ class Caller:
             self.user_id is not None and task.created_by_id == self.user_id
         )
 
+    def seen(self, prefix: str = "") -> Q:
+        """The tasks the caller reads (``prefix`` as in ``own``): all with «View all tasks», else their own, and the
+        assistant hears the role keeps them to it (``only_theirs``)."""
+        if self.ctx.has(VIEW_ALL):
+            return Q()
+        only_theirs()
+        return self.own(prefix)
+
     def visible(self, tasks: QuerySet[Task]) -> QuerySet[Task]:
-        return tasks if self.ctx.has(VIEW_ALL) else tasks.filter(self.own())
+        return tasks.filter(self.seen())
 
     def may_change(self, task: Task) -> bool:
         return self.ctx.has(CHANGE_ALL) or (self.ctx.has(CHANGE) and self.is_own(task))

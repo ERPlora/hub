@@ -169,7 +169,7 @@ Hojas que se abren encima, todas con **Cerrar**, «Cargando…» mientras llegan
   gastada diciendo quién la hizo «Profesional: <nombre>», quién y el motivo. Vacía: «Este bono aún no se ha
   usado.».
 - **Bonos vendidos**: una fila por compra, con **Activo** o **Anulado**, la clienta, la fecha, el
-  importe, «{used} usadas · quedan {remaining}» (o «· sin límite»), «Caduca el …» o «No caduca» y lo
+  importe, «2 usadas · quedan 3» («1 usada · queda 1»; o «· sin límite»), «Caduca el …» o «No caduca» y lo
   regalado o corregido después; en una anulada, «Anulado por {who} el {when}» y el motivo. Botones
   **Gastar una sesión** (en un bono sin anular ni caducar y al que le queda alguna sesión, o sin límite),
   **Ajustar** y **Anular** cuando proceden y para quien puede.
@@ -266,7 +266,10 @@ Pasos:
    duración.»), «Importante», a quien puede dar de alta servicios. «Configurar» lleva a **Servicios**.
 2. En **Servicios** pulsa **Nuevo servicio**.
 3. Escribe el Nombre, elige la Tarifa (viene **Precio fijo**), el Precio y la Duración (min). Elige
-   una Categoría o deja «Sin categoría».
+   una Categoría o deja «Sin categoría». Por el asistente, un servicio pedido sin decir su precio («da de
+   alta el corte y peinado») no saca la tarjeta: antes pregunta cuánto cuesta, y solo es gratis si la
+   persona lo dice. La tarjeta dice primero el nombre, el precio y la duración con los que se crea; si no
+   se dijo la duración, la de los Ajustes.
 4. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
    si hay una). Sin ella **Crear servicio** no se puede pulsar; tampoco mientras el negocio no haya dicho
    todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000);
@@ -367,7 +370,8 @@ Actor: responsable, asistente
 Pantalla: ninguna
 Pasos:
 1. Pide al asistente que cree una lista de servicios (hasta 500), cada uno con nombre, precio,
-   duración y, si quieres, categoría fiscal y categoría.
+   duración y, si quieres, categoría fiscal y categoría. El precio de cada uno se dice siempre (0 si es
+   gratis): si falta, el asistente lo pregunta antes de la tarjeta.
 2. Antes de crearlos, la tarjeta de confirmación dice cada servicio por su nombre («Servicios: Corte, Tinte,
    Peinado»; con más de cuatro, los tres primeros y cuántos más) y, debajo, las categorías y las categorías fiscales
    que llevan, una vez cada una («Categoría: Peluquería», «Categoría fiscal: Servicio — general · 21 %»).
@@ -427,8 +431,8 @@ Estado: hecho (lo hace Ventas, SALE-F38)
 Actor: empleado
 Pantalla: Ventas: Vender
 Pasos:
-1. En la tira de categorías del TPV, **Servicios** enseña cada servicio en oferta con su precio y su
-   duración (también salen en el buscador).
+1. En la tira de categorías del TPV, **Todos** y **Servicios** enseñan cada servicio en oferta con su
+   precio y su duración (también salen en el buscador).
 2. Un servicio **Sin configurar** sale con la marca «Falta el IVA» y no se vende.
 3. Un servicio que no es de precio fijo pide el importe, con su precio como sugerencia.
 Entra: los servicios en oferta, su tarifa y su categoría fiscal.
@@ -590,7 +594,7 @@ Pasos:
    Ventas con una devolución.».
 3. Escribe el Motivo (obligatorio) y pulsa **Anular**.
 Entra: la compra y el motivo.
-Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si su cuenta no tiene,
+Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si no tiene ninguno,
 por lo que va antes de la @ de su correo, nunca el correo entero), cuándo y el motivo (`service.grant.voided`). No mueve dinero ni emite documento. Si una línea de una venta lo pagó, esa parte
 vuelve a contar para quien la vendió, hasta que una devolución diga otra cosa (SALE-F28).
 Si falla: «Ese bono ya se ha usado: no se puede anular.», «Ese bono ya estaba anulado.» o «Indica

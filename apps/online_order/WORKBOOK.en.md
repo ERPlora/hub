@@ -76,40 +76,46 @@ table that has none yet. If some tables have no QR, a notice says how many are n
 missing QR codes**. The QR is drawn on the device itself: the sheet asks nothing of the internet.
 
 ### Table page
-<!-- from WORKBOOK.md sha256:0d21163a0d62 -->
+<!-- from WORKBOOK.md sha256:731fe33e6666 -->
 The one the customer sees on their phone when they scan their table's QR: the business's menu, with the table they are
-at above it. It is only to look at; ordering from here comes with ONLINE_ORDER-F04.
+at above it. From here they build their order and send it to the restaurant.
 
 #### Details
-<!-- from WORKBOOK.md sha256:0a83b1d81501 -->
+<!-- from WORKBOOK.md sha256:35b5c5f75956 -->
 Address `/p/<business>/order/<code>`, with no session, in the phone's language (Spanish or English). At the top, the
 business's name and "Table 4 · Terrace" (without a zone, just "Table 4"). Below, **Menus** first, with each set menu's
 closed price and its courses ("Starters · Mains · Drink"), and then each Inventory category in its order, with its
 dishes sorted by name: the photo (if it has one), the name, the description, "Allergens: Gluten, Milk" and the price.
 Dishes without a category go last, under "More dishes". Tapping a dish opens its card with the photo in large, the same
 as its row, and each modifier group with how many are chosen ("Optional · up to 2", "Choose 1") and each option with
-its allergens and what it adds ("+€0.50"); tapping a set menu opens its dishes, course by course, in the same way.
-**Close** closes it.
+its allergens and what it adds ("+€0.50"); tapping a set menu opens its dishes, course by course, in the same way. On
+the card one ticks what they want from each group (in a group of one, ticking another swaps the one chosen; a full
+group leaves the rest waiting; what may be repeated has one less and one more with its count), how many and a note for
+the kitchen; **Add · €8.00** puts it in the order, and waits while a group lacks what it asks. Below, **View order (3) ·
+€25.50** opens the order: each line with what goes with it, its note and its amount, one less and one more (one less on
+a line of one takes it out) and the total; **Send order** sends it to the restaurant. Once sent, the page says "Order
+sent: the restaurant will confirm it shortly.". The amounts are the menu's; the restaurant prices the order again when
+it arrives.
 
 ## States of each screen
-<!-- from WORKBOOK.md sha256:cf56646b5824 -->
+<!-- from WORKBOOK.md sha256:abefe6887bfb -->
 
 | Screen | Loading | Empty | Error |
 |---|---|---|---|
 | QR codes | The list loading; **Print sheet**, off until all the tables are in | "No tables yet", with **Go to Tables** for whoever can add them | The list's, with "Retry"; that of generating or regenerating, in a passing notice with its reason; "The sheet could not be printed." |
-| Table page | "Loading the menu…"; on a dish's card, "Loading its options…" | "No dishes on the menu yet", with "Ask the staff what you can order." | "The menu could not be loaded." with "Retry"; on the card, "Its options could not be loaded." with "Retry"; a QR that no longer works, "This QR is no longer active" with "Ask the staff for help.", with nothing of the business |
+| Table page | "Loading the menu…"; on a dish's card, "Loading its options…"; while it is sent, **Send order** waits | "No dishes on the menu yet", with "Ask the staff what you can order."; the order with nothing in it, "Your order is empty" with "Add dishes from the menu." | "The menu could not be loaded." with "Retry"; on the card, "Its options could not be loaded." with "Retry"; a QR that no longer works, "This QR is no longer active" with "Ask the staff for help.", with nothing of the business; a refused order, its reason in the order, which stays to be sent again; without a connection, "No connection. Check it and send the order again." |
 
 "Reconnecting…" while the live connection recovers (what is painted stays).
 
 ## Flows
-<!-- from WORKBOOK.md sha256:d564c702c5cb -->
+<!-- from WORKBOOK.md sha256:312be6f8c8a7 -->
 
 | ID | Flow | Status |
 |---|---|---|
 | ONLINE_ORDER-F01 | Generate or regenerate a table's QR | done |
 | ONLINE_ORDER-F02 | See and print the tables' QR sheet | done |
 | ONLINE_ORDER-F03 | The customer opens the menu from their table's QR | done |
-| ONLINE_ORDER-F04 | The customer orders from their table | not done |
+| ONLINE_ORDER-F04 | The customer orders from their table | done |
 | ONLINE_ORDER-F05 | Accept or reject a table's first order | not done |
 | ONLINE_ORDER-F06 | The customer sees whether their order was accepted | not done |
 | ONLINE_ORDER-F07 | Set up ordering from the table | not done |
@@ -177,38 +183,44 @@ menu does not load, "The menu could not be loaded." with "Retry".
 Involved: ONLINE_ORDER-F01, INVENTORY-F36, COMBO-F14
 
 ### ONLINE_ORDER-F04 The customer orders from their table
-<!-- from WORKBOOK.md sha256:79a4da862d5b -->
-Status: not done — the order is missing
+<!-- from WORKBOOK.md sha256:ec80a54eef8d -->
+Status: done
 Actor: customer (no session)
 Screen: Table page
 Steps:
-1. Adds products, with their modifiers, menus, quantity and a note.
-2. Taps **Order**.
-3. If the table has an open check, the order goes into it and is sent to the kitchen with everything the check had
-   not sent yet, also what the waiter had entered at the POS. If not, the order waits until an employee accepts it
-   (ONLINE_ORDER-F05).
-In: the menu, the table's check (Tables and Sales) and the business's opening hours (Schedule).
-Out: the lines on the table's check and the ticket in the kitchen, or the pending order with its notice.
-If it fails: nothing is written. The business is closed (the menu still shows, but says no orders are taken right
-now); a product sold out while ordering; too many orders in a row
-from the same phone or in the business («Try again in a few minutes or ask the staff for help.»); a QR that no longer
-works.
-Involved: ONLINE_ORDER-F05, SALE-F20, KITCHEN-F05
+1. On their table's menu, taps a dish or a set menu, ticks its modifiers or the dishes of each course, chooses how
+   many, writes a note for the kitchen if they want and taps **Add**.
+2. Taps **View order**: checks each line and the total, changes how many or takes one out.
+3. Taps **Send order**: the order is saved at the restaurant as pending, and the page says "Order sent: the restaurant
+   will confirm it shortly.". What happens next is ONLINE_ORDER-F05.
+In: the menu (Inventory and, when they are on, Modifiers and Menus) and the table (Tables).
+Out: the table's pending order, each dish with its modifiers and each set menu with its dishes at the menu's price, and
+its notice.
+If it fails: nothing is saved and the order stays on the phone to be sent again. A dish or a set menu no longer on the
+menu (sold out, hidden or removed while ordering: "This is no longer on the menu: take it out of your order and send it
+again."); a modifier group or a course of the set menu without what it asks, or a dish of the set menu sold out
+(Modifiers' or Menus' reason); too many orders in a row from the same table or in the business ("Too many orders in a
+row. Try again in a few minutes or ask the staff for help."); a QR that no longer works ("This QR is no longer
+active"); without a connection ("No connection. Check it and send the order again.").
+Involved: ONLINE_ORDER-F03, ONLINE_ORDER-F05
 
 ### ONLINE_ORDER-F05 Accept or reject a table's first order
-<!-- from WORKBOOK.md sha256:6cee11f96c0e -->
+<!-- from WORKBOOK.md sha256:7995c6552019 -->
 Status: not done — the pending order and its notice are missing
 Actor: employee, manager, administrator or owner
 Screen: Notification centre → Orders to accept
 Steps:
-1. The notification centre shows «Orders to accept» with each pending order: the table, what it asks for and when.
-2. Tap **Accept**: the table's check opens, the lines go in and are sent to the kitchen; or tap **Reject** and the
+1. If the table already has an open check, the order goes into it without waiting and is sent to the kitchen with
+   everything the check had not sent yet, also what the waiter had entered at the POS.
+2. If not, the notification centre shows «Orders to accept» with each pending order: the table, what it asks for and
+   when.
+3. Tap **Accept**: the table's check opens, the lines go in and are sent to the kitchen; or tap **Reject** and the
    customer sees it on their page.
-3. Once the check is charged or voided, that table's next order waits again.
+4. Once the check is charged or voided, that table's next order waits again.
 In: the pending order.
 Out: the table's check with its lines and the ticket, or the rejected order.
 If it fails: another employee already decided it («This order has already been decided.»).
-Involved: ONLINE_ORDER-F04, TABLE-F10, TABLE-F18
+Involved: ONLINE_ORDER-F04, TABLE-F10, TABLE-F18, SALE-F20, KITCHEN-F05
 
 ### ONLINE_ORDER-F06 The customer sees whether their order was accepted
 <!-- from WORKBOOK.md sha256:886fd7534cbd -->
@@ -224,14 +236,16 @@ If it fails: a QR that no longer works stops showing the order.
 Involved: ONLINE_ORDER-F05
 
 ### ONLINE_ORDER-F07 Set up ordering from the table
-<!-- from WORKBOOK.md sha256:3bbbf26d99cf -->
-Status: not done — the settings are missing
+<!-- from WORKBOOK.md sha256:e9ebc39b4837 -->
+Status: not done — the settings and ordering only while the business is open are missing
 Actor: owner or administrator
 Screen: Settings
 Steps:
 1. Turn on or off «Accept the first order of each table» (on by default). Off, every order goes in on its own and
    opens the table's check if there is none.
 2. Tap **Save**.
+3. Outside the hours of Schedule, the table's page still shows the menu, but says no orders are taken right now and
+   does not let them be sent.
 In: the app's settings and the business's opening hours (Schedule), which say whether orders are taken today.
 Out: the saved settings.
 If it fails: without the business's opening hours, the settings warn that no orders will be taken until they are set.
@@ -258,7 +272,7 @@ whoever speaks), with the same rules and permissions. A table is named by its id
 and, if it repeats, its zone.
 
 ### What it offers: queries
-<!-- from WORKBOOK.md sha256:b83fefa46990 -->
+<!-- from WORKBOOK.md sha256:a9427e5e9c59 -->
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -266,25 +280,27 @@ and, if it repeats, its zone.
 | The menu of a code's table: the business's name, the table's number and zone, the dishes on sale shown on the menu by category and the set menus with their dishes | anyone with the table's QR, without a session | F03 | `online_order.public.menu` |
 | The modifier groups of a dish of that menu, with their options | anyone with the table's QR, without a session | F03 | `online_order.public.options` |
 
-The two of the menu belong to the table's page: its phone calls them through the Hub's public door, with the code in
-the call's body, and they are not tools of the assistant.
+The two of the menu and the sending of the order belong to the table's page: its phone calls them through the Hub's
+public door, with the code in the call's body, and they are not tools of the assistant.
 
 ### What it offers: actions
-<!-- from WORKBOOK.md sha256:6fd3529a003d -->
+<!-- from WORKBOOK.md sha256:3012c402a403 -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
 | Gives a table a new code; the previous one stops working at once | regenerate the tables' QR codes (+ see tables) | F01 | `online_order.qr_code.regenerate` |
+| Saves as pending the order of the table of a code: each dish with its modifiers and each set menu with its dishes, at the menu's price | anyone with the table's QR, without a session | F04 | `online_order.public.send` |
 
 Regenerating is **high risk** for the assistant: the printed QR stops working and it cannot be undone, so its card
 asks for confirmation before doing it.
 
 ### What it announces
-<!-- from WORKBOOK.md sha256:5585cdb52d23 -->
+<!-- from WORKBOOK.md sha256:1a6d8d0bc1de -->
 
 | Notice | When | What it carries |
 |---|---|---|
 | `online_order.qr_code.regenerated` | A table's code is generated or regenerated | The table (`table_id`); never the code |
+| `online_order.order.sent` | A table's order arrives | The order (`order_id`), the table (`table_id`) and its total (`total`) |
 
 ### What it reacts to
 <!-- from WORKBOOK.md sha256:2d292dad27bb -->

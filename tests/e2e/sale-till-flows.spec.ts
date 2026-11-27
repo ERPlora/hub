@@ -178,7 +178,7 @@ test('SALE-F09, F10: an open-price line by its section, and apples sold by weigh
   await add(page, apples);
   const apple = lineOf(page, apples.name);
   await expect(apple.locator('[data-testid=pos-qty-unit]')).toHaveText('kg');
-  const quantity = apple.locator('.pos-qty__field');
+  const quantity = apple.locator('[data-testid=pos-qty-field]');
   await quantity.fill('0.75');
   await quantity.press('Enter');
   // The server values the weight: 0.75 kg × €3.00.

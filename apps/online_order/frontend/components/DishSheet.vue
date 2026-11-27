@@ -1,23 +1,17 @@
 <script setup lang="ts">
-// What a customer reads on opening a dish or a set menu of their table's menu: its photo, what it is, its allergens
-// and price, and each group of what goes with it (a dish's options, a set menu's courses) with how many to pick.
-// Only to read: ordering is not here.
-import { AllergenRow, FormModal, formatMoney, InlineFeedback, type Money } from '@erplora/ui/components';
-import { IonButton, IonImg, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonSpinner } from '@ionic/vue';
-import { computed } from 'vue';
+// What a customer reads on opening a dish or a set menu of their table's menu, and how they add it to their order: its
+// photo, what it is, its allergens and price, each group of what goes with it (a dish's options, a set menu's courses)
+// to pick from, how many and a note for the kitchen. «Add» waits until each group has what it asks; its price is the
+// menu's as the page shows it, and the server prices the order again.
+import { AllergenRow, FormModal, formatMoney, InlineFeedback, type Money, QuantityStepper } from '@erplora/ui/components';
+import { IonButton, IonImg, IonInput, IonItem, IonLabel, IonSpinner } from '@ionic/vue';
+import { computed, ref, watch } from 'vue';
 
 import { useBaseI18n } from '../../../../base/frontend/lib/i18n';
 import { ownImageUrl } from '../../../../base/frontend/lib/own-image';
-import { choiceRule } from '../lib/choice-rule';
-import type { ChoiceOut } from '../operations';
-
-/** A group of what goes with it: a dish's modifier group or a set menu's course. */
-export interface ChoiceGroup {
-  name: string;
-  min_choices: number;
-  max_choices: number;
-  choices: ChoiceOut[];
-}
+import { addedCents, type Choice, choose, missingGroup, unchoose } from '../../../sale/frontend/lib/modifierChoice';
+import { type BasketPick, MAX_QUANTITY } from '../lib/basket';
+import ChoicePicker, { type PickGroup } from './ChoicePicker.vue';
 
 export interface OpenedDish {
   name: string;
@@ -27,28 +21,43 @@ export interface OpenedDish {
   allergens: string[];
 }
 
+/** What the customer adds: what they picked, how many and their note. */
+export interface Added {
+  picks: BasketPick[];
+  quantity: number;
+  notes: string;
+}
+
 const props = defineProps<{
   dish: OpenedDish;
-  groups: ChoiceGroup[];
+  groups: PickGroup[];
   money: Money | undefined;
   loading?: boolean;
   error?: boolean;
 }>();
 const open = defineModel<boolean>('open', { required: true });
-defineEmits<{ retry: [] }>();
+const emit = defineEmits<{ retry: []; add: [added: Added] }>();
 
 const { t, locale } = useBaseI18n();
 const photo = computed(() => ownImageUrl(props.dish.image_url));
 
-function rule(group: ChoiceGroup): string {
-  const [key, named] = choiceRule(group.min_choices, group.max_choices);
-  return t(key, named);
-}
+const choice = ref<Choice>({ picks: [], refused: null });
+const quantity = ref(1);
+const notes = ref('');
+watch(open, (opened) => {
+  if (!opened) return;
+  choice.value = { picks: [], refused: null };
+  quantity.value = 1;
+  notes.value = '';
+});
 
-function delta(minor: number): string {
-  if (minor === 0) return '';
-  const money = formatMoney(minor, locale.value, props.money);
-  return minor > 0 ? `+${money}` : money;
+const ready = computed(() => !props.loading && !props.error && !missingGroup(props.groups, choice.value));
+const price = computed(() => (props.dish.price + addedCents(props.groups, choice.value)) * quantity.value);
+
+function add(): void {
+  const byId = new Map(props.groups.flatMap((group) => group.options.map((option) => [option.id, option] as const)));
+  const picks = choice.value.picks.map((id) => ({ id, name: byId.get(id)!.name, price_delta: byId.get(id)!.price_delta }));
+  emit('add', { picks, quantity: quantity.value, notes: notes.value.trim() });
 }
 </script>
 
@@ -56,9 +65,11 @@ function delta(minor: number): string {
   <FormModal
     v-model:open="open"
     :title="dish.name"
-    readonly
+    :submit-label="t('online_order.order.add', { price: formatMoney(price, locale, money) })"
+    :submit-disabled="!ready"
     size="md"
     testid="oo-menu-sheet"
+    @submit="add"
   >
     <div>
       <ion-img
@@ -66,13 +77,20 @@ function delta(minor: number): string {
         :src="photo"
         :alt="t('online_order.menu.photo', { name: dish.name })"
       />
-      <p v-if="dish.description">
-        {{ dish.description }}
-      </p>
-      <AllergenRow :codes="dish.allergens" />
-      <p>
-        <strong>{{ formatMoney(dish.price, locale, money) }}</strong>
-      </p>
+      <!-- The sheet opens here, on what the dish is: a field focused on opening would raise a phone's keyboard. -->
+      <div
+        data-autofocus
+        tabindex="-1"
+        data-testid="oo-dish-about"
+      >
+        <p v-if="dish.description">
+          {{ dish.description }}
+        </p>
+        <AllergenRow :codes="dish.allergens" />
+        <p>
+          <strong>{{ formatMoney(dish.price, locale, money) }}</strong>
+        </p>
+      </div>
       <p
         v-if="loading"
         role="status"
@@ -97,35 +115,36 @@ function delta(minor: number): string {
           </ion-button>
         </template>
       </InlineFeedback>
-      <ion-list
-        v-for="(group, g) in groups"
-        :key="`${g}-${group.name}`"
-        lines="inset"
-      >
-        <ion-list-header>
-          <ion-label>
-            <h3>{{ group.name }}</h3>
-            <p>{{ rule(group) }}</p>
-          </ion-label>
-        </ion-list-header>
-        <ion-item
-          v-for="(choice, c) in group.choices"
-          :key="`${c}-${choice.name}`"
-          :data-testid="`oo-menu-choice-${g}-${c}`"
-        >
-          <ion-label class="ion-text-wrap">
-            {{ choice.name }}
-            <AllergenRow :codes="choice.allergens" />
-          </ion-label>
-          <ion-note
-            v-if="choice.price_delta"
-            slot="end"
-          >
-            {{ delta(choice.price_delta) }}
-          </ion-note>
-        </ion-item>
-      </ion-list>
+      <ChoicePicker
+        v-for="group in groups"
+        :key="group.id"
+        :group="group"
+        :choice="choice"
+        :money="money"
+        @tap="(id) => (choice = choose(choice, group, id))"
+        @less="(id) => (choice = unchoose(choice, id))"
+      />
+      <ion-item lines="none">
+        <ion-label>{{ t('online_order.order.quantity') }}</ion-label>
+        <QuantityStepper
+          :quantity="quantity"
+          :min="1"
+          :max="MAX_QUANTITY"
+          :label="t('online_order.order.quantity')"
+          testid="oo-dish-qty"
+          @change="quantity = Number($event)"
+        />
+      </ion-item>
+      <ion-item lines="none">
+        <ion-input
+          :label="t('online_order.order.note')"
+          label-placement="stacked"
+          :maxlength="200"
+          :value="notes"
+          data-testid="oo-dish-note"
+          @ion-input="notes = String($event.detail.value ?? '')"
+        />
+      </ion-item>
     </div>
   </FormModal>
 </template>
-

@@ -84,7 +84,7 @@ test('hub#974: the till’s quantity field takes 1500 as typed and keeps it ungr
     // The till in Spanish with the dish on a new check.
     await checkWithDish(page, context, 'es', sold);
     const line = shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: sold.name }).first();
-    const field = line.locator('.pos-qty input');
+    const field = line.locator('[data-testid=pos-qty-field]');
     await field.fill('1500');
     await field.press('Enter');
     // The server keeps it: the line's total is 1500 × 0,03 €.

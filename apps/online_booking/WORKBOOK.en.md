@@ -115,13 +115,13 @@ Title "Booking page settings". Three blocks and a **Save** button:
 On saving: "Settings saved."; a refusal shows under its field ("Could not save").
 
 #### Booking page (the customer, no session)
-<!-- from WORKBOOK.md sha256:d3bd6dee3ac6 -->
+<!-- from WORKBOOK.md sha256:19d02cc45a94 -->
 Page `/p/<business>/book` at the business's address: anyone opens it, without signing in or seeing anything of the
 team's (no menu of theirs). At the top, the business's name, its logo (the one uploaded in Settings, served from the
 business's own address; without a logo, only the name) and its colour. Also "Book online" and "Choose your
 services, a day and a free time, then leave your name and mobile."; below, the title and welcome message of the
-Settings and the flow: services with their price and length, professional or "No preference", day, free times, name,
-mobile, email, note and **Book**. Beside **Book**, the notice of who uses her details and the link to the privacy
+Settings and the flow: services with their price (with how it is priced, as on the till: "From €65.00") and length,
+professional or "No preference", day, free times, name, mobile, email, note and **Book**. Beside **Book**, the notice of who uses her details and the link to the privacy
 policy. With nothing to book online, only that notice shows, without the invitation or the form. Once booked, the
 appointment number, the confirmation message, **See my booking**, **Cancel the booking** and **Book another**. With
 another business's address, or this one's at another's, there is no page. The confirmation gives a clickable link to
@@ -171,7 +171,7 @@ Dates and times show on the business's clock and in the format of the language o
 | ONLINE_BOOKING-F12 | Erase a customer's data (GDPR) | done |
 
 ### ONLINE_BOOKING-F01 The customer books from the booking page
-<!-- from WORKBOOK.md sha256:f1cb172614fc -->
+<!-- from WORKBOOK.md sha256:1c2558d0c431 -->
 Status: done
 Actor: customer (no session); owner or administrator, with the preview or with the assistant
 Screen: Booking page (`/p/<business>/book`; in development, the preview too)
@@ -179,8 +179,9 @@ Steps:
 1. She opens the business's page: its name, its logo (the one from Settings, from the business's own address; without
    a logo, only the name), title, welcome message and colour.
 2. She picks one or several services (up to 5) among those **booked online**, with their price (in the
-   business's currency, its country's: "20,00 zł" in Poland; grouped from four digits: "1.234,56 €")
-   and their duration if Services shows them ("Show prices", "Show duration").
+   business's currency, its country's: "20,00 zł" in Poland; grouped from four digits: "1.234,56 €"), with how
+   it is priced as on the till ("From €65.00", "€65.00 / hour", "Variable · €65.00" or "Free"), and their duration
+   if Services shows them ("Show prices", "Show duration"; without prices, no pricing either).
 3. If the business allows it, she picks a professional among those who do all those services, or "No
    preference".
 4. She taps the day in the calendar, which opens whole in the middle of the screen, and it is chosen with nothing

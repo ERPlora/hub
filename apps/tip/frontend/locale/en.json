@@ -129,6 +129,53 @@
         "amount": "Write an amount above zero.",
         "same": "That suggestion is already there."
       }
+    },
+    "figures": {
+      "total": "Total",
+      "card": "By card",
+      "cash": "In cash",
+      "other": "Other ways",
+      "count": "{count} tip | {count} tips"
+    },
+    "report": {
+      "by": {
+        "label": "View",
+        "person": "By person",
+        "shift": "By shift"
+      },
+      "columns": {
+        "person": "Person",
+        "shift": "Working day",
+        "count": "Tips",
+        "card": "By card",
+        "cash": "In cash",
+        "other": "Other ways",
+        "total": "Total"
+      },
+      "outside": "Outside a clocked working day",
+      "open": "still open",
+      "loading": "Loading the report…",
+      "loadError": "The report could not be loaded.",
+      "empty": "No tips in this period.",
+      "emptyMessage": "The tips charged at the till, and the ones recorded in Tips, add up here.",
+      "noShifts": {
+        "heading": "Time clock is not active",
+        "message": "The report by shift is made of the working days clocked in Time clock: turn it on in Apps, or see the report by person."
+      },
+      "entity": {
+        "one": "line",
+        "many": "lines"
+      },
+      "export": "Export"
+    },
+    "mine": {
+      "today": "Today",
+      "thisWeek": "This week",
+      "week": "This week, since {day}",
+      "loadError": "Your tips could not be loaded.",
+      "retry": "Retry",
+      "empty": "You have no tips this week yet.",
+      "emptyMessage": "The tips of the checks you serve show up here as soon as they are charged."
     }
   }
 }

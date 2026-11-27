@@ -14,6 +14,7 @@ import pytest
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
 
 from apps.invoice.tests.conftest import catalog_of
@@ -51,6 +52,17 @@ def run(name: str, data: dict | None = None, ctx: OperationContext | None = None
     """Runs the operation ``name`` with ``data`` as its input (validated as a route would)."""
     op = get(name)
     return op(ctx or ctx_for(), op.input.model_validate(data or {}))
+
+
+def events(name: str) -> list[dict]:
+    return [
+        event.payload
+        for event in OutboxEvent.objects.filter(name=name).order_by("created_at", "id")
+    ]
+
+
+def settings(**values):
+    return run("cash_register.settings.update", values)
 
 
 @pytest.fixture

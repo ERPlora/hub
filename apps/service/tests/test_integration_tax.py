@@ -58,7 +58,7 @@ def test_a_category_created_in_taxes_is_offered_to_services_and_becomes_the_defa
         "salon.beauty",
         "Beauty treatments",
     )
-    facial = run("service.service.create", {"name": "Facial"})
+    facial = run("service.service.create", {"name": "Facial", "price": 4500})
     assert (facial.tax_category_key, facial.tax_category_name, facial.status) == (
         "salon.beauty",
         "Beauty treatments",
@@ -69,13 +69,13 @@ def test_a_category_created_in_taxes_is_offered_to_services_and_becomes_the_defa
 def test_a_category_taxes_deactivates_leaves_its_services_unconfigured_and_no_longer_offered():
     run("tax.category.create", {"key": "salon.old", "name": "Old"})
     service = run(
-        "service.service.create", {"name": "Perm", "tax_category_key": "salon.old"}
+        "service.service.create", {"name": "Perm", "price": 6000, "tax_category_key": "salon.old"}
     )
     TaxCategory.objects.filter(key="salon.old").update(is_active=False)
     assert run("service.service.get", {"id": str(service.id)}).status == "unconfigured"
     assert run("service.service.list_for_sale", {}).rows[0].needs_tax_setup is True
     with pytest.raises(InvalidPayload):
         run(
-            "service.service.create", {"name": "Other", "tax_category_key": "salon.old"}
+            "service.service.create", {"name": "Other", "price": 3000, "tax_category_key": "salon.old"}
         )
     assert run("service.catalog.status", {}).sellable_services == 0

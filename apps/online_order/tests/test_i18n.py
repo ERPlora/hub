@@ -5,15 +5,22 @@ from pathlib import Path
 from django.apps import apps
 from django.utils import translation
 
-from apps.online_order.models import TableCode
+from apps.online_order import services
+from apps.online_order.models import Order, OrderLine, TableCode
 from base.tests.po import compiled_differences, config_texts, missing_from_catalogue, model_texts, untranslated
 
 LOCALE = Path(apps.get_app_config("online_order").path) / "locale" / "es" / "LC_MESSAGES"
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (the store, its permissions, the admin)."""
-    lazies = [*config_texts(apps.get_app_config("online_order")), *model_texts((TableCode,))]
+    """The English source of every lazy text the app shows (the store, its permissions, the admin, what the table's
+    page is told when its order is refused)."""
+    lazies = [
+        *config_texts(apps.get_app_config("online_order")),
+        *model_texts((TableCode, Order, OrderLine)),
+        services.TOO_MANY_ORDERS,
+        services.NOT_ON_MENU,
+    ]
     with translation.override("en"):
         return {str(text) for text in lazies}
 

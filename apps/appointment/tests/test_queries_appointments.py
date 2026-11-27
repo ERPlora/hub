@@ -5,7 +5,7 @@ import datetime as dt
 import pytest
 from django.utils import timezone
 
-from apps.appointment.models import History
+from apps.appointment.models.appointments import History
 from apps.appointment.queries.appointments import APPOINTMENT_ORDER
 from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
@@ -256,6 +256,39 @@ def test_the_customers_own_bookings_waiting_for_confirmation_are_counted(salon):
     counted = run("appointment.appointment.count_to_confirm")
     assert (counted.count, counted.earliest) == (1, at(MONDAY, "10:00"))
 
+
+
+def test_every_booking_to_confirm_is_listed_whatever_its_day_as_many_as_counted(salon):
+    """hub#2640: «N to confirm» counted a booking of another day that the agenda's day never showed."""
+    first = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), status="pending", source="online")
+    later = make_appointment(
+        salon.lucia, salon.bea, [salon.colour], at(MONDAY + dt.timedelta(days=15), "12:00"), status="pending"
+    )
+    next_day = make_appointment(salon.lucia, salon.bea, [salon.cut], at(TUESDAY, "09:00"), status="pending")
+    make_appointment(salon.lucia, salon.ana, [salon.cut], at(TUESDAY, "11:00"), status="confirmed", source="online")
+    make_appointment(salon.lucia, salon.ana, [salon.cut], timezone.now() - dt.timedelta(hours=2), status="pending")
+
+    listed = run("appointment.appointment.list_to_confirm")
+
+    assert [row.id for row in listed.rows] == [first.id, next_day.id, later.id]
+    assert listed.total == run("appointment.appointment.count_to_confirm").count == 3
+
+
+def test_an_employee_lists_and_counts_only_her_own_bookings_to_confirm(salon, make_user):
+    own = make_appointment(salon.lucia, salon.bea, [salon.cut], at(TUESDAY, "09:00"), status="pending")
+    make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"), status="pending")
+    ctx = employee_linked_to(salon.bea, make_user)
+
+    listed = as_ctx(ctx, "appointment.appointment.list_to_confirm")
+
+    assert [row.id for row in listed.rows] == [own.id]
+    assert listed.total == as_ctx(ctx, "appointment.appointment.count_to_confirm").count == 1
+
+
+def test_a_confirmed_booking_leaves_the_list_to_confirm(salon):
+    booked = make_appointment(salon.lucia, salon.ana, [salon.cut], at(TUESDAY, "09:00"), status="pending")
+    run("appointment.appointment.confirm", {"id": str(booked.id)})
+    assert run("appointment.appointment.list_to_confirm").rows == []
 
 def _tied_appointments(salon):
     rows = [make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, f"{hour:02}:00")) for hour in range(9, 13)]

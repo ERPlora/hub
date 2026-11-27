@@ -16,6 +16,7 @@ from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, model_validator
 
 from apps.cash_register.schemas.app_lines import AppLine, AppMark
+from apps.cash_register.schemas.counts import COUNT_SOMETHING, counts_something
 from base.schemas.assistant import names
 from base.sensitive import COSTS
 
@@ -35,7 +36,6 @@ NOTHING_TO_CHANGE = _(
 ONE_LIST = _(
     "Ask for the lines of one session (its id or number) or for the unassigned ones, one of the two."
 )
-COUNT_SOMETHING = _("Count the drawer: give its notes and coins or its total.")
 #: How «Open session» and the drawers of the settings name a drawer (the assistant's card names the datum by it).
 DRAWER = gettext_noop("Drawer")
 
@@ -601,7 +601,7 @@ class CountAddIn(SessionRefIn):
 
     @model_validator(mode="after")
     def _counted(self):
-        if self.denominations is None and self.total is None:
+        if not counts_something(self.denominations, self.total):
             raise ValueError(str(COUNT_SOMETHING))
         return self
 

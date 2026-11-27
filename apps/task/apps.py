@@ -62,4 +62,20 @@ class TaskConfig(LiveAppConfig):
         Nav("tasks", _("Tasks"), "ion:checkbox-outline", "/task/tasks", permission="task.view"),
         Nav("projects", _("Projects"), "ion:folder-outline", "/task/projects", permission="task.view"),
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "73wOkcIBVpw", "en": "njU86EpkRC4"},
+        flow_videos={
+            "TASK-F01": {"es": ["cm6YZAImrmg"], "en": ["s_Hp15-5B18"]},
+            "TASK-F04": {"es": ["aVwwCoD-FFo"], "en": ["NfhAAruRWik"]},
+            "TASK-F05": {"es": ["R_T_HTZ6fAQ"], "en": ["ZaLS5IWfcbM"]},
+            "TASK-F06": {"es": ["R_T_HTZ6fAQ"], "en": ["ZaLS5IWfcbM"]},
+            "TASK-F07": {"es": ["R_T_HTZ6fAQ"], "en": ["ZaLS5IWfcbM"]},
+            "TASK-F08": {"es": ["cm6YZAImrmg"], "en": ["s_Hp15-5B18"]},
+            "TASK-F09": {"es": ["aVwwCoD-FFo"], "en": ["NfhAAruRWik"]},
+            "TASK-F10": {"es": ["aVwwCoD-FFo"], "en": ["NfhAAruRWik"]},
+            "TASK-F11": {"es": ["cm6YZAImrmg"], "en": ["s_Hp15-5B18"]},
+            "TASK-F12": {"es": ["Z3CpRKoAGtE"], "en": ["Aw0iv2BJI8g"]},
+            "TASK-F13": {"es": ["Z3CpRKoAGtE"], "en": ["Aw0iv2BJI8g"]},
+            "TASK-F14": {"es": ["Z3CpRKoAGtE"], "en": ["Aw0iv2BJI8g"]},
+        },
+    )

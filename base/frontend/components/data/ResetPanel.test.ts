@@ -116,7 +116,7 @@ describe('ResetPanel', () => {
     await m.wrapper.get(`[data-testid="undo-${load().id}"]`).trigger('click');
     await settle();
     const confirm = dialog(m, 'undo-confirm');
-    expect([confirm.props('open'), confirm.props('title'), confirm.props('requireText')]).toEqual([true, 'Undo «Restaurant»', undefined]);
+    expect([confirm.props('open'), confirm.props('title'), confirm.props('requireText')]).toEqual([true, 'Undo “Restaurant”', undefined]);
     expect(confirm.props('message')).toBe('The 14 rows this import brought will be removed. What you created afterwards stays.');
     confirm.vm.$emit('confirm');
     await settle();
@@ -154,7 +154,7 @@ describe('ResetPanel', () => {
     expect(sections[0].text()).toContain('Products · 12');
     expect(m.wrapper.text()).toContain('Sales, invoices, fiscal records, people and their access');
     expect(m.wrapper.get('[data-testid="reset-copy-first"]').text()).toBe(
-      'Before emptying, a full copy of the business\'s data is made and kept for 90 days, in «Copies» below.',
+      'Before emptying, a full copy of the business\'s data is made and kept for 90 days, in “Copies” below.',
     );
     await m.wrapper.get('[data-testid="reset-export-first"]').trigger('click');
     await settle();
@@ -179,7 +179,7 @@ describe('ResetPanel', () => {
       message: '14 rows will be removed for good:',
       consequences: ['Inventory — 14 rows'],
       requireText: 'Bar Pepe',
-      requireTextLabel: 'Type «Bar Pepe» to confirm',
+      requireTextLabel: 'Type “Bar Pepe” to confirm',
       confirmLabel: 'Remove for good',
     });
     confirm.vm.$emit('confirm');
@@ -208,7 +208,7 @@ describe('ResetPanel', () => {
     expect(m.wrapper.find('[data-testid="reset-progress"]').exists()).toBe(false);
     const result = m.wrapper.get('[data-testid="reset-result"]').text();
     expect(result).toContain('Inventory — 14 rows removed');
-    expect(result).toContain('A full copy of the data from before is kept in «Copies»');
+    expect(result).toContain('A full copy of the data from before is kept in “Copies”');
     // What each section has now: the plan is read again.
     expect(m.sent.slice(asked).map((call) => call.body)).toEqual([{ dry_run: true }]);
     expect((m.wrapper.get('[data-testid="reset-submit"]').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);

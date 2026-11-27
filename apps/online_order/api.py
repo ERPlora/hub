@@ -5,7 +5,7 @@ from ninja import Query, Router
 
 from apps.online_order import queries, services
 from apps.online_order.schemas import TableCodeListIn
-from apps.table.schemas import TableRefIn
+from apps.table.schemas.tables import TableRefIn
 
 router = Router(tags=["online_order"])
 

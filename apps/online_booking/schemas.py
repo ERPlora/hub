@@ -23,11 +23,13 @@ from pydantic import (
     model_validator,
 )
 
-from apps.appointment.schemas.fields import A_MEMBER, A_SERVICE, AN_APPOINTMENT
+from apps.appointment.schemas.fields import A_MEMBER, A_SERVICE, AN_APPOINTMENT, OF_STATUS
+from apps.appointment.schemas.settings import AdvanceDays
 from apps.customer.schemas.contact import EMAIL, PHONE
 from apps.customer.schemas.fields import Email
 from apps.online_booking.logo import LogoFieldsOut, LogoName
 from apps.online_booking.public_page import LinkOwnerOut, PageOwnerOut, TrapIn
+from apps.online_booking.service_price import ServicePriceOut
 
 T = TypeVar("T")
 
@@ -209,7 +211,7 @@ class BookingRow(Schema):
     start: dt.datetime = Field(description="On the business's clock.")
     end: dt.datetime
     duration_minutes: int
-    status: Status
+    status: Status = Field(json_schema_extra=OF_STATUS)
     total: int = Field(description="The sum of its services' prices, in cents.", json_schema_extra={"money": True})
     notes: str = Field(description="The customer's note.")
     booked_at: dt.datetime
@@ -281,10 +283,8 @@ class SettingsIn(In):
         title=gettext_noop("Minimum booking notice (minutes)"),
         description="Diary rule: minutes ahead the customer must book.",
     )
-    max_advance_booking: int | None = Field(
+    max_advance_booking: AdvanceDays | None = Field(
         None,
-        ge=0,
-        le=365,
         title=gettext_noop("Book at most this far ahead (days)"),
         description="Diary rule: days ahead one may book; 0 = no limit.",
     )
@@ -369,14 +369,11 @@ class ProfessionalOut(Schema):
     name: str
 
 
-class PublicServiceOut(Schema):
+class PublicServiceOut(ServicePriceOut):
     id: UUID
     name: str
     description: str
     category: str = Field(description="Its category's name; empty without one.")
-    price: int | None = Field(
-        description="In cents; empty when the business does not show prices.", json_schema_extra={"money": True}
-    )
     duration_minutes: int | None = Field(
         description="Empty when the business does not show durations."
     )
@@ -460,7 +457,7 @@ class PublicBookIn(In, TrapIn):
 
 class BookedOut(Schema):
     number: str = Field(description="The appointment number the customer quotes.")
-    status: Status
+    status: Status = Field(json_schema_extra=OF_STATUS)
     start: dt.datetime
     end: dt.datetime
     timezone: str
@@ -485,7 +482,7 @@ class PublicCancelIn(TokenIn):
 
 class PublicBookingOut(LinkOwnerOut):
     number: str
-    status: Status
+    status: Status = Field(json_schema_extra=OF_STATUS)
     start: dt.datetime
     end: dt.datetime
     timezone: str

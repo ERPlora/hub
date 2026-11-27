@@ -358,7 +358,7 @@ APP_SAVES = [
     (
         "combo",
         "/api/combo/combos",
-        {"name": "Once", "supply_kind": "goods", "tax_category_key": "product.generic"},
+        {"name": "Once", "price": 900, "supply_kind": "goods", "tax_category_key": "product.generic"},
         "combo.combo.created",
     ),
     ("customer", "/api/customer/groups", {"name": "Once"}, "customer.group.created"),
@@ -615,8 +615,8 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
 #: may repeat never reaches one of them before its COMMIT (BASE-F111).
 NOT_UNDONE_BY_A_ROLLBACK = {
     "apps.appointment.services.writes._next_number": "numbers an appointment",
-    "apps.cart_checkout.services._number": "numbers an order",
-    "apps.cash_register.services._number": "numbers a till session",
+    "apps.cart_checkout.services.orders._number": "numbers an order",
+    "apps.cash_register.services.sessions._number": "numbers a till session",
     "apps.invoice.services.numbering._take_number": "numbers an invoice",
     "apps.kitchen.services.writes.take_number": "numbers a kitchen ticket",
     "apps.payment.services.payments._number": "numbers a payment",

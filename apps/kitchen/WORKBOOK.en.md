@@ -114,7 +114,7 @@ which the tablet remembers. Tap a dish to mark it ready, "Ready" for the whole c
 "⋮" you have "Mark rush" and "Recall". It updates by itself, without reloading.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:2205fe06a92a -->
+<!-- from WORKBOOK.md sha256:f3ea9b63ee41 -->
 Menu **Kitchen → Display**. The kitchen board. A single bar at the top, fixed while scrolling: the three
 views as tabs with their counter ("Tickets" and "Ready"; "All-Day" without a counter), the "Full screen"
 button and, if the tickets on the line have dishes from more than one station, the station buttons
@@ -124,8 +124,9 @@ sideways scroll). Each card: on the left, the type as an icon, the label ("Table
 type) and "Waiter: <name>"; on the right, the clock, the wait in words with its icon ("On time", "Warning"
 or "Late") and the short number "#0012"; below, the status ("To prepare", "Preparing" or "Ready") and the
 marks "Rush", "VIP", "Allergy" and "Round N" (from the second one). The dishes with the quantity in large type
-("2×"), the name, the customer's allergy in a red block, their modifiers in bold, the note in italics, in "All" the
-station with its colour, "Paper only" if the station is paper only and, on the right, an icon with their state (to
+("2×"; one sold by weight, with its unit: "0.35 kg"), the name, the customer's allergy in a red block, their
+modifiers in bold, the note in italics, in "All" the station with its colour, "Paper only" if the station is
+paper only and, on the right, an icon with their state (to
 prepare, preparing, ready or voided); the dishes of a menu, next to a line under the menu header, which says how
 many dishes it has ("2 dishes") and, when tapped, marks its dishes ready. A dish that is ready shows
 struck through and dimmed. A dish voided at the till shows struck through, with "Voided" and the reason in
@@ -356,7 +357,7 @@ error.
 Involved: KITCHEN-F01, KITCHEN-F05, KITCHEN-F08, INVENTORY-F04, INVENTORY-F06, INVENTORY-F07, INVENTORY-F27
 
 ### KITCHEN-F05 Receive the round the till sends
-<!-- from WORKBOOK.md sha256:05d8dced4cc1 -->
+<!-- from WORKBOOK.md sha256:18e50afdbbd0 -->
 Status: done
 Actor: system
 Screen: none
@@ -365,7 +366,7 @@ Steps:
    API); the one Sales sends by itself reaches Kitchen a moment later, without anyone doing anything.
 2. Kitchen opens a ticket with the day's number (`YYYYMMDD-NNNN`, the business day, in its time zone), the
    check's round, the check's label ("Table 4"), the type, the priority and the waiter: their name or, if
-   their account has none, what goes before the @ of their e-mail, never the whole e-mail (BASE-F119); a
+   they have none, what goes before the @ of their e-mail, never the whole e-mail (BASE-F119); a
    ticket saved before with the e-mail reads the same way.
 3. Each line that is not a service is a dish, in the order of the check, sent to its station
    (KITCHEN-F04); a menu, one dish for each dish chosen (KITCHEN-F06). Service lines are not cooked.
@@ -437,7 +438,7 @@ comes out the same under its dish.
 Involved: SALE-F11, SALE-F13, SALE-F20, MODIFIER-F08, KITCHEN-F08
 
 ### KITCHEN-F08 The ticket comes out on paper at each station
-<!-- from WORKBOOK.md sha256:9e781354cb0d -->
+<!-- from WORKBOOK.md sha256:4ae8e4bd25f2 -->
 Status: done
 Actor: system
 Screen: none
@@ -448,9 +449,9 @@ Steps:
    name a specific printer), it asks for no sheet: those dishes are seen on the display only. It is the
    same for the round the waiter sends (KITCHEN-F18) and for the one Sales sends by itself, which prints
    when it reaches Kitchen.
-2. The sheet carries the label, the number, the round, the waiter and each dish with its quantity, its
-   modifiers (one per line) and its note, and the dishes of a menu indented under their header
-   (KITCHEN-F06, F07); if the round is rush, `!! URGENT !!`.
+2. The sheet carries the label, the number, the round, the waiter and each dish with its quantity ("2x"; one
+   sold by weight, with its unit: "0.35 kg"), its modifiers (one per line) and its note, and the dishes of a
+   menu indented under their header (KITCHEN-F06, F07); if the round is rush, `!! URGENT !!`.
 In: the dishes with the destination and the printer frozen on receiving.
 Out: one job per printer in Printing's queue, only once even if it is asked for twice: the round Kitchen
 sent is not printed again when the notice from Sales reaches it.
@@ -570,13 +571,13 @@ cooked."). If the notice does not print, the display says so.
 Involved: KITCHEN-F10, KITCHEN-F16, KITCHEN-F20, PRINTING-F10
 
 ### KITCHEN-F15 See how much is left to cook
-<!-- from WORKBOOK.md sha256:8b24c1faa59b -->
+<!-- from WORKBOOK.md sha256:d15eb9cca21a -->
 Status: done
 Actor: employee, manager
 Screen: Display (also the assistant: "what is left on the grill")
 Steps:
-1. Press "All-Day": each dish and the quantity left to cook adding up every ticket being cooked, from most
-   to least; in "All", with its station.
+1. Press "All-Day": each dish and the quantity left to cook (with its unit if it is sold by weight, "0.35 kg")
+   adding up every ticket being cooked, from most to least; in "All", with its station.
 2. With a station chosen, only its own.
 In: the dishes to cook of the tickets To prepare and Preparing.
 Out: nothing.
@@ -647,7 +648,7 @@ could not be sent to the kitchen. Try again.". Without Kitchen active, the till 
 Involved: SALE-F20, KITCHEN-F05, KITCHEN-F08, KITCHEN-F09, KITCHEN-F19, PRINTING-F10
 
 ### KITCHEN-F19 Follow the check's tickets from the till
-<!-- from WORKBOOK.md sha256:e8391da1a490 -->
+<!-- from WORKBOOK.md sha256:3c12619795f9 -->
 Status: done
 Actor: employee
 Screen: Sales: Sell ("Order tickets" sheet)
@@ -656,8 +657,8 @@ Steps:
    N" next to the header of what was sent; press it.
 2. The "Order tickets" sheet opens: one card per round, the most recent first, with "Order N", the sending
    time (the business's), its state with the same words as the kitchen ("To prepare", "Preparing",
-   "Ready", "Served", "Cancelled"), "Rush" if it is one and its dishes (a voided one, struck through with
-   "Voided").
+   "Ready", "Served", "Cancelled"), "Rush" if it is one and its dishes with their quantity, as in the kitchen
+   ("2×"; one sold by weight, "0.35 kg"; a voided one, struck through with "Voided").
 3. The sheet updates by itself while it is open: what the kitchen marks shows without reloading.
 In: the tickets of that check, also those that came from a check merged into it.
 Out: nothing; it only shows.

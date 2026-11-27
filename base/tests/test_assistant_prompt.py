@@ -2,6 +2,7 @@
 which language and money, and what it is told of the person who asks."""
 
 import pytest
+from live import assistant as shared
 
 from base import assistant
 from base.models import Membership
@@ -33,6 +34,13 @@ def test_the_instructions_keep_ids_out_of_the_answer():
         "Name a record to the person by its name, as the screens do: never write an id (a code such as "
         "0190a3b4-…) in the answer, not in a table either."
     ) in text
+
+
+def test_the_instructions_say_a_value_by_the_name_its_result_gives_it():
+    """hub#2675: a customer created in Spanish was told «con la etapa «lead» y origen «walk-in»», codes no screen shows.
+    A result names each value of a closed list it holds as the screens do (``screen_names``): the model says that."""
+    text = " ".join(assistant.prompt.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert f"`{shared.SCREEN_NAMES}`" in text
 
 
 def test_the_instructions_ask_for_a_missing_datum_and_leave_the_yes_to_the_card():

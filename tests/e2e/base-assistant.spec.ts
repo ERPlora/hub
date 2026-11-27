@@ -29,6 +29,7 @@ import {
   panelAtTheDesk,
   shots,
 } from './assistant-panel';
+import { userMenu } from './access-door';
 import { CLAIM_ANSWER, DICTATION, DONE, GREETING, LINK_ANSWER } from './assistant-provider';
 import { saasSql } from './assistant-real';
 import { A, api, capture, login, saveSessionForTheSweep, shot, shown, THREE_SIZES as VIEWPORTS, untilStill, upgradeLandsInside } from './helpers';
@@ -242,12 +243,7 @@ test('the conversation stays in the tab across reloads, «New conversation» emp
   await expect(panel(page).locator('[data-testid="assistant-empty"]')).toBeVisible();
   await ask(page, 'Hola otra vez');
   await panel(page).locator('[data-testid="assistant-close"]').click();
-  const presented = page.evaluate(
-    () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-  );
-  await page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name').click();
-  await presented;
-  await page.locator('ion-popover [data-testid="user-menu-logout"]').click();
+  await userMenu(page, 'logout');
   await page.waitForURL((url) => !url.href.startsWith(A));
   await login(page, A, '/', undefined, { fresh: true });
   await openPanel(page);

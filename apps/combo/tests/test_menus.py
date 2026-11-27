@@ -26,7 +26,7 @@ def test_a_menu_needs_a_name_and_takes_the_old_defaults():
 def test_a_menu_is_sold_eaten_in_or_to_take_away_and_nothing_else():
     assert "supply_kind" in refused(ComboIn, {"name": "x", "supply_kind": "mixed"})
     assert (
-        ComboIn.model_validate({"name": "x", "supply_kind": "goods"}).supply_kind
+        ComboIn.model_validate({"name": "x", "price": 600, "supply_kind": "goods"}).supply_kind
         == "goods"
     )
 

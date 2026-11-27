@@ -159,8 +159,8 @@ describe('useProductImport: the tax categories of the file', () => {
     await s.api().confirmTax();
     await flush();
     const report = s.api().report.value!;
-    expect(report.notes).toEqual(['Taxes could not save «Vino»: This text is already learned.']);
-    expect(report.failed).toContainEqual({ line: 5, key: 'WIN-1', reason: 'Taxes could not save «Vino»: This text is already learned.' });
+    expect(report.notes).toEqual(['Taxes could not save “Vino”: This text is already learned.']);
+    expect(report.failed).toContainEqual({ line: 5, key: 'WIN-1', reason: 'Taxes could not save “Vino”: This text is already learned.' });
   });
 
   it('when every text is known it imports at once', async () => {

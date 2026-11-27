@@ -43,6 +43,10 @@ def test_the_way_in_s_live_queries_and_what_re_runs_them():
     assert on["base.device.current"] == sorted({events.DEVICE_MODE_CHANGED, events.DEVICE_REMOVED, events.DEVICES_PRUNED})
     assert on["base.access.settings"] == [events.ACCESS_SETTINGS_CHANGED]
     assert on["base.profile.get"] == sorted({events.PROFILE_UPDATED, events.PIN_SET, events.ACCESS_SETTINGS_CHANGED})
+    # An open till's idle lock: the business's dial, and this device made personal, removed or pruned.
+    assert on["base.session.idle"] == sorted(
+        {events.ACCESS_SETTINGS_CHANGED, events.DEVICE_MODE_CHANGED, events.DEVICE_REMOVED, events.DEVICES_PRUNED}
+    )
 
 
 class FakeRequest:
@@ -72,6 +76,28 @@ def test_changing_the_dial_in_b_tells_b_only(listen, hub_b):
         get("base.access.settings_update")(system_context(B), AccessSettingsUpdateIn(pin_length=6))
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": [events.ACCESS_SETTINGS_CHANGED]})]
     assert received(on_a, timeout=0.3) == []
-    assert {"base.access.faces", "base.access.settings", "base.profile.get"} <= live_registry.affected(
-        [events.ACCESS_SETTINGS_CHANGED]
+    assert {"base.access.faces", "base.access.settings", "base.profile.get", "base.session.idle"} <= (
+        live_registry.affected([events.ACCESS_SETTINGS_CHANGED])
     )
+
+
+def test_an_open_till_reads_its_idle_minutes_again_once_the_business_changes_them(make_user, hub_a):
+    ana = make_user("saas:1", host=SLUG_A, role=Membership.Role.EMPLOYEE, first_name="Ana")
+    shared, personal = access.new_device_token(), access.new_device_token()
+    idle = get("base.session.idle")
+
+    def minutes(token=""):
+        ctx = OperationContext(scope=A, actor=ana, permissions=frozenset({"base.view_home"}), request=FakeRequest(token))
+        return idle(ctx, idle.input()).idle_minutes
+
+    with use_hub(hub_a):
+        TrustedDevice.objects.create(token_digest=access.token_digest(shared), last_entry_at=timezone.now())
+        TrustedDevice.objects.create(
+            token_digest=access.token_digest(personal), mode=access.PERSONAL, last_entry_at=timezone.now()
+        )
+        until_sign_out = minutes(shared)
+        update = get("base.access.settings_update")
+        update(system_context(A), AccessSettingsUpdateIn(pin_policy=access.ALWAYS, pin_inactivity_minutes=1))
+        one_minute = (minutes(shared), minutes(personal), minutes())
+    assert (until_sign_out, one_minute) == (None, (1, None, None))
+    assert idle.permission == "base.view_home"

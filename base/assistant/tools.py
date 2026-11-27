@@ -17,6 +17,7 @@ from live.operations import Operation
 from base import activation, approvals, entitlement
 from base.business import DEFAULT_CURRENCY, business_zone, money_text
 from base.operations import business_currency
+from base.only_theirs import hearing, told
 from base.permissions import refused_outright
 
 from .relevance import FIND_TOOLS
@@ -55,15 +56,18 @@ def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = No
 def run(ctx: OperationContext, op: Operation, arguments: str) -> shared.ToolOutcome:
     """``op`` run for ``ctx`` with the model's ``arguments`` (``live.assistant.run_tool``), its result told as the screens
     write it in the person's language: its hours on the business's clock and each amount by ``money_text``, in the
-    currency of the record that names one, else in the business's."""
+    currency of the record that names one, else in the business's. A read the person's role kept to their own says so
+    (``only_theirs``)."""
     try:
         business = business_currency(ctx.scope)
     except NotFound:
         business = DEFAULT_CURRENCY
-    return shared.run_tool(
-        ctx,
-        op,
-        arguments,
-        zone=business_zone(),
-        money=lambda value, named: money_text(value, named or business, language=ctx.language),
-    )
+    with hearing() as heard:
+        outcome = shared.run_tool(
+            ctx,
+            op,
+            arguments,
+            zone=business_zone(),
+            money=lambda value, named: money_text(value, named or business, language=ctx.language),
+        )
+    return told(outcome) if heard and op.kind == "query" else outcome

@@ -33,6 +33,9 @@ OPEN_MANAGEMENT = "base.open_management"
 OWN_BUSINESS = "base.own_business"
 #: What the owner holds and no other role does: an administrator runs the business, it does not own it.
 OWNER_ONLY = frozenset({OWN_BUSINESS})
+#: The invitations no role of the business rules over: the owner always owns the business, and the accountancy firm
+#: only reads, which is why it takes no place of the plan.
+INVITATION_ALONE = frozenset({Membership.Role.OWNER, Membership.Role.ACCOUNTANT})
 
 
 class RoleHeld(NamedTuple):
@@ -50,14 +53,15 @@ def is_a_person(actor: Any) -> bool:
 
 def role_held(user: Any, scope: Scope) -> RoleHeld | None:
     """The role of ``user`` on ``scope``, read from the business at work; ``None`` without a ``Membership`` there, as for
-    whoever is no person. The owner keeps the role of their invitation whatever role of the business their row names."""
+    whoever is no person. The owner and the accountancy firm keep the role of their invitation whatever role of the
+    business their row names."""
     if not is_a_person(user):
         return None
     invitation = Membership.objects.filter(user=user, host=scope.key).values_list("role", flat=True).first()
     if invitation is None:
         return None
     own = None
-    if invitation != Membership.Role.OWNER:
+    if invitation not in INVITATION_ALONE:
         own = BusinessRole.objects.filter(people__username=user.get_username()).first()
     return RoleHeld(invitation, own)
 
@@ -68,8 +72,8 @@ def access_for(user: Any, scope: Scope) -> frozenset[str]:
 
     A superuser is ERPlora's staff, whose place is the Hub admin on the platform host: on a
     business's host it holds only what a ``Membership`` there gives it, like anyone (the staff copy ``saas-staff:<id>``
-    never has one). What each basic role gets, ``permissions_of_role``. The owner keeps the role of their invitation
-    whatever role of the business their row names: nobody takes owning the business from them. The role of the business
+    never has one). What each basic role gets, ``permissions_of_role``. The owner and the accountancy firm keep the role
+    of their invitation whatever role of the business their row names (``INVITATION_ALONE``). The role of the business
     is read from the business's own database, the one at work (``use_hub``); outside one it fails, as any model of a
     business does.
     """
