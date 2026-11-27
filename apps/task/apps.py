@@ -8,8 +8,6 @@ class TaskConfig(LiveAppConfig):
     name = "apps.task"
     label = "task"
     blueprint_stays = {
-        "Project": "pending",
-        "Task": "pending",
         "Comment": "history",
         "TaskCounter": "internal",
     }
@@ -85,3 +83,9 @@ class TaskConfig(LiveAppConfig):
             "TASK-F14": {"es": ["Z3CpRKoAGtE"], "en": ["Aw0iv2BJI8g"]},
         },
     )
+
+    def blueprint_datasets(self) -> list:
+        """What of Tasks travels in an export of the business (BASE-F35): its active projects and its open tasks."""
+        from apps.task import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS
