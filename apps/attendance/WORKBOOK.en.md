@@ -368,13 +368,13 @@ If it fails: "The history could not be loaded.".
 Involved: ATTENDANCE-F08, ATTENDANCE-F13
 
 ### ATTENDANCE-F10 Export the month in CSV for the accountant or the Inspectorate
-<!-- from WORKBOOK.md sha256:9875ffb75a21 -->
+<!-- from WORKBOOK.md sha256:49d0ca406786 -->
 Status: done (server and screen)
 Actor: everyone (the employee, only their working days)
 Screen: Records
 Steps:
 1. In "Records", choose the month (and, as a manager, the person and the status).
-2. Tap "Export CSV"; meanwhile you see "Exporting…".
+2. Tap "Export CSV" (the bar's download icon); meanwhile it spins and is called "Exporting…".
 3. "attendance-2026-10.csv" downloads with one line per working day of the filter, all of them, not only
    those that fit on the screen, in the language of whoever exports it: date, person, clock-in, clock-out,
    break minutes, minutes worked, status ("Open", "Closed" or "Needs review") and whether the clock-in and

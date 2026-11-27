@@ -82,8 +82,7 @@ function waiting(u: UsageSummary): string {
 }
 
 function alertText(u: UsageSummary): string {
-  const named = { n: u.pending, usage: t(`printing.usage.${u.usage}`), age: waited(u.oldest_pending_at ?? '', now.value, t) };
-  return u.pending === 1 ? t('printing.summary.alertOne', named) : t('printing.summary.alert', named);
+  return t('printing.summary.alert', { n: u.pending, usage: t(`printing.usage.${u.usage}`), age: waited(u.oldest_pending_at ?? '', now.value, t) });
 }
 </script>
 
