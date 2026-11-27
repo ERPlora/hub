@@ -436,7 +436,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     # A dict, not AI(...): AI has no ``check`` (base.assistant.cards.check_of), the read run before the card (hub#542, hub#539).
     ai={
         "description": "Tries again to set up one of this business's apps that could not be turned on (its state "
-        "«failed» in base.app.list; by its name as the person says it, or its id), with what it needs that failed too: "
+        "`failed` in base.app.list; by its name as the person says it, or its id), with what it needs that failed too: "
         "it is set up in a moment and then shows in the menu. Refused for an app that is not waiting for it, or when the "
         "name fits several apps (ask which one).",
         "risk": "normal",
