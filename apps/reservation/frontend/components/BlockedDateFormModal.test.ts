@@ -53,7 +53,8 @@ describe('BlockedDateFormModal', () => {
     const message = 'Esa fecha ya está bloqueada a esa hora.';
     s.answer(409, { error: { code: 'reservation.blocked_date_exists', message, fields: { date: message } } });
     await click(s.submit());
-    expect(s.inDoc('reservation-blocked-form-error')?.textContent).toContain(message);
+    expect(s.field('date')?.errorText).toBe(message);
+    expect(s.inDoc('reservation-blocked-form-error')).toBeNull();
   });
 });
 

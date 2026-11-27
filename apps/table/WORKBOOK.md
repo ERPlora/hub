@@ -455,9 +455,11 @@ Pasos:
    saltan a los 60 y a los 90 minutos.
 Entra: los tres valores.
 Sale: los ajustes de sala (avisa: `table.settings.updated`).
-Si falla: un valor fuera de rango sale en su campo. El aviso se quita en cuanto se cambia algo y el
-motivo de un campo en cuanto se corrige ese campo; los dos vuelven si al guardar otra vez se rechaza.
-Un aviso que no es de ningún campo se queda hasta que se vuelve a guardar.
+Si falla: un valor fuera de rango sale en su campo; un rojo que llega antes que el ámbar, «El aviso
+rojo no puede llegar antes que el ámbar.», bajo «Aviso rojo (minutos)». El motivo de un campo sale una
+sola vez, junto al campo: el aviso de encima de «Guardar» no lo repite. El aviso se quita en cuanto se
+cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si al guardar otra
+vez se rechaza. Un aviso que no es de ningún campo se queda hasta que se vuelve a guardar.
 Implicados: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 Ver cómo está la sala

@@ -14,6 +14,7 @@ from apps.appointment import engine
 from apps.appointment.models import Appointment, Recurring
 from apps.appointment.schemas.series import RecurringDetailOut, RecurringGetIn, RecurringListIn, RecurringPage
 from base.ordering import list_order_for
+from base.text_search import contains_text
 from base.weekdays import weekday_name
 
 from .access import VIEW_OWN
@@ -126,11 +127,7 @@ def list_series(ctx: OperationContext, params: RecurringListIn) -> dict:
     rows = series_rows(ctx)
     if params.search:
         text = params.search
-        rows = rows.filter(
-            Q(customer_name__icontains=text)
-            | Q(staff_name__icontains=text)
-            | Q(lines__service__name__icontains=text)
-        ).distinct()
+        rows = rows.filter(contains_text(text, "customer_name", "staff_name", "lines__service__name")).distinct()
     if params.is_active is not None:
         rows = rows.filter(is_active=params.is_active)
     if params.frequency:

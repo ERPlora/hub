@@ -5,6 +5,7 @@
 // Spanish, whose session the fleet's visual sweep reads. Nothing is created.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { addDrawerNamed } from './cash-register-helpers';
 import { A, api, capture, login, psql, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { dialog } from './inventory-helpers';
@@ -65,14 +66,10 @@ async function typeMore(field: Locator, more: string): Promise<void> {
 }
 
 async function drawerNameTaken(page: Page, language: Language, label: string): Promise<void> {
-  await shown(page).locator('[data-testid=cash-register-registers-heading]').scrollIntoViewIfNeeded();
-  await shown(page).locator('[data-testid=cash-register-registers-add]').click();
-  const modal = dialog(page, 'cash-register-register');
-  const name = modal.locator('[data-testid=cash-register-register-name]');
-  await name.locator('input').fill(DRAWER.toLowerCase());
-  await modal.locator('[data-testid=cash-register-register-submit]').click();
+  const { modal, name } = await addDrawerNamed(page, DRAWER.toLowerCase());
   await expectMarked(name, TAKEN[language]);
-  await expect(modal.locator('[data-testid=cash-register-register-error]')).toBeVisible();
+  await expect(modal.locator('[data-testid=cash-register-register-error]')).toBeHidden();
+  await expect(modal.getByText(TAKEN[language], { exact: true })).toHaveCount(1);
   await capture(page, `CLOSE-CASH_REGISTER-hub1470-drawer-refused-${label}`);
 
   await typeMore(name, ' 2');
@@ -93,7 +90,8 @@ async function floatRequired(page: Page, language: Language, label: string): Pro
   await notes.locator('input').fill('E2E1470');
   await modal.locator('[data-testid=cash-register-open-submit]').click();
   await expectMarked(balance, FLOAT_REQUIRED[language]);
-  await expect(modal.locator('[data-testid=cash-register-open-error]')).toBeVisible();
+  await expect(modal.locator('[data-testid=cash-register-open-error]')).toBeHidden();
+  await expect(modal.getByText(FLOAT_REQUIRED[language], { exact: true })).toHaveCount(1);
   await capture(page, `CLOSE-CASH_REGISTER-hub1470-float-refused-${label}`);
 
   await typeMore(balance, '50');
