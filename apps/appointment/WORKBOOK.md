@@ -333,7 +333,8 @@ Pasos:
    profesional ese día (la de la propia cita cuenta como libre).
 2. Cambia Día, Hora, «Duración (min)», Servicios o Profesional y pulsa **Guardar cambios**. Si la cita es de una
    serie, elige **Solo esta cita** o **Esta y todas las siguientes**. Desde el
-   mostrador se puede llevar a una hora ya pasada (para apuntar lo que ya ocurrió).
+   mostrador se puede llevar a una hora ya pasada (para apuntar lo que ya ocurrió). Una cita reservada con otra
+   duración que la suma de sus servicios abre con **Usar la suma**, que la lleva a esa suma.
 3. Atajo: en «Por profesional» arrástrala a otra hora, otro día u otra fila. Arrastrando no se lleva a
    una hora ya pasada (eso, desde el panel).
 4. La cita conserva su número y el historial dice «Cambio de hora», «Cambio de profesional» o «Cambio

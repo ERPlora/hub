@@ -174,6 +174,8 @@ for (const [size, viewport] of Object.entries(VIEWPORTS)) {
       await expect(form(page).locator('[data-testid=appointment-form-booked]')).toContainText(who.customer.name);
       await expect(time(page, /^3:00\sPM$/)).toHaveAttribute('aria-pressed', 'true');
       await expect(form(page).locator('[data-testid=appointment-form-duration-60]')).toHaveAttribute('aria-pressed', 'true');
+      // Booked at an hour for a half-hour service: the way back to the sum is there from the start.
+      await expect(form(page).locator('[data-testid=appointment-form-duration-use-sum]')).toBeVisible();
       await fitsItsWidth(page, `${size} edit`);
       await capture(page, `APPOINTMENT-F04-panel-${size}`);
       await time(page, /^4:30\sPM$/).click();

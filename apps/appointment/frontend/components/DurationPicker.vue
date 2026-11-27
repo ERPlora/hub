@@ -81,7 +81,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
       >
         <span data-testid="appointment-form-duration-sum">{{ $t('appointment.form.durationSum', { n: sum }) }}</span>
         <button
-          v-if="touched && minutes !== sum"
+          v-if="minutes !== sum"
           type="button"
           class="duration-picker__use-sum"
           data-testid="appointment-form-duration-use-sum"

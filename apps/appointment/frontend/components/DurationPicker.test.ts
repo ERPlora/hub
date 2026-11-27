@@ -1,6 +1,7 @@
 // «Duration (min)» of the booking panel (APPOINTMENT-F01, F04): one tap for 15, 30, 45, 60, 90 and 120 minutes, and
 // «Other» to type it. It shows the length the panel holds (the services' sum unless changed); a length that is not one
-// of the buttons comes with «Other» pressed and typed in. Once changed, «Use the sum» goes back to the services' sum.
+// of the buttons comes with «Other» pressed and typed in. A length that is not the services' sum, changed here or
+// booked so, offers «Use the sum» to go back to it.
 import { describe, expect, it } from 'vitest';
 
 import { ionValue, mountAppointment, settle } from '../__tests__/mount-appointment';
@@ -63,6 +64,11 @@ describe('DurationPicker', () => {
     expect(s.wrapper.emitted('useSum')).toHaveLength(1);
     await s.wrapper.setProps({ minutes: '30', touched: false });
     expect(s.choice('use-sum').exists()).toBe(false);
+  });
+
+  it('«Use the sum» shows for an appointment booked at another length than its services’ sum', async () => {
+    const s = await setup({ minutes: '60', sum: '30', touched: false });
+    expect(s.choice('use-sum').text()).toBe('Use the sum');
   });
 
   it('nothing is pressed nor summed before any service', async () => {

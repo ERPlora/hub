@@ -339,12 +339,11 @@ describe('AppointmentFormModal: Edit appointment', () => {
     ]);
   });
 
-  it('notes with text come open; «Use the sum» sends the sum when the length had been changed', async () => {
+  it('notes with text come open; «Use the sum» shows for a length booked off the sum and sends the sum', async () => {
     const s = await setup({ appointment: { ...BOOKED, internal_notes: 'Warm water', duration_minutes: 50 } });
     expect(s.field('internal_notes').value).toBe('Warm water');
     expect(s.field('notes')).toBeNull();
     expect(s.held()).toBe('50');
-    await click(s.inDoc('appointment-form-duration-60'));
     await click(s.inDoc('appointment-form-duration-use-sum'));
     expect(s.held()).toBe('30');
     s.answer(200, BOOKED);

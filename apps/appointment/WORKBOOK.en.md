@@ -346,7 +346,7 @@ written.
 Involved: none
 
 ### APPOINTMENT-F04 Move an appointment or change its professional or services
-<!-- from WORKBOOK.md sha256:4aab7ba4f871 -->
+<!-- from WORKBOOK.md sha256:9bb7faf793d9 -->
 Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda
@@ -356,7 +356,8 @@ Steps:
 2. Change Day, Time, "Duration (min)", Services or Professional and tap **Save changes**. If the appointment belongs
    to a series, choose **This appointment only** or **This and all following appointments**.
    From the front desk it can be taken to a time already past (to note down what
-   already happened).
+   already happened). An appointment booked with another length than its services' sum opens with **Use the
+   sum**, which takes it to that sum.
 3. Shortcut: in "By professional" drag it to another time, another day or another row. Dragging does not
    take it to a time already past (that, from the panel).
 4. The appointment keeps its number and the history says "Time changed", "Professional changed" or
