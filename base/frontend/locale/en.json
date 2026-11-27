@@ -436,7 +436,7 @@
       },
       "copies": {
         "title": "Copies of the data",
-        "intro": "Before each reset, ERPlora makes a full copy of the business's data and keeps it for 90 days. It brings the whole business back as it was (PostgreSQL's format, restored with pg_restore). To take your products, services or settings to another business, use «Export».",
+        "intro": "Before each reset, and when the business is deleted, ERPlora makes a full copy of all the business's data as it was and keeps it for 90 days. You can download it to keep it yourself; it cannot be loaded in «Import». To take your products, services or settings to another business, use «Export».",
         "loading": "Reading the copies…",
         "loadError": "The copies could not be read.",
         "empty": "No copies yet: one is made before each reset.",
