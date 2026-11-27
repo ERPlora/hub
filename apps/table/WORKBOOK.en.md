@@ -565,7 +565,7 @@ Involved: TABLE-F13, TABLE-F14, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F18, TABL
 SALE-F19
 
 ### TABLE-F12 Take a check that is already open to a table
-<!-- from WORKBOOK.md sha256:d59662b0cb73 -->
+<!-- from WORKBOOK.md sha256:cdd5e295c423 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Sales → Sell ("Choose table", SALE-F19); assistant
@@ -581,9 +581,8 @@ Steps:
 3. The check's header shows its table ("Table 4"), followed live. In the same window, "Remove from
    table" parks it (TABLE-F13), and a parked check is seated again by tapping another table
    (TABLE-F24).
-4. With the assistant: "put Ana's check at table 4". If that check was parked (TABLE-F13), it is seated
-   again at the table as with "Seat again" (TABLE-F24), with its guests, its server and its opening
-   time.
+4. With the assistant: "put Ana's check at table 4". If that check was parked, it is seated again at
+   the table as with "Seat again", with its guests, its server and its opening time.
 In: the check (open) and the table.
 Out: the table check opened and linked to that check (announces: `table.session.opened`), or the parked
 one seated again (announces: `table.session.restored`).
@@ -797,7 +796,7 @@ deleting it.".
 Involved: TABLE-F22
 
 ### TABLE-F24 Seat a parked check again
-<!-- from WORKBOOK.md sha256:19cfade7b81b -->
+<!-- from WORKBOOK.md sha256:5a3ad4bad149 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Sessions; also in Sales → Sell, by tapping a table in "Choose table" with the check on screen (SALE-F19); assistant
@@ -807,8 +806,8 @@ Steps:
    and its Sales check takes the table's title; the table turns Occupied and, if it was Reserved, its
    booking counts as seated.
 3. With the assistant: "seat the parked check at table 9", or by taking its check to a free table ("the
-   ones with the beers want to sit down again, put their tab on table 3", TABLE-F12): both seat the same
-   table check again.
+   ones with the beers want to sit down again, put their tab on table 3"): both seat the same table check
+   again.
 In: the parked check and the table.
 Out: the seated table check (announces: `table.session.restored`).
 If it fails: "That check is not parked: it does not exist in this business, or it is already seated at

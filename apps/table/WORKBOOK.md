@@ -550,9 +550,8 @@ Pasos:
 3. La cabecera de la cuenta enseña su mesa («Mesa 4»), seguida en vivo. En la misma ventana, «Quitar de
    la mesa» la aparca (TABLE-F13), y una cuenta aparcada se vuelve a sentar tocando otra mesa
    (TABLE-F24).
-4. Con el asistente: «pon la cuenta de Ana en la mesa 4». Si esa cuenta estaba aparcada (TABLE-F13), se
-   vuelve a sentar en la mesa como con «Volver a sentar» (TABLE-F24), con sus comensales, su camarero y
-   su hora de apertura.
+4. Con el asistente: «pon la cuenta de Ana en la mesa 4». Si esa cuenta estaba aparcada, se vuelve a
+   sentar en la mesa como con «Volver a sentar», con sus comensales, su camarero y su hora de apertura.
 Entra: la cuenta (abierta) y la mesa.
 Sale: la cuenta de mesa abierta y enlazada a esa cuenta (avisa: `table.session.opened`), o la aparcada
 otra vez sentada (avisa: `table.session.restored`).
@@ -763,8 +762,8 @@ Pasos:
    apertura, y su cuenta de Ventas toma el título de la mesa; la mesa pasa a Ocupada y, si estaba
    Reservada, su reserva se da por sentada.
 3. Con el asistente: «vuelve a sentar la cuenta aparcada en la mesa 9», o llevando su cuenta a una mesa
-   libre («los de las cañas vuelven a sentarse, ponles la cuenta en la mesa 3», TABLE-F12): las dos
-   vuelven a sentar la misma cuenta de mesa.
+   libre («los de las cañas vuelven a sentarse, ponles la cuenta en la mesa 3»): las dos vuelven a
+   sentar la misma cuenta de mesa.
 Entra: la cuenta aparcada y la mesa.
 Sale: la cuenta de mesa sentada (avisa: `table.session.restored`).
 Si falla: «Esa cuenta no está aparcada: no existe en este negocio, o ya está sentada en una mesa.»; la
