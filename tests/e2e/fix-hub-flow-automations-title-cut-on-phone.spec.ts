@@ -7,14 +7,14 @@
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, horizontalOverflow, login, shot, shown, untilStill } from './helpers';
-import { compactBar, topbarMore, topbarMoreMenu } from './topbar';
+import { topbarMore, topbarMoreMenu } from './topbar';
 
 const KEY = 'FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE';
 const SIZES = [
-  { label: '375', width: 375, height: 667 },
-  { label: '390', width: 390, height: 844 },
-  { label: '834', width: 834, height: 1112 },
-  { label: '1440', width: 1440, height: 900 },
+  { label: '375', width: 375, height: 667, phone: true },
+  { label: '390', width: 390, height: 844, phone: true },
+  { label: '834', width: 834, height: 1112, phone: false },
+  { label: '1440', width: 1440, height: 900, phone: false },
 ];
 
 /** The owner on `a` in Spanish at `viewport`, on «Automatizaciones». */
@@ -34,6 +34,15 @@ for (const size of SIZES) {
   test(`flow-automations-list at ${size.label}: «Automatizaciones» read whole, «Nueva automatización» one tap away`, async ({ browser }) => {
     const { context, page } = await spanishOwner(browser, { width: size.width, height: size.height });
     try {
+      // On a phone the bar's actions are in its «⋮»; from a tablet on, on the bar.
+      if (size.phone) await topbarMore(page).click();
+      const where = size.phone ? topbarMoreMenu(page) : shown(page);
+      const add = where.getByRole('button', { name: 'Nueva automatización', exact: true });
+      await expect(add).toBeVisible();
+      // At every size the action is its «+» alone, its name as its title.
+      await expect(where.locator('[data-testid=flow-new]')).toHaveAttribute('title', 'Nueva automatización');
+      const words = await where.locator('[data-testid=flow-new]').evaluate((el) => (el as HTMLElement).innerText.trim());
+      expect(words, `the words of the action at ${size.label}`).toBe('');
       // The list as the owner reads it: its gallery painted, nothing still loading.
       await expect(shown(page).locator('[data-testid^=flow-card-open-]').first()).toBeVisible();
       await expect(shown(page).locator('.flow-page__loading')).toHaveCount(0);
@@ -50,16 +59,6 @@ for (const size of SIZES) {
       const overflow = await horizontalOverflow(page);
       expect(overflow, `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
       await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
-
-      // On a phone the bar's actions are in its «⋮»; from a tablet on, on the bar. At every size the action is its «+»
-      // alone, its name as its title.
-      if (compactBar(page)) await topbarMore(page).click();
-      const where = compactBar(page) ? topbarMoreMenu(page) : shown(page);
-      const add = where.getByRole('button', { name: 'Nueva automatización', exact: true });
-      await expect(add).toBeVisible();
-      const words = await where.locator('[data-testid=flow-new]').evaluate((el) => (el as HTMLElement).innerText.trim());
-      expect(words, `the words of the action at ${size.label}`).toBe('');
-      await expect(where.locator('[data-testid=flow-new]')).toHaveAttribute('title', 'Nueva automatización');
 
       await add.click();
       await page.waitForURL(/\/flow\/automations\/new$/);
