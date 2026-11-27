@@ -7,6 +7,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import time
 
 import pytest
@@ -223,10 +224,12 @@ def test_servers_that_ignore_term_are_killed_after_20_seconds(world):
 def test_what_listens_on_the_stacks_ports_is_stopped_with_its_group_never_the_nights(world):
     listeners, children = world.root / "listeners", world.root / "children"
     # A runserver a spec restarted, with its Vite, in a group of its own; and one in the night's own group, which has to
-    # be stopped alone. Both orphans, so that whoever reaps them is not this test.
+    # be stopped alone. Both orphans, so that whoever reaps them is not this test. macOS ships no command that
+    # starts a new session, so the group of its own comes from start_new_session, in a Python that leaves at once.
     subprocess.run(["bash", "-c", f"sleep 60 & echo $! >> {listeners}"], check=True)
-    subprocess.run(["bash", "-c", f"setsid bash -c 'sleep 60 & echo $! >> {children}; echo $$ >> {listeners};"
-                    " exec sleep 60' &"], check=True)
+    in_a_group_of_its_own = "import subprocess, sys; subprocess.Popen(sys.argv[1:], start_new_session=True)"
+    subprocess.run([sys.executable, "-c", in_a_group_of_its_own, "bash", "-c",
+                    f"sleep 60 & echo $! >> {children}; echo $$ >> {listeners}; exec sleep 60"], check=True)
     wait_for(lambda: len(listeners.read_text().split()) == 2 and children.exists())
     pids = [int(pid) for pid in listeners.read_text().split() + children.read_text().split()]
     world.every_pid += pids
