@@ -632,7 +632,7 @@ If it fails: if that step cannot be checked, it does not show.
 Involved: none
 
 ### BASE-F05 Open an app from "My apps"
-<!-- from WORKBOOK.md sha256:666e291dadd0 -->
+<!-- from WORKBOOK.md sha256:714fa4918199 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary, the top bar of any screen
@@ -640,9 +640,9 @@ Steps:
   1. In "My apps", one tile per app this person can open, with its icon and its name (if it does not
      fit, the whole name shows on hover). An app shows if their role lets them open at least one of its screens. An
      employee has the ones of their daily work: Sales & POS, Cash register, Tables, Kitchen, Reservations, Online
-     booking, Appointments, Customers, Inventory, Invoicing, Services, Staff, Time clock, Tasks, Cart & Checkout and
-     the WhatsApp inbox, and Automations to answer what an automation asks them. The ones that set up the business
-     (Taxes, Price Lists, Modifiers, Menus and combos, Payments, Schedules, VeriFactu, Printing and Website) belong to
+     booking, Appointments, Customers, Inventory, Invoicing, VeriFactu, Services, Staff, Time clock, Tasks, Cart &
+     Checkout and the WhatsApp inbox, and Automations to answer what an automation asks them. The ones that set up the
+     business (Taxes, Price Lists, Modifiers, Menus and combos, Payments, Schedules, Printing and Website) belong to
      whoever manages them: the employee does not have them, even though the till and the assistant keep using what
      they read from them.
   2. The ones opened most in this browser go first.
