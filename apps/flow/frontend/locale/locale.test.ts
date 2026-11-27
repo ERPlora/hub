@@ -103,4 +103,16 @@ describe('flow catalogues (en source + es)', () => {
       ['flow.drafts.badge', 'Draft', 'Borrador'],
     ]);
   });
+
+  it('quote in English with English quotation marks, never the Spanish «»', () => {
+    for (const [key, message] of EN) expect(message, key).not.toMatch(/[«»]/);
+    expect(EN.get('flow.quoted')).toBe('“{text}”');
+    expect(ES.get('flow.quoted')).toBe('«{text}»');
+  });
+
+  it('leave the amounts and times of the gallery cards to the data, never written by hand', () => {
+    for (const [key, message] of [...EN, ...ES].filter(([name]) => name.startsWith('flow.gallery.cards.'))) {
+      expect(message, key).not.toMatch(/\d{1,2}:\d{2}|\d[.,]\d{2}\s?€|€\s?\d/);
+    }
+  });
 });

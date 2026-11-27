@@ -30,6 +30,7 @@ from apps.tip.schemas import (
 )
 from base.business import business_zone
 from base.operations import answer_if_on, call
+from base.only_theirs import only_theirs
 from base.text_search import contains_text
 
 
@@ -190,6 +191,7 @@ def find_tip(ref: TipRefIn, *, lock: bool = False) -> Tip:
 def get_tip(ctx: OperationContext, params: TipRefIn) -> dict:
     tip = find_tip(params)
     if not ctx.has("tip.manage") and (tip.member_id is None or tip.member_id != own_member_id(ctx)):
+        only_theirs()
         raise NotFound(str(TIP_NOT_FOUND), code="tip.tip_not_found")
     return tip_row(tip)
 
@@ -239,6 +241,7 @@ def _filtered(params: TipListIn) -> QuerySet[Tip]:
 def list_tips(ctx: OperationContext, params: TipListIn) -> dict:
     rows = _filtered(params)
     if not ctx.has("tip.manage"):
+        only_theirs()
         own = own_member_id(ctx)
         rows = rows.filter(member_id=own) if own is not None else rows.none()
     rows = rows.order_by("-created_at", "id")

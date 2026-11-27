@@ -3086,7 +3086,10 @@ Pasos:
   3. Si nadie la aprueba («Cancelar»), no se hace: el recibo dice «No se hizo, cancelado: …» y el asistente lo sabe.
   4. Si aun así intenta una acción sin permiso que nadie puede aprobar, no se hace: el recibo dice «No se hizo, sin
      permiso: …» y el asistente explica que no puede.
-  5. Lo que el asistente cuenta (listas, cifras) es lo que esa persona puede leer.
+  5. Lo que el asistente cuenta (listas, cifras) es lo que esa persona puede leer. Si su rol solo le deja ver lo suyo
+     (sus citas, su comisión, sus tareas, sus fichajes, sus propinas, sus ventas), el asistente lo sabe: preguntado por
+     lo de otra persona, dice que solo puede ver lo suyo («Solo puedo ver tus citas; las de Ana no»), nunca que la otra
+     persona no tiene nada.
 Entra: la sesión de quien pregunta, que firma cada acción; para lo que aprueba un responsable, su PIN o su placa.
 Sale: la acción hecha con esa persona como autora. La aprobación vale para esa acción de esa conversación, una sola
 vez y durante dos minutos, y se gasta junto con la acción (BASE-F84). La que un responsable podría aprobar y la persona
