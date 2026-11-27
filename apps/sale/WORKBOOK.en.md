@@ -1556,7 +1556,7 @@ no row is not taken for a dish without allergens.
 Involved: INVENTORY-F27, INVENTORY-F35, SALE-F11, SALE-F12, SALE-F41, KITCHEN-F32, MODIFIER-F12
 
 ### SALE-F41 Mark the customer's allergy on a line
-<!-- from WORKBOOK.md sha256:3470420bb0e1 -->
+<!-- from WORKBOOK.md sha256:7f4112585736 -->
 Status: done
 Vertical: restaurant
 Actor: employee, manager
@@ -1584,8 +1584,10 @@ loud or the dish is voided with its reason and ordered again with the allergy. W
 sheet has no block, because there is no kitchen order to carry it, and the note still works. An allergen that is
 not on the list is refused, also through the assistant or the API.
 Through the assistant: "the burger on table 4 is for someone allergic to gluten" marks the allergy on that line after
-the confirmation card, which says the check, the dish and the allergens by their name.
-Involved: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32
+the confirmation card, which says the check, the dish and the allergens by their name. If no dish is said, it asks
+which one; for a celiac it marks gluten. It is no health data of the customer's card and asks for no permission of
+theirs (CUSTOMER-F32): it marks it even when the sentence speaks of the customer.
+Involved: SALE-F13, SALE-F20, SALE-F40, INVENTORY-F35, KITCHEN-F32, CUSTOMER-F32
 
 ### SALE-F42 Choose the modifiers of a dish in a menu
 <!-- from WORKBOOK.md sha256:aa1c4f5d73c2 -->
