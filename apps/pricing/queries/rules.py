@@ -1,6 +1,5 @@
 """Read operations of the automatic discount rules."""
 
-from django.db.models import Q
 from django.db.models.functions import Lower
 from live.context import OperationContext
 from live.operations import operation
@@ -11,6 +10,7 @@ from apps.pricing.schemas.fields import Page
 from apps.pricing.schemas.rules import RuleListIn, RuleOut, RuleRefIn
 from base import operations as platform
 from base.ordering import list_order
+from base.text_search import contains_text
 
 
 @operation(
@@ -42,11 +42,11 @@ from base.ordering import list_order
 def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
     rows = _status(_rules(), params.status)
     if params.search:
-        rows = rows.filter(Q(code__icontains=params.search) | Q(name__icontains=params.search))
+        rows = rows.filter(contains_text(params.search, "code", "name"))
     for column in ("code", "name"):
         value = getattr(params, column)
         if value:
-            rows = rows.filter(**{f"{column}__icontains": value})
+            rows = rows.filter(contains_text(value, column))
     for column in ("rule_type", "applies_to", "customer_group_id"):
         value = getattr(params, column)
         if value:

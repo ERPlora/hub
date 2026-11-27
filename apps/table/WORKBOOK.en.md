@@ -465,7 +465,7 @@ none is created and it says which ones.
 Involved: TABLE-F02
 
 ### TABLE-F08 Set up the room: guests when seating and time warnings
-<!-- from WORKBOOK.md sha256:1c494047e8c7 -->
+<!-- from WORKBOOK.md sha256:cc60988344ee -->
 Status: done
 Actor: administrator
 Screen: Settings
@@ -481,7 +481,9 @@ Steps:
    minutes.
 In: the three values.
 Out: the room settings (announces: `table.settings.updated`).
-If it fails: a value out of range shows in its field. The notice goes as soon as something is changed
+If it fails: a value out of range shows in its field; a red that comes before the amber, "The red warning
+cannot come before the amber one.", under "Red warning (minutes)". A field's reason shows once, next to
+the field: the notice above "Save" does not repeat it. The notice goes as soon as something is changed
 and a field's reason as soon as that field is corrected; both come back if saving again is refused. A
 notice that belongs to no field stays until it is saved again.
 Involved: TABLE-F10, TABLE-F22
