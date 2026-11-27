@@ -34,6 +34,7 @@ from apps.kitchen.schemas.tickets import (
 )
 from apps.sale.models import OrderLine
 from base.ordering import list_order
+from base.text_search import contains_text
 
 TICKET_NOT_FOUND = _("That kitchen ticket does not exist in this business.")
 TICKET_AMBIGUOUS = _(
@@ -139,9 +140,7 @@ def list_tickets(ctx: OperationContext, params: TicketListIn) -> dict:
         .annotate(items_alive=Count("items", filter=~Q(items__status__in=STRUCK)))
     )
     if params.search:
-        final = final.filter(
-            Q(number__icontains=params.search) | Q(label__icontains=params.search)
-        )
+        final = final.filter(contains_text(params.search, "number", "label"))
     for name in ("status", "order_type", "priority"):
         value = getattr(params, name)
         if value is not None:

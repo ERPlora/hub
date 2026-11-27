@@ -1,6 +1,5 @@
 """Read operations of the price lists."""
 
-from django.db.models import Q
 from django.db.models.functions import Lower
 from live.context import OperationContext
 from live.operations import operation
@@ -10,6 +9,7 @@ from apps.pricing.queries.rows import _lists, _status, list_row
 from apps.pricing.schemas.fields import Page
 from apps.pricing.schemas.price_lists import PriceListListIn, PriceListOut, PriceListRefIn
 from base.ordering import list_order
+from base.text_search import contains_text
 
 
 @operation(
@@ -40,11 +40,11 @@ from base.ordering import list_order
 def list_price_lists(ctx: OperationContext, params: PriceListListIn) -> dict:
     rows = _status(_lists(), params.status)
     if params.search:
-        rows = rows.filter(Q(code__icontains=params.search) | Q(name__icontains=params.search))
+        rows = rows.filter(contains_text(params.search, "code", "name"))
     for column in ("code", "name", "currency"):
         value = getattr(params, column)
         if value:
-            rows = rows.filter(**{f"{column}__icontains": value})
+            rows = rows.filter(contains_text(value, column))
     if params.customer_group_id:
         rows = rows.filter(customer_group_id=params.customer_group_id)
     if params.tax_basis == "business":
