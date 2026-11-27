@@ -436,7 +436,7 @@
       },
       "copies": {
         "title": "Copias de los datos",
-        "intro": "Antes de cada restablecimiento, ERPlora hace una copia completa de los datos del negocio y la guarda 90 días. Sirve para recuperar el negocio entero tal como estaba (formato de PostgreSQL, se restaura con pg_restore). Para llevar tus productos, servicios o ajustes a otro negocio, usa «Exportar».",
+        "intro": "Antes de cada restablecimiento, y al eliminar el negocio, ERPlora hace una copia completa de todos los datos del negocio tal como estaban y la guarda 90 días. Puedes descargarla para guardarla tú; no se carga en «Importar». Para llevar tus productos, servicios o ajustes a otro negocio, usa «Exportar».",
         "loading": "Leyendo las copias…",
         "loadError": "No se han podido leer las copias.",
         "empty": "Todavía no hay copias: se hace una antes de cada restablecimiento.",

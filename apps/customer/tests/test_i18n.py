@@ -9,7 +9,7 @@ from django.apps import apps
 from django.utils import translation
 from live.errors import InvalidPayload
 
-from apps.customer import models, queries, schemas, services
+from apps.customer import consent_notice, models, queries, schemas, services
 from base.tests.po import (
     compiled_differences,
     config_texts,
@@ -32,7 +32,7 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("customer")
     lazies = [
         *config_texts(config),
-        *module_texts(schemas, queries, services),
+        *module_texts(schemas, queries, services, consent_notice),
     ]
     lazies += model_texts(config.get_models())
     for choices in (
