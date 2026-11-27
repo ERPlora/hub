@@ -75,8 +75,8 @@ bash .github/scripts/smoke-e2e.sh --spec tests/e2e/login-and-shell.spec.ts   # s
 
 Recorre en el navegador lo que no se puede romper: entrar, las sesiones y los permisos, la separación entre negocios, la
 suspensión por impago, cobrar y la caja, la impresión, el ticket con QR, la factura, VeriFactu, la cocina y las mesas, las
-citas, los servicios y los bonos, el alta de un negocio, activar y desactivar apps, la demo y la actualización en vivo
-entre pestañas. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pila de la pasada»): sus worktrees,
+citas, los servicios y los bonos, el alta de un negocio, activar y desactivar apps, la demo, la actualización en vivo
+entre pestañas y que los textos de la agenda «Por profesional» se lean enteros. Usa la misma pila que la pasada nocturna (`tests/e2e/README.md`, «La pila de la pasada»): sus worktrees,
 sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
 
 - **Qué tests**: los que llevan `@smoke` al final de su título; se marca el test concreto, nunca la spec entera.
@@ -106,7 +106,12 @@ sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
   profesional, dar de alta un servicio con quien lo hace, crear un bono, venderlo y ajustarlo, y pagar con él un corte
   en el TPV); y el alta, las apps, la demo y lo vivo (dar de alta en erplora.com un negocio de España, que nace con
   Impuestos y sin VeriFactu; desactivar Reservas, que se lleva Mesas, y volver a activarlas; entrar en la demo desde
-  la puerta del SaaS hasta que termina, y ver en otra pestaña, sin recargar, un elemento recién creado).
+  la puerta del SaaS hasta que termina, y ver en otra pestaña, sin recargar, un elemento recién creado); y los textos
+  enteros de la agenda «Por profesional», por día y por semana (`screens-text-fits.spec.ts`, en español, con nombres
+  largos, en los tres tamaños y midiendo en Arial, la misma fuente en todas las máquinas). El recorrido de todas las
+  pantallas de las apps de los recorridos de peluquería y restaurante, de la misma spec, corre cada noche con el resto
+  de la e2e: no cabe en el tope del humo. Un texto cortado fuera de los sitios ya conocidos de `text-fits-known.json`
+  la hace caer; un sitio caduca pantalla a pantalla y `tests/test_guardrails_text_fits.py` no deja añadir uno nuevo.
   Nada del grupo fiscal llega a la AEAT: el runner no tiene pasarela de envío ni certificados, y sus
   tests caen si un registro va al entorno de producción de la AEAT. Tampoco pide un PDF al servidor (la factura se
   imprime desde el navegador), así que el job no instala WeasyPrint. `.github/scripts/workflows.test.sh` lleva la

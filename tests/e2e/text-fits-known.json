@@ -1,0 +1,23 @@
+[
+  {
+    "box": "ion-title.ios.title-default >> div.toolbar-title",
+    "what": "The topbar's title on the phone ends in «…» when it is longer than the room its buttons leave.",
+    "screens": [
+      "/api-docs",
+      "/customer/fields",
+      "/customer/preview/customer-search",
+      "/online_booking/preview",
+      "/verifactu/config",
+      "/verifactu/recovery"
+    ],
+    "issue": "ERPlora/hub#2642"
+  },
+  {
+    "box": "span.pos-tile__name",
+    "what": "The till: a product's name in its tile ends in «…».",
+    "screens": [
+      "/sale/pos"
+    ],
+    "issue": "ERPlora/hub#2642"
+  }
+]

@@ -98,7 +98,7 @@ it to another time or another professional. The **N to confirm** notice takes yo
 booked that are waiting for your confirmation.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:466197d6b72c -->
+<!-- from WORKBOOK.md sha256:f3a1eb7d019c -->
 A bar with the day (‹ date › and **Today**, and the calendar button to jump to a date), **Filter by
 status**, the **N to confirm** notice when there are pending bookings made by customers, and the
 **List · By professional · Repeating** switch (on a phone, icons only). In **List** and in **By
@@ -111,8 +111,12 @@ professional**, also **Day · Week**.
   still open at the till (then No-show, Cancel and Delete are greyed out).
 - **By professional · Day**: one row per bookable professional and an "Unassigned" row if there are
   appointments without a professional (two appointments that overlap share the row, each in its own lane);
-  the calendar hours run horizontally and what the business has closed
-  or blocked is shaded (what is closed, according to Schedules; there you cannot tap to book). A professional who no longer takes appointments (not bookable, inactive, left)
+  the calendar hours run horizontally, at the scale of the usual agendas, so that the working day fits on the screen
+  (today it opens half an hour before the business's time; another day, at the hour it opens), and what
+  the business has closed or blocked is shaded (what is closed, according to Schedules; there you cannot tap to
+  book). Each appointment puts the customer on one line and the services on another; what does not fit ends in "…"
+  (a half-hour appointment usually keeps the first name) and the whole appointment (time, customer and services)
+  shows on its card when tapping it and, with a mouse, when hovering over it. A professional who no longer takes appointments (not bookable, inactive, left)
   keeps their row, behind the bookable ones, on the days they still have appointments, and above the grid
   a notice "Ana no longer takes new appointments: their appointments for the day stay on their row so you
   can move them to someone else.". Tapping a free slot opens the new appointment with that professional and
