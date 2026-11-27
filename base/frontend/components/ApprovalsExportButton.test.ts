@@ -1,10 +1,11 @@
 // «Export CSV» of Employees › Approvals (BASE-F85; the old hub exported its record): the server writes `approvals.csv`
 // with every approval the list's search and filters keep (not only the newest it shows), in the person's language;
-// this hands the file to the browser, with a byte-order mark first so a spreadsheet reads the accents.
+// this hands the file to the browser, with a byte-order mark first so a spreadsheet reads the accents. The button is
+// the download icon alone, named and titled «Export CSV».
 import { toastError } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { flush, mountBase } from '../__tests__/mount-base';
+import { accessibleName, flush, mountBase } from '../__tests__/mount-base';
 import ApprovalsExportButton from './ApprovalsExportButton.vue';
 
 const mocks = vi.hoisted(() => ({ saveFile: vi.fn(async () => true) }));
@@ -25,7 +26,7 @@ describe('ApprovalsExportButton', () => {
       onApi: ({ url }) => (urls.push(url), Response.json(FILE)),
     });
     const button = m.wrapper.get('[data-testid="approvals-export"]');
-    expect(button.text()).toBe('Export CSV');
+    expect([button.text(), accessibleName(button.element), button.attributes('title')]).toEqual(['', 'Export CSV', 'Export CSV']);
     await button.trigger('click');
     await flush();
     const url = new URL(urls[0], 'http://a.localhost');
@@ -46,14 +47,15 @@ describe('ApprovalsExportButton', () => {
       onApi: () => new Promise<Response>((resolve) => (answer = resolve)),
     });
     const button = m.wrapper.get('[data-testid="approvals-export"]');
-    expect(button.text()).toBe('Exportar CSV');
+    expect(accessibleName(button.element)).toBe('Exportar CSV');
     await button.trigger('click');
     await flush();
-    expect(button.text()).toBe('Exportando…');
+    expect([accessibleName(button.element), button.attributes('title')]).toEqual(['Exportando…', 'Exportando…']);
     expect(button.attributes('disabled')).toBeDefined();
     answer(Response.json(FILE));
     await flush();
-    expect(button.text()).toBe('Exportar CSV');
+    await flush();
+    expect(accessibleName(button.element)).toBe('Exportar CSV');
     expect(button.attributes('disabled')).toBeUndefined();
   });
 

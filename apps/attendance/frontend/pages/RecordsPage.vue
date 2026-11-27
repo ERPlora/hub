@@ -21,7 +21,7 @@ import {
 } from '@erplora/ui/components';
 import { useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
-import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonButton, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import CorrectionModal from '../components/CorrectionModal.vue';
@@ -141,8 +141,8 @@ const columns = computed<DataTableColumn<RecordOut>[]>(() => [
 ]);
 
 const actions = computed<DataTableAction<RecordOut>[]>(() => [
-  ...(canCorrect.value ? [{ id: 'correct', label: t('attendance.records.actions.correct'), icon: 'create-outline', showLabel: true }] : []),
-  { id: 'history', label: t('attendance.records.actions.history'), icon: 'time-outline', showLabel: true },
+  ...(canCorrect.value ? [{ id: 'correct', label: t('attendance.records.actions.correct'), icon: 'create-outline' }] : []),
+  { id: 'history', label: t('attendance.records.actions.history'), icon: 'time-outline' },
 ]);
 
 // Dialogs
@@ -169,6 +169,7 @@ function onCorrected(): void {
 
 // CSV (ATTENDANCE-F10): every row of the filter, written by the server.
 const exporting = ref(false);
+const exportName = computed(() => (exporting.value ? t('attendance.records.exporting') : t('attendance.records.exportCsv')));
 const exportNotice = ref<{ tone: 'info' | 'danger'; text: string } | null>(null);
 
 async function exportCsv(): Promise<void> {
@@ -295,13 +296,20 @@ const cardTitle = (row: RecordOut): string => {
           fill="outline"
           data-testid="attendance-export-csv"
           :disabled="exporting"
+          :aria-label="exportName"
+          :title="exportName"
           @click="exportCsv"
         >
+          <ion-spinner
+            v-if="exporting"
+            slot="icon-only"
+            name="crescent"
+          />
           <HubIcon
-            slot="start"
+            v-else
+            slot="icon-only"
             name="ion:download-outline"
           />
-          {{ exporting ? $t('attendance.records.exporting') : $t('attendance.records.exportCsv') }}
         </ion-button>
       </template>
       <template #worked="{ row }">

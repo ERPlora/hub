@@ -318,11 +318,6 @@
       "count": 1
     }
   },
-  "apps/sale/frontend/composables/pos/useTill.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "apps/sale/frontend/composables/useLiveWindows.ts": {
     "max-lines-per-function": {
       "count": 1
