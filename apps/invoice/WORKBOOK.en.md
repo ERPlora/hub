@@ -177,13 +177,13 @@ type" (only outside Spain), "Tax ID" and "Address", all mandatory except the typ
 and "Cancel". On issuing, the window closes and the detail opens the new F3.
 
 #### Ask for the ticket's invoice (public page)
-<!-- from WORKBOOK.md sha256:a19072e3e5a2 -->
+<!-- from WORKBOOK.md sha256:1eb5eba4e55f -->
 The customer opens it, without an account, with their ticket's code (`/p/<business>/invoice/<code>`, INVOICE-F04).
 Title "Request your invoice". At the top, "Ticket {number}" with "Business", "Date" and "Total". Below,
 "Enter your tax details to get the full invoice for this ticket.", the same fields as in "Full invoice" without the
 customer search, and "Request full invoice", grey until the name, the tax ID and the address are there. On asking,
 "Your invoice is ready." and "Invoice {number}" with "Issuer", "Issue date", "Customer" and "Customer tax ID", the
-lines and the totals as in the detail, and "Print / PDF", which prints the invoice in A4 with its VeriFactu QR; if
+lines and the totals as in the detail, and the icon-only button "Print / PDF", which prints the invoice in A4 with its VeriFactu QR; if
 they had already asked for it, opening it shows that same invoice with "You already requested this invoice. This is
 the same invoice, with your original details.". A refusal of a field shows under it, and the server's above the
 button.

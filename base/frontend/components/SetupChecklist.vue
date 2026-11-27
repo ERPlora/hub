@@ -192,13 +192,14 @@ function note(item: SetupItem): string {
         size="small"
         class="setup-review"
         data-testid="setup-review"
+        :aria-label="$t('base.assistant.setup.ask')"
+        :title="$t('base.assistant.setup.ask')"
         @click="assistant.openForSetup()"
       >
         <HubIcon
-          slot="start"
+          slot="icon-only"
           name="ion:sparkles-outline"
         />
-        {{ $t('base.assistant.setup.ask') }}
       </ion-button>
     </footer>
   </section>
