@@ -358,7 +358,7 @@ APP_SAVES = [
     (
         "combo",
         "/api/combo/combos",
-        {"name": "Once", "supply_kind": "goods", "tax_category_key": "product.generic"},
+        {"name": "Once", "price": 900, "supply_kind": "goods", "tax_category_key": "product.generic"},
         "combo.combo.created",
     ),
     ("customer", "/api/customer/groups", {"name": "Once"}, "customer.group.created"),

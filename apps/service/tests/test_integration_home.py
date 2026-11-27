@@ -134,7 +134,7 @@ def add_one(tax, service):
 def add_many(tax, service):
     run(
         "service.service.bulk_create",
-        {"services": [{"name": "Wash", "tax_category_key": TAX}, {"name": "Dry", "tax_category_key": TAX}]},
+        {"services": [{"name": "Wash", "tax_category_key": TAX, "price": 800}, {"name": "Dry", "tax_category_key": TAX, "price": 900}]},
     )
 
 

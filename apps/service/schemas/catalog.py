@@ -108,7 +108,7 @@ class ServiceIn(In):
         description="fixed (its price), hourly, from or variable (the till asks the amount, the price is a "
         "suggestion) or free.",
     )
-    price: Cents = Field(0, description="Price in cents (minor units of the business's currency).")
+    price: Cents = Field(description="Price in cents (minor units of the business's currency); 0 for a free service.")
     min_price: Cents | None = Field(
         None, description="Lowest price of a 'from' or 'variable' service, in cents (minor units of the business's currency)."
     )

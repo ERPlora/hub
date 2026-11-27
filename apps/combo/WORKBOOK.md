@@ -188,7 +188,9 @@ Pasos:
 1. En Menús, pulsa **+**.
 2. Escribe el Nombre; si la comanda debe decir otra cosa, el «Nombre de cocina».
 3. Escribe el «Precio cerrado» (en España, «Precio cerrado (EUR)»): lo que paga el cliente por el menú entero, en la moneda del
-   negocio y con sus decimales (el yen no tiene). Vacío es 0.
+   negocio y con sus decimales (el yen no tiene). Vacío es 0. Por el asistente, un menú pedido sin decir
+   su precio («crea el menú del día») no saca la tarjeta: antes pregunta cuánto cuesta, y solo es gratis
+   si la persona lo dice.
 4. Elige «¿Cómo se vende?»: «Se consume en el local» factura UNA línea al tipo del menú, la bebida
    incluida (el menú del día); «Se vende como producto / para llevar»: si todas las elecciones tributan
    igual, UNA línea a ese tipo; si no, UNA línea por plato, cada una a su tipo, con el precio repartido.

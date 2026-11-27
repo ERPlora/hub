@@ -104,12 +104,12 @@ def noted_for() -> list[tuple[str, str]]:
 def test_a_menu_written_in_b_notifies_b_only(listen, hub_b):
     on_a, on_b = listen(A), listen(B)
     with use_hub(hub_b):
-        run("combo.combo.create", {"name": "Menu B", "supply_kind": "goods"}, ctx_for(scope=B))
+        run("combo.combo.create", {"name": "Menu B", "price": 900, "supply_kind": "goods"}, ctx_for(scope=B))
         assert noted_for() == [(B.kind, B.key)]
     assert received(on_b, stop_after=1) == [(channel_for(B), {"events": [events.COMBO_CREATED]})]
     assert received(on_a, timeout=0.3) == []
     # Positive control: the same listener of A hears a menu written in A.
-    run("combo.combo.create", {"name": "Menu A", "supply_kind": "goods"}, ctx_for(scope=A))
+    run("combo.combo.create", {"name": "Menu A", "price": 900, "supply_kind": "goods"}, ctx_for(scope=A))
     assert received(on_a, stop_after=1) == [(channel_for(A), {"events": [events.COMBO_CREATED]})]
     assert noted_for() == [(A.kind, A.key)]
 
@@ -118,5 +118,5 @@ def test_a_menu_written_in_b_notifies_b_only(listen, hub_b):
 def test_a_refused_write_notifies_nobody(listen):
     on_a = listen(A)
     with pytest.raises(InvalidPayload):
-        run("combo.combo.create", {"name": "Menu"}, ctx_for(scope=A))
+        run("combo.combo.create", {"name": "Menu", "price": 1350}, ctx_for(scope=A))
     assert received(on_a, timeout=0.3) == []

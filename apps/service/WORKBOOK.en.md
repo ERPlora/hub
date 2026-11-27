@@ -265,7 +265,7 @@ With the window as it opened, Back closes it without asking (BASE-F05).
 | SERVICE-F36 | Say later which sale charged a voucher | done (assistant and API); in **Sold vouchers**, not (see "What is left out") |
 
 ### SERVICE-F01 Add a service
-<!-- from WORKBOOK.md sha256:a5a521258115 -->
+<!-- from WORKBOOK.md sha256:d5206dbc8f84 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Home, Services
@@ -275,7 +275,10 @@ Steps:
    whoever may add services. "Set up" leads to **Services**.
 2. In **Services** tap **New service**.
 3. Type the Name, choose the Pricing (**Fixed price** comes chosen), the Price and the Duration (min).
-   Choose a Category or leave "No category".
+   Choose a Category or leave "No category". Through the assistant, a service asked for without saying its
+   price ("add the cut and blow-dry") draws no card: it first asks how much it costs, and it is free only
+   if the person says so. The card says first the name, the price and the duration it is created with;
+   if the duration was not said, the one of the Settings.
 4. Choose the Tax category (they are the ones of Taxes, by their name and their rate; the one of the
    Settings comes chosen if there is one). Without it **Create service** cannot be tapped; nor while the
    business has not yet said its currency, because the price is read in it (without it, "1500" yen would be
@@ -380,13 +383,14 @@ Edit or Archive and tapping it opens nothing.
 Involved: SERVICE-F04
 
 ### SERVICE-F06 Add many services in one go
-<!-- from WORKBOOK.md sha256:2d8935165630 -->
+<!-- from WORKBOOK.md sha256:d1377b99cbff -->
 Status: done (assistant and API; there is no importer on screen)
 Actor: manager, assistant
 Screen: none
 Steps:
 1. Ask the assistant to create a list of services (up to 500), each with a name, a price, a duration
-   and, if you want, a tax category and a category.
+   and, if you want, a tax category and a category. The price of each one is always said (0 if it is
+   free): if it is missing, the assistant asks for it before the card.
 2. Before creating them, the confirmation card says each service by its name ("Services: Cut, Colour, Blow-dry";
    with more than four, the first three and how many more) and, below, the categories and the tax categories they
    take, once each ("Category: Hair", "Tax category: Service — generic · 21%").

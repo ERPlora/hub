@@ -114,7 +114,7 @@ def test_an_employee_reads_and_prices_menus_but_does_not_build_them(employee_cli
     assert line.status_code == 200, line.content
     assert line.json()["amount"] == 1350
     for path, body in (
-        ("/combo/combos", {"name": "x", "supply_kind": "goods"}),
+        ("/combo/combos", {"name": "x", "price": 600, "supply_kind": "goods"}),
         ("/combo/combos/delete", {"id": str(combo.id)}),
         ("/combo/combos/set_active", {"id": str(combo.id), "is_active": False}),
         ("/combo/groups", {"combo_id": str(combo.id), "name": "Mains"}),
@@ -269,7 +269,7 @@ def test_an_unknown_vat_category_is_refused_in_spanish_with_the_name_of_its_fiel
     Spanish of the same English, does not speak for it (hub#664)."""
     response = admin_client.post(
         "/api/combo/combos",
-        json.dumps({"name": "x", "tax_category_key": "nope.nope"}),
+        json.dumps({"name": "x", "price": 1350, "tax_category_key": "nope.nope"}),
         content_type="application/json",
         HTTP_HOST=HOST,
         HTTP_ACCEPT_LANGUAGE="es",

@@ -266,7 +266,10 @@ Pasos:
    duración.»), «Importante», a quien puede dar de alta servicios. «Configurar» lleva a **Servicios**.
 2. En **Servicios** pulsa **Nuevo servicio**.
 3. Escribe el Nombre, elige la Tarifa (viene **Precio fijo**), el Precio y la Duración (min). Elige
-   una Categoría o deja «Sin categoría».
+   una Categoría o deja «Sin categoría». Por el asistente, un servicio pedido sin decir su precio («da de
+   alta el corte y peinado») no saca la tarjeta: antes pregunta cuánto cuesta, y solo es gratis si la
+   persona lo dice. La tarjeta dice primero el nombre, el precio y la duración con los que se crea; si no
+   se dijo la duración, la de los Ajustes.
 4. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
    si hay una). Sin ella **Crear servicio** no se puede pulsar; tampoco mientras el negocio no haya dicho
    todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000);
@@ -367,7 +370,8 @@ Actor: responsable, asistente
 Pantalla: ninguna
 Pasos:
 1. Pide al asistente que cree una lista de servicios (hasta 500), cada uno con nombre, precio,
-   duración y, si quieres, categoría fiscal y categoría.
+   duración y, si quieres, categoría fiscal y categoría. El precio de cada uno se dice siempre (0 si es
+   gratis): si falta, el asistente lo pregunta antes de la tarjeta.
 2. Antes de crearlos, la tarjeta de confirmación dice cada servicio por su nombre («Servicios: Corte, Tinte,
    Peinado»; con más de cuatro, los tres primeros y cuántos más) y, debajo, las categorías y las categorías fiscales
    que llevan, una vez cada una («Categoría: Peluquería», «Categoría fiscal: Servicio — general · 21 %»).
