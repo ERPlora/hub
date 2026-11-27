@@ -1,12 +1,12 @@
 """What the AEAT holds (``verifactu.aeat_record.list``), as the last «Query AEAT» left it."""
 
-from django.db.models import Q
 from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import AeatRecord
 from apps.verifactu.schemas.aeat_records import AeatRecordListIn, AeatRecordOut
 from apps.verifactu.schemas.fields import Page
+from base.text_search import contains_text
 
 from .reads import VIEW, page
 
@@ -52,11 +52,7 @@ def list_aeat_records(ctx: OperationContext, data: AeatRecordListIn) -> dict:
     queryset = AeatRecord.objects.all()
     text = (data.search or "").strip()
     if text:
-        queryset = queryset.filter(
-            Q(invoice_number__icontains=text)
-            | Q(fingerprint__icontains=text)
-            | Q(csv__icontains=text)
-        )
+        queryset = queryset.filter(contains_text(text, "invoice_number", "fingerprint", "csv"))
     if data.state:
         queryset = queryset.filter(state=data.state)
     if data.issue_date_from:

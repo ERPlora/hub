@@ -107,7 +107,9 @@ def _valid_range(value: dt.date | None, info: ValidationInfo) -> dt.date | None:
 
 class ScheduleIn(Schema):
     name: Text100 = Field(
-        "", description="Name of the schedule; empty = «Regular schedule»."
+        "",
+        description="Name of the schedule, only when the person gives one; empty: the Hub names it as its screens "
+        "do, in the person's language.",
     )
     is_default: bool = Field(
         True, description="Whether it is the person's usual schedule (only one is)."
@@ -131,7 +133,7 @@ class ScheduleUpdateIn(Schema):
 
     id: UUID = Field(title=SCHEDULE, description="The schedule's id.", json_schema_extra=A_SCHEDULE)
     name: Text100 | None = Field(
-        None, description="New name; empty = «Regular schedule»."
+        None, description="New name; empty: the name the Hub gives a schedule without one, in the person's language."
     )
     is_default: bool | None = Field(
         None, description="Whether it becomes (or stops being) the usual schedule."

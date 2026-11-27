@@ -16,6 +16,7 @@ from .lookups import find_zone
 from .paging import _page
 from apps.table.schemas import ZoneListIn, ZoneOut, ZonePage, ZoneRefIn
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 ZONE_ORDER = {
     "sort_order": ("sort_order",),
@@ -85,7 +86,7 @@ def list_zones(ctx: OperationContext, params: ZoneListIn) -> dict:
     zones = zones_now(timezone.now())
     for text in (params.search, params.name):
         if text and text.strip():
-            zones = zones.filter(name__icontains=text.strip())
+            zones = zones.filter(contains_text(text.strip(), "name"))
     if params.color:
         zones = zones.filter(color=params.color)
     if params.is_active is not None:
