@@ -172,7 +172,7 @@ test('a manager sees who is in, corrects a day with its reason, reads its histor
     expect(file.suggestedFilename()).toMatch(/^attendance-\d{4}-\d{2}\.csv$/);
     const text = readFileSync((await file.path()) as string, 'utf8').replace(/^﻿/, '');
     const [header, ...lines] = text.trim().split('\r\n');
-    expect(header).toBe('date,user,clock_in,clock_out,break_minutes,worked_minutes,status,within_radius_in,within_radius_out');
+    expect(header).toBe('Date,Person,Clock-in,Clock-out,Break minutes,Worked minutes,Status,Clock-in within radius,Clock-out within radius');
     expect(lines.join('\n')).toContain(`${TAG}Bea Clock`);
 
     // The manager clocks out: nobody of the spec is in any more.
