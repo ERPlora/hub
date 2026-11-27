@@ -180,28 +180,28 @@ describe('PosCart: Charge with lines marked (SALE-F22)', () => {
     const m = await marking(['coffee']);
     expect(m.params('sale.checkout.preview')).toEqual([{ order_id: BILL.id, line_ids: ['coffee'] }]);
     await m.result('sale.checkout.preview', preview({ total: 180 }));
-    expect(plain(m.find('pos-charge').text())).toBe('Cobrar 1 línea · 1,80 €');
+    expect(plain(m.find('pos-charge').attributes('aria-label') ?? '')).toBe('Cobrar 1 línea · 1,80 €');
     expect(plain(m.find('pos-total').text())).toBe('7,50 €');
   });
 
   it('with nothing marked, Charge says the whole check and nothing else is valued', async () => {
     const m = await marking([]);
     expect(m.params('sale.checkout.preview')).toEqual([]);
-    expect(plain(m.find('pos-charge').text())).toBe('Cobrar · 7,50 €');
+    expect(plain(m.find('pos-charge').attributes('aria-label') ?? '')).toBe('Cobrar · 7,50 €');
   });
 
   it('marking another line shows a dash until the server values the new set, never the last one’s amount', async () => {
     const m = await marking(['coffee']);
     await m.result('sale.checkout.preview', preview({ total: 180 }));
     await m.mark(['l1', 'coffee']);
-    expect(plain(m.find('pos-charge').text())).toBe('Cobrar 2 líneas · —');
+    expect(plain(m.find('pos-charge').attributes('aria-label') ?? '')).toBe('Cobrar 2 líneas · —');
     const both = { order_id: BILL.id, line_ids: ['l1', 'coffee'] };
     await m.reopen();
     expect(m.params('sale.checkout.preview')).toContainEqual(both);
     await m.resultOn(m.net.lastStream(), 'sale.checkout.preview', preview({ total: 750 }), 1, both);
-    expect(plain(m.find('pos-charge').text())).toBe('Cobrar 2 líneas · 7,50 €');
+    expect(plain(m.find('pos-charge').attributes('aria-label') ?? '')).toBe('Cobrar 2 líneas · 7,50 €');
     await m.mark([]);
-    expect(plain(m.find('pos-charge').text())).toBe('Cobrar · 7,50 €');
+    expect(plain(m.find('pos-charge').attributes('aria-label') ?? '')).toBe('Cobrar · 7,50 €');
   });
 
   it('when the server cannot value the marked lines, the foot says why in its words and Charge shows a dash', async () => {
@@ -209,7 +209,7 @@ describe('PosCart: Charge with lines marked (SALE-F22)', () => {
     m.net.lastStream().push(errorFrame(m.subId('sale.checkout.preview'), 'sale.order_changed'));
     await m.reopen();
     expect(m.find('pos-preview-error').text()).toBe('msg sale.order_changed');
-    expect(plain(m.find('pos-charge').text())).toBe('Cobrar 1 línea · —');
+    expect(plain(m.find('pos-charge').attributes('aria-label') ?? '')).toBe('Cobrar 1 línea · —');
     await m.mark([]);
     expect(m.find('pos-preview-error').exists()).toBe(false);
   });
@@ -248,12 +248,12 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
   it('«Check», the tab a check opens on, offers «Send order (N)» while something waits; a send goes up from there (hub#1017)', async () => {
     const m = await setup({ kitchen: true, order: WITH_ROUND }, 'es');
     expect(m.find('pos-cart-tab-check').attributes('aria-selected')).toBe('true');
-    expect(m.find('pos-kitchen-send').text()).toContain('Enviar comanda (2)');
+    expect(m.find('pos-kitchen-send').attributes('aria-label')).toBe('Enviar comanda (2)');
     await click(m.find('pos-kitchen-send').element);
     expect(m.cart().emitted('send')).toEqual([[false]]);
     // It is the same bar on both tabs, and it goes with nothing left to send or without Kitchen.
     await click(m.find('pos-cart-tab-round').element);
-    expect(m.find('pos-kitchen-send').text()).toContain('Enviar comanda (2)');
+    expect(m.find('pos-kitchen-send').attributes('aria-label')).toBe('Enviar comanda (2)');
     for (const over of [{ order: order({ lines: [SENT] }) }, { kitchen: false }]) {
       const none = await setup({ kitchen: true, order: WITH_ROUND, ...over });
       expect(none.find('pos-kitchen-send').exists(), JSON.stringify(Object.keys(over))).toBe(false);
@@ -267,7 +267,7 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
     shown.value = order({ id: 'o10', lines: [line({ id: 'l2' }), line({ id: 'l3', product_id: 'p3' })] });
     await settle();
     expect(m.find('pos-cart-tab-check').attributes('aria-selected')).toBe('true');
-    expect(m.find('pos-kitchen-send').text()).toContain('Send order (2)');
+    expect(m.find('pos-kitchen-send').attributes('aria-label')).toBe('Send order (2)');
   });
 
   it('«Tickets · N» follows the check’s kitchen tickets in the head of what it sent, only when they can be seen (KITCHEN-F19)', async () => {
