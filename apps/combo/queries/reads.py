@@ -7,6 +7,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict, NotFound
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
+from base.text_search import contains_text
 
 COMBO_NOT_FOUND = _("That menu does not exist in this business.")
 GROUP_NOT_FOUND = _("That course does not exist in this menu.")
@@ -46,7 +47,7 @@ def find_combo(
     found, never a row that vanished between two reads."""
     combos = Combo.objects.order_by("name", "id")
     if combo_id is None:
-        candidates = _first_match(combos, (Q(name__iexact=said), Q(name__icontains=said)))
+        candidates = _first_match(combos, (Q(name__iexact=said), contains_text(said, "name")))
         if len(candidates) > 1:
             names = _names(candidates, lambda combo: combo.name)
             raise Conflict(
@@ -74,7 +75,7 @@ def find_group(
         menu = find_combo(combo_id, combo)
         groups = menu.groups.order_by("sort_order", "name", "id")
         candidates = _first_match(
-            groups, (Q(name__iexact=said), Q(name__icontains=said))
+            groups, (Q(name__iexact=said), contains_text(said, "name"))
         )
         if len(candidates) > 1:
             names = _names(candidates, lambda group: group.name)
@@ -94,7 +95,7 @@ def _product_lookups(said: str):
     return (
         Q(product__sku__iexact=said),
         Q(product__name__iexact=said),
-        Q(product__name__icontains=said),
+        contains_text(said, "product__name"),
     )
 
 

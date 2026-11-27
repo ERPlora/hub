@@ -69,7 +69,7 @@ async function sendAboveTheFoot(page: Page, which: 'check' | 'round', words: str
   const send = shown(page).locator('[data-testid=pos-kitchen-send]');
   if (scrolled) await send.scrollIntoViewIfNeeded();
   await expect(send, `«Send order» ${where}`).toBeInViewport({ ratio: 1 });
-  await expect(send).toContainText(words);
+  await expect(send.locator('button')).toHaveAccessibleName(words);
   const bar = await send.boundingBox();
   const total = await shown(page).locator('[data-testid=pos-total]').boundingBox();
   const charge = await shown(page).locator('[data-testid=pos-charge]').boundingBox();

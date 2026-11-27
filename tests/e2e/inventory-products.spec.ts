@@ -203,7 +203,7 @@ test('the form keeps a refusal under its field: 422 for a price over the limit, 
   await form.locator('[data-testid=inventory-product-form-submit]').click();
   const skuField = form.locator('[data-testid=inventory-product-sku]');
   await expect(skuField.locator('.error-text')).toContainText(/SKU/);
-  await expect(form.locator('[data-testid=inventory-product-form-error]')).toBeVisible();
+  await expect(form.locator('[data-testid=inventory-product-form-error]')).toBeHidden();
   await page.screenshot({ path: shot('inventory-product-409-1280') });
 });
 

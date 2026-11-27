@@ -368,7 +368,10 @@ Pantalla: ninguna
 Pasos:
 1. Pide al asistente que cree una lista de servicios (hasta 500), cada uno con nombre, precio,
    duración y, si quieres, categoría fiscal y categoría.
-2. El asistente responde cuántos se crearon.
+2. Antes de crearlos, la tarjeta de confirmación dice cada servicio por su nombre («Servicios: Corte, Tinte,
+   Peinado»; con más de cuatro, los tres primeros y cuántos más) y, debajo, las categorías y las categorías fiscales
+   que llevan, una vez cada una («Categoría: Peluquería», «Categoría fiscal: Servicio — general · 21 %»).
+3. El asistente responde cuántos se crearon.
 Entra: la lista de servicios.
 Sale: los servicios, todos o ninguno, cada uno con su aviso (`service.service.created`). Lo que una
 línea no dice toma los Ajustes, como el alta suelta.
@@ -464,8 +467,8 @@ online y la categoría fiscal por defecto los toma todo servicio nuevo que no lo
 asistente, API y alta de golpe); el formulario trae elegida la categoría fiscal por defecto.
 «Mostrar precios» y «Mostrar duración» los usa la página de Reservas online: sin ellos no enseña el
 precio o la duración de cada servicio.
-Si falla: «No se pudieron guardar los ajustes.» y el motivo debajo del campo (una duración de 0, una
-categoría fiscal que no existe). Como en las ventanas de formulario, el aviso se quita en cuanto se cambia
+Si falla: el motivo debajo del campo, una sola vez (una duración de 0, una categoría fiscal que no
+existe): el aviso «No se pudieron guardar los ajustes.» de encima de «Guardar» no lo repite. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia
 algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el siguiente intento
 también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento.
 Implicados: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
@@ -587,7 +590,7 @@ Pasos:
    Ventas con una devolución.».
 3. Escribe el Motivo (obligatorio) y pulsa **Anular**.
 Entra: la compra y el motivo.
-Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si su cuenta no tiene,
+Sale: el bono deja de poder gastarse y queda como rastro, con quién (por su nombre o, si no tiene ninguno,
 por lo que va antes de la @ de su correo, nunca el correo entero), cuándo y el motivo (`service.grant.voided`). No mueve dinero ni emite documento. Si una línea de una venta lo pagó, esa parte
 vuelve a contar para quien la vendió, hasta que una devolución diga otra cosa (SALE-F28).
 Si falla: «Ese bono ya se ha usado: no se puede anular.», «Ese bono ya estaba anulado.» o «Indica

@@ -6,6 +6,7 @@ from live.operations import AI, operation
 from apps.customer.models import CustomField
 from apps.customer.queries.reads import _ordered, page
 from apps.customer.schemas.custom_fields import FieldListIn, FieldPage
+from base.text_search import contains_text
 
 
 @operation(
@@ -26,7 +27,7 @@ from apps.customer.schemas.custom_fields import FieldListIn, FieldPage
 def list_fields(ctx: OperationContext, params: FieldListIn) -> dict:
     fields = CustomField.objects.all()
     if params.search:
-        fields = fields.filter(name__icontains=params.search)
+        fields = fields.filter(contains_text(params.search, "name"))
     filters = {
         "field_type": params.field_type,
         "is_required": params.is_required,
