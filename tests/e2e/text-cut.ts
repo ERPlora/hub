@@ -8,7 +8,7 @@
 //   `ion-select` shows (opening it shows the options whole).
 // - Split word: a run of 2 to 12 letters, in a token of at most 16 characters, over two lines (a long token such as an
 //   address may break anywhere; so may a box with `word-break: break-all`, `line-break: anywhere` or `hyphens: auto`).
-import type { Page } from '@playwright/test';
+import type { BrowserContext, Page } from '@playwright/test';
 
 export interface CutText {
   kind: 'cut' | 'ellipsis' | 'split-word';
@@ -16,6 +16,16 @@ export interface CutText {
   box: string;
   /** The text as written, whole (the word, for a split one). */
   text: string;
+}
+
+/** Draws every page of `context` in Arial (Liberation Sans on Linux, with the same widths), also after a page reloads
+ *  itself: the Hub's own font, `system-ui`, is another one on each machine, and each machine cut other texts. */
+export async function measureInOneFont(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    const pin = (): void => document.documentElement?.style.setProperty('--ion-font-family', 'Arial, "Liberation Sans", sans-serif');
+    pin();
+    document.addEventListener('DOMContentLoaded', pin);
+  });
 }
 
 /** Every text of the page that a person cannot read whole, once per box and text. */

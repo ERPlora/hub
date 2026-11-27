@@ -4,7 +4,7 @@
 // alone what is whole, what a title gives whole, what scrolls, what is hidden on purpose and a form field's value.
 import { expect, type Page, test } from '@playwright/test';
 
-import { type CutText, cutTexts } from './text-cut';
+import { type CutText, cutTexts, measureInOneFont } from './text-cut';
 
 /** A page of `body` at 390 × 844, in the font of the Hub's pages. */
 async function pageOf(page: Page, body: string): Promise<CutText[]> {
@@ -102,4 +102,19 @@ test.describe('cutTexts: the texts a person cannot read whole', () => {
     });
     expect(await cutTexts(page)).toEqual([]);
   });
+});
+
+test('e2e-text-cut: every page of the measure, also after it reloads itself, is drawn in Arial', async ({ browser }) => {
+  const context = await browser.newContext();
+  try {
+    await measureInOneFont(context);
+    const page = await context.newPage();
+    const fontOf = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ion-font-family'));
+    await page.goto('data:text/html,<!doctype html><html><body>Agenda</body></html>');
+    expect(await fontOf()).toContain('Arial');
+    await page.reload();
+    expect(await fontOf(), 'after the page reloads itself').toContain('Arial');
+  } finally {
+    await context.close();
+  }
 });

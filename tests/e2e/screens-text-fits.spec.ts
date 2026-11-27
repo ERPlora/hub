@@ -7,7 +7,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, settled, shown, signedInSpanish, turnOffTurnedOn, turnOnMissing } from './helpers';
 import { journeyApps, registeredRoutes, screensAmong } from './journey-screens';
-import { cutTexts } from './text-cut';
+import { cutTexts, measureInOneFont } from './text-cut';
 import { KNOWN_SITES, staleScreens } from './text-fits-known';
 import { BOOKED_DAY, removeLongTexts, seedLongTexts } from './text-fits-seed';
 
@@ -42,14 +42,8 @@ const described = (seen: Seen): string => `${seen.screen} · ${seen.size} · ${s
 const snapName = (seen: Seen): string => `text-fits-${seen.screen.replace(/[^a-z0-9]+/gi, '-')}-${seen.size}`;
 
 /** The texts cut on the screen on view at each size, a screenshot of each size that cuts one it does not know. */
-/** Every machine measures in the same font: Arial, which Linux draws with Liberation Sans (the same widths), close to
- *  the tablets' Roboto. The Hub's own, `system-ui`, is another font on each machine, and each one cut other texts. */
-const sameFont = (page: Page): Promise<void> =>
-  page.evaluate(() => document.documentElement.style.setProperty('--ion-font-family', 'Arial, "Liberation Sans", sans-serif'));
-
 async function measured(page: Page, screen: string): Promise<Seen[]> {
   const out: Seen[] = [];
-  await sameFont(page);
   for (const size of SIZES) {
     await page.setViewportSize(size);
     await settled(page);
@@ -70,6 +64,7 @@ const turnedOn: string[] = [];
 
 test.beforeAll(async ({ browser }) => {
   ({ context, page } = await signedInSpanish(browser, SIZES[0], '/'));
+  await measureInOneFont(context);
   await turnOnMissing(context, A, journeyApps().filter((app) => app !== 'base'), turnedOn);
   await seedLongTexts(context);
 });

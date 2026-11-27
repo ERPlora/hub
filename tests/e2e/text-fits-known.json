@@ -5,16 +5,10 @@
     "screens": [
       "/api-docs",
       "/customer/fields",
-      "/customer/groups",
       "/customer/preview/customer-search",
-      "/customer/tags",
       "/online_booking/preview",
       "/verifactu/config",
-      "/verifactu/contingency",
-      "/verifactu/events",
-      "/verifactu/records",
-      "/verifactu/recovery",
-      "/verifactu/settings"
+      "/verifactu/recovery"
     ],
     "issue": "ERPlora/hub#2642"
   },
