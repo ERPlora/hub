@@ -1,8 +1,10 @@
+import { DOMWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createAssistant, installAssistant, useAssistant } from '@erplora/ui/components';
 
 import type { AppHelp } from '../operations-help';
+import { iconOnly, iconOnlyNamed } from '../__tests__/icon-only';
 import { EMPLOYEE, flush, help, memoryStorage, mountBase } from '../__tests__/mount-base';
 import { resetHelpCache } from '../lib/help';
 import HelpContent from './HelpContent.vue';
@@ -131,6 +133,11 @@ describe('HelpWindow', () => {
     m.el('help-ask-assistant')!.click();
     await flush();
     expect(useAssistant().state.draft).toBe('How do I use Tables on Floor plan?');
+  });
+
+  it('«Ask the assistant» is its sparkles alone, named and titled by its label', async () => {
+    const m = await setup();
+    expect(iconOnly(new DOMWrapper(m.el('help-ask-assistant')!))).toEqual(iconOnlyNamed('Ask the assistant'));
   });
 
   it('hides the assistant action without base.view_home', async () => {

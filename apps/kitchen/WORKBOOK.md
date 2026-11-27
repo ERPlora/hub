@@ -161,7 +161,7 @@ debajo, cada otro dato con el icono de su columna delante, sin repetir el destin
 perfil puede hacer y se esconden las que el estado no admite. Tocar una fila abre su detalle: los
 platos con la alergia del cliente, su menú, sus suplementos, su estación y su estado. «Nueva comanda» abre el panel
 (a pantalla completa en el móvil) con Tipo, Destino, Notas y sus platos (producto del catálogo, cantidad y nota;
-«Añadir plato»), y «Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
+«Añadir plato», su +), y «Crear comanda». Vacía: «Sin comandas.». Cargando: el esqueleto de la tabla. Error de carga: el de la
 tabla con reintento; un rechazo de una acción sale en su diálogo o encima de la tabla, y uno del alta,
 dentro del panel.
 
