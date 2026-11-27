@@ -284,26 +284,20 @@ def test_another_app_writes_activity_with_its_own_key_but_never_one_of_ours():
     ]
 
 
-def test_consent_needs_its_channel_and_for_a_grant_the_words_shown():
-    grant = ConsentGrantIn(
-        customer_id=ID, channel="email", notice_text="I want offers."
-    )
+def test_consent_needs_its_channel_and_nothing_else():
+    grant = ConsentGrantIn(customer_id=ID, channel="email")
     assert (grant.purpose, grant.source, grant.occurred_at) == ("marketing", "counter", None)
-    assert invalid_fields(
-        ConsentGrantIn, customer_id=ID, channel="email", notice_text=" "
-    ) == {"notice_text"}
-    assert invalid_fields(
-        ConsentGrantIn, customer_id=ID, channel="any", notice_text="x"
-    ) == {"channel"}
+    assert invalid_fields(ConsentGrantIn, customer_id=ID, channel="any") == {"channel"}
     assert ConsentWithdrawIn(customer_id=ID, channel="sms").reason == ""
 
 
-def test_the_address_of_a_consent_is_never_the_callers():
-    # The proof must name the real contact: the server takes it from the card (WORKBOOK F14).
+def test_the_address_and_the_words_of_a_consent_are_never_the_callers():
+    # The proof names the real contact and the business's own words: the server sets both (WORKBOOK F14).
+    taken = ("contact_point", "notice_text", "notice_version")
     for schema in (ConsentGrantIn, ConsentWithdrawIn):
-        assert "contact_point" not in schema.model_fields
-    sent = ConsentGrantIn(customer_id=ID, channel="email", notice_text="Yes", contact_point="someone@else.com")
-    assert "contact_point" not in sent.model_dump()
+        assert set(taken).isdisjoint(schema.model_fields)
+    sent = ConsentGrantIn(customer_id=ID, channel="email", contact_point="someone@else.com", notice_text="Whatever")
+    assert set(taken).isdisjoint(sent.model_dump())
 
 
 @pytest.mark.parametrize("schema", [GroupIn, GroupPatchIn, FieldIn, FieldPatchIn])

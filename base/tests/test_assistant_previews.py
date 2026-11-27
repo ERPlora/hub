@@ -2,6 +2,7 @@
 ``base/assistant/checks.py``): what a dangerous write will do (its preview) and the check that refuses its data
 first, each run as the person and checked at start."""
 
+import dataclasses
 import json
 
 import pytest
@@ -274,6 +275,34 @@ def test_a_preview_is_checked_at_start(monkeypatch, write, why):
     monkeypatch.setitem(registry, write.name, write)
     [error] = preview_errors()
     assert "demo.item.settle" in error.msg and why in error.msg
+
+
+class PagedPreviewIn(SettlePreviewIn):
+    offset: int = 0
+
+
+def test_a_read_the_assistant_reads_on_by_its_offset_is_still_a_preview(monkeypatch):
+    """Where a read goes on from (``offset``, when its answer is too long to be told at once) is never a write's data: the
+    preview reads it from its start."""
+    paged = dataclasses.replace(SETTLE_PREVIEW, input=PagedPreviewIn)
+    monkeypatch.setitem(registry, paged.name, paged)
+    monkeypatch.setitem(registry, SETTLE.name, SETTLE)
+
+    assert preview_errors() == []
+
+
+class OffsetNeededPreviewIn(SettlePreviewIn):
+    offset: int
+
+
+def test_a_read_that_cannot_be_read_without_its_offset_is_no_preview(monkeypatch):
+    """A preview never sends an ``offset`` the write does not take: a read that needs one would fail on every card."""
+    needy = dataclasses.replace(SETTLE_PREVIEW, input=OffsetNeededPreviewIn)
+    monkeypatch.setitem(registry, needy.name, needy)
+    monkeypatch.setitem(registry, SETTLE.name, SETTLE)
+
+    [error] = preview_errors()
+    assert "the write never takes offset" in error.msg
 
 
 class SignedNameOut(Schema):

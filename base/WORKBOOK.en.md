@@ -2046,7 +2046,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:5fca4faf21e2 -->
+<!-- from WORKBOOK.md sha256:e2999f5c0cdc -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2055,6 +2055,8 @@ Steps:
      and your personal preferences in this business." and their role.
   2. In "Account details" they change "First name", "Last name" or "Email" ("Only to contact you: it is not the
      email you sign in with.") and tap "Save my details": "Profile saved", and the side menu already says the new name, without reloading.
+     If their erplora.com account has no name, "First name" brings what goes before the @ of their email, never the
+     whole address.
   3. "Choose image" uploads a JPG, PNG or WebP photo of up to 2 MB ("Photo updated"); "Remove" deletes it
      ("Photo removed").
   4. In "Preferences", "Language" ("Use the business’s language", "Español", "English") and "Appearance" ("Theme
@@ -2068,7 +2070,8 @@ Steps:
      business's language"). On confirming it only that changes, and
      the theme, the palette and the size they did not name stay as they were. The new language applies just as from the
      selector: the open application switches to it without reloading, and stays in it on reloading or opening it again
-     on this device.
+     on this device. The same with the appearance ("put the app in dark mode"): the open application switches to the
+     new theme, palette or size without reloading.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"; without it, the side menu and the
 faces say the one of their linked Staff record, STAFF-F03), their photo, their language and their
@@ -2535,7 +2538,7 @@ it is not made. What is refused is said in the window itself, which stays open. 
 Involved: BASE-F82, BASE-F97, BASE-F128, BASE-F129, BASE-F130
 
 ### BASE-F128 Adjust what a role of your own allows
-<!-- from WORKBOOK.md sha256:784762e39360 -->
+<!-- from WORKBOOK.md sha256:d9e5d0c77ecb -->
 Status: done
 Actor: owner, administrator
 Screen: Employees · Roles · What it allows; Assistant
@@ -2546,7 +2549,9 @@ Steps:
      with its phrase and a switch or, for what a manager can approve with their PIN, "Allowed", "With approval" or "No".
   2. They change what they want and press "Save" at the end: "Role saved.". With nothing changed, "Save" cannot be pressed.
   3. If another person saves it meanwhile, what was not touched here is brought up to date.
-  4. It is also asked of the assistant: "the Cashier role can't void sales", "call the Cashier role Evening till".
+  4. It is also asked of the assistant: "the Cashier role can't take payments or void sales", "call the Cashier role
+     Evening till". Before proposing the change it reads everything the role allows, also with many apps on, so it
+     takes away just what was asked: "Take payments" and "Void a sale", and nothing else of Sales & POS.
      The card says the role, each permission with the same phrase as "What it allows" and what it becomes ("Allowed",
      "With approval" or "No"), and, under "What will happen", how many people have that role. It asks to type CONFIRM,
      and once accepted only what was asked for changes.
@@ -2964,7 +2969,7 @@ If it fails: a badly written answer reads as text: it is never lost nor breaks t
 Involved: BASE-F96
 
 ### BASE-F96 Go to a screen from an answer
-<!-- from WORKBOOK.md sha256:dad0c85c76a7 -->
+<!-- from WORKBOOK.md sha256:0c53c566bb03 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2972,9 +2977,11 @@ Steps:
   1. If the answer names a screen of this business, "Go to …" with its name shows under the bubble (up to four,
      without repeating) and the mention itself can be tapped.
   2. It can lead to Home, Employees, Apps, Settings, My profile, Files (for whoever sees them), System (for whoever
-     runs the business) and the screens in the menu of each app that is on.
+     runs the business), each tab of those screens the person may open (Employees › Roles, Settings › Business…) and
+     the screens in the menu of each app that is on. The roles of the business lead to Employees › Roles, not to the
+     job titles of the Staff app.
   3. The button uses the name the person sees in the menu ("Go to Settings", "Go to Home" and, for an app, its name
-     and the screen's), never the address.
+     and the screen's), never the address; a tab's says its screen ("Go to Employees") and opens it on that tab.
   4. Tapping it opens that screen and the panel closes so it can be seen.
 In: the screens the answer names; those of this business and of its apps that are on.
 Out: the screen opened; nothing is asked for.
@@ -3242,7 +3249,7 @@ the network cut half way, BASE-F106.
 Involved: BASE-F97, BASE-F106
 
 ### BASE-F102 The conversation: what is kept, where and when it is deleted
-<!-- from WORKBOOK.md sha256:173ed0b9e97e -->
+<!-- from WORKBOOK.md sha256:f5261c5b264c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3253,8 +3260,9 @@ Steps:
      "Try again".
   3. "New conversation", at the top of the panel, empties it and starts from scratch.
   4. On signing out (also when the till closes by itself for inactivity) it is deleted, and the answer that was
-     arriving is cut. On switching user with a PIN, that of whoever left is deleted along with what they had written
-     without sending and their attachments, and whoever arrives finds the panel closed and empty.
+     arriving is cut. On switching user, with a PIN or a badge, that of whoever left is deleted along with what they
+     had written without sending and their attachments. Either way, whoever enters next finds the panel closed and
+     empty.
   5. What is kept: what the person wrote (of their attachments, only the name), what the assistant answered, its
      notices and its receipts.
 In: the panel's messages; the sign-outs and the user switches.
@@ -4055,7 +4063,7 @@ system says. An app older than this command does not show it.
 Involved: HUB_APP-F27 (ERPlora/app), BASE-F62
 
 ### BASE-F126 Turn ERPlora's support access on or off
-<!-- from WORKBOOK.md sha256:63af2ec5f10c -->
+<!-- from WORKBOOK.md sha256:a610db0844f3 -->
 Status: done
 Actor: owner, administrator, ERPlora's support staff
 Screen: Settings · General, the page "This business does not let support in"
@@ -4068,8 +4076,8 @@ Steps:
      support can come in." or "Support access is off: ERPlora support can no longer come in.". It does not expire: it
      stays on until someone of the business turns it off, because getting started can take several days.
   3. Anyone of the business sees in the card whether it is on, who changed it last and when ("Last changed by Ana,
-     11/24/2026, 10:30 AM.") and, under "Latest support visits", the last 10 entries of support (who and when), the
-     most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
+     11/24/2026, 10:30 AM.") and, under "Latest support visits", the last 10 entries of support (who and when; a
+     support account without a name, by what goes before the @ of its email), the most recent first; the API gives the same. While nobody of support has come in, it says "Nobody from ERPlora
      support has come in yet.". Whoever does not run the business sees the switch disabled, with "Only who runs the
      business can change it.".
   4. With the access on, a person of ERPlora's support comes into the business with "Enter as support", in erplora.com's

@@ -9,8 +9,7 @@
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
 305 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
 618 apps/cash_register/schemas/__init__.py ERPlora/erplora-next#74
-742 apps/cash_register/services.py ERPlora/erplora-next#74
-542 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
+541 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74
 579 apps/flow/frontend/operations.d.ts ERPlora/erplora-next#74
@@ -51,7 +50,6 @@
 652 frontend/form-modal-field-names.test.ts ERPlora/erplora-next#74
 617 tests/e2e/assistant-probes.test.ts ERPlora/erplora-next#74
 636 tests/e2e/assistant-probes.ts ERPlora/erplora-next#74
-514 tests/e2e/base-access.spec.ts ERPlora/erplora-next#74
 638 tests/e2e/base-app-activation.spec.ts ERPlora/erplora-next#74
 624 tests/e2e/base-files.spec.ts ERPlora/erplora-next#74
 624 tests/e2e/base-home.spec.ts ERPlora/erplora-next#74
