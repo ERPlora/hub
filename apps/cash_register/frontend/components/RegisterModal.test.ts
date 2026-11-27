@@ -54,13 +54,13 @@ describe('RegisterModal', () => {
 describe('RegisterModal: a refused name, corrected, loses its mark without saving again (hub#1470)', () => {
   const TAKEN = 'There is already a drawer with that name.';
 
-  it('a taken name: typing another one takes its mark and the notice away, before «Save» is pressed again', async () => {
+  it('a taken name is said once, under the name: typing another one takes its mark away, before «Save» is pressed again', async () => {
     const s = await setup();
     await ionValue(s.name(), 'bar', 'ionInput');
     s.answer(409, { error: { code: 'cash_register.register_exists', message: TAKEN, fields: { name: TAKEN } } });
     await s.submit();
     expect(prop(s.name(), 'errorText')).toBe(TAKEN);
-    expect(s.inDoc('cash-register-register-error')?.textContent).toContain(TAKEN);
+    expect(s.inDoc('cash-register-register-error')).toBeNull();
     s.name()?.dispatchEvent(new Event('input', { bubbles: true }));
     await ionValue(s.name(), 'terrace', 'ionInput');
     expect(prop(s.name(), 'errorText') ?? '').toBe('');

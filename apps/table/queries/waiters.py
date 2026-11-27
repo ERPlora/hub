@@ -6,6 +6,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.table.models import TableSession
+from base.text_search import contains_text
 from .paging import _page
 from apps.table.schemas import WaiterListIn, WaiterPage
 
@@ -38,7 +39,7 @@ def list_waiters(ctx: OperationContext, params: WaiterListIn) -> dict:
         .annotate(name=Max("waiter_name"))
     )
     if params.search and params.search.strip():
-        rows = rows.filter(name__icontains=params.search.strip())
+        rows = rows.filter(contains_text(params.search.strip(), "name"))
     rows = rows.order_by(Lower("name"), "waiter_id")
     return _page(
         rows,

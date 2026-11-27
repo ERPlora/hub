@@ -80,6 +80,13 @@ describe('ContingencyPage', () => {
     expect(s.find('verifactu-queue-result').text()).toBe('2 sent, 2 accepted, 0 rejected, 0 waiting.');
   });
 
+  it('in Spanish, «Process queue» says each figure in the singular or the plural', async () => {
+    const s = await setup({ locale: 'es' });
+    s.answer(200, { chains: 1, sent: 1, accepted: 0, accepted_with_errors: 1, rejected: 2, waiting: 0, reason: '', message: '' });
+    await click(s.find('verifactu-queue-process').element);
+    expect(s.find('verifactu-queue-result').text()).toBe('1 enviado, 1 aceptado, 2 rechazados, 0 en espera.');
+  });
+
   it('a pass that could not send says why', async () => {
     const s = await setup();
     s.answer(200, { chains: 0, sent: 0, accepted: 0, accepted_with_errors: 0, rejected: 0, waiting: 3, reason: 'gateway_unavailable', message: "ERPlora's sending gateway is not configured on this server" });

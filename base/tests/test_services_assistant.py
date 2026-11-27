@@ -105,7 +105,7 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "Spanish" in plan["instructions"]
     assert (plan["append"], plan["executed"], plan["confirm"], plan["pending"]) == ([], [], None, [])
     # The business's currency with its decimals: an amount sent in its minor unit, one of a result as it comes.
-    assert "17.00 EUR → 1700" in plan["instructions"] and '(`"17.00 EUR"`): say it as it comes' in plan["instructions"]
+    assert "17,00\xa0€ → 1700" in plan["instructions"] and '(`"17,00\xa0€"`): say it as it comes' in plan["instructions"]
 
 
 def test_a_turn_whose_actor_has_no_role_here_names_none():
@@ -127,7 +127,7 @@ def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
     the card's money carries the same decimals."""
     Hub.objects.filter(slug=A.key).update(country="JP")
     plan = turn(call("demo.item.create", {"name": "Mesa 4"}))
-    assert "17 JPY → 17" in plan["instructions"]
+    assert "17\xa0JPY → 17" in plan["instructions"]
     assert plan["confirm"]["money"] == {"currency": "JPY", "decimals": 0}
 
 
@@ -646,9 +646,11 @@ def test_every_tool_asked_for_at_once_past_the_last_round_hears_that_it_did_not_
 
 
 def test_in_setup_the_turn_reads_the_checklist_again_for_the_model():
+    """In Spanish the list is named as the Home names it in Spanish, never by its English title."""
     plan = run("base.assistant.turn", messages=[ASK], setup=True)
-    assert "Finish setting up your business" in plan["instructions"]
-    assert "Finish setting up" not in run("base.assistant.turn", messages=[ASK])["instructions"]
+    assert "«Termina de configurar tu negocio»" in plan["instructions"]
+    assert "Finish setting up" not in plan["instructions"]
+    assert "Termina de configurar" not in run("base.assistant.turn", messages=[ASK])["instructions"]
 
 
 # ── The gateway's doors ──────────────────────────────────────────────────────────────────────────────────────────
