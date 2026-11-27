@@ -44,8 +44,8 @@ def visible_texts() -> set[str]:
     ]
     lazies += list(Site.Template.labels)
     lazies += [
-        queries.NOT_PUBLISHED,
-        queries.MODULE_OFF,
+        queries.public.NOT_PUBLISHED,
+        queries.public.MODULE_OFF,
         services.IMAGE_NOT_FOUND,
         schemas.NOT_HTTPS,
         schemas.NOT_A_PHONE,
@@ -114,7 +114,7 @@ def test_spanish_says_the_websites_own_words_not_an_earlier_apps():
 def test_spanish_texts():
     with translation.override("es"):
         assert str(apps.get_app_config("website").verbose_name) == "Página web"
-        assert str(queries.NOT_PUBLISHED) == "Esta página web no está publicada."
+        assert str(queries.public.NOT_PUBLISHED) == "Esta página web no está publicada."
         assert not hasattr(schemas, "CUSTOM_WITHOUT_COLOURS")
 
 

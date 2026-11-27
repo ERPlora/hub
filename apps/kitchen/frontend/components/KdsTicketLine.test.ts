@@ -27,6 +27,13 @@ describe('KdsTicketLine', () => {
     expect(text.indexOf('+CHEESE')).toBeLessThan(text.indexOf('Allergic to nuts'));
   });
 
+  it('says a dish sold by measure with its unit and no times sign, in the person’s language', async () => {
+    const line = item('i1', { quantity: '0.350', unit: 'kg', name: 'Prawns' });
+    expect((await setup(line)).row().find('.ep-order-ticket__qty').text()).toBe('0.35 kg');
+    expect((await setup(line, {}, 'es')).row().find('.ep-order-ticket__qty').text()).toBe('0,35 kg');
+    expect((await setup(item('i2', { quantity: '2.000', unit: 'ud' }), {}, 'es')).row().find('.ep-order-ticket__qty').text()).toBe('2×');
+  });
+
   it('shows the allergy before the options and only the allergens that match', async () => {
     const s = await setup(item('i1', {
       allergy: ['gluten', 'milk'],

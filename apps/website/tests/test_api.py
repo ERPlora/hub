@@ -12,7 +12,7 @@ from live.ninja import ensure_api_parity
 from PIL import Image as PILImage
 
 from apps.website.api import router
-from apps.website.queries import PUBLIC_LIMIT
+from apps.website.queries.public import PUBLIC_LIMIT
 from apps.website.tests.conftest import HOST, HUB_DB, A, B, full_content
 from apps.website.tests.test_apps import CARD_ONLY
 from base.tests.routes import spa_routes

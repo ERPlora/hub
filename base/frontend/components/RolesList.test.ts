@@ -2,7 +2,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { offeredRowActions, pressRowAction } from '@erplora/ui/testing/data-table';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { click, EMPLOYEE, errorFrame, flush, installedApp, ionValue, leaveInstalledApp, mountBase, OWNER, settle, subId, tap } from '../__tests__/mount-base';
+import { accessibleName, click, EMPLOYEE, errorFrame, flush, installedApp, ionValue, leaveInstalledApp, mountBase, OWNER, settle, subId, tap } from '../__tests__/mount-base';
 import type { HubRoleRow } from '../operations/people';
 import RolesList from './RolesList.vue';
 
@@ -131,7 +131,8 @@ describe('RolesList', () => {
     const m = await managed();
     expect(offeredRowActions(m.wrapper, 'hub_employee')).toEqual(['duplicate']);
     expect(offeredRowActions(m.wrapper, OWN)).toEqual(['duplicate', 'edit', 'delete']);
-    expect(m.wrapper.find('[data-testid="roles-add"]').text()).toContain('Nuevo rol');
+    const add = m.wrapper.get('[data-testid="roles-add"]').element;
+    expect([add.textContent?.trim(), accessibleName(add), add.getAttribute('title')]).toEqual(['', 'Nuevo rol', 'Nuevo rol']);
   });
 
   it('one’s own role is not one’s to edit: it is only duplicated', async () => {
