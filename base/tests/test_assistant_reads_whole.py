@@ -7,13 +7,16 @@ import json
 import pytest
 from live.assistant.cutting import CUT
 from live.context import OperationContext
+from live.meta import all_live_app_configs
 from live.operations import get
 
 from base import assistant
 from base.catalog.verticals import template_apps
 from base.models import Membership
-from base.permissions import access_for
+from base.models.roles import BusinessRole
+from base.permissions import access_for, permissions_of_business_role
 from base.queries.app_help import ready_apps
+from base.roles import ON
 from base.tenancy.tests.business import A, HUB_DB, in_business_a
 from base.tests.roles import a_role
 
@@ -62,21 +65,25 @@ def trimmed_list(answer: dict, full: dict) -> str:
     return next(key for key, value in full.items() if isinstance(value, list) and len(answer.get(key, [])) < len(value))
 
 
-def test_the_assistant_reads_every_permission_of_a_cashier_with_23_apps_on_sales_among_them(olga, monkeypatch):
+def test_the_assistant_reads_every_permission_of_a_cashier_of_a_restaurant_sales_among_them(olga, monkeypatch):
     on = frozenset({"base", *template_apps("restaurant")})
     monkeypatch.setattr("base.queries.roles.active_apps", lambda scope: on)
     ctx = asking(olga, "es")
     create = get("base.role.create")
     cashier = create(ctx, create.input(based_on=Membership.Role.EMPLOYEE, name="Cajero")).key
     full = whole(ctx, "base.role.detail", {"role": cashier}, monkeypatch)
-    listed = {row["key"]: row["permissions"] for row in told(ctx, "base.role.list", {})["roles"]}
-    assert (listed[cashier], len(full["apps"])) == (77, 23)
     assert CUT in told(ctx, "base.role.detail", {"role": cashier})
 
     apps = read_on(ctx, "base.role.detail", {"role": cashier}, "apps")
 
+    configs = [config for config in all_live_app_configs() if config.permissions and config.label in on]
+    declared = {permission for config in configs for permission in config.permissions}
+    states = {line["permission"]: line["state"] for app in apps for line in app["permissions"]}
+    allowed = {permission for permission, state in states.items() if state == ON}
     assert apps == full["apps"]
-    assert {"sale.take_payment", "sale.void_sale"} <= {line["permission"] for app in apps for line in app["permissions"]}
+    assert {app["app"] for app in apps} == {*(config.label for config in configs), "sensitive"}
+    assert allowed == permissions_of_business_role(BusinessRole.objects.get(pk=cashier)) & declared
+    assert {"sale.take_payment", "sale.void_sale"} <= states.keys()
 
 
 def reads_that_grow_with_the_apps(ctx: OperationContext) -> list[tuple[str, dict]]:
