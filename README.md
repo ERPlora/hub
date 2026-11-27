@@ -85,8 +85,7 @@ sus BD, los dos `runserver` y, pase lo que pase, la limpieza.
   El SaaS va en su `origin/main`.
 - **El tope**: 20 minutos para los tests (el tope global de Playwright), fijado con las pasadas medidas en el Mac
   cargado. Al llegar, Playwright corta y el humo sale en rojo. Subirlo es una decisión, no el arreglo de una pasada lenta.
-  En el job de GitHub, con todos los grupos dentro, los tests tardan de 11,9 a 15,0 minutos (15,0 con la comprobación de
-  textos, que se lleva 2,5).
+  En el job de GitHub, con todos los grupos dentro, los tests tardan de 11,9 a 14,2 minutos.
 - **Dónde**: `~/.erplora/hub-smoke-e2e/` y el puerto `9780` (el SaaS en el `9781`, como en la noche), aparte de la
   pasada nocturna, así que ninguna espera a la otra. Un worker lo lleva a su carpeta y a sus puertos con `NIGHTLY_DIR` y
   `NIGHTLY_HUB_PORT`. Nunca escribe en GitHub; lo que deja está en `runs/<pasada>/` de esa carpeta (`night.log`, los
