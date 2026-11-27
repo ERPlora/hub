@@ -12,7 +12,7 @@ from apps.inventory.queries.categories import load_category
 from apps.inventory.queries.reads import find_category, held
 from apps.inventory.schemas.categories import CategoryIn, CategoryOut, CategoryPatchIn, CategoryRecoverIn
 from apps.inventory.schemas.fields import CategoryRefIn, DeletedOut
-from apps.inventory.services.writes import SYSTEM, _actor, _record_link, _tax_category
+from apps.inventory.services.writes import SYSTEM, _actor, _next_category_order, _record_link, _tax_category
 
 
 @operation(
@@ -69,8 +69,9 @@ def recover_category(ctx: OperationContext, data: CategoryRecoverIn) -> dict:
 def _new_category(ctx: OperationContext, data: CategoryIn) -> Category:
     tax_category = _tax_category(data.tax_category_key) if data.tax_category_key else None
     category = Category.objects.create(
-        **data.model_dump(include=CategoryIn.model_fields.keys() - {"slug", "tax_category_key"}),
+        **data.model_dump(include=CategoryIn.model_fields.keys() - {"slug", "order", "tax_category_key"}),
         slug=data.slug or slugify(data.name),
+        order=_next_category_order() if data.order is None else data.order,
         tax_category=tax_category,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
