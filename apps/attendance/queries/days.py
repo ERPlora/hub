@@ -25,8 +25,10 @@ from live.context import OperationContext
 from live.errors import NotFound, PermissionDenied
 
 from apps.attendance.models import Break, Correction, Record
+from base.only_theirs import only_theirs
 from apps.attendance.schemas import RecordListIn
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 from .people import actor_user, find_member
 from .reads import READS_ANY_DAY, VIEW_ALL, _own_days, _reads_any, review_hours
@@ -149,9 +151,22 @@ def _owns(ctx: OperationContext, record: Record) -> bool:
 def visible_record(ctx: OperationContext, record_id: UUID) -> Record:
     """A day the caller may see (their own, or any for whoever sees the team or corrects); ``NotFound`` otherwise."""
     record = annotated(Record.objects.filter(pk=record_id)).first()
-    if record is None or not (_reads_any(ctx, READS_ANY_DAY) or _owns(ctx, record)):
-        raise NotFound(str(RECORD_NOT_FOUND))
-    return record
+    if record is not None and (_reads_any(ctx, READS_ANY_DAY) or _owns(ctx, record)):
+        return record
+    if record is not None:
+        only_theirs()
+    raise NotFound(str(RECORD_NOT_FOUND))
+
+
+def _kept_to_own(ctx: OperationContext, records: QuerySet, own: Q | None, *, mine: bool) -> QuerySet:
+    """``records`` as the caller reads them: all with «View the whole team's shifts» unless they ask for their own
+    (``mine``); else their own, and the assistant hears the role keeps them to it (``only_theirs``)."""
+    whole = ctx.has(VIEW_ALL)
+    if whole and not mine:
+        return records
+    if not whole:
+        only_theirs()
+    return records.filter(own) if own is not None else records.none()
 
 
 def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.datetime, hours: int) -> QuerySet:
@@ -169,8 +184,7 @@ def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.dateti
         ):
             raise PermissionDenied(str(OWN_DAYS_ONLY))
         records = records.filter(member=member)
-    if params.mine or not ctx.has(VIEW_ALL):
-        records = records.filter(own) if own is not None else records.none()
+    records = _kept_to_own(ctx, records, own, mine=params.mine)
     if params.status:
         limit = as_of - dt.timedelta(hours=hours)
         if params.status == Record.Status.OPEN:
@@ -187,5 +201,5 @@ def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.dateti
         records = records.filter(work_date__lte=params.date_to)
     records = annotated(records)
     if params.search:
-        records = records.filter(member_name__icontains=params.search)
+        records = records.filter(contains_text(params.search, "member_name"))
     return records.order_by(*list_order_for(params.sort))

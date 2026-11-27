@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ACCOUNTANT, EMPLOYEE, flush } from '../__tests__/mount-invoice';
 import { EMPTY, PAGE, setup } from '../__tests__/invoices-page';
 import { browserDownloads, outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
+import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 
 afterEach(() => {
   outOfTheApp();
@@ -18,7 +19,7 @@ describe('InvoicesPage: «Download in Excel»', () => {
 
   it('is offered to whoever sees everyone’s invoices, and to nobody else', async () => {
     const owner = await setup();
-    expect(button(owner).text()).toBe('Download in Excel');
+    expect(accessibleName(button(owner).element)).toBe('Download in Excel');
     const employee = await setup({ session: EMPLOYEE });
     expect(button(employee).exists()).toBe(false);
   });
@@ -64,6 +65,6 @@ describe('InvoicesPage: «Download in Excel»', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
-    expect(button(s).text()).toBe('Descargar en Excel');
+    expect(accessibleName(button(s).element)).toBe('Descargar en Excel');
   });
 });

@@ -1,6 +1,7 @@
 """The settings of Appointments as they are read."""
 
-from apps.appointment.models import Appointment, Settings
+from apps.appointment.models.appointments import Appointment
+from apps.appointment.models.settings import Settings
 from apps.appointment.queries.settings import settings_out
 from apps.appointment.schemas.settings import SettingsOut
 

@@ -46,9 +46,9 @@ def the_model_hears(plan: dict) -> dict:
 
 
 def no_card_but_the_model_hears(plan: dict, code: str) -> None:
-    """No card that would act on anything: the model hears ``code`` and asks the person which one."""
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("error", code)]
+    """No card that would act on anything, and no receipt, since the person was never asked: the model hears ``code``
+    and asks the person which one."""
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
     assert the_model_hears(plan)["code"] == code
 
 

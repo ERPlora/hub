@@ -419,7 +419,7 @@ def test_a_local_save_of_each_app_refused_as_read_only_goes_in_once(boss, hub_a,
     cut = settings.LIVE["database_cut"]
     settings.LIVE = {**settings.LIVE, "database_cut": {**cut, "wait_seconds": 5}}
     if app == "whatsapp_inbox":
-        from apps.whatsapp_inbox.models import Conversation
+        from apps.whatsapp_inbox.models.conversations import Conversation
 
         with context.use_hub(hub_a):
             conversation = Conversation.objects.create(phone="+34600111222", contact_name="Ana")
@@ -615,8 +615,8 @@ def test_every_routed_command_declares_whether_a_cut_may_repeat_it():
 #: may repeat never reaches one of them before its COMMIT (BASE-F111).
 NOT_UNDONE_BY_A_ROLLBACK = {
     "apps.appointment.services.writes._next_number": "numbers an appointment",
-    "apps.cart_checkout.services._number": "numbers an order",
-    "apps.cash_register.services._number": "numbers a till session",
+    "apps.cart_checkout.services.orders._number": "numbers an order",
+    "apps.cash_register.services.sessions._number": "numbers a till session",
     "apps.invoice.services.numbering._take_number": "numbers an invoice",
     "apps.kitchen.services.writes.take_number": "numbers a kitchen ticket",
     "apps.payment.services.payments._number": "numbers a payment",

@@ -18,7 +18,9 @@ function detail(fields: Partial<PersonDetail> = {}): PersonDetail {
     me: false,
     pin_set_at: '2026-10-20T09:00:00Z',
     badge_set_at: null,
-    may: { remove_pin: true, set_badge: true },
+    business_role: null,
+    role_refusal: null,
+    may: { remove_pin: true, set_badge: true, give_role: true },
     ...fields,
   };
 }
@@ -99,6 +101,16 @@ describe('PersonPage', () => {
     expect(play.wrapper.find('[data-testid="person-open-saas"]').exists()).toBe(false);
   });
 
+  it('their role in this business, under their details, which say the role of the invitation comes from erplora.com', async () => {
+    const m = await open({ locale: 'es' });
+    await m.result(m.call, 'base.person.detail', detail());
+    const cards = m.wrapper.findAll('section.settings-card').map((card) => card.attributes('data-testid'));
+    expect(cards.slice(0, 2)).toEqual(['person-data', 'person-role']);
+    expect(m.wrapper.get('[data-testid="person-data"]').text()).toContain('Rol de la invitación');
+    expect(m.wrapper.get('[data-testid="person-data"]').text()).toContain('El nombre, el email y el rol de la invitación se cambian en erplora.com.');
+    expect(m.client.stream.subscriptions('base.role.list')).toHaveLength(1);
+  });
+
   it('«Remove the PIN» asks first, then the PIN goes', async () => {
     const m = await open({ onApi: () => Response.json(detail({ ways: { account: true, pin: false, badge: false }, pin_set_at: null })), locale: 'es' });
     await m.result(m.call, 'base.person.detail', detail());
@@ -168,7 +180,7 @@ describe('PersonPage', () => {
     await m.result(
       m.call,
       'base.person.detail',
-      detail({ role: 'hub_owner', ways: { account: true, pin: true, badge: true }, may: { remove_pin: false, set_badge: false } }),
+      detail({ role: 'hub_owner', ways: { account: true, pin: true, badge: true }, may: { remove_pin: false, set_badge: false, give_role: false } }),
     );
     expect(m.wrapper.find('[data-testid="person-pin-remove"]').exists()).toBe(false);
     expect(m.wrapper.find('[data-testid="person-badge-input"]').exists()).toBe(false);
@@ -178,7 +190,7 @@ describe('PersonPage', () => {
 
   it('one’s own badge is not one’s to give', async () => {
     const m = await open();
-    await m.result(m.call, 'base.person.detail', detail({ me: true, role: 'hub_admin', may: { remove_pin: true, set_badge: false } }));
+    await m.result(m.call, 'base.person.detail', detail({ me: true, role: 'hub_admin', may: { remove_pin: true, set_badge: false, give_role: false } }));
     expect(m.wrapper.find('[data-testid="person-badge-input"]').exists()).toBe(false);
     expect(m.wrapper.text()).toContain('Nobody registers their own badge');
   });

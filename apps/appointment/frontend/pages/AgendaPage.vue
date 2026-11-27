@@ -280,6 +280,7 @@ const listError = computed(() => (list.status.value === 'error' ? t('appointment
         <DayGrid
           v-if="span === 'day'"
           :day="day"
+          :zone="zone"
           :hours="dayHours"
           :lanes="lanes.data.value?.rows ?? []"
           :appointments="list.rows.value"

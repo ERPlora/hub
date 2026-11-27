@@ -110,7 +110,7 @@ export async function expectTakes(button: Locator, takes: boolean): Promise<void
 /** A tile of the till's grid, a child of it: `PosItemTile.vue`, an Ionic button for products, services and menus alike. */
 export const TILL_TILE = ':scope > ion-button.pos-tile';
 
-/** The till's grid on screen. «Services» keeps its own grid in the page, hidden while «All» is chosen. */
+/** The till's grid on screen. «Services» keeps its own grid in the page, hidden while a category of articles is chosen. */
 export const tillGrid = (page: Page): Locator => shown(page).locator('.pos-grid').filter({ visible: true });
 
 /** That one grid of the till is on screen and its first tile is `testid`'s (COMBO-F07, SALE-F12: the menus go first). */
@@ -405,6 +405,16 @@ export async function drawerOff(context: BrowserContext): Promise<void> {
 export function restoreDrawer(): void {
   if (drawerWasOn) psql('update cash_register_settings set enable_cash_register = true');
   drawerWasOn = null;
+}
+
+/** A till spec's `beforeAll`: the owner signed in at the till on a context of its own, the cash register off (the
+ *  drawer's lock is sale-cash-gate.spec.ts's), then `then` on that context, which closes after it. */
+export async function asOwnerAtTheTill(browser: Browser, then: (context: BrowserContext) => Promise<void> = async () => {}): Promise<void> {
+  const context = await browser.newContext({ baseURL: A });
+  await login(await context.newPage(), A, '/sale/pos');
+  await drawerOff(context);
+  await then(context);
+  await context.close();
 }
 
 /** The e2e checks: their lines name an `E2E-` product or an `e2e ` department, or their title is `e2e …`. */

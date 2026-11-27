@@ -66,7 +66,7 @@ function move(index: number, step: -1 | 1): void {
       class="wg-count"
       data-testid="website-gallery-count"
     >
-      {{ t('website.gallery.count', { n: modelValue.length, max: MAX_PHOTOS }) }}
+      {{ t('website.gallery.count', { shown: modelValue.length, count: MAX_PHOTOS }) }}
     </ion-note>
     <p
       v-if="!modelValue.length"
@@ -95,6 +95,7 @@ function move(index: number, step: -1 | 1): void {
           fill="clear"
           color="medium"
           :aria-label="t('website.gallery.up')"
+          :title="t('website.gallery.up')"
           :data-testid="`website-gallery-photo-${index}-up`"
           :disabled="disabled || index === 0"
           @click="move(index, -1)"
@@ -108,6 +109,7 @@ function move(index: number, step: -1 | 1): void {
           fill="clear"
           color="medium"
           :aria-label="t('website.gallery.down')"
+          :title="t('website.gallery.down')"
           :data-testid="`website-gallery-photo-${index}-down`"
           :disabled="disabled || index === modelValue.length - 1"
           @click="move(index, 1)"
@@ -133,7 +135,7 @@ function move(index: number, step: -1 | 1): void {
       class="wg-empty"
       data-testid="website-gallery-full"
     >
-      {{ t('website.gallery.full', { max: MAX_PHOTOS }) }}
+      {{ t('website.gallery.full', { count: MAX_PHOTOS }) }}
     </p>
     <p
       v-if="error"

@@ -17,7 +17,7 @@ from django.core import checks
 from django.test import Client
 from django.urls import resolve
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.online_booking.models import Booking
 from apps.online_booking.tests.conftest import (
     TUESDAY,

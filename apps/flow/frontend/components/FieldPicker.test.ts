@@ -49,7 +49,7 @@ describe('FieldPicker', () => {
     ]);
     expect(m.find('flow-picker-group-secret').text()).toBe('Secrets');
     expect(m.find('flow-picker-group-run').text()).toBe('This call');
-    expect(m.find('flow-picker-secret.STRIPE_KEY').text()).toContain('Secret «STRIPE_KEY»');
+    expect(m.find('flow-picker-secret.STRIPE_KEY').text()).toContain('Secret “STRIPE_KEY”');
     expect(m.find('flow-picker-run.idempotency_key').text()).toContain('No-repeat key');
   });
 

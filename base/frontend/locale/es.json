@@ -34,7 +34,7 @@
     },
     "setup": {
       "title": "Termina de configurar tu negocio",
-      "progress": "{done} de {total} hechos",
+      "progress": "{done} de {total} hecho | {done} de {total} hechos",
       "viewAll": "Ver todo",
       "viewLess": "Ver menos",
       "configure": "Configurar",
@@ -345,7 +345,11 @@
         "complete": "Todo ha entrado.",
         "partial": "No todo entró.",
         "failed": "No ha entrado nada.",
-        "counts": "{created} creadas · {already} ya estaban · {failed} fallaron",
+        "counts": {
+          "created": "{n} fila nueva | {n} filas nuevas",
+          "already": "{n} ya estaba | {n} ya estaban",
+          "failed": "{n} con error"
+        },
         "dropped": "Se ha dejado fuera a propósito",
         "unfinished": "Este es el informe de tu última importación de {name} ({date}). No todo entró.",
         "retry": "Reintentar lo que falta",
@@ -432,7 +436,7 @@
       },
       "copies": {
         "title": "Copias de los datos",
-        "intro": "Antes de cada restablecimiento, ERPlora hace una copia completa de los datos del negocio y la guarda 90 días. Sirve para recuperar el negocio entero tal como estaba (formato de PostgreSQL, se restaura con pg_restore). Para llevar tus productos, servicios o ajustes a otro negocio, usa «Exportar».",
+        "intro": "Antes de cada restablecimiento, y al eliminar el negocio, ERPlora hace una copia completa de todos los datos del negocio tal como estaban y la guarda 90 días. Puedes descargarla para guardarla tú; no se carga en «Importar». Para llevar tus productos, servicios o ajustes a otro negocio, usa «Exportar».",
         "loading": "Leyendo las copias…",
         "loadError": "No se han podido leer las copias.",
         "empty": "Todavía no hay copias: se hace una antes de cada restablecimiento.",
@@ -510,7 +514,7 @@
         "retry": "Reenviar",
         "discard": "Descartar",
         "retryAll": "Reenviar todos",
-        "more": "Se ven los {shown} más recientes de {total}.",
+        "more": "Se ve el más reciente de {total}. | Se ven los {count} más recientes de {total}.",
         "empty": {
           "heading": "Todo en orden",
           "body": "No hay eventos caídos. La cola de eventos vive en la base de datos: un reinicio nunca la pierde."
@@ -602,7 +606,7 @@
           "of": "{used} de {limit}",
           "perMonth": "{used} de {limit} al mes",
           "noLimit": "{used} · Sin límite",
-          "connections": "{used} de {limit} conexiones",
+          "connections": "{used} de {limit} conexión | {used} de {limit} conexiones",
           "connectionsOpen": "{used} conexión | {used} conexiones",
           "notIncluded": "Tu plan no incluye {name}",
           "notIncludedAssistant": "Tu plan no incluye asistente",
@@ -700,7 +704,7 @@
     "pinSetup": {
       "title": "Crea tu PIN de acceso",
       "why": "Con él entrarás en esta caja sin tu contraseña.",
-      "choose": "Elige un PIN de {n} dígitos",
+      "choose": "Elige un PIN de {n} dígito | Elige un PIN de {n} dígitos",
       "confirm": "Confirma tu PIN",
       "mismatch": "Los PIN no coinciden, inténtalo de nuevo",
       "later": "Ahora no",
@@ -780,7 +784,7 @@
         "change": "Cambiar PIN",
         "set": "Establecer PIN",
         "saved": "PIN actualizado",
-        "length": "El PIN debe tener {n} dígitos.",
+        "length": "El PIN debe tener {n} dígito. | El PIN debe tener {n} dígitos.",
         "mismatch": "Los dos PIN no coinciden."
       },
       "roles": {
@@ -815,7 +819,7 @@
       "again": "Volver a preguntar tras inactividad",
       "untilSignOut": "Hasta cerrar sesión",
       "minutes": "{n} min",
-      "againMinutes": "Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.",
+      "againMinutes": "Una caja que nadie toca durante {n} minuto cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona. | Una caja que nadie toca durante {n} minutos cierra la sesión y muestra el pinpad: la siguiente venta lleva el nombre de la siguiente persona.",
       "againShift": "El pinpad vuelve a preguntar cuando acaba la sesión: al terminar el turno o cuando alguien cierra sesión.",
       "digits": "Dígitos del PIN",
       "four": "4 dígitos",
@@ -848,10 +852,8 @@
       "removeBody": "Su sesión se cierra al momento. Para volver a usarlo, alguien tiene que entrar en él con su cuenta.",
       "removeYours": "Es el dispositivo que estás usando: al quitarlo se cerrará tu sesión y tendrás que volver a entrar.",
       "removeFailed": "No se pudo quitar este dispositivo. Comprueba la conexión e inténtalo de nuevo.",
-      "pruneOne": "Quitar el dispositivo sin usar desde hace 30 días",
-      "pruneMany": "Quitar los {n} dispositivos sin usar desde hace 30 días",
-      "pruneAsk": "¿Quitar {n} dispositivos que nadie usa desde hace 30 días?",
-      "pruneAskOne": "¿Quitar el dispositivo que nadie usa desde hace 30 días?",
+      "prune": "Quitar el dispositivo sin usar desde hace 30 días | Quitar los {n} dispositivos sin usar desde hace 30 días",
+      "pruneAsk": "¿Quitar el dispositivo que nadie usa desde hace 30 días? | ¿Quitar {n} dispositivos que nadie usa desde hace 30 días?",
       "pruneBody": "Dejan de aparecer aquí y, para volver a usar uno, alguien tendrá que entrar en él con su cuenta. Los usados en los últimos 30 días y el que estás usando se quedan.",
       "pruneConfirm": "Quitar",
       "pruneFailed": "No se pudieron quitar los dispositivos sin usar. Comprueba la conexión y vuelve a intentarlo.",
@@ -966,7 +968,8 @@
       },
       "save": "Guardar",
       "saved": "Rol guardado.",
-      "saveError": "No se pudo guardar el rol"
+      "saveError": "No se pudo guardar el rol",
+      "mine": "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti."
     },
     "person": {
       "title": "Persona",
@@ -976,9 +979,10 @@
       "retry": "Reintentar",
       "data": {
         "heading": "Sus datos",
-        "managed": "El nombre, el email y el rol se cambian en erplora.com.",
+        "managed": "El nombre, el email y el rol de la invitación se cambian en erplora.com.",
         "open": "Abrir en erplora.com",
-        "notEntered": "Aún no ha entrado en este hub: su PIN y su placa se guardan para cuando entre."
+        "notEntered": "Aún no ha entrado en este hub: su PIN y su placa se guardan para cuando entre.",
+        "invitation": "Rol de la invitación"
       },
       "pin": {
         "heading": "PIN",
@@ -1013,6 +1017,26 @@
       "refused": {
         "ownerOnly": "Solo el propietario cambia el acceso del propietario.",
         "ownBadge": "Nadie da de alta su propia placa: pídeselo a otro administrador."
+      },
+      "role": {
+        "heading": "Rol en este negocio",
+        "intro": "Manda sobre el rol de su invitación: lo que ve y puede hacer aquí cambia al momento, sin volver a entrar.",
+        "label": "Rol",
+        "invitation": "El de la invitación ({role})",
+        "given": "{name} tiene ahora el rol {role}.",
+        "failed": "No se pudo cambiar el rol.",
+        "loading": "Cargando los roles…",
+        "loadError": "No se pudieron cargar los roles.",
+        "retry": "Reintentar",
+        "none": "Este negocio aún no tiene roles propios: se crean en Empleados › Roles, a partir de cualquier rol.",
+        "make": "Crear un rol",
+        "refused": {
+          "owner": "El propietario siempre es el propietario: nadie le da otro rol.",
+          "accountant": "La gestoría solo lee y no ocupa plaza del plan: se queda con el rol de su invitación.",
+          "own": "Nadie se cambia su propio rol: pídeselo a alguien por encima de ti.",
+          "above": "Solo puedes dar un rol a quien está por debajo de ti en el negocio.",
+          "beyond": "Un rol no puede permitir más de lo que puedes hacer tú."
+        }
       }
     },
     "apiKeys": {
@@ -1204,7 +1228,7 @@
       "newFolder": "Nueva carpeta",
       "space": {
         "label": "Espacio",
-        "unlimited": "{used} usados · Sin límite",
+        "unlimited": "{used} en uso · Sin límite",
         "of": "{used} de {limit}"
       },
       "loading": "Cargando archivos…",
@@ -1277,9 +1301,9 @@
           "heading": "No se pudo abrir el archivo",
           "body": "No llegó el contenido del archivo. Revisa la conexión e inténtalo de nuevo."
         },
-        "pdfPages": "Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.",
+        "pdfPages": "Mostrando la primera de {total} páginas. Descarga el archivo para leerlo entero. | Mostrando las primeras {count} de {total} páginas. Descarga el archivo para leerlo entero.",
         "textCut": "Mostrando el principio del archivo. Descárgalo para leerlo entero.",
-        "tableCut": "Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas.",
+        "tableCut": "Mostrando la primera fila. Descarga el archivo para verlas todas. | Mostrando las primeras {count} filas. Descarga el archivo para verlas todas.",
         "damaged": {
           "heading": "No se pudo leer el archivo",
           "body": "Puede que esté dañado o guardado en otro formato. Descárgalo para abrirlo con una aplicación de tu dispositivo."
@@ -1294,11 +1318,9 @@
         "yes": "VERDADERO",
         "no": "FALSO",
         "json": {
-          "oneItem": "1 elemento",
-          "items": "{count} elementos",
-          "oneField": "1 campo",
-          "fields": "{count} campos",
-          "more": "{count} más. Descarga el archivo para verlos todos.",
+          "items": "{count} elemento | {count} elementos",
+          "fields": "{count} campo | {count} campos",
+          "more": "{count} más. Descarga el archivo para verlo. | {count} más. Descarga el archivo para verlos todos.",
           "broken": "Este archivo no es un JSON válido: se muestra tal cual."
         }
       },

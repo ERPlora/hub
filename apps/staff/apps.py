@@ -43,10 +43,12 @@ class StaffConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms). To «desactivar» names the deactivation
     # itself (staff.member.deactivate and every other *.deactivate), not only a switch off, and what one «pide» or
-    # «solicita» for oneself, a «solicitud», is a request (staff.time_off.request).
+    # «solicita» for oneself, a «solicitud», is a request (staff.time_off.request). To «enganchar» a record to an account
+    # is to link it (staff.account.list, staff.member.update).
     assistant_synonyms = (
         ("desactiva", "desactivar", "deactivate"),
         ("pido", "solicito", "solicitud", "request"),
+        ("engancha", "vincula", "link"),
     )
     # The old module's permissions (module.json), one by one, plus asking for one's own time off.
     permissions = {

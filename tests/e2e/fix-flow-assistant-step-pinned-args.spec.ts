@@ -79,7 +79,7 @@ for (const viewport of VIEWPORTS) {
       await expect(fixed.locator('span')).toHaveText(['Cancel a reservation › On behalf of the customer', lucia]);
       await expect(tried).not.toContainText(writer.card);
       await expect(tried.locator(`[data-testid="flow-test-pinnedempty-s1-${UPDATE}"]`)).toHaveText(
-        '«Change a reservation» would not be used: «On behalf of the customer», fixed by this step, would be empty in this run.',
+        '“Change a reservation” would not be used: “On behalf of the customer”, fixed by this step, would be empty in this run.',
       );
       await tried.scrollIntoViewIfNeeded();
       await noHorizontalScroll(page, viewport.label);

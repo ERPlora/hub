@@ -54,7 +54,21 @@ class WebsiteConfig(LiveAppConfig):
     navigation = [
         Nav("site", pgettext_lazy("app name", "Website"), "ion:globe-outline", "/website", permission="website.manage")
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "c_eaJUp0VQ4", "en": "k1rnkdX9GDU"},
+        flow_videos={
+            "WEBSITE-F01": {"es": ["JvaOnGvy-_s"], "en": ["hLyBTFeITFc"]},
+            "WEBSITE-F02": {"es": ["ivAQLYwuqRg"], "en": ["lrgmUSOaICw"]},
+            "WEBSITE-F03": {"es": ["LADk7huQV5A"], "en": ["LvUFTktstI4"]},
+            "WEBSITE-F04": {"es": ["CpHm3c5LpF8"], "en": ["CJc3ij7WhNM"]},
+            "WEBSITE-F05": {"es": ["LADk7huQV5A"], "en": ["LvUFTktstI4"]},
+            "WEBSITE-F07": {"es": ["tZQwXZW4fkM"], "en": ["4PQ6LfGngyg"]},
+            "WEBSITE-F08": {"es": ["tZQwXZW4fkM"], "en": ["4PQ6LfGngyg"]},
+            "WEBSITE-F09": {"es": ["gUnb_p6mwVc"], "en": ["_hNFl4jyOLo"]},
+            "WEBSITE-F10": {"es": ["tZQwXZW4fkM"], "en": ["4PQ6LfGngyg"]},
+            "WEBSITE-F11": {"es": ["CpHm3c5LpF8"], "en": ["CJc3ij7WhNM"]},
+        },
+    )
     # The closed lists kept inside the site's JSON (the palette, the background, the catalog's source, the days of the
     # opening hours), by the word the editor shows: the assistant's card says each value by it.
     choices = CHOICES

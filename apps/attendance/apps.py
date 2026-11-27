@@ -36,8 +36,12 @@ class AttendanceConfig(LiveAppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     # What these words mean to the Hub's assistant (base.assistant.relevance.synonyms): «mi salida» or «mi entrada»
     # is clocking (attendance.record.clock_*). Only after «mi»: «la salida de» or «su entrada» also says the drawer's
-    # money, goods received or a place in the waiting list.
-    assistant_synonyms = (("clock", "mi salida", "mi entrada", "my departure", "my exit", "my arrival"),)
+    # money, goods received or a place in the waiting list. «En pausa» is a break («pon a Javi en pausa»); «pausa»
+    # alone also pauses a recipe or a series, and «descanso» is also a day off.
+    assistant_synonyms = (
+        ("clock", "mi salida", "mi entrada", "my departure", "my exit", "my arrival"),
+        ("break", "en pausa"),
+    )
     # Clocking someone else in or out (ATTENDANCE-F12) is a permission of its own.
     permissions = {
         "attendance.clock": _("Clock in and out, and see and export their own history"),
@@ -102,4 +106,13 @@ class AttendanceConfig(LiveAppConfig):
             "catch_up": "collapse",
         }
     ]
-    help = Help()
+    help = Help(
+        videos={"es": "uOXeTh1ZSSE", "en": "bJRtG4HzBgM"},
+        flow_videos={
+            "ATTENDANCE-F01": {"es": ["d0mJ-eWWSs4"], "en": ["r7rMT_CeHdI"]},
+            "ATTENDANCE-F02": {"es": ["-r7iRA_l84E"], "en": ["NqHXQAtrRXs"]},
+            "ATTENDANCE-F06": {"es": ["7Iw3EckX5sk"], "en": ["vO7WaXRXYLI"]},
+            "ATTENDANCE-F07": {"es": ["2AIG_S251qE"], "en": ["ISb1OnHEnUA"]},
+            "ATTENDANCE-F10": {"es": ["2AIG_S251qE"], "en": ["ISb1OnHEnUA"]},
+        },
+    )

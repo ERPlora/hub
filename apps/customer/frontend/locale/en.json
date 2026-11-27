@@ -195,7 +195,6 @@
       "granted": "Given",
       "withdrawn": "Withdrawn",
       "record": "Record consent",
-      "notice": "I want to receive offers and news from this business through this channel. I can unsubscribe whenever I want.",
       "askHint": "Read it out loud and only press if they say yes. This exact sentence is what gets stored as the record, together with your name and the time.",
       "confirm": "They said yes",
       "withdraw": "Withdraw",

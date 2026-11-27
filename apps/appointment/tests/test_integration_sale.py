@@ -15,7 +15,7 @@ from live.operations import get
 from django.utils import timezone
 
 from apps.appointment import events
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.sale.models import Order
 from apps.tax.models import TaxCategory
 

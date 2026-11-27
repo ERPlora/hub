@@ -18,7 +18,7 @@ import pytest
 from live import assistant as shared
 from live.errors import InvalidPayload, PermissionDenied
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.tests.conftest import (  # noqa: F401 - anytime is a fixture
     MONDAY,
     TESTER,

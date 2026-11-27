@@ -40,7 +40,7 @@ def test_restore_brings_the_same_card_back_with_all_that_hangs_from_it_and_annou
     run("customer.note.add", NoteIn(customer_id=ana.id, content="Prefers mornings"))
     run(
         "customer.consent.grant",
-        ConsentGrantIn(customer_id=ana.id, channel="sms", notice_text="I want offers.", notice_version="v1"),
+        ConsentGrantIn(customer_id=ana.id, channel="sms"),
     )
     run("customer.customer.delete", RefIn(id=ana.id))
     clear_outbox()

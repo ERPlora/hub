@@ -71,6 +71,7 @@ function remove(id: string): void {
           size="small"
           :disabled="disabled"
           :aria-label="t('appointment.form.removeService', { name: option.label })"
+          :title="t('appointment.form.removeService', { name: option.label })"
           @click="remove(option.id)"
         >
           <HubIcon

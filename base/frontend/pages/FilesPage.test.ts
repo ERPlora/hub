@@ -253,7 +253,7 @@ describe('FilesPage · see', () => {
 
   it('in Spanish', async () => {
     const m = await open({ locale: 'es' });
-    expect(m.wrapper.find('[data-testid="files-space"]').text()).toBe('Espacio: 1,5 MB usados · Sin límite');
+    expect(m.wrapper.find('[data-testid="files-space"]').text()).toBe('Espacio: 1,5 MB en uso · Sin límite');
     expect(m.wrapper.find('[data-testid="files-folders-label"]').text()).toBe('Carpetas');
   });
 

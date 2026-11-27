@@ -4,8 +4,9 @@
 // one button, its count a badge on its corner. The owner of hub `a` opens the list in Spanish at 375, 390, 834 and
 // 1440 px with «Todavía no puedes facturar» in the bell (its issuer parked for the run and put back after it): the
 // title is read whole (its `.toolbar-title` not cut with «…»), the help and the bell are on the bar, and «Nueva
-// automatización» opens the new automation from the bar, by its icon and its words from a tablet on and as a row of
-// «⋮» on a phone. No sideways scroll. Each width leaves its capture. Nothing is created.
+// automatización» opens the new automation from the bar's «⋮» on a phone and from the bar from a tablet on. At every
+// size it is only its «+», named and titled «Nueva automatización». No sideways scroll. Each width leaves its
+// capture. Nothing is created.
 import { expect, type Page, test } from '@playwright/test';
 
 import { actionBell } from './action-center';
@@ -27,16 +28,17 @@ const SIZES = [
 test.beforeAll(() => parkIssuer(PARKED));
 test.afterAll(() => unparkIssuer(PARKED));
 
-/** Presses «Nueva automatización» where the bar puts it: on the bar from a tablet on, in «⋮» on a phone. */
-async function pressNewAutomation(page: Page, phone: boolean): Promise<void> {
-  if (!phone) {
-    const words = await shown(page).locator('[data-testid=flow-new]').evaluate((el) => (el as HTMLElement).innerText.trim());
-    expect(words, 'its words on the bar').toBe(NEW_AUTOMATION);
-    await shown(page).getByRole('button', { name: NEW_AUTOMATION, exact: true }).click();
-    return;
-  }
-  await topbarMore(page).click();
-  await topbarMoreMenu(page).getByRole('button', { name: NEW_AUTOMATION, exact: true }).click();
+/** Presses «Nueva automatización» where the bar puts it: in its «⋮» on a phone, on the bar from a tablet on. At every
+ *  size it is its «+» alone, its name as its title. */
+async function pressNewAutomation(page: Page, size: (typeof SIZES)[number]): Promise<void> {
+  if (size.phone) await topbarMore(page).click();
+  const where = size.phone ? topbarMoreMenu(page) : shown(page);
+  const add = where.getByRole('button', { name: NEW_AUTOMATION, exact: true });
+  await expect(add).toBeVisible();
+  await expect(where.locator('[data-testid=flow-new]')).toHaveAttribute('title', NEW_AUTOMATION);
+  const words = await where.locator('[data-testid=flow-new]').evaluate((el) => (el as HTMLElement).innerText.trim());
+  expect(words, `the words of the action at ${size.label}`).toBe('');
+  await add.click();
 }
 
 for (const size of SIZES) {
@@ -62,7 +64,7 @@ for (const size of SIZES) {
 
       await capturedFitting(page, `${KEY}-${size.label}`, size.label);
 
-      await pressNewAutomation(page, size.phone);
+      await pressNewAutomation(page, size);
       await page.waitForURL(/\/flow\/automations\/new$/);
     } finally {
       await context.close();

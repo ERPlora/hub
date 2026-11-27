@@ -3,7 +3,8 @@ worktrees of the Hub and the SaaS, their dependencies, databases and seeding, st
 then, whatever happened, stop what listens on the stack's ports, drop both databases and remove the worktrees.
 
 Every command gets the stack's own variables, and INT and TERM stop the night once the command running ends, as a
-shell's trap does; while the specs run, at once. Only the standard library: the Mac runs it with its own python3.
+shell's trap does; while the specs run, at once. Only the standard library: a runner or a Mac runs it with its own
+python3.
 """
 
 from __future__ import annotations
@@ -133,7 +134,6 @@ class Settings:
     max_minutes: int
     start_seconds: int
     keep_runs: int
-    gh_repo: str
 
 
 def answers(url: str) -> bool:
@@ -177,9 +177,9 @@ class Night:
     """One night's stack: its ports, databases, worktrees and the servers it starts, each in a process group of its
     own, so stopping one stops its Vite too."""
 
-    def __init__(self, settings: Settings, folder: str, specs: list[str]) -> None:
+    def __init__(self, settings: Settings, folder: str, specs: list[str], shard: str = "") -> None:
         port = settings.port
-        self.settings, self.folder, self.specs = settings, folder, specs
+        self.settings, self.folder, self.specs, self.shard = settings, folder, specs, shard
         self.hub_port, self.saas_port, self.provider_port = port, port + 1, port + 2
         self.ports = (port, port + 1, port + 2, port + 5, port + 6, port + 9)
         self.hub_db, self.saas_db = f"hub_e2e_{port}", f"saas_e2e_{port + 1}"
@@ -324,7 +324,7 @@ class Night:
     def run_specs(self) -> bool:
         grep = os.environ.get("NIGHTLY_GREP")
         command = ["pnpm", "e2e", f"--global-timeout={self.settings.max_minutes * 60000}",
-                   *(["--grep", grep] if grep else []), *self.specs]
+                   *(["--grep", grep] if grep else []), *([f"--shard={self.shard}"] if self.shard else []), *self.specs]
         extra = {**self.hub_env, "CI": "1", "E2E_OUTPUT_DIR": f"{self.folder}/test-results"}
         specs = self.start(command, self.hub_wt, extra, stdin=subprocess.DEVNULL)
         return specs is not None and SIGNALS.wait_at_once(specs) == 0
@@ -366,10 +366,11 @@ class Night:
         say("step: las specs")
         return ("success" if self.run_specs() else "failure"), ""
 
-    def report(self, result: str, failed_step: str, commit: str, publish: bool) -> int:
+    def report(self, result: str, failed_step: str, commit: str) -> int:
+        """What came out red, in the night's output; the nightly workflow keeps the issue from every share's report."""
         settings = {"RESULT": result, "REPORT": f"{self.folder}/test-results/results.json", "STEP": failed_step,
-                    "SHA": commit, "RUN_DIR": self.folder, "PUBLISH": "true" if publish else "false"}
+                    "SHA": commit, "RUN_DIR": self.folder, "PUBLISH": "false"}
         if not ok([sys.executable, str(HERE / "e2e_report.py")], extra=settings):
-            say("the report failed: the night's result did not reach GitHub")
+            say("the report failed: what came out red is not listed")
             return 1
         return 0 if result == "success" else 1

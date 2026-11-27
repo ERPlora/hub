@@ -18,6 +18,7 @@ from apps.tax.queries.jurisdiction import business_jurisdiction, business_today
 from apps.tax.queries.naming import category_by_reference
 from apps.tax.queries.resolution import current_rates
 from base.ordering import list_order
+from base.text_search import contains_text
 
 DEPARTMENT_NOT_FOUND = _(
     "That section is no longer in this business. Reload the list and try again."
@@ -62,7 +63,7 @@ def _find_named(  # noqa: PLR0913
     else:
         exact = list(rows.filter(**{f"{field}__iexact": said.strip()})[:2])
         found_rows = exact or list(
-            rows.filter(**{f"{field}__icontains": said.strip()})[:6]
+            rows.filter(contains_text(said.strip(), field))[:6]
         )
         if len(found_rows) > 1:
             names = ", ".join(getattr(row, field) for row in found_rows[:5])
@@ -158,7 +159,7 @@ def list_departments(ctx: OperationContext, params: DepartmentListIn) -> dict:
             "tax_category"
         )
         if params.search:
-            departments = departments.filter(name__icontains=params.search.strip())
+            departments = departments.filter(contains_text(params.search.strip(), "name"))
         ordered = departments.order_by(
             *list_order(params.sort, "name", descending=params.dir == "desc")
         )
@@ -199,7 +200,7 @@ def quick_note_row(note: QuickNote) -> dict:
 def list_quick_notes(ctx: OperationContext, params: QuickNoteListIn) -> dict:
     notes = QuickNote.objects.filter(is_deleted=False)
     if params.search:
-        notes = notes.filter(text__icontains=params.search.strip())
+        notes = notes.filter(contains_text(params.search.strip(), "text"))
     page = notes.order_by(*list_order(params.sort, "text", descending=params.dir == "desc"))[
         params.offset : params.offset + params.limit
     ]

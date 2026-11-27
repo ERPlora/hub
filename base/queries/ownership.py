@@ -13,6 +13,7 @@ from live.meta import all_live_app_configs
 
 from base.api_keys import KeyCaller
 from base.apps_on import active_apps
+from base.only_theirs import only_theirs
 from base.permissions import is_a_person
 from base.sensitive import VIEW_BUSINESS_TOTALS
 
@@ -85,6 +86,7 @@ class Owned:
     def visible(self, ctx: OperationContext) -> QuerySet:
         if self.sees_all(ctx):
             return self.model.objects.all()
+        only_theirs()
         return self.theirs(_person(ctx, _reads_as(ctx)))
 
     def theirs(self, person: Me) -> QuerySet:
@@ -99,4 +101,5 @@ class Owned:
         whose = _reads_as(ctx)
         if ctx.has(VIEW_BUSINESS_TOTALS) or whose is None:
             return self.visible(ctx)
+        only_theirs()
         return self.theirs(_person(ctx, whose))

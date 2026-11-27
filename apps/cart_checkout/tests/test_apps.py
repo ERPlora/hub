@@ -3,9 +3,11 @@ its scheduled task, what the assistant sees of each operation and its help windo
 
 import pytest
 from django.apps import apps
-from live.meta import Category, Help, LiveAppConfig, Nav, module_configs, permissions_for_role
+from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
 
 from base.queries import app_help
+from base.tenancy.tests.business import HUB_DB
+from base.tests import help_videos
 
 PERMISSIONS = [
     "cart_checkout.view_cart",
@@ -184,8 +186,20 @@ def test_every_input_field_says_what_it_is():
             assert info.description, f"{name}: {field}"
 
 
-def test_its_help_window_is_ready_without_a_video_yet():
-    assert cart_checkout().help == Help()
+def test_its_help_window_plays_the_app_s_tour_in_spanish_and_in_english():
+    assert cart_checkout().help.videos == {"es": "BsQdeNv70R0", "en": "xjvkg4GVStE"}
+
+
+#: The short video of each task, with the flows it shows: its Spanish and its English one.
+TASK_VIDEOS = [
+    (("CART_CHECKOUT-F01", "CART_CHECKOUT-F05", "CART_CHECKOUT-F06"), "kx8RsQwjKB8", "WKCQruONKUI"),
+]
+
+
+@HUB_DB
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_each_task_of_the_help_window_shows_its_short_videos_in_the_person_s_language(language):
+    assert help_videos.shown("cart_checkout", language) == help_videos.by_task(TASK_VIDEOS, language)
 
 
 @pytest.mark.parametrize("language", ["es", "en"])

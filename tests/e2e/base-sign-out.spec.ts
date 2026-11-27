@@ -8,6 +8,7 @@
 // account's session there, so never the demo accounts whose erplora.com session the other specs reuse (`login`).
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { userMenu } from './access-door';
 import { api, type Credentials, login, SAAS, shot, shown, untilStill } from './helpers';
 import { businessOnSaas, signUpOnSaas } from './saas-owner';
 import { STACK } from './stack';
@@ -41,14 +42,8 @@ test.afterAll(async () => {
 
 /** «Sign out» of the business's user menu (pinned at 1440): the status of the page the browser lands on. */
 async function signOutOfTheBusiness(): Promise<number> {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  const presented = page.evaluate(
-    () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-  );
-  await page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name').click();
-  await presented;
   const landed = page.waitForResponse((response) => response.url() === SIGN_OUT_PAGE && response.request().resourceType() === 'document');
-  await page.locator('ion-popover [data-testid="user-menu-logout"]').click();
+  await userMenu(page, 'logout');
   return (await landed).status();
 }
 

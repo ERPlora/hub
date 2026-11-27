@@ -232,6 +232,19 @@ class TestThePhoto:
             person = HubUser.objects.get()
         assert (person.name, person.email) == ("Ana María", "ana@example.com")
 
+    def test_an_account_without_a_name_is_named_by_what_goes_before_its_at(self, hub_a):
+        # erplora.com names an account without a name by its address: a new person and one already named without it.
+        ana, olga = "ana.ruiz+bar@example.com", "olga@example.com"
+        with use_hub(hub_a):
+            HubUser.objects.create(username=f"saas:{ANA_ID}", account_id=ANA_ID, name="ana.ruiz+bar", email=ana)
+
+        hub_registry.hub_state_apply(
+            SYSTEM, photo(1, (ANA_ID, ana, ana, "hub_employee"), (OLGA_ID, olga, olga, "hub_owner"))
+        )
+
+        with use_hub(hub_a):
+            assert dict(HubUser.objects.values_list("account_id", "name")) == {ANA_ID: "ana.ruiz+bar", OLGA_ID: "olga"}
+
     def test_whoever_is_no_longer_listed_keeps_their_name_but_is_no_longer_active(self, hub_a):
         for saas_id in (ANA_ID, OLGA_ID):
             Membership.objects.create(user=account_copy(saas_id, email=""), host=A, role="hub_employee")

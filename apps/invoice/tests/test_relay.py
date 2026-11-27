@@ -22,7 +22,8 @@ from base.catalog.register_apps import RegisterResult
 from base.models.relay import EventDelivery
 
 #: The worker's real loop releases a business's connections once it has served it: what the test writes is committed.
-pytestmark = HUB_DB_COMMITTED
+#: What the relay seals for the tax agency never leaves the machine.
+pytestmark = [HUB_DB_COMMITTED, pytest.mark.usefixtures("nothing_leaves")]
 
 REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 
@@ -100,3 +101,10 @@ def test_after_the_last_attempt_the_sale_waits_for_issue_now(tick, product, char
     issued = run("sale.sale.issue_documents", {"sale": sale.number})
     ticket = Invoice.objects.get(source_sale_id=sale.id)
     assert (issued.invoice_status, issued.invoice_number) == ("issued", ticket.number)
+
+    # Its failed event goes back to the queue with the ticket, and the next tick finds it done: nothing more is issued.
+    assert to_invoicing(sale) == ("pending", 0)
+    tick(at + dt.timedelta(hours=3))
+    assert to_invoicing(sale) == ("delivered", 1)
+    assert Invoice.objects.filter(source_sale_id=sale.id).count() == 1
+    assert Record.objects.filter(invoice_id=ticket.id).count() == 1

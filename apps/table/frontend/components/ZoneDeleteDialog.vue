@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// «Delete zone?» (WORKBOOK «Zonas», «Plano de sala»; TABLE-F06): «N tables in this zone. A zone with tables
-// cannot be deleted: move or delete its tables first.», always said; with tables, «Delete zone» is off.
+// «Delete zone?» (WORKBOOK «Zonas», «Plano de sala»; TABLE-F06): an empty zone only says what deleting does;
+// a zone with tables says they must be moved or deleted first, and «Delete zone» is off.
 // Deleting (`table.zone.delete`) tells the page (`deleted`); a refusal stays in the dialog.
 import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
@@ -44,6 +44,11 @@ async function remove(): Promise<void> {
     :submit-disabled="zone.table_count > 0"
     @submit="remove"
   >
-    <p>{{ $t('table.zones.delete.impact', { count: zone.table_count }) }}</p>
+    <p v-if="zone.table_count > 0">
+      {{ $t('table.zones.delete.impact', { count: zone.table_count }) }}
+    </p>
+    <p v-else>
+      {{ $t('table.zones.delete.emptyImpact') }}
+    </p>
   </FormModal>
 </template>

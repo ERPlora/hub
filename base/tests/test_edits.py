@@ -1,7 +1,7 @@
 """An edit the assistant asks for that changes nothing — it names its record and no datum to change, as
 ``customer.customer.update`` with its ``id`` alone — shows no card: the person would confirm a change that changes
 nothing and read on its receipt that it was done (hub#2324). The model hears that there was nothing to change and goes
-on with what was asked, or asks what to change; the receipt says why it was not done (BASE-F97).
+on with what was asked, or asks what to change; the person, who was never asked, sees no receipt of it (BASE-F97).
 
 It holds for every edit (``<app>.<entity>.update``, where only the data sent change): what names its record is what its
 read (``<app>.<entity>.get`` or ``.detail``) takes to find it, and anything else it sends is a change.
@@ -18,7 +18,6 @@ from base import assistant
 from base.tenancy.tests.business import HUB_DB, in_business_a
 from base.tests.assistant_context import owner_of_a
 from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, turn_as
-from base.tests.test_failure_reason import turn_in
 from base.tests.test_services_assistant import call, run, turn
 
 __all__ = ["in_business_a"]
@@ -86,15 +85,15 @@ def test_an_edit_with_something_to_change_still_shows_its_card():
     assert plan["executed"] == []
 
 
-@HUB_DB
 @pytest.mark.parametrize(
     ("language", "said"),
     [("es", "El asistente no dijo qué cambiar."), ("en", "The assistant did not say what to change.")],
 )
-def test_the_receipt_says_the_assistant_did_not_say_what_to_change(language, said):
-    item = run("demo.item.create", name="Mesa 4")
-    [row] = turn_in(language, call("demo.item.update", {"id": item["id"]}))["executed"]
-    assert (row["outcome"], row["code"], row["reason"]) == ("error", NOTHING_TO_CHANGE, {language: said})
+def test_its_reason_says_the_assistant_did_not_say_what_to_change(language, said):
+    """Never what the model hears, should a receipt ever carry it."""
+    op = get("demo.item.update")
+    refused = assistant.edits.unchanged(op, {"id": AN_ID})
+    assert assistant.failure_reason.reason(op, refused, language) == {language: said}
 
 
 @HUB_DB

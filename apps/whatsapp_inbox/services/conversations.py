@@ -11,7 +11,7 @@ from live.outbox import record_event
 from apps.customer.models import Customer
 from apps.customer.queries.reads import find_customer
 from apps.whatsapp_inbox import events
-from apps.whatsapp_inbox.models import Conversation
+from apps.whatsapp_inbox.models.conversations import Conversation
 from apps.whatsapp_inbox.queries.agents import team
 from apps.whatsapp_inbox.queries.conversations import conversation_out, find_conversation, profile_name
 from apps.whatsapp_inbox.queries.reads import actor_id, person_name
@@ -231,7 +231,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
                 "señala el chat de Elena: necesita a alguien del negocio",
             ),
         },
-        "description": "Marks an open WhatsApp conversation «Needs attention»: an automatic answer could not answer "
+        "description": "Marks an open WhatsApp conversation as needing attention: an automatic answer could not answer "
         "the customer, so she waits for a person even after its apology; somebody of the business answering, or "
         "changing its status, takes it away. A pending or closed conversation is left as it is.",
         "risk": "normal",
