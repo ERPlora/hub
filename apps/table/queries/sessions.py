@@ -40,6 +40,7 @@ from apps.table.schemas import (
 )
 from base.business import business_zone, currency_decimals
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 LINE_NOT_FOUND = _("That line is not on the check of any table.")
 
@@ -189,7 +190,7 @@ def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
     rows = sessions_now()
     for text in (params.search, params.table_number):
         if text and text.strip():
-            rows = rows.filter(table__number__icontains=text.strip())
+            rows = rows.filter(contains_text(text.strip(), "table__number"))
     if params.status:
         rows = rows.filter(status_now=params.status)
     if params.zone_id:
@@ -281,7 +282,7 @@ def sessions_by_order(ctx: OperationContext, params: ByOrderIn) -> dict:
     expose_api=True,
     ai={
         "description": "Get one line of the check of Sales of a table check by its id: its name and quantity, as "
-        "«Split check» lists it.",
+        "splitting the check lists it.",
         "asks": {
             "en": (
                 "what is that line on the table's check?",

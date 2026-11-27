@@ -253,7 +253,7 @@ La página que sale en la dirección de un negocio que erplora.com aún está pr
 Desde «Archivos» en el menú lateral; la ve todo el equipo. A la izquierda, «Carpetas»: el árbol de carpetas del
 negocio, que empieza en «Archivos» (lo de arriba del todo), con la carpeta abierta resaltada; en una pantalla
 estrecha, el árbol se pliega en el selector «Carpetas». A la derecha, «Buscar archivos…», «Lista» y «Cuadrícula» y,
-para quien administra el negocio, «Nueva carpeta» y «Subir archivo». Debajo, lo que hay en la carpeta abierta: pulsar
+para quien administra el negocio, «Nueva carpeta» y «Subir archivo» (solo su nube). Debajo, lo que hay en la carpeta abierta: pulsar
 un archivo lo abre.
 
 #### La carpeta abierta
@@ -779,9 +779,11 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
-  1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente» (o pregúntaselo desde su panel).
+  1. En «Termina de configurar tu negocio», pulsa «Pedírselo al asistente», sus destellos (o pregúntaselo desde su
+     panel).
   2. El asistente lee la misma lista del Inicio, con lo que esa persona puede ver, y le dice qué falta y
-     dónde se hace; cada paso sigue teniendo su «Configurar» en la lista.
+     dónde se hace; cada paso sigue teniendo su «Configurar» en la lista. Si nombra la lista, la llama como sale
+     en el Inicio, en el idioma de esa persona: «Te faltan 4 pasos de Termina de configurar tu negocio».
   3. De un paso hecho dice que está hecho, sin sacar una cifra, un nombre ni un ajuste de su texto, que dice lo que
      pide el paso y no lo que tiene el negocio: «Tu catálogo» está hecho porque ya hay productos, nunca «tienes uno».
      Si se le pregunta cuántos o cuál, lo lee en la app del paso (los productos activos, en Inventario).
@@ -907,7 +909,8 @@ Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en 
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
 límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para el propietario en el
-navegador (en la app instalada no sale). Una app de pago sin contratar no ofrece «Activar». Una app que
+navegador (en la app instalada no sale). El límite nunca frena una app que el país del negocio exige (VeriFactu en
+España): se activa aunque el plan esté en su límite. Una app de pago sin contratar no ofrece «Activar». Una app que
 este negocio no puede usar tampoco: sale «No disponible» y, para quien administra, el motivo debajo («VeriFactu solo
 es para negocios de España.»). Cualquier otro fallo sale en un aviso con el nombre de la app y el
 motivo, que se queda hasta cerrarlo.
@@ -1186,10 +1189,13 @@ Pasos:
      duplica ni se sobrescribe. Si una app de la plantilla aún se está preparando, lo suyo entra solo en
      cuanto queda lista, sin volver ni pulsar nada.
 Entra: la plantilla o el fichero y las apps marcadas.
-Sale: las apps marcadas que estaban desactivadas, activadas antes de cargar, con las que necesitan y dentro
-del tope de apps del plan, como si se activaran en Apps (`base.app.enabled`); en cada app marcada, lo que
-trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus categorías, productos, servicios,
-zonas, mesas y, desde una copia de seguridad, clientes), y el informe guardado (`base.blueprint.imported`).
+Sale: las apps marcadas que estaban desactivadas, activadas antes de cargar y dentro del tope de apps del plan,
+cada una elegida por el negocio como si se activara en Apps (`base.app.enabled`): cuentan para el límite de
+apps del plan y desactivar otra no se las lleva; las que necesitan y no se marcaron llegan con ellas, e Impuestos,
+que el país exige, llega con las que la necesitan sin contar para el plan, como al darse de alta. En cada app
+marcada, lo que trae y faltaba, dado de alta como si se hiciera a mano en esa app (sus categorías, productos,
+servicios, zonas, mesas y, desde una copia de seguridad, clientes), y el informe guardado
+(`base.blueprint.imported`).
 Si falla: «La importación falló:» con el motivo y se queda en la revisión; sin ninguna app marcada, «Elige al
 menos una app.» y no se puede importar; si ninguna de sus apps se puede activar aquí, «Nada de este fichero
 puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una app que no se pudo activar (el
@@ -1290,8 +1296,11 @@ Pasos:
      en Ajustes › Datos y copias › Exportar, con «Plantilla para compartir» o «Copia de seguridad de este negocio», y
      qué lleva: los productos y los servicios van con sus fotos propias dentro. El archivo no lo saca él.
 Entra: el nombre, el idioma, para qué es y lo marcado.
-Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas, con las fotos propias de los
-productos y los servicios dentro (INVENTORY-F33); nunca las ventas, las personas, los PIN ni los datos fiscales. En el
+Sale: un .blueprint.zip con las apps marcadas y, de las que llevan datos, sus filas: de Inventario, las categorías y los
+productos, y de Servicios, las categorías y los servicios, con sus fotos propias dentro (INVENTORY-F33); de Mesas, las
+zonas y las mesas; de Suplementos, los grupos, cada uno con sus opciones y con los productos (por su código) y las
+categorías a los que se aplica; y, solo en una copia de seguridad, los clientes. Nunca las ventas, las personas, los PIN
+ni los datos fiscales. Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
 negocio no se guarda nada.
 Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un nombre para el archivo.» y no se puede
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
@@ -2125,7 +2134,7 @@ Estado: hecho
 Actor: propietario, administrador
 Pantalla: Archivos
 Pasos:
-  1. En la carpeta abierta pulsa «Subir archivo» y elige uno o varios, o los arrastra al gestor («Suelta los
+  1. En la carpeta abierta pulsa «Subir archivo» (la nube) y elige uno o varios, o los arrastra al gestor («Suelta los
      archivos para subirlos aquí»). Mientras suben: «Subiendo 2 de 5…».
   2. Sale «Archivos subidos.» y aparecen en la carpeta. Si ya había uno con el mismo nombre, no se pisa: el nuevo se
      guarda como «carta (1).pdf» y sale «Se ha subido como «carta (1).pdf»: ya había uno con ese nombre.».
@@ -2738,7 +2747,9 @@ Pasos:
      cobra, cómo se abre y se cierra la caja, si cada reserva pide teléfono); no tiene que buscarlos en cada pregunta. Toda fecha y hora que dice va en la hora del negocio, la misma que enseñan las
      pantallas, nunca en UTC: en un bar de Madrid, lo que pasó a las 16:18 lo cuenta a las 16:18, no a las 15:18. Todo
      importe que dice va en la moneda y con los decimales que enseñan las pantallas: lo que la ficha de un cliente dice
-     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €.
+     «3,60 €» lo cuenta como 3,60 €, nunca como 360,00 €. Una opción de una lista cerrada la dice con el nombre
+     que le dan las pantallas en su idioma, nunca con su código: de una clienta recién dada de alta dice que ha quedado en
+     la etapa «Contacto» y con origen «En el local», no «lead» ni «walk_in».
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -2934,14 +2945,18 @@ Pasos:
      estaba así («Hecho: ahora hay que contar el dinero al cerrar (antes no); el fondo al abrir ya se pedía»), y tras
      «Cancelar», cómo siguen («No lo he cambiado: la semana sigue empezando en lunes»).
   4. Lo que solo lee (ver las ventas, buscar un cliente) no pide tarjeta; cada acción que cambia algo pide la suya.
-  5. Bajo la respuesta queda el recibo de cada acción del turno, con la acción nombrada como en su tarjeta: «Hecho:
-     Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». El de
-     un fallo dice el motivo en una frase: si su app la rechaza, la misma que daría su pantalla («No se hizo, falló:
-     Quitar en Empleados. Esa persona no está en este negocio.»); si lo que no valía eran los datos que envió el
-     asistente, cuáles, con el nombre que les da la tarjeta («El asistente envió datos que no valen: Productos.»), y si
-     pidió un cambio sin decir qué cambiar, eso («El asistente no dijo qué cambiar.»). Si
-     la persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app; el
-     motivo, que se dijo en el otro idioma, ya no sale.
+  5. Bajo la respuesta queda el recibo de cada acción del turno que se le propuso a la persona, con la acción nombrada
+     como en su tarjeta: «Hecho: Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se
+     hizo, sin permiso: …». El de un fallo dice el motivo en una frase: si su app la rechaza, la misma que daría su
+     pantalla («No se hizo, falló: Imprimir en Ventas / TPV. Ninguna impresora de tiques recibe el papel de esta
+     venta: abre la venta para imprimirlo en este dispositivo.»); si lo que no valía eran los datos que envió el
+     asistente (un fichero adjunto que pesa más de lo que admite la acción), cuáles, con el nombre que les da la
+     tarjeta («El asistente envió datos que no valen: Archivo.»). Lo que el Hub rechaza antes de enseñar la tarjeta
+     (datos que no valen, un cambio sin nada que cambiar, un registro que no encuentra) no deja recibo, como en los
+     asistentes de Shopify o Intercom: a la persona no se le preguntó nada, y el asistente oye el motivo y lo corrige o
+     se lo cuenta. Así, «Quita la paella de la carta» deja solo «Hecho: Cambiar en Inventario», aunque antes el
+     asistente probara otra acción con datos que no valían. Si la persona cambia de idioma, los recibos de antes salen
+     enteros en el nuevo, también el nombre de la app; el motivo, que se dijo en el otro idioma, ya no sale.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio, la del registro sobre el
 que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio; y,
 si su app la declara, la comprobación que hace antes de la tarjeta, como la persona: si rechaza los datos (dar de alta a
@@ -2949,7 +2964,7 @@ alguien con un rol que el negocio no tiene, STAFF-F01), no sale tarjeta y el asi
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Unos datos que la acción no acepta (un país o una moneda que no existe, un valor fuera de su lista) no
-llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Tampoco llega un
+llegan a la tarjeta ni dejan recibo: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Tampoco llega un
 cambio que solo nombra su registro, sin ningún dato que cambiar (nunca «Cambiar en Clientes: Lucía QA» a secas): el
 asistente oye que no hay nada que cambiar y sigue con lo que se le pidió, con la acción que lo hace, o pregunta qué
 quiere cambiar; si el registro no está, oye eso. «Ejecutar» vale solo
@@ -2985,8 +3000,9 @@ Entra: el riesgo que la app declara en cada acción y sus datos; si la declara, 
 Sale: si se acepta, como BASE-F97.
 Si falla: lo escrito que no coincide no deja ejecutar; cancelar no hace nada y el asistente lo cuenta como cancelado.
 Si la vista previa no se puede leer (el registro ya no está, o la persona no puede verlo), no sale la tarjeta ni se
-hace nada: nada se confirma a ciegas. El recibo dice «No se hizo, falló: …» o «No se hizo, sin permiso: …» y el
-asistente cuenta por qué.
+hace nada: nada se confirma a ciegas, y el asistente cuenta por qué. Si el registro no está, no queda recibo, porque a
+la persona no se le preguntó nada (BASE-F97); si no puede verlo, el recibo dice «No se hizo, sin permiso: …». Si deja
+de poderse leer después de pulsar «Ejecutar», el recibo dice «No se hizo, falló: …».
 Implicados: BASE-F35, BASE-F37, BASE-F97
 
 ### BASE-F99 Comprobar lo que dice el asistente contra lo que de verdad hizo
@@ -3104,7 +3120,8 @@ Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Asistente
 Pasos:
-  1. En el Inicio, mientras falta algo, «Termina de configurar tu negocio» lleva «Pedírselo al asistente». Abre el
+  1. En el Inicio, mientras falta algo, «Termina de configurar tu negocio» lleva «Pedírselo al asistente», sus
+     destellos. Abre el
      panel con «Revisa la configuración de tu negocio. Elige una opción o escribe tu duda.».
   2. Abierto desde la barra, la conversación vacía ofrece los mismos atajos: «¿Qué falta por configurar?» y, por cada
      paso pendiente que esta persona puede hacer (hasta cuatro, en el orden de la lista), «¿Cómo configuro «Tu
@@ -3710,7 +3727,7 @@ Pasos:
   6. «Otras pantallas» trae las demás pestañas del módulo, o las demás pantallas del Hub que la persona puede ver,
      plegadas, cada una con su resumen corto. Un enlace de la ayuda a una pantalla del Hub lleva a ella y cierra la
      ayuda.
-  7. «Pregúntale al asistente» cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
+  7. «Pregúntale al asistente», los destellos del pie, cierra la ayuda y abre el asistente con la pregunta escrita, sin enviarla: «¿Cómo hago
      esto: <tarea>?» sobre la última tarea que se abrió o, si no se abrió ninguna, «¿Cómo uso <módulo> en
      <pantalla>?»; si ya había algo escrito, la pregunta va debajo. «Cerrar» cierra la ayuda.
 Entra: el módulo, o la pantalla del Hub, y la pestaña en la que se está.
@@ -4327,15 +4344,18 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   enciende sola, con sus filas escritas al nacer (Impuestos, hub#997); un hub sin filas lo tiene todo apagado; los hubs
   anteriores a la migración `base/0017` conservan todo encendido con sus raíces elegidas, y los locales `a`/`b` salen así de `seed_local_hubs`; el hub de
   ERPlora y el ámbito del worker lo tienen todo encendido siempre, `activation.is_platform`; `base/activation.py`).
-  `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto (sus raíces, elegidas, por
-  `base.app.enable`: tope, derechos y evento); la que no puede encender sale `inactive` con su `reason` en el
+  `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto, cada una elegida, por
+  `base.app.enable` y primero lo que necesita cada una (tope, derechos y evento), salvo las que la plataforma enciende
+  al darse de alta (`activation.born_on`: Impuestos), que van al final y llegan sin elegir con las que las necesitan;
+  la que ya estaba encendida se queda como estaba, y los negocios montados antes con una plantilla o una copia las
+  tienen elegidas desde la migración `base/0033`. La que no puede encender sale `inactive` con su `reason` en el
   informe. La que nunca se enciende en este negocio (`can_enable`) no se promete en la revisión (`inactive`, no `turns_on`)
   y, sin filas suyas en el blueprint, no deja la carga a medias ni ofrece un reintento que no cambiaría nada (hub#694). `base.app.enable`/`base.app.disable`
   (`POST /api/apps/enable|disable`, `base.administer_hub`: cierre de `requires`, 409 `base.app_required`, negativas
   `can_disable` y `can_enable` del `LiveAppConfig` → 409 `base.app_vetoed`, que `base.app.list` adelanta en el `refusal`
   de cada fila, con cada gancho una sola vez por lista (hub#618, hub#694), y la de una app que otra en marcha necesita
-  dice el motivo de esa otra, nunca «Desactiva antes» (`app_off_refusal`, hub#619), 402 `base.app_limit_reached` con `max_apps`/`enabled`;
-  bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
+  dice el motivo de esa otra, nunca «Desactiva antes» (`app_off_refusal`, hub#619), 402 `base.app_limit_reached` con `max_apps`/`enabled`,
+  nunca para una app que el país del negocio exige, `mandatory_in`; bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
   (caché `base.apps_off:<host>`, olvidada al COMMIT). Una app cuyas tablas la BD del hub aún no tiene (`Hub.schema_apps`;
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
   `creating` (el OpenAPI documenta 200 y 202 con el mismo esquema, hub#705): el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,
@@ -4791,10 +4811,19 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   puede correrla; una línea corta por dato) y, con `setup`, la lista de `base.setup.status` releída; lo que
   el modelo lee de una herramienta sale de `base.assistant.tools.run`, que llama a `run_tool` de `live` con
   `zone=business_zone()` y `money`, así que sus horas van en la zona del negocio y no en UTC, y cada importe marcado
-  como dinero va como lo escriben las pantallas («3.60 EUR»), en la moneda del objeto que la nombra (`currency`, con
-  sus `currency_decimals` si los da) o en la del negocio, nunca en la unidad menor: lo comprueban
+  como dinero va como lo escriben las pantallas en el idioma de la persona («3,60 €» en español, «€3.60» en inglés:
+  lo escribe `base.business.money_text`), en la moneda del objeto que la nombra (`currency`) o en la del negocio,
+  nunca en la unidad menor: lo comprueban
   `base/tests/test_business_facts.py`, también con dos negocios en zonas distintas, y
-  `base/tests/test_assistant_result_amounts.py`; el paso del asistente de Automatizaciones lo lee igual), `base.assistant.usage` (query), `base.assistant.report`,
+  `base/tests/test_assistant_result_amounts.py`; cada valor de una lista cerrada que nombran las pantallas lleva
+  además ese nombre en el idioma de la persona, una vez por dato y valor, bajo `screen_names` (`live.assistant`, con
+  la etiqueta de las opciones del modelo que usa la tarjeta, `choice_label`): lo comprueban
+  `base/tests/test_assistant_screen_names.py` (toda lista cerrada que devuelve una herramienta, la que declara su
+  esquema y la que solo tiene opciones en el modelo, como los días de la semana; las que aún no nombra ninguna app o
+  que el esquema no declara van por herramienta en `assistant_closed_lists_known.json`, que solo encoge),
+  `apps/customer/tests/test_assistant_screen_names.py` y `apps/staff/tests/test_assistant_schedule_days.py`; los
+  catorce alérgenos los nombra la plataforma (`base.allergens.NAMED`); el paso del asistente de Automatizaciones lo
+  lee igual), `base.assistant.usage` (query), `base.assistant.report`,
   `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api/assistant.py` (`/api/assistant/turn`,
   `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,

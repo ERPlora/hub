@@ -224,7 +224,19 @@ def test_the_export_comes_as_csv_text(boss, client):
     assert response.status_code == 200
     body = response.json()
     assert (body["filename"], body["rows"]) == ("attendance-2026-10.csv", 0)
-    assert body["csv"].startswith("date,user,clock_in")
+    assert body["csv"].startswith("Date,Person,Clock-in")
+
+
+@HUB_DB
+def test_the_export_follows_the_language_of_the_request(boss, client):
+    response = client.get(
+        "/api/attendance/records/export",
+        {"date_from": "2026-10-01", "date_to": "2026-10-31"},
+        HTTP_HOST=HOST,
+        HTTP_ACCEPT_LANGUAGE="es",
+    )
+    assert response.status_code == 200
+    assert response.json()["csv"].startswith("Fecha,Persona,Entrada,Salida,")
 
 
 @HUB_DB

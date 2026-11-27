@@ -236,8 +236,9 @@ disponible: no existe en este negocio, o se ha eliminado o retirado.», «Ese us
 acceso a este negocio.» o la cuenta ya vinculada a otra ficha. Quien no puede ver la
 compensación no puede enviarla: el aviso dice qué permiso le falta. Dos fichas con el mismo
 nombre, email o nº de empleado se aceptan. Desde el asistente, un rol que el negocio no tiene (o que se
-ha retirado) se comprueba antes de la tarjeta de confirmación: no sale tarjeta, el asistente dice que
-ese rol no está disponible y cuáles hay, y no se crea nada. Guardar (también al editar) está en gris
+ha retirado) y una cuenta sin acceso a este negocio se comprueban antes de la tarjeta de confirmación: no sale
+tarjeta, el asistente dice que ese rol no está disponible y cuáles hay, o que esa cuenta no tiene acceso, y no se
+crea nada. Guardar (también al editar) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque la tarifa por hora se lee en ella (sin ella,
 «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, Guardar se enciende.
@@ -266,14 +267,17 @@ Implicados: BASE-F119
 
 ### STAFF-F03 Vincular la ficha con una cuenta del negocio
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable, asistente
 Pantalla: Personal
 Pasos:
 1. En el formulario, abre «Usuario del Hub»: salen «Sin acceso al Hub» y las cuentas con acceso a
    este negocio.
 2. Elige la cuenta de esa persona, o «Sin acceso al Hub» para desvincular, y guarda.
 Entra: las cuentas activas con acceso a este negocio, solo su identificador y su nombre
-(`staff.account.list`; las lee quien puede dar de alta o editar fichas).
+(`staff.account.list`; las lee quien puede dar de alta o editar fichas). Al asistente («La ficha de Ana engánchala a
+su usuario») le valen las mismas: busca la cuenta en esa lista, y su tarjeta de confirmación dice la ficha y el nombre
+de la cuenta que se vincula. Una cuenta sin acceso a este negocio se comprueba antes de la tarjeta: no sale tarjeta,
+el asistente dice que esa cuenta no tiene acceso y no se cambia nada.
 Sale: el vínculo. Con él, la persona ve su propia ficha (STAFF-F08) y pide sus ausencias (STAFF-F24), y si no
 tiene nombre en su perfil, las caras de la caja y la tarjeta del menú de usuario la llaman por el de la ficha
 (BASE-F55). No cambia ningún permiso ni la comisión: una venta cuenta para quien se eligió al cobrarla (STAFF-F21).
@@ -662,7 +666,8 @@ López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no p
 | Quién falta hoy, con el tipo de cada ausencia en el idioma de quien pregunta | ver ausencias | F20 | `staff.time_off.today` |
 | Mis ausencias, con su motivo y sus notas | ver ausencias | F08 | `staff.time_off.mine` |
 | Los ajustes | ver | F22 | `staff.settings.get` |
-| Las cuentas activas con acceso al negocio, para «Usuario del Hub» (id y nombre, con búsqueda o por usuario: la cuenta de una ficha que ya no tiene acceso no sale y la pantalla dice «Sin acceso a este negocio») | dar de alta o editar | F03 | `staff.account.list` |
+| Las cuentas activas con acceso al negocio, para «Usuario del Hub» y para el asistente (id y nombre, con búsqueda o por usuario: la cuenta de una ficha que ya no tiene acceso no sale y la pantalla dice «Sin acceso a este negocio») | ver el equipo y dar de alta o editar | F03 | `staff.account.list` |
+| La cuenta que el asistente va a vincular a una ficha, comprobada antes de su tarjeta como la comprueba la ficha al guardarse (no es herramienta del asistente) | dar de alta o editar | F01, F03 | `staff.account.check` |
 
 ### Lo que ofrece: acciones (cambian datos)
 

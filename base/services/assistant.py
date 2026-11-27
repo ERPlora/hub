@@ -133,6 +133,15 @@ def _assistant_ran(ctx: OperationContext, tools: dict, call, outcome: "shared.To
     return {**ran, **assistant.handed_files.receipt(outcome)}
 
 
+def _assistant_receipt(ctx: OperationContext, tools: dict, call, outcome: "shared.ToolOutcome", *, answered: bool) -> list:
+    """The receipt of ``call``, or none for a write the Hub refused before its card: the person was never asked, and
+    the model hears why and corrects it. A write the person answered says how it ended, and a read always does."""
+    op = shared.operation_of(call.name, tools)
+    if op is not None and op.kind == "command" and outcome.outcome == "error" and not answered:
+        return []
+    return [_assistant_ran(ctx, tools, call, outcome)]
+
+
 @dataclasses.dataclass(frozen=True)
 class _Calls:
     """What the calls of a turn run among: the person's tools and the files they attached, each by its name."""
@@ -259,11 +268,12 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
             # The call its card waits on goes back with what the card showed: the yes comes with it (hub#1208).
             pending[0] = call.model_copy(update={"shown": shown})
             break
-        if decision is not None and decision.call_id == call.call_id:
+        answered = decision is not None and decision.call_id == call.call_id
+        if answered:
             stopped = decision.stop
             decision = None
         append.append({"role": "tool", "tool_call_id": call.call_id, "content": outcome.content})
-        executed.append(_assistant_ran(ctx, runs, call, outcome))
+        executed += _assistant_receipt(ctx, runs, call, outcome, answered=answered)
         pending.pop(0)
     messages = [*data.messages, *append]
     still_open = data.messages[_assistant_opened(data.messages, tools) :]

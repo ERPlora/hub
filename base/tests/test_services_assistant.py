@@ -105,7 +105,7 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "Spanish" in plan["instructions"]
     assert (plan["append"], plan["executed"], plan["confirm"], plan["pending"]) == ([], [], None, [])
     # The business's currency with its decimals: an amount sent in its minor unit, one of a result as it comes.
-    assert "17.00 EUR → 1700" in plan["instructions"] and '(`"17.00 EUR"`): say it as it comes' in plan["instructions"]
+    assert "17,00\xa0€ → 1700" in plan["instructions"] and '(`"17,00\xa0€"`): say it as it comes' in plan["instructions"]
 
 
 def test_a_turn_whose_actor_has_no_role_here_names_none():
@@ -127,7 +127,7 @@ def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
     the card's money carries the same decimals."""
     Hub.objects.filter(slug=A.key).update(country="JP")
     plan = turn(call("demo.item.create", {"name": "Mesa 4"}))
-    assert "17 JPY → 17" in plan["instructions"]
+    assert "17\xa0JPY → 17" in plan["instructions"]
     assert plan["confirm"]["money"] == {"currency": "JPY", "decimals": 0}
 
 
@@ -199,10 +199,9 @@ def test_a_write_its_operation_would_refuse_shows_no_card_and_the_model_hears_wh
     failed and the model asked again: two cards for one change. The data are checked before any card is drawn; the
     model hears which do not fit, field by field, and asks again with them corrected."""
     plan = turn(call("demo.item.create", {"name": "Mesa 4", "status": "abierto"}))
-    assert plan["confirm"] is None
-    assert plan["pending"] == []
-    assert (plan["executed"][0]["outcome"], plan["executed"][0]["code"]) == ("error", "invalid_payload")
-    assert set(json.loads(plan["append"][0]["content"])["error"]["fields"]) == {"status"}
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    told = json.loads(plan["append"][0]["content"])["error"]
+    assert (told["code"], set(told["fields"])) == ("invalid_payload", {"status"})
     assert "Mesa 4" not in items()
     corrected = turn(call("demo.item.create", {"name": "Mesa 4", "status": "open"}))
     assert corrected["confirm"]["operation"] == "demo.item.create"
@@ -347,13 +346,12 @@ def test_a_card_whose_app_declares_no_preview_is_as_before():
 
 
 def test_a_preview_that_cannot_be_read_shows_no_card_does_nothing_and_says_why(settle):
-    """Nothing is confirmed blind: the write is not done, its receipt says it failed, and the model hears why (the
-    read's own error) to tell the person, as when the write itself refuses."""
+    """Nothing is confirmed blind: the write is not done and the model hears why (the read's own error) to tell the
+    person, as when the write itself refuses; the person was never asked, so no receipt."""
     plan = turn(call("demo.item.settle", {"id": "gone"}))
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    [row] = plan["executed"]
-    assert (row["name"], row["kind"], row["outcome"], row["code"]) == ("demo.item.settle", "command", "error", "demo.item_not_found")
-    assert json.loads(plan["append"][0]["content"])["error"]["message"] == "This item is not there any more."
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    told = json.loads(plan["append"][0]["content"])["error"]
+    assert (told["code"], told["message"]) == ("demo.item_not_found", "This item is not there any more.")
 
 
 def test_a_preview_the_person_may_not_read_shows_no_card(settle):
@@ -393,11 +391,10 @@ def test_a_name_that_fits_several_apps_shows_no_card_and_the_model_asks_which(na
     """«reserva» is Reservas and Reservas online: nothing to confirm blind; the model hears both names to ask."""
     admin = {"base.view_home", "base.administer_hub"}
     plan = turn(call(name, {"app": "reserva"}), permissions=admin)
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    [row] = plan["executed"]
-    assert (row["name"], row["outcome"], row["code"]) == (name, "error", "base.app_ambiguous")
-    said = json.loads(plan["append"][0]["content"])["error"]["message"]
-    assert "Reservas online" in said and "Reservas," in said
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    told = json.loads(plan["append"][0]["content"])["error"]
+    assert told["code"] == "base.app_ambiguous"
+    assert "Reservas online" in told["message"] and "Reservas," in told["message"]
 
 
 @pytest.mark.parametrize("name", ["base.app.enable", "base.app.disable", "base.app.retry"])
@@ -405,9 +402,8 @@ def test_a_name_that_is_no_apps_shows_no_card(name):
     """A name of no app put an empty card up, and the yes ended in a 404: it goes back to the model before any card."""
     admin = {"base.view_home", "base.administer_hub"}
     plan = turn(call(name, {"app": "nope"}), permissions=admin)
-    assert (plan["confirm"], plan["pending"]) == (None, [])
-    [row] = plan["executed"]
-    assert (row["name"], row["outcome"], row["code"]) == (name, "error", "not_found")
+    assert (plan["confirm"], plan["pending"], plan["executed"]) == (None, [], [])
+    assert json.loads(plan["append"][0]["content"])["error"]["code"] == "not_found"
 
 
 def test_each_write_of_a_chain_asks_its_own_yes():
@@ -646,9 +642,11 @@ def test_every_tool_asked_for_at_once_past_the_last_round_hears_that_it_did_not_
 
 
 def test_in_setup_the_turn_reads_the_checklist_again_for_the_model():
+    """In Spanish the list is named as the Home names it in Spanish, never by its English title."""
     plan = run("base.assistant.turn", messages=[ASK], setup=True)
-    assert "Finish setting up your business" in plan["instructions"]
-    assert "Finish setting up" not in run("base.assistant.turn", messages=[ASK])["instructions"]
+    assert "«Termina de configurar tu negocio»" in plan["instructions"]
+    assert "Finish setting up" not in plan["instructions"]
+    assert "Termina de configurar" not in run("base.assistant.turn", messages=[ASK])["instructions"]
 
 
 # ── The gateway's doors ──────────────────────────────────────────────────────────────────────────────────────────

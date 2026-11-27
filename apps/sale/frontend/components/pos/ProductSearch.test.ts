@@ -126,6 +126,17 @@ describe('ProductSearch: the services of Services (SALE-F38)', () => {
     expect(m.wrapper.emitted('pickService')).toEqual([[cut]]);
   });
 
+  it('a search that finds only services does not say «No products.»; one that finds nothing says so for both', async () => {
+    const m = await setup('es', { withServices: true });
+    await m.result(OP, page([]));
+    expect(m.find('pos-search-empty').exists()).toBe(false);
+    await m.result(SERVICES, page([service({ id: 'sv1' })]));
+    expect(m.find('pos-search-empty').exists()).toBe(false);
+    expect(m.find('pos-search-service-sv1').exists()).toBe(true);
+    await m.result(SERVICES, page([]), {}, 2);
+    expect(m.find('pos-search-empty').text()).toBe('Ningún producto ni servicio coincide con la búsqueda.');
+  });
+
   it('without services, Services is not asked', async () => {
     const m = await setup();
     expect(m.params(SERVICES)).toEqual([]);

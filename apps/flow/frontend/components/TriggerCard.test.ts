@@ -36,12 +36,12 @@ describe('TriggerCard', () => {
     expect(s.wrapper.emitted('toggle')).toHaveLength(1);
   });
 
-  it('chooses what happens among the events of this business, in words, and its «Only when…»', async () => {
+  it('chooses what happens among the events of this business, in words with their app, and its «Only when…»', async () => {
     const s = await setup({ kind: 'event', event: '' });
     const combo = s.wrapper.findComponent(Combo);
     expect(combo.props('options')).toEqual([
-      { id: 'customer.group.deleted', label: 'a customer group is deleted', hint: 'Customers · customer.group.deleted' },
-      { id: 'sale.sale.completed', label: 'a sale is charged', hint: 'Sales · sale.sale.completed' },
+      { id: 'customer.group.deleted', label: 'a customer group is deleted', hint: 'Customers' },
+      { id: 'sale.sale.completed', label: 'a sale is charged', hint: 'Sales' },
     ]);
     combo.vm.$emit('update:modelValue', { id: 'sale.sale.completed', label: 'a sale is charged' });
     expect(s.emitted()).toEqual([{ kind: 'event', event: 'sale.sale.completed' }]);

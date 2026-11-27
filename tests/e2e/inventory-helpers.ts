@@ -118,6 +118,16 @@ export async function fill(scope: Locator, testid: string, value: string): Promi
   await input.blur();
 }
 
+/** Saves the category form `form` and returns the row of `name` in Categories, searched for and on screen. */
+export async function savedCategoryRow(page: Page, form: Locator, name: string): Promise<Locator> {
+  await form.locator('[data-testid=inventory-category-form-submit]').click();
+  await expect(form).toBeHidden();
+  await shown(page).locator('[data-testid=inventory-categories-search] input').fill(name);
+  const row = shown(page).locator('[data-testid=inventory-categories-row]', { hasText: name });
+  await expect(row).toBeVisible();
+  return row;
+}
+
 export const productsReady = (page: Page) =>
   shown(page).locator('[data-testid=inventory-products-row], [data-testid=inventory-products-empty]').first().waitFor({ state: 'visible' });
 

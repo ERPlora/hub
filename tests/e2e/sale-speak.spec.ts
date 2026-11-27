@@ -37,10 +37,13 @@ async function till(page: Page): Promise<void> {
 
 /** Speaks into the key: a first tap records, a second one stops; the words land in the box of the open panel. */
 async function speak(page: Page): Promise<void> {
-  await expect(key(page)).toHaveText('Speak');
+  // The key is the microphone alone: what it does is its accessible name and its tooltip.
+  await expect(key(page)).toHaveText('');
+  await expect(key(page)).toHaveAttribute('title', 'Speak');
+  await expect(announced(page)).toHaveAccessibleName('Speak');
   await key(page).click();
   await expect(announced(page)).toHaveAttribute('aria-pressed', 'true');
-  await expect(key(page)).toHaveText('Stop');
+  await expect(announced(page)).toHaveAccessibleName('Stop');
   await expect(page.locator('[data-testid="pos-speak-status"]')).toHaveText('Listening…');
   await page.waitForTimeout(1200);
   await key(page).click();
@@ -66,7 +69,7 @@ test('SALE-F01 / BASE-F94 — «Speak» dictates into the assistant: the words w
     expect(transcribed()).toBe(dictations + 1);
     expect(asked()).toBe(questions);
     await expect(answers(page)).toHaveCount(0);
-    await expect(key(page)).toHaveText('Speak');
+    await expect(announced(page)).toHaveAccessibleName('Speak');
     await untilStill(page);
     await page.screenshot({ path: shot(`FIX-SALE-POS-NO-SPEAK-KEY-${vp.label}`) });
     if (vp.label !== '1440') await reset(page);
@@ -140,7 +143,7 @@ test('SALE-F01 — a recording stopped once the connection is gone is thrown awa
     await expect(page.locator('[data-testid="pos-grid-loading"]')).toBeHidden();
     const dictations = transcribed();
     await key(page).click();
-    await expect(key(page)).toHaveText('Stop');
+    await expect(announced(page)).toHaveAccessibleName('Stop');
     await expect(status).toHaveText('Listening…');
     await untilStill(page);
     await page.screenshot({ path: shot(`FIX-HUB-SALE-SPEAK-KEY-REPEATS-BASE-DICTATION-${vp.label}`) });
@@ -150,7 +153,7 @@ test('SALE-F01 — a recording stopped once the connection is gone is thrown awa
     await expect(announced(page)).not.toHaveAttribute('aria-disabled', 'true');
     await key(page).click();
     await expect(toastSaying(page, 'No connection: talking to the assistant needs the internet.')).toBeVisible();
-    await expect(key(page)).toHaveText('Speak');
+    await expect(announced(page)).toHaveAccessibleName('Speak');
     await expect(announced(page)).toHaveAttribute('aria-disabled', 'true');
     await expect(status).toBeHidden();
     await expect(panel(page)).toHaveAttribute('data-open', 'false');

@@ -15,6 +15,7 @@ from apps.table.models import Table
 from apps.table.queries import floor
 from apps.table.queries.tables import natural_key
 from base.business import zone_name
+from base.text_search import contains_text
 
 
 @operation(
@@ -113,11 +114,7 @@ def free_tables(ctx: OperationContext, params: TablesIn) -> dict:
     )
     if params.search:
         said = params.search.strip()
-        tables = tables.filter(
-            Q(number__icontains=said)
-            | Q(name__icontains=said)
-            | Q(zone__name__icontains=said)
-        )
+        tables = tables.filter(contains_text(said, "number", "name", "zone__name"))
     out = []
     for table in tables.order_by(natural_key("number"), "id"):
         clash = booked_windows(table.pk, window, exclude)

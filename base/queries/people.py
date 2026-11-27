@@ -221,15 +221,23 @@ def person_label(user, staff_name: str = "") -> str:
     """How ``user`` is named in this hub: its «My profile» name, else the name of its Staff record (``staff_name``),
     else its erplora.com account's, else its username. erplora.com names an account without a name by its address, and
     «My profile» starts from the account's name: an address names them only when nothing else does."""
-    profile = Profile.objects.filter(username=user.get_username()).only("first_name", "last_name").first()
-    own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
-    named = [name for name in (own, staff_name, user.get_full_name()) if name]
-    return next((name for name in named if "@" not in name), named[0] if named else user.get_username())
+    return _first_name_of(user, staff_name, user.get_full_name()) or user.get_username()
 
 
 def face_name(user, staff_name: str = "") -> str:
-    """How ``user`` shows on the grid of a till, seen by anyone at it: their name, never an email."""
-    return without_address(person_label(user, staff_name))
+    """How ``user`` shows to a colleague, on the grid of a till and on what they do: their name as ``person_label``
+    finds it, else what goes before the «@» of their e-mail; never an address."""
+    found = _first_name_of(user, staff_name, user.get_full_name(), getattr(user, "email", ""))
+    return without_address(found or user.get_username())
+
+
+def _first_name_of(user, *others: str) -> str:
+    """The first of ``user``'s «My profile» name and ``others`` that is not an address, else the first one; empty when
+    there is none."""
+    profile = Profile.objects.filter(username=user.get_username()).only("first_name", "last_name").first()
+    own = f"{profile.first_name} {profile.last_name}".strip() if profile is not None else ""
+    named = [name for name in (own, *others) if name]
+    return next((name for name in named if "@" not in name), named[0] if named else "")
 
 
 def faces_of(scope: Scope, people: Iterable[tuple[Any, Any]]) -> list[dict[str, str]]:
@@ -266,13 +274,12 @@ def staff_names(scope: Scope, usernames: Iterable[str]) -> dict[str, str]:
 
 
 def actor_name(who) -> str:
-    """Whoever acts as a colleague reads them, kept on what they do (a kitchen ticket, a table's check): their account's
-    name, else what goes before the «@» of their e-mail, never the address; their username only as the last resort;
-    anything else (the platform, an API key) as it is."""
+    """Whoever acts as a colleague reads them, kept on what they do (a note on a card, a kitchen ticket, a table's
+    check): a person by the name their face shows (``face_name``); anything else (the platform, an API key) as it is."""
     if who is None:
         return ""
     if hasattr(who, "get_username"):
-        return without_address(who.get_full_name() or getattr(who, "email", "")) or who.get_username()
+        return face_name(who)
     return str(who)
 
 
