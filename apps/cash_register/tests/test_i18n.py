@@ -40,7 +40,7 @@ def visible_texts() -> set[str]:
         *models.Session.Status.labels,
         *models.Movement.Type.labels,
         *models.Count.Type.labels,
-        *(label for _, label, _ in services.REPORT_LINES),
+        *(label for _, label, _ in services.reports.REPORT_LINES),
     ]
     with translation.override("en"):
         return {source(text) for text in lazies} | operation_titles("cash_register")
@@ -64,7 +64,7 @@ def test_spanish_texts():
     with translation.override("es"):
         assert str(apps.get_app_config("cash_register").verbose_name) == "Caja"
         assert (
-            str(services.SESSION_ALREADY_OPEN)
+            str(services.sessions.SESSION_ALREADY_OPEN)
             == "Ya hay una sesión de caja abierta. Ciérrala antes de abrir otra."
         )
         assert str(models.Movement.Type.OUT.label) == "Salida"

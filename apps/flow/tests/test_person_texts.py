@@ -25,7 +25,7 @@ from apps.cart_checkout.tests.conftest import make_cart
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries.values import words_for
 from apps.task.models import Task
-from apps.whatsapp_inbox.models import Message
+from apps.whatsapp_inbox.models.conversations import Message
 from base.models import Hub
 
 from .conftest import A, HUB_DB, ctx_for, make_flow, run

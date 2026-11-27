@@ -56,6 +56,13 @@ AN_ATTACHED_FILE: dict = {"attached_file": True}
 #: the panel offers it to download and the model hears its name.
 A_HANDED_FILE: dict = {"handed_file": True}
 
+#: The ``offset`` of a read whose answer grows with the apps that are on and can be too long to be told to the assistant
+#: at once: its cut says how many to leave out to read on (``live.assistant``). A screen reads it whole, without one.
+ReadOn = Annotated[
+    int,
+    Field(ge=0, description="How many items of the answer's list to leave out, to read on where a cut answer stopped."),
+]
+
 
 def in_currency_of(read: str, by: str = "id", code: str = "currency") -> dict:
     """The mark of a datum that names a record in a currency of its own, a cart or a price list (base/assistant/cards.py

@@ -9,7 +9,7 @@
 // What it creates is «E2E Fhf …», `e2e_…` templates, `e2e-…` files and `+3469900…` conversations, and goes.
 import { expect, type Page, test } from '@playwright/test';
 
-import { choose, confirmDialog, signedIn } from './flow-helpers';
+import { choose, confirmDialog, grantAllAndSwitchOn, signedIn } from './flow-helpers';
 import { capture, psql, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { photo } from './website-helpers';
@@ -99,11 +99,7 @@ for (const viewport of FLOW_VIEWPORTS) {
       await editor.locator('[data-testid=flow-editor-save]').click();
       await page.waitForURL(/\/flow\/automations\/[0-9a-f-]+$/);
       await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
-      await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
-      await shown(page).locator('[data-testid=flow-perm-grantall]').click();
-      await shown(page).locator('[data-testid=flow-editor-enabled]').click();
-      await shown(page).locator('[data-testid=flow-editor-save]').click();
-      await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
+      await grantAllAndSwitchOn(page);
       await shown(page).locator('[data-testid=flow-editor-run]').click();
       await confirmDialog(page, 'Run it now?');
       await shown(page).locator('[data-testid=flow-editor-tab-history]').click();

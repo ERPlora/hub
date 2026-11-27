@@ -34,10 +34,16 @@ export const MANAGER: SessionMe = withMenu('verifactu', {
   permissions: ['verifactu.view_record', 'verifactu.add_record', 'verifactu.transmit_record', 'invoice.view_invoice'],
 });
 
-/** The employee: looks. */
+/** The employee, as the role comes: watches and pushes the queue as the manager does. */
 export const EMPLOYEE: SessionMe = withMenu('verifactu', {
   ...OWNER,
-  permissions: ['verifactu.view_record', 'verifactu.add_record', 'invoice.view_invoice'],
+  permissions: ['verifactu.view_record', 'verifactu.add_record', 'verifactu.transmit_record', 'invoice.view_invoice'],
+});
+
+/** The accountancy firm: reads the records and sends nothing. */
+export const ACCOUNTANT: SessionMe = withMenu('verifactu', {
+  ...OWNER,
+  permissions: ['verifactu.view_record', 'invoice.view_invoice'],
 });
 
 /** What a test mounts a screen with; Records reads its total in the business's money, so a test can say how the

@@ -70,7 +70,7 @@ test('«Charge» ends on the till with the appointment’s check, at the price b
     // Back on the agenda: «Go to the check» returns to the same one.
     await page.goto(`${A}/appointment/agenda`);
     await pickDay(page, shown(page).locator('[data-testid=appointment-toolbar-calendar]'), DAY);
-    await expect(shown(page).locator(`[data-testid=appointment-list-row-${booked.id}-charge]`)).toContainText('Go to the check');
+    await expect(shown(page).locator(`[data-testid=appointment-list-row-${booked.id}-charge]`)).toHaveAttribute('title', /^Go to the check/);
     await rowAction(page, 'appointment-list', booked.id, 'charge');
     await page.waitForURL(new RegExp(`/sale/pos\\?order=${orderId}`));
     await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(`${customer.name} · ${booked.number}`);

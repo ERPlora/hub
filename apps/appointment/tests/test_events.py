@@ -5,10 +5,14 @@ recorded them (as the relay does), and run as the system; repeating one changes 
 import datetime as dt
 import uuid
 
+import pytest
 from live.models import OutboxEvent
 
 from apps.appointment import events
-from apps.appointment.models import Appointment, History, Recurring, RecurringService
+from apps.appointment.models.appointments import Appointment, History
+from apps.appointment.models.series import Recurring, RecurringService
+from base import recovery
+from base.tests.actors import RUN
 
 from .conftest import A, HUB_DB, MONDAY, at, make_appointment, run
 
@@ -182,3 +186,38 @@ def test_charged_and_voided_sales_come_back_as_their_payload_says(salon):
     }
     assert events.react(A, "sale.sale.voided", voided).changed == 1
     assert Appointment.objects.get(pk=booked.pk).sale_id is None
+
+
+@pytest.mark.parametrize(
+    "outbox_actor, who, by_platform",
+    [
+        pytest.param("bea-account", "Bea Ruiz", False, id="a person, by her name"),
+        pytest.param("API · Zapier", "API · Zapier", False, id="an API key"),
+        pytest.param("system", "system", True, id="the system"),
+        pytest.param(f"flow_run:{RUN}", f"flow_run:{RUN}", True, id="an automation's step"),
+        pytest.param(recovery.actor_of(RUN), recovery.actor_of(RUN), True, id="a recovery from a copy"),
+        pytest.param("", "system", True, id="no one"),
+    ],
+)
+def test_the_history_names_whoever_charged_or_voided_the_sale_at_the_till(
+    salon, make_user, outbox_actor, who, by_platform
+):
+    """The relay hands the whole event: its outbox row keeps who did it at the till, as for any other change."""
+    bea = make_user("bea-account")
+    bea.first_name, bea.last_name = "Bea", "Ruiz"
+    bea.save(update_fields=["first_name", "last_name"])
+    booked = make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "10:00"))
+    sale = str(uuid.uuid7())
+
+    for name, payload in (
+        (events.SALE_FROM_APPOINTMENT, {"sale_id": sale, "appointment_id": str(booked.id)}),
+        (events.SALE_VOIDED, {"sale_id": sale}),
+    ):
+        events.deliver(OutboxEvent(scope_kind=A.kind, scope_key=A.key, name=name, payload=payload, actor=outbox_actor))
+
+    page = run("appointment.appointment.history", {"id": str(booked.id)})
+    assert [(line.action, line.actor, line.by_platform) for line in page.rows] == [
+        ("charged", who, by_platform),
+        ("completed", who, by_platform),
+        ("uncharged", who, by_platform),
+    ]

@@ -69,7 +69,7 @@ for (const viewport of VIEWPORTS) {
       // The owner finds the cancellation in «Waiting for your answer», naming the reservation by its guest, day and
       // time, never by its id.
       const question = await reservationsQuestion(page);
-      await expect(question).toContainText('From «WhatsApp → table booked»');
+      await expect(question).toContainText('From “WhatsApp → table booked”');
       // The account is in English: Reservas says the reservation «E2E Lucía · Nov 2, 2026 · 9:00 PM».
       await expect(question).toContainText(`E2E Lucía · ${dayAsSaid(DAY)} · 9:00`);
       await expect(question).toContainText('On behalf of the customer: E2E Lucía');

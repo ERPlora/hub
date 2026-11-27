@@ -9,16 +9,11 @@ from django.utils import translation
 from django.utils.functional import Promise
 
 from apps.appointment import assistant_cards, queries, schemas, services
-from apps.appointment.models import (
-    Appointment,
-    AppointmentService,
-    BlockedTime,
-    Counter,
-    History,
-    Recurring,
-    RecurringService,
-    Settings,
-)
+from apps.appointment.models.appointments import Appointment, AppointmentService, History
+from apps.appointment.models.blocked_times import BlockedTime
+from apps.appointment.models.numbering import Counter
+from apps.appointment.models.series import Recurring, RecurringService
+from apps.appointment.models.settings import Settings
 from apps.appointment.schemas import references
 from base.tests.po import (
     catalogue_key,

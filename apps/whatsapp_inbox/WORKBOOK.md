@@ -154,12 +154,12 @@ aquí.».
 Se abre con **Añadir plantilla** («Nueva plantilla») o **Editar** («Editar plantilla — nombre»), encima
 de Ajustes. Campos: **Nombre** («Minúsculas, números y guiones bajos. No se puede cambiar después.»),
 **Idioma** y **Categoría** (Utilidad o Marketing), **Tipo de cabecera** (Texto, Foto, Vídeo o Documento) con
-**Cabecera (opcional)** si es de texto o, si lleva archivo, **Elegir archivo** («Ningún archivo elegido»; elegido,
-su nombre y su peso con **Cambiar archivo**, lo que admite, p. ej. «JPEG o PNG, hasta 5 MB.», y «Meta revisa la
+**Cabecera (opcional)** si es de texto o, si lleva archivo, **Elegir archivo** (su nube; «Ningún archivo elegido»;
+elegido, su nombre y su peso con **Cambiar archivo**, la misma nube), lo que admite, p. ej. «JPEG o PNG, hasta 5 MB.», y «Meta revisa la
 plantilla con este archivo.»), **Texto** («Donde va una
 variable, escribe su número entre dobles llaves, empezando por el 1.»), un **Ejemplo de la variable n**
 por cada variable («Meta revisa la plantilla con estos ejemplos.»), **Pie (opcional)** y **Botones**
-(**Añadir botón**: Respuesta rápida, Enlace o Llamada, con su texto y su dirección o su número;
+(**Añadir botón**, su +: Respuesta rápida, Enlace o Llamada, con su texto y su dirección o su número;
 **Quitar botón**). Botón final **Enviar a revisión de Meta** (nueva) o **Guardar y enviar a Meta**
 (editar). Al editar una aprobada avisa: «Hasta que Meta apruebe los cambios, se sigue enviando la
 aprobada.»; la categoría de una que Meta no ha rechazado no se puede tocar («Meta solo deja cambiar la
@@ -1243,7 +1243,7 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   código de verificación, ni cabecera con ubicación o con variable, ni variables con nombre, solo respuestas
   rápidas, enlaces fijos y llamadas; una cabecera con archivo se envía con el archivo elegido, F33). La
   migración 0008 marca `supported` las de cabecera con archivo que ya cumplían el resto. El Hub escribe
-  (`models.hub_writes`) las `supported`, y las de cabecera con archivo solo con su archivo elegido aquí: las
+  (`models.templates.hub_writes`) las `supported`, y las de cabecera con archivo solo con su archivo elegido aquí: las
   de WhatsApp Manager se editan allí. En la lista, `sendable` es «se envía tal cual», sin elegir
   nada (la de cabecera con archivo, solo con el suyo), y `fillable` «la bandeja la envía» (pidiendo el archivo si no
   tiene); el paso «Enviar un mensaje» de una automatización (FLOW-F31, F32) ofrece las `fillable`, no solo las

@@ -1,16 +1,17 @@
 """What more than one write of the inventory app shares: the system's own permission, who wrote a row, the
 checks that run before anything is written (a tax category, a quantity on its unit's step, a service that has no
-stock), and the events of a product's link to a category and of a changed product."""
+stock), the place of a new category, and the events of a product's link to a category and of a changed product."""
 
 from decimal import Decimal
 from uuid import UUID
 
+from django.db.models import Max
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload
 from live.outbox import record_event
 
-from apps.inventory.models import ACTOR_MAX_LENGTH, fits_unit, increment_of, Product
+from apps.inventory.models import ACTOR_MAX_LENGTH, Category, fits_unit, increment_of, Product
 from apps.inventory.queries.exports import quantity_text
 from apps.inventory.queries.reads import held
 from apps.tax.models import TaxCategory
@@ -35,6 +36,12 @@ def _tax_category(key: str, field: str = "tax_category_key") -> TaxCategory:
     if tax_category is None:
         raise InvalidPayload(str(TAX_CATEGORY_UNKNOWN), code="invalid_field", fields={field: str(TAX_CATEGORY_UNKNOWN)})
     return tax_category
+
+
+def _next_category_order() -> int:
+    """The position after the last category: one created without its own goes at the end of the till's strip."""
+    last = Category.objects.filter(is_deleted=False).aggregate(last=Max("order"))["last"]
+    return 0 if last is None else last + 1
 
 
 def _check_grid(qty: Decimal, unit: str, field: str) -> None:

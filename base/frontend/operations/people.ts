@@ -35,11 +35,18 @@ export interface Seats {
   full: boolean;
 }
 
+/** Why who asks, managing roles, may not give a person a role (the codes `base.role.assign` answers with). */
+export type RoleRefusal = 'base.role_of_owner' | 'base.role_of_accountant' | 'base.role_own' | 'base.role_above';
+
 /** `base.PersonDetailOut`: a person's page (who runs the business). */
 export interface PersonDetail extends Person {
   pin_set_at: string | null;
   badge_set_at: string | null;
-  may: { remove_pin: boolean; set_badge: boolean };
+  /** The id of the role of the business that rules what they may do; null: their invitation's. */
+  business_role: string | null;
+  /** Null when who asks may give them a role, or does not manage roles. */
+  role_refusal: RoleRefusal | null;
+  may: { remove_pin: boolean; set_badge: boolean; give_role: boolean };
 }
 
 /** `base.RoleOut`: one of erplora.com's roles (`basic`, its `HubRole`) or one the business made (`own`, its id). */
@@ -51,6 +58,8 @@ export interface HubRoleInfo {
   members: number;
   /** An own one: an app turned on or a permission added after it was saved is still to look at. */
   to_review: boolean;
+  /** The role that rules what who asks may do: they see it and never change it. */
+  mine: boolean;
 }
 
 /** `base.RoleRowOut`: a role as the list shows it. */

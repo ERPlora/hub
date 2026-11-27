@@ -11,13 +11,14 @@
     { "language": "en", "trigger": { "kind": "event", "event": "spa.sauna.overheated" }, "said": "When Sauna overheated" },
     { "language": "en", "trigger": { "kind": "event", "event": "" }, "said": "Choose what has to happen for it to start" },
     { "language": "en", "trigger": { "kind": "manual" }, "said": "Only when you press Run" },
-    { "language": "en", "trigger": { "kind": "schedule", "every": "day", "time": "09:00" }, "said": "Every day at 09:00" },
+    { "language": "en", "trigger": { "kind": "schedule", "every": "day", "time": "09:00" }, "said": "Every day at 9:00 AM" },
     { "language": "es", "trigger": { "kind": "schedule", "every": "day", "time": "10:00" }, "said": "Todos los días a las 10:00" },
-    { "language": "en", "trigger": { "kind": "schedule", "every": "week", "weekday": 4, "time": "18:00" }, "said": "Every Friday at 18:00" },
+    { "language": "es", "trigger": { "kind": "schedule", "every": "day", "time": "09:00" }, "said": "Todos los días a las 9:00" },
+    { "language": "en", "trigger": { "kind": "schedule", "every": "week", "weekday": 4, "time": "18:00" }, "said": "Every Friday at 6:00 PM" },
     { "language": "es", "trigger": { "kind": "schedule", "every": "week", "weekday": 4, "time": "18:00" }, "said": "Todos los viernes a las 18:00" },
-    { "language": "en", "trigger": { "kind": "schedule", "every": "week", "time": "18:00" }, "said": "Every Monday at 18:00" },
-    { "language": "en", "trigger": { "kind": "schedule", "every": "month", "day": 1, "time": "08:30" }, "said": "Every month on day 1 at 08:30" },
-    { "language": "en", "trigger": { "kind": "schedule", "every": "month", "time": "08:30" }, "said": "Every month on day 1 at 08:30" },
+    { "language": "en", "trigger": { "kind": "schedule", "every": "week", "time": "18:00" }, "said": "Every Monday at 6:00 PM" },
+    { "language": "en", "trigger": { "kind": "schedule", "every": "month", "day": 1, "time": "08:30" }, "said": "Every month on day 1 at 8:30 AM" },
+    { "language": "en", "trigger": { "kind": "schedule", "every": "month", "time": "08:30" }, "said": "Every month on day 1 at 8:30 AM" },
     { "language": "en", "trigger": { "kind": "at" }, "said": "Once, on a date you choose" }
   ],
   "steps": [
@@ -47,16 +48,16 @@
     { "language": "en", "step": { "id": "s4", "kind": "http", "url": "https://api.example.com:8443/orders" }, "said": "Call api.example.com:8443" },
     { "language": "en", "step": { "id": "s4", "kind": "http", "url": "https://{{input.host}}/orders" }, "said": "Call another system" },
     { "language": "en", "step": { "id": "s4", "kind": "http", "url": "http://api.example.com" }, "said": "Call another system" },
-    { "language": "en", "step": { "id": "s5", "kind": "ask", "title": "Approve {{input.total}}?" }, "said": "Ask: Approve «Total»?" },
+    { "language": "en", "step": { "id": "s5", "kind": "ask", "title": "Approve {{input.total}}?" }, "said": "Ask: Approve “Total”?" },
     {
       "language": "en",
       "step": { "id": "s5", "kind": "ask", "title": "Close {{ steps.s1.number }} with {{secret.API_KEY}}?" },
       "steps": [{ "id": "s1", "kind": "command", "operation": "task.task.create", "params": {} }],
-      "said": "Ask: Close «1. Create a task › Number» with «Secret «API_KEY»»?"
+      "said": "Ask: Close “1. Create a task › Number” with “Secret “API_KEY””?"
     },
-    { "language": "en", "step": { "id": "s5", "kind": "ask", "title": "Close {{steps.s9.id}}?" }, "said": "Ask: Close «steps.s9.id»?" },
+    { "language": "en", "step": { "id": "s5", "kind": "ask", "title": "Close {{steps.s9.id}}?" }, "said": "Ask: Close “steps.s9.id”?" },
     { "language": "en", "step": { "id": "s5", "kind": "ask", "title": "" }, "said": "Ask someone first" },
-    { "language": "en", "step": { "id": "s6", "kind": "assistant", "prompt": "input.customer_name" }, "said": "Ask the assistant: «Customer name»" },
+    { "language": "en", "step": { "id": "s6", "kind": "assistant", "prompt": "input.customer_name" }, "said": "Ask the assistant: “Customer name”" },
     { "language": "es", "step": { "id": "s6", "kind": "assistant", "prompt": "Resume {{input.customer.name}}" }, "said": "Pedírselo al asistente: Resume «Cliente › Nombre»" },
     { "language": "en", "step": { "id": "s6", "kind": "assistant", "prompt": "" }, "said": "Ask the assistant" }
   ]

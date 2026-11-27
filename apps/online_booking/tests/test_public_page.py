@@ -7,7 +7,7 @@ import json
 import pytest
 from django.utils import translation
 
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.customer.models import Customer
 from apps.online_booking import public_page
 from apps.online_booking.models import Booking, Settings

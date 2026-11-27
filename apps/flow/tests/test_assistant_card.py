@@ -7,6 +7,7 @@ the owner could not tell what they were saying yes to (hub#2300). The expected w
 catalogues, as the editor reads them."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -71,21 +72,21 @@ def test_the_card_of_a_draft_says_its_name_when_it_starts_and_its_steps(language
 
 
 @pytest.mark.parametrize(
-    ("trigger", "key", "values"),
+    ("trigger", "key", "values", "clock"),
     [
-        ({"kind": "schedule", "every": "day", "time": "10:00"}, "day", {"time": "10:00"}),
-        ({"kind": "schedule", "every": "week", "weekday": 4, "time": "18:00"}, "week", {"time": "18:00"}),
-        ({"kind": "schedule", "every": "month", "day": 1, "time": "09:30"}, "month", {"day": 1, "time": "09:30"}),
+        ({"kind": "schedule", "every": "day", "time": "10:00"}, "day", {}, {"es": "10:00", "en": "10:00 AM"}),
+        ({"kind": "schedule", "every": "week", "weekday": 4, "time": "18:00"}, "week", {}, {"es": "18:00", "en": "6:00 PM"}),
+        ({"kind": "schedule", "every": "month", "day": 1, "time": "09:30"}, "month", {"day": 1}, {"es": "9:30", "en": "9:30 AM"}),
     ],
 )
-def test_a_draft_on_a_schedule_says_it_as_the_list_does(trigger, key, values):
-    """The case of the birthdays: «Revisar cumpleaños de clientes cada mañana · schedule · day · 10:00 · crear_tarea…»."""
+def test_a_draft_on_a_schedule_says_it_as_the_list_does(trigger, key, values, clock):
+    """The case of the birthdays: «Revisar cumpleaños de clientes cada mañana · schedule · day · 10:00 · crear_tarea…»,
+    its time on the clock of the language, as the screens write it."""
     arguments = {**REVIEW, "definition": {"trigger": trigger, "steps": [TASK]}}
     for language in ("es", "en"):
         weekday = {"weekday": WORDS[language]["trigger"]["weekdays"][4]} if key == "week" else {}
-        assert dict(its_line(drawn("flow.draft.propose", arguments, language)))["when"] == when(
-            language, key, **values, **weekday
-        )
+        said = dict(its_line(drawn("flow.draft.propose", arguments, language)))["when"]
+        assert re.sub(r"\s", " ", said) == when(language, key, **values, **weekday, time=clock[language])
 
 
 def test_a_draft_with_no_trigger_starts_only_by_hand():

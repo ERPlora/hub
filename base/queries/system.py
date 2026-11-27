@@ -60,8 +60,8 @@ def system_status(ctx: OperationContext, data: SystemStatusIn) -> dict:
         description=(
             "Reads the log of the last 50 events between this hub's apps (a sale charged, a round fired…), newest "
             "first: when each happened, which app recorded it, its level (info, warning, error) and what happened to "
-            "it (delivered to each app, retrying, given up and waiting in «Failed events», discarded). Never the "
-            "content of an event."
+            "it (delivered to each app, retrying, given up and waiting among System's failed events, discarded). "
+            "Never the content of an event."
         ),
         asks={
             "en": ("what's been happening between the apps?", "show me the latest event log"),

@@ -444,7 +444,7 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     expect(s.field('header-format').value).toBe('IMAGE');
     expect(s.field('header-file-name').textContent).toContain('carta.jpg');
     expect(s.field('header-file-preview-image').getAttribute('src')).toBe(SAMPLE.url);
-    expect(s.field('header-file-choose').textContent).toContain('Change file');
+    expect([s.field('header-file-choose').textContent?.trim(), s.field('header-file-choose').title]).toEqual(['', 'Change file']);
     s.answer(200, approved());
     await click(s.submit());
     await flush();
@@ -475,7 +475,7 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     await s.choose('header-format', 'DOCUMENT');
     expect(s.field('header-format').label).toBe('Tipo de cabecera');
     expect(s.field('header-file-rules').textContent).toContain('PDF, hasta 25 MB');
-    expect(s.field('header-file-choose').textContent).toContain('Elegir archivo');
+    expect([s.field('header-file-choose').textContent?.trim(), s.field('header-file-choose').title]).toEqual(['', 'Elegir archivo']);
     expect(s.field('header-file-empty').textContent).toContain('Ningún archivo elegido');
   });
 });

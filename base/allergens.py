@@ -58,6 +58,8 @@ def found_in(allergy: list[str], allergens: list[str]) -> list[str]:
 
 
 Code = Annotated[str, WithJsonSchema({"type": "string", "enum": list(CODES)})]
+#: Allergens an answer gives, named as the platform names them (``BaseConfig.choices``) in every app that gives them.
+NAMED = {"choices_of": "base.allergens"}
 Allergens = Annotated[list[Code], AfterValidator(in_order)]
 
 
@@ -80,21 +82,25 @@ class AllergensPatchIn(Schema):
 
 
 class AllergensOut(Schema):
-    allergens: list[Code] = Field(description="Its allergens, by their codes, in the order of the list.")
+    allergens: list[Code] = Field(
+        description="Its allergens, by their codes, in the order of the list.", json_schema_extra=NAMED
+    )
 
 
 AllergyInDish = Annotated[
     list[Code],
     Field(
         description="The allergens of the customer's allergy the dish contains, in the order of the list; none if it "
-        "contains none of them or there is no allergy."
+        "contains none of them or there is no allergy.",
+        json_schema_extra=NAMED,
     ),
 ]
 Allergy = Annotated[
     list[Code],
     Field(
         description="The customer's allergy: the allergens, by their codes and in the order of the list, the person "
-        "it is for must not eat; none if no allergy was marked."
+        "it is for must not eat; none if no allergy was marked.",
+        json_schema_extra=NAMED,
     ),
 ]
 

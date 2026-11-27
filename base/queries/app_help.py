@@ -84,7 +84,8 @@ def _language(code: str) -> str:
 def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
     """An app's help in the person's language while its file is current, else in its base language's, else in the
     source's (``language`` says which); its video and each task's short videos likewise. Without the screens whose
-    permission the person does not hold, nor the tasks that are only done there or that their role does not do."""
+    permission the person does not hold, nor the tasks that are only done there or that their role does not do. With an
+    ``offset``, the tasks from that one on."""
     config = _ready(data.app)
     if config is None:
         with translation.override(ctx.language):
@@ -92,15 +93,16 @@ def help_get(ctx: OperationContext, data: AppHelpIn) -> dict:
     language = _language(ctx.language)
     read = _read(config, language)
     closed = {tab.id for tab in tabs_of(config) if not ctx.has(tab.permission)}
+    flows = [
+        {**flow, "screens": screens, "videos": _flow_videos(config.help, flow["id"], language)}
+        for flow in read["flows"]
+        if ctx.has(flow["permission"]) and (screens := [tab for tab in flow["screens"] if tab not in closed])
+    ]
     return {
         **read,
         "screens": [screen for screen in read["screens"] if screen["id"] not in closed],
         "video": _in_language(config.help.videos, language),
-        "flows": [
-            {**flow, "screens": screens, "videos": _flow_videos(config.help, flow["id"], language)}
-            for flow in read["flows"]
-            if ctx.has(flow["permission"]) and (screens := [tab for tab in flow["screens"] if tab not in closed])
-        ],
+        "flows": flows[data.offset :],
     }
 
 

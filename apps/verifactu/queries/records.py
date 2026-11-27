@@ -22,6 +22,7 @@ from apps.verifactu.schemas.records import (
     RecordRowOut,
     RecordSummaryOut,
 )
+from base.text_search import contains_text
 
 from .country import outside_spain
 from .events import event_out
@@ -207,9 +208,7 @@ def list_records(ctx: OperationContext, data: RecordListIn) -> dict:  # noqa: C9
         queryset = queryset.filter(sequence=int(text[1:]))
     elif text:
         match = (
-            Q(invoice_number__icontains=text)
-            | Q(issuer_name__icontains=text)
-            | Q(issuer_nif__icontains=text)
+            contains_text(text, "invoice_number", "issuer_name", "issuer_nif")
         )
         if text.isdigit():
             match |= Q(sequence=int(text))

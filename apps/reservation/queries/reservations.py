@@ -20,9 +20,10 @@ from apps.reservation.schemas.reservations import (
     ReservationPage,
     ReservationRefIn,
 )
-from apps.schedule.queries import day_label
+from apps.schedule.queries.outputs import day_label
 from apps.table.queries import floor
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 #: What a guest's name alone names, when she has any of them.
 OPEN = HOLDING
@@ -148,7 +149,6 @@ RESERVATION_FILTERS = {
     "status": "status",
     "table_id": "table_id",
     "customer_id": "customer_id",
-    "guest_name": "guest_name__icontains",
     "party_size_from": "party_size__gte",
     "party_size_to": "party_size__lte",
 }
@@ -191,6 +191,8 @@ RESERVATION_SORTS = {
 def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
     asked = {lookup: getattr(params, field) for field, lookup in RESERVATION_FILTERS.items() if getattr(params, field)}
     rows = reservations().filter(**asked)
+    if params.guest_name:
+        rows = rows.filter(contains_text(params.guest_name, "guest_name"))
     if params.search:
         rows = rows.filter(_guest_matches(ctx, params.search))
     if params.guest_phone:

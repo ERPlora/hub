@@ -9,8 +9,8 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import NotFound
 
-from apps.appointment.models import Appointment
-from apps.schedule.queries import day_label
+from apps.appointment.models.appointments import Appointment
+from apps.schedule.queries.outputs import day_label
 from base.business import business_zone
 
 from .access import for_caller

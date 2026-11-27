@@ -7,7 +7,7 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 
 from apps.appointment import events
-from apps.appointment.models import Appointment
+from apps.appointment.models.appointments import Appointment
 from apps.appointment.queries.booking import resolve_services
 from apps.appointment.queries.reads import APPOINTMENT_NOT_FOUND, MOVABLE, find_appointment, load_detail
 from apps.appointment.schemas.appointments import AppointmentIdIn, AppointmentOut, AppointmentRefIn
