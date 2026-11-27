@@ -1349,7 +1349,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:f4f311ae8d9b -->
+<!-- from WORKBOOK.md sha256:94ff4453084e -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1366,9 +1366,12 @@ Steps:
      done here, in Settings › Data and backups › Export, with "Template to share" or "Backup of this business", and
      what it takes: the products and the services go with their own photos inside. It does not make the file itself.
 In: the name, the language, what it is for and what is ticked.
-Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows, with the products' and
-the services' own photos inside (INVENTORY-F33); never the sales, people, PINs nor fiscal data. Nothing is kept in the
-business.
+Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows: of Inventory, the categories
+and the products, and of Services, the categories and the services, with their own photos inside (INVENTORY-F33); of
+Tables, the zones and the tables; of Modifiers, the groups, each with its options and the products (by their code) and
+categories it applies to; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
+into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
+the business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
 exported. Who does not administer the business reads "Only an administrator can export the business.". The
 administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset.
