@@ -1444,14 +1444,16 @@ If it fails: a repeated name is refused: "There is already a payment method with
 Involved: none
 
 ### SALE-F38 Sell a service from Services
-<!-- from WORKBOOK.md sha256:ca62f433f92b -->
+<!-- from WORKBOOK.md sha256:71724d38e649 -->
 Status: done
 Vertical: hair salon
 Actor: employee, manager
 Screen: Sell
 Steps:
-1. With Services active and "Show services in the till" on, tap "Services" in the category strip (or
-   search for it with the magnifier).
+1. With Services active and "Show services in the till" on, the services show in "All", after the menus
+   and before the articles (its number counts both: "13 items"), and on their own in "Services". Tap the
+   service in either, or search for it by name with the magnifier; if the magnifier finds neither articles
+   nor services, it says "No product or service matches your search.".
 2. Tap the service: it goes in as a line with its price. If it is not a fixed price ("From", "Hourly",
    "Variable", "Free"), "Amount of Highlights" opens with its price as a suggestion: enter the amount and
    press "Add €45.00".
@@ -1480,7 +1482,7 @@ made. An archived one, "That service is no longer offered…"; an amount outside
 maximum, "That amount is outside what the service allows (€30.00 – €80.00).". A booked price that
 does not match the appointment: "That is not the price the appointment booked for this service: it is
 cancelled, it is another customer's, it did not book this service or it booked it cheaper.". Without
-Services active, "Services" does not show in the strip.
+Services active, "Services" does not show in the strip and "All" shows and counts only Inventory's articles.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ### SALE-F39 Charge with what another app adds (the tip)
