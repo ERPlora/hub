@@ -29,7 +29,7 @@ def people_without_address(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("base", "0033_apps_turned_on_by_a_load_are_chosen"),
+        ("base", "0034_unaccent"),
     ]
 
     operations = [
