@@ -111,8 +111,8 @@ switches between the two.
   width, and **Reload**. It reloads by itself after each save.
 
 #### Share and QR
-<!-- from WORKBOOK.md sha256:9cd4fb66fb51 -->
-The website's address with **Copy link**, its QR code and **Download PNG** (to print) and **Download SVG** (to scale up
+<!-- from WORKBOOK.md sha256:1ca773a751ec -->
+The website's address with **Copy link** (its icon, beside it), its QR code and **Download PNG** (to print) and **Download SVG** (to scale up
 without losing quality). It warns that, on the device where you signed in, the address opens the app (to see the
 page: your phone or a private window) and, if the page is not online, that the address still leads to the team's
 sign-in. If the draft shows the catalog, below it, after a line, «Your catalog's address»: the same address, which
@@ -338,13 +338,13 @@ If it fails: «The website could not be taken offline» and the page stays onlin
 Involved: WEBSITE-F07, WEBSITE-F10
 
 ### WEBSITE-F09 Share the address and the QR
-<!-- from WORKBOOK.md sha256:a632520a45ce -->
+<!-- from WORKBOOK.md sha256:4d9fe920de0f -->
 Status: done (server, screen and e2e)
 Actor: owner, administrator, manager, API
 Screen: Share and QR
 Steps:
 1. In **Website**, tap **Share and QR**.
-2. **Copy link** copies the address («Link copied»); **Download PNG** gets the QR to print it and **Download SVG** to
+2. **Copy link**, the icon beside the address, copies it («Link copied»); **Download PNG** gets the QR to print it and **Download SVG** to
    enlarge it without losing quality.
 3. If the draft shows the catalog, below is «Your catalog's address», with its own **Copy link**,
    **Download PNG** and **Download SVG**: it is the QR to print and leave on the tables.

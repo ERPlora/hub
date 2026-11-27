@@ -1,7 +1,8 @@
-// A row action with an icon is the icon alone: its label is the button's accessible name and tooltip, which the
-// DataTable already gives it. `showLabel` paints the label beside the icon too, and only an action whose icon cannot say
-// it alone keeps it. This guard reads the scripts of base and of every app, and every `showLabel` it finds has to be
-// one of the exceptions below; the list only shrinks, and an exception that is no longer there is struck off it.
+// A row action (or a list's main action) with an icon is the icon alone: its label is the button's accessible name and
+// tooltip, which the DataTable already gives it. `showLabel` paints the label beside the icon too, and only an action
+// whose icon cannot say it alone keeps it. This guard reads the scripts of base and of every app, and every `showLabel`
+// it finds has to be one of the exceptions below; the list only shrinks, and an exception that is no longer there is
+// struck off it.
 import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
@@ -11,8 +12,11 @@ import { describe, expect, it } from 'vitest';
 import { bare, findingsByApp, HUB, hubFrontends, linesWhere, scriptBlocks } from './__tests__/frontend-sources';
 import { NO_CLOCK } from '../../vitest.load';
 
-/** `<path from the hub>#<action id>` → why its icon does not say it alone. */
+/** `<path from the hub>#<action id, or the i18n key of its label>` → why its icon does not say it alone. */
 const PAINTED_LABELS: Readonly<Record<string, string>> = {
+  'apps/kitchen/frontend/pages/StationsPage.vue#kitchen.routing.route':
+    '«Route» sends a product or a category to a station: the swap arrows do not say it',
+  'apps/kitchen/frontend/pages/StationsPage.vue#route': '«Route» of a station, the same action and icon as the list’s main one',
   'apps/payment/frontend/pages/PaymentsPage.vue#advance':
     'the next step changes with the payment (Approve, Mark as sent, Mark as completed): one icon cannot say which',
   'apps/printing/frontend/pages/JobsPage.vue#retry': '«Try again» has no icon of its own (a refresh arrow reloads)',
@@ -27,15 +31,29 @@ const ICON_ALONE =
 const nameOf = (name: ts.Node): string | undefined =>
   ts.isIdentifier(name) || ts.isStringLiteral(name) ? name.text : undefined;
 
-/** The literal `id` of the action `node` (a property of it) belongs to; `?` when it is not written as one. */
+/** The value of the property `name` of `action`, as written. */
+function propertyOf(action: ts.ObjectLiteralExpression, name: string): ts.Expression | undefined {
+  const found = action.properties.find((p) => ts.isPropertyAssignment(p) && nameOf(p.name) === name) as
+    | ts.PropertyAssignment
+    | undefined;
+  return found && bare(found.initializer);
+}
+
+/** The i18n key of a label written as `t('<key>')`. */
+function labelKey(label: ts.Expression | undefined): string | undefined {
+  if (!label || !ts.isCallExpression(label)) return undefined;
+  const [key] = label.arguments;
+  return key && ts.isStringLiteralLike(key) ? key.text : undefined;
+}
+
+/** The literal `id` of the action `node` (a property of it) belongs to, else the i18n key of its label (a list's main
+ *  action has no id); `?` when it is written as neither. */
 function actionId(node: ts.Node): string {
   const action = node.parent;
   if (!ts.isObjectLiteralExpression(action)) return '?';
-  const id = action.properties.find((p) => ts.isPropertyAssignment(p) && nameOf(p.name) === 'id') as
-    | ts.PropertyAssignment
-    | undefined;
-  const value = id && bare(id.initializer);
-  return value && ts.isStringLiteralLike(value) ? value.text : '?';
+  const id = propertyOf(action, 'id');
+  if (id && ts.isStringLiteralLike(id)) return id.text;
+  return labelKey(propertyOf(action, 'label')) ?? '?';
 }
 
 /** Whether `node` paints its action's label: a `showLabel` that is not a written `false`. */
@@ -77,12 +95,13 @@ describe('guardrail: a row action with an icon shows the icon alone', () => {
       "const e = [{ id: 'edit', icon: 'create-outline' }];",
       "const f = [{ id: 'retry', label: 'Retry', icon: 'refresh-outline', showLabel: true }];",
       '// A comment that says showLabel: true paints nothing.',
+      "const g = computed(() => ({ label: t('demo.items.route'), icon: 'swap-horizontal-outline', showLabel: true }));",
     ].join('\n');
     const file = join(HUB, 'apps', 'demo', 'frontend', 'Planted.ts');
-    expect(paintedLabels(planted, file, { 'apps/demo/frontend/Planted.ts#retry': 'planted' })).toEqual([1, 2, 3]);
-    expect(paintedIds(planted, file)).toEqual(['open', 'charge', '?', 'retry']);
+    expect(paintedLabels(planted, file, { 'apps/demo/frontend/Planted.ts#retry': 'planted' })).toEqual([1, 2, 3, 8]);
+    expect(paintedIds(planted, file)).toEqual(['open', 'charge', '?', 'retry', 'demo.items.route']);
     const component = ['<template><DataTable :actions="actions" /></template>', '<script setup lang="ts">', planted, '</script>'];
-    expect(paintedLabels(component.join('\n'), file.replace('.ts', '.vue'), {})).toEqual([3, 4, 5, 8]);
+    expect(paintedLabels(component.join('\n'), file.replace('.ts', '.vue'), {})).toEqual([3, 4, 5, 8, 10]);
   });
 
   it('no action of base or of an app paints its label unless it is an exception', async () => {
