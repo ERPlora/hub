@@ -821,14 +821,15 @@ In ERPlora's own business, which has no plan and buys nothing, its owner has nei
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
-<!-- from WORKBOOK.md sha256:c95a59546413 -->
+<!-- from WORKBOOK.md sha256:52b15eac53e3 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
   1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
-     missing and where it is done; each step keeps its "Set up" in the list.
+     missing and where it is done; each step keeps its "Set up" in the list. If it names the list, it calls it as
+     the Home shows it, in that person's language: "You have 4 steps left in Finish setting up your business".
   3. Of a step that is done it says it is done, without taking a figure, a name or a setting from its text, which
      says what the step asks for and not what the business has: "Your catalog" is done because there are already
      products, never "you have one". Asked how many or which, it reads it in the step's app (the active products, in
