@@ -1,12 +1,12 @@
 """The queue (``verifactu.contingency.list``): the records not in the AEAT yet, in the order they go out."""
 
-from django.db.models import Q
 from live.context import OperationContext
 from live.operations import operation
 
 from apps.verifactu.models import Record, wait_reason_text
 from apps.verifactu.schemas.contingency import ContingencyListIn, QueueRowOut
 from apps.verifactu.schemas.fields import Page
+from base.text_search import contains_text
 
 from .reads import VIEW, page
 
@@ -56,11 +56,7 @@ def list_queue(ctx: OperationContext, data: ContingencyListIn) -> dict:
     if data.environment:
         queryset = queryset.filter(environment=data.environment)
     if data.search:
-        queryset = queryset.filter(
-            Q(invoice_number__icontains=data.search)
-            | Q(wait_detail__icontains=data.search)
-            | Q(wait_reason__icontains=data.search)
-        )
+        queryset = queryset.filter(contains_text(data.search, "invoice_number", "wait_detail", "wait_reason"))
     if data.sort:
         prefix = "-" if data.dir == "desc" else ""
         queryset = queryset.order_by(f"{prefix}{data.sort}", f"{prefix}id")
