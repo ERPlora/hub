@@ -44,6 +44,7 @@ const DETAIL: CustomerDetailOut = {
   consent: [],
   marketing_consent: false,
   consent_date: null,
+  consent_notice: '',
 };
 
 describe('the fields of the form', () => {

@@ -16,7 +16,7 @@
     "list": {
       "new": "Nueva automatización",
       "heading": "Tus automatizaciones",
-      "search": "Busca por nombre, por lo que la arranca o por lo que hace",
+      "search": "Buscar automatización…",
       "count": "Se ven {shown} de {total}",
       "noMatch": "Aquí no hay nada que encaje con eso.",
       "clear": "Volver a verlas todas",
@@ -54,9 +54,7 @@
       "deleteYes": "Sí, bórrala",
       "deleteNo": "Déjala",
       "deleted": "Borrada.",
-      "enabledMissing": "Encendida, pero aún no tiene los permisos que pide: no hará nada hasta que se los concedas en la pestaña Permisos.",
-      "stateAll": "Encendidas y en pausa",
-      "triggerAny": "Cualquier cosa"
+      "enabledMissing": "Encendida, pero aún no tiene los permisos que pide: no hará nada hasta que se los concedas en la pestaña Permisos."
     },
     "drafts": {
       "heading": "Propuestas por el asistente",
@@ -1697,6 +1695,7 @@
       "consent_at": "Fecha del consentimiento",
       "consent_by": "Consentimiento dado por",
       "consent_date": "Fecha del consentimiento",
+      "consent_notice": "Frase del consentimiento",
       "contact_name": "Nombre de contacto",
       "contact_point": "Punto de contacto",
       "contacted_at": "Fecha del contacto",

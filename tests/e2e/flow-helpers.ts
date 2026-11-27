@@ -30,6 +30,13 @@ export async function choose(page: Page, testid: string, text: string): Promise<
   await expect(popover).toHaveCount(0);
 }
 
+/** Narrows the list `table` by picking `text` in its filter `filter`, behind the list's filters button. */
+export async function filterList(page: Page, table: string, filter: string, text: string): Promise<void> {
+  await shown(page).locator(`[data-testid="${table}-filters-toggle"]`).click();
+  await choose(page, `${table}-filter-${filter}`, text);
+  await shown(page).locator(`[data-testid="${table}-filters-apply"]`).click();
+}
+
 /** Confirms the dialog titled `title` with its main button. */
 export async function confirmDialog(page: Page, title: string, beforeConfirm?: () => Promise<void>): Promise<void> {
   const dialog = page.locator('ion-modal.ep-form-modal').filter({ hasText: title });

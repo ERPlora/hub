@@ -390,7 +390,7 @@ def test_marketing_needs_the_card_s_whatsapp_consent():
         send(promo)  # a card without consent
     run(
         "customer.consent.grant",
-        {"customer_id": str(ana.id), "channel": "whatsapp", "notice_text": "¿Quieres recibir ofertas por WhatsApp?"},
+        {"customer_id": str(ana.id), "channel": "whatsapp"},
     )
     assert send(promo).template_name == "promo"
     run("customer.consent.withdraw", {"customer_id": str(ana.id), "channel": "whatsapp"})
@@ -430,7 +430,7 @@ def test_marketing_to_a_number_without_conversation_reads_the_card_of_that_numbe
     ana = card("Ana López", "600222333")
     run(
         "customer.consent.grant",
-        {"customer_id": str(ana.id), "channel": "whatsapp", "notice_text": "¿Quieres recibir ofertas por WhatsApp?"},
+        {"customer_id": str(ana.id), "channel": "whatsapp"},
     )
     out = send({"to": "+34 600 222 333", "template": {"name": "promo"}})
     assert Conversation.objects.get(pk=out.conversation_id).customer_id == ana.id
