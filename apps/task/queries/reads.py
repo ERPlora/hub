@@ -17,6 +17,7 @@ from apps.staff.queries.reads import actor_user_id, own_member
 from base.business import business_zone
 from base.models import HubUser
 from base.only_theirs import only_theirs
+from base.text_search import contains_text
 from apps.task.models import Project, Task
 from apps.task.schemas import PageIn
 
@@ -113,8 +114,8 @@ def resolve_task(
             for step in (
                 open_tasks.filter(title__iexact=text),
                 ordered.filter(title__iexact=text),
-                open_tasks.filter(title__icontains=text),
-                ordered.filter(title__icontains=text),
+                open_tasks.filter(contains_text(text, "title")),
+                ordered.filter(contains_text(text, "title")),
             ):
                 matches = list(step[: MAX_CANDIDATES + 1])
                 if len(matches) > 1:
@@ -145,7 +146,7 @@ def resolve_project(
     else:
         project = projects.filter(code__iexact=text).first()
         if project is None:
-            for step in (projects.filter(name__iexact=text), projects.filter(name__icontains=text)):
+            for step in (projects.filter(name__iexact=text), projects.filter(contains_text(text, "name"))):
                 matches = list(step[: MAX_CANDIDATES + 1])
                 if len(matches) > 1:
                     names = ", ".join(f"{match.name} ({match.code})" for match in matches[:MAX_CANDIDATES])

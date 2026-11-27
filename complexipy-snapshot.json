@@ -750,16 +750,6 @@
     ]
   },
   {
-    "path": "base/services/apps.py",
-    "file_name": "apps.py",
-    "functions": [
-      {
-        "name": "_enable",
-        "complexity": 18
-      }
-    ]
-  },
-  {
     "path": "apps/verifactu/services/authorisation.py",
     "file_name": "authorisation.py",
     "functions": [

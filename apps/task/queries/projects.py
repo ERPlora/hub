@@ -8,6 +8,7 @@ from live.context import OperationContext
 from live.operations import operation
 
 from base.ordering import list_order_for
+from base.text_search import contains_text
 from apps.task.models import Project, Task
 from apps.task.queries.reads import Caller, _full_name, _page, resolve_project
 from apps.task.schemas import ProjectListIn, ProjectOut, ProjectPage, ProjectRefIn
@@ -82,13 +83,13 @@ def load_project(project_id: UUID, caller: Caller) -> dict:
 def list_projects(ctx: OperationContext, params: ProjectListIn) -> dict:
     projects = annotated_projects(Project.objects.all(), Caller(ctx))
     if params.search:
-        projects = projects.filter(Q(code__icontains=params.search) | Q(name__icontains=params.search))
+        projects = projects.filter(contains_text(params.search, "code", "name"))
     if params.code:
-        projects = projects.filter(code__icontains=params.code)
+        projects = projects.filter(contains_text(params.code, "code"))
     if params.name:
-        projects = projects.filter(name__icontains=params.name)
+        projects = projects.filter(contains_text(params.name, "name"))
     if params.color:
-        projects = projects.filter(color__icontains=params.color)
+        projects = projects.filter(contains_text(params.color, "color"))
     if params.is_active is not None:
         projects = projects.filter(is_active=params.is_active)
     if params.owner_id:
