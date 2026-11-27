@@ -12,6 +12,7 @@ from apps.customer.models import OrderLink
 from apps.customer.queries.reads import find_customer, page
 from apps.customer.schemas.orders import OrderCustomerOut, OrderIn, OrderListIn, OrderNamedOut, OrderPage
 from base import operations as platform
+from base.text_search import contains_text
 
 SALES_UNAVAILABLE = _("Sales is not active in this business.")
 
@@ -59,7 +60,7 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     customer = find_customer(ctx, params.customer_id, params.customer)
     links = OrderLink.objects.filter(customer=customer)
     if params.search:
-        links = links.filter(order_id__icontains=params.search.strip())
+        links = links.filter(contains_text(params.search.strip(), "order_id"))
     return page(links.order_by("-linked_at", "-id"), params)
 
 

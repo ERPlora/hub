@@ -206,7 +206,7 @@ test('Agenda: book with a free time, an overlap refused, the grid and the week, 
     await page.goto(`${A}/appointment/agenda`);
     await goToDay(page);
     // While its check is open, «Charge» is «Go to the check» and goes back to the same one.
-    await expect(view.locator(`[data-testid=appointment-list-row-${second.id}-charge]`)).toContainText('Go to the check');
+    await expect(view.locator(`[data-testid=appointment-list-row-${second.id}-charge]`)).toHaveAttribute('title', /^Go to the check/);
     await rowAction(page, 'appointment-list', second.id, 'charge');
     await page.waitForURL(/\/sale\/pos\?order=/);
     expect(psql(`select count(*) from sale_order where appointment_id = '${second.id}'`)).toBe('1');

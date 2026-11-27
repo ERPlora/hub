@@ -92,8 +92,7 @@
       },
       "table": {
         "filters": "Filtros de días especiales",
-        "filtersActiveOne": "Filtros de días especiales ({n} activo)",
-        "filtersActiveMany": "Filtros de días especiales ({n} activos)",
+        "filtersActive": "Filtros de días especiales ({n} activo) | Filtros de días especiales ({n} activos)",
         "viewList": "Ver días especiales como lista",
         "viewCards": "Ver días especiales como tarjetas"
       }
@@ -125,8 +124,7 @@
       },
       "table": {
         "filters": "Filtros de cambios temporales",
-        "filtersActiveOne": "Filtros de cambios temporales ({n} activo)",
-        "filtersActiveMany": "Filtros de cambios temporales ({n} activos)",
+        "filtersActive": "Filtros de cambios temporales ({n} activo) | Filtros de cambios temporales ({n} activos)",
         "viewList": "Ver cambios temporales como lista",
         "viewCards": "Ver cambios temporales como tarjetas"
       }

@@ -2,7 +2,7 @@
 and the rate a typed line of a manual invoice starts with (INVOICE-F03).
 """
 
-from django.db.models import F, Q
+from django.db.models import F
 from django.utils import translation
 from live.context import OperationContext
 from live.operations import operation
@@ -25,6 +25,7 @@ from apps.invoice.schemas.invoices import (
     LineDefaultsIn,
     LineDefaultsOut,
 )
+from base.text_search import contains_text
 from apps.sale.queries.sales import visible_sale
 from apps.tax.queries.jurisdiction import business_tax_kind
 from apps.tax.queries.resolution import resolve_tax
@@ -60,11 +61,7 @@ def filter_invoices(ctx: OperationContext, params: InvoiceFiltersIn):
     invoices = INVOICES.visible(ctx)
     if params.search:
         text = params.search.strip()
-        invoices = invoices.filter(
-            Q(number__icontains=text)
-            | Q(customer_name__icontains=text)
-            | Q(customer_tax_id__icontains=text)
-        )
+        invoices = invoices.filter(contains_text(text, "number", "customer_name", "customer_tax_id"))
     if params.status == OVERDUE:
         invoices = invoices.filter(overdue())
     elif params.status:

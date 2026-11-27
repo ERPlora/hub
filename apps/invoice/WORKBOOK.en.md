@@ -128,10 +128,10 @@ Empty: "No invoices yet.". Loading: "Loading…". Error: the message with "Retry
 action shows as a notice above the table.
 
 #### Invoice detail
-<!-- from WORKBOOK.md sha256:c24544971c9f -->
+<!-- from WORKBOOK.md sha256:946e8ba70aa3 -->
 Opens from a row of **Invoices** (`/invoice/invoices/<id>`). On top, "Invoice {number}" with the status
-tag and the buttons "Print / PDF", "Download PDF", "Send by email" (for whoever issues invoices) and "← Back". If the last
-email did not leave, the notice "The invoice was not sent by email" and why. If it is a full invoice, or a rectifying invoice of a full
+tag and the icon-only buttons "Print / PDF", "Download PDF" and "Send by email" (this one, for whoever issues invoices;
+each says its name when hovered) and "← Back". If the last email did not leave, the notice "The invoice was not sent by email" and why. If it is a full invoice, or a rectifying invoice of a full
 invoice, without the customer's tax ID, the notice "This invoice has no customer tax ID: the ticket
 printer cannot print it as a full invoice.". Below, "Type", "Series", "Issue date", "Operation date" (if
 it is another), "Due date" (if it has one), "Customer", "Customer tax ID", "Address", "Issuer", "Source" ("POS sale", "Manual",
@@ -475,7 +475,7 @@ or the customer themselves with the code of their ticket.
 Involved: none
 
 ### INVOICE-F06 A charged sale that could not be invoiced
-<!-- from WORKBOOK.md sha256:6954ac8ae03c -->
+<!-- from WORKBOOK.md sha256:22172139dd57 -->
 Status: done
 Actor: system, employee, manager, administrator, assistant
 Screen: none
@@ -492,7 +492,11 @@ Steps:
    that sale: its document comes out and the sale is no longer pending. Through the API or the assistant
    it is asked the same way, by the sale's number, of Sales or of Invoicing: in both cases the sale carries
    its document as soon as it is issued.
-4. If it still cannot be done, "Issue now" says why and changes nothing.
+4. If that sale's notice to Invoicing was already in System › Failed events, it leaves it and the bell as
+   soon as its document comes out, without resending or discarding it by hand: the hub takes it as
+   delivered and issues no other document. The same with its void's or each refund's once its rectifying
+   invoice comes out.
+5. If it still cannot be done, "Issue now" says why and changes nothing.
 In: the sale waiting for its document.
 Out: that of INVOICE-F01 or INVOICE-F02, dated the day it is finally issued (the operation date is still
 that of the charge); the sale carries its number from that very moment (announces
@@ -502,7 +506,7 @@ operation; if it still cannot, the void or the refund goes ahead and both docume
 hub retries them and "Issue now" issues them in order (INVOICE-F07, INVOICE-F09). Asking Invoicing for
 the rectifying invoice of that void or that refund also leaves it in Sales at once. Asking again for a
 document that already came out issues no other and uses no number.
-Involved: SALE-F01, SALE-F29
+Involved: SALE-F01, SALE-F29, BASE-F43
 
 ### INVOICE-F07 Void a charged sale that already has its ticket
 <!-- from WORKBOOK.md sha256:f006da9259db -->
@@ -789,7 +793,7 @@ or replaces one of theirs is theirs, so its links open.
 Involved: INVOICE-F03, VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
-<!-- from WORKBOOK.md sha256:9b7526e4de98 -->
+<!-- from WORKBOOK.md sha256:38a88c89f151 -->
 Status: done
 Actor: employee (their invoices), manager and administrator (everyone's)
 Screen: Invoice detail
@@ -816,7 +820,9 @@ service did not open"…). Someone else's, for an employee, is neither printed n
 assistant say "Invoice not found.". Asked of the assistant, it is only done if a system printer takes it; if not,
 its receipt says "Not done, it failed: Print in Invoicing." with the reason, "No system printer takes this invoice:
 open it to print it or save it as PDF." or, if its record cannot be read, "Its VeriFactu record could not be read,
-and an invoice never prints without its QR.".
+and an invoice never prints without its QR.". If the printer takes it but no device that is on prints its queue, the
+assistant says it waits in that printer's queue and will come out when a device set up to print it does, never that it
+has printed it.
 Involved: PRINTING-F08, VERIFACTU-F19, BASE-F97, BASE-F109 (the fiscal archive of a deleted business keeps this A4 as a PDF), INVOICE-F03, INVOICE-F21, INVOICE-F25
 
 ### INVOICE-F19 Mark an invoice as paid
@@ -971,7 +977,7 @@ tapped again.
 Involved: INVOICE-F16, BASE-F112
 
 ### INVOICE-F25 Download an invoice in PDF
-<!-- from WORKBOOK.md sha256:93d690dcb305 -->
+<!-- from WORKBOOK.md sha256:8079b60e9dbf -->
 Status: done
 Actor: employee (their invoices), manager, administrator, owner and accountancy firm (everyone's), assistant
 Screen: Invoice detail
@@ -990,8 +996,8 @@ Steps:
 5. The same can be asked of the assistant ("download FACT-2026-000003 as a PDF"): the file stays under its answer, with
    "Download" and its name.
 In: the invoice, its lines and, with VeriFactu, the QR of its record.
-Out: the file; the invoice does not change and the file is not kept in the Hub. While it is made, the button says
-"Preparing…".
+Out: the file; the invoice does not change and the file is not kept in the Hub. While it is made, the button spins
+and is called "Preparing…".
 If it fails: a notice says "The PDF could not be downloaded" and why, and it can be tapped again. If the VeriFactu record
 of an invoice that has one cannot be read, "Its VeriFactu record could not be read, and an invoice never prints without
 its QR."; if the server cannot make it, "The PDF cannot be made right now. Try again later.". Someone else's, for an

@@ -259,7 +259,7 @@ def in_part(data: CatalogIn, app: str, name: str) -> bool:
         },
         "description": "What an automation can start on and do in this business: the events of the active apps "
         "(`sale.sale.completed`…) and the actions and reads it can be granted, with the data each one asks for. "
-        "One with `ask_first` only goes in an «Ask the assistant» step with «Ask me first». A business with many apps "
+        "One with `ask_first` only goes in an `assistant` step whose `mode` is `ask`. A business with many apps "
         "has more than you can read at once: first read the names in the apps you need (`apps` and `only_names`), "
         "then read whole only the events and actions you will use, by name (`names`)."
     },

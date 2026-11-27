@@ -7,6 +7,7 @@ from live.errors import Conflict, NotFound
 
 from apps.inventory.models import Category, Product
 from apps.kitchen.queries.reads import MAX_CANDIDATES
+from base.text_search import contains_text
 
 PRODUCT_NOT_FOUND = _("That product does not exist in the catalogue.")
 PRODUCT_AMBIGUOUS = _("“%(said)s” matches several products: %(names)s. Say which one.")
@@ -42,7 +43,7 @@ def find_product(product_id: UUID | None, said: str | None) -> Product:
         products.filter(sku__iexact=said)[:2]
     )
     rows = exact or list(
-        products.filter(name__icontains=said).order_by("name", "id")[
+        products.filter(contains_text(said, "name")).order_by("name", "id")[
             : MAX_CANDIDATES + 1
         ]
     )
@@ -61,7 +62,7 @@ def find_category(category_id: UUID | None, said: str | None) -> Category:
         )
     exact = list(categories.filter(name__iexact=said)[:2])
     rows = exact or list(
-        categories.filter(name__icontains=said).order_by("name", "id")[
+        categories.filter(contains_text(said, "name")).order_by("name", "id")[
             : MAX_CANDIDATES + 1
         ]
     )
