@@ -397,7 +397,9 @@ Pasos:
    - **Pasa algo**: en «Elige qué pasa», los avisos de las apps activas del negocio, dichos en palabras
      («se cobra una venta», «se crea una ficha de cliente», «una cita se marca como no vino»…), con la
      palabra de la app que los tiene («se crea un cambio temporal», como en Horarios), con el nombre de
-     esa app debajo de cada uno y nunca su código, y con buscador. Debajo, **Solo cuando…**: condiciones
+     esa app debajo de cada uno y nunca su código, y con buscador. No salen los que solo anota la
+     plataforma, que no arrancan nada: la limpieza de las impresiones antiguas y lo que devuelve una
+     recuperación desde una copia aparte («se recupera una cita»). Debajo, **Solo cuando…**: condiciones
      sobre los datos del aviso («el total es mayor que 10000»); sin ellas arranca sola con cada aviso.
    - **Según un horario**: «Cada cuánto» (todos los días, todas las semanas, todos los meses), el día de
      la semana o del mes si toca, y la hora, en la hora del negocio. Un día del mes que no existe (el 31
@@ -1408,7 +1410,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   se reanuda (FLOW-F25).
 - **Una consulta trae como mucho 100 filas**, el tope de toda lista del Hub.
 - **Catálogo sin inventar nombres**: los avisos son los `events.ALL` de las apps activas (todas declaran
-  el suyo); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
+  el suyo), menos los de su `events.SYSTEM_ONLY`, que solo anota la plataforma y no arrancan nada (la limpieza de
+  cada hora de Impresión y lo que trae de vuelta una recuperación, que nunca arranca una automatización); cada
+  aviso ofrecido tiene su frase `flow.events.*` en `en` y en `es` (`test_event_words.py`); las acciones y consultas, las operaciones registradas de las apps activas cuyo permiso
   declara su app (las de «solo la plataforma» quedan fuera) **y que no necesitan a una persona delante**:
   toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) o que
   se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`;
