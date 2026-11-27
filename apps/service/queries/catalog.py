@@ -23,6 +23,7 @@ from apps.service.schemas.service_images import ServiceImageSuggestIn, ServiceIm
 from base import images
 from base.queries.catalog_images import image_suggestion, titled_search
 from base.ordering import list_order_for
+from base.text_search import contains_text
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
 SERVICE_AMBIGUOUS = _("“%(said)s” matches several services: %(names)s. Say which one.")
@@ -192,13 +193,9 @@ def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
                 tax_category__isnull=False, tax_category__is_active=True
             )
     if params.search:
-        services = services.filter(
-            Q(name__icontains=params.search)
-            | Q(category__name__icontains=params.search)
-            | Q(sku__icontains=params.search)
-        )
+        services = services.filter(contains_text(params.search, "name", "category__name", "sku"))
     if params.name:
-        services = services.filter(name__icontains=params.name)
+        services = services.filter(contains_text(params.name, "name"))
     if params.category_id:
         services = services.filter(category_id=params.category_id)
     if params.category:
@@ -290,7 +287,7 @@ def list_for_sale(ctx: OperationContext, params: ServiceForSaleIn) -> dict:
         "category", "tax_category"
     )
     if params.search:
-        services = services.filter(name__icontains=params.search)
+        services = services.filter(contains_text(params.search, "name"))
     if params.category_id:
         services = services.filter(category_id=params.category_id)
     return _page(services.order_by("name", "id"), params, partial(_sale_row, urls=images.Urls(ctx.scope)))

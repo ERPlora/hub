@@ -17,7 +17,7 @@ from base.relay import by_platform
 class NoteIn(CustomerOfIn):
     content: _text(5000, 1) = Field(title=gettext_noop("Note"), description="The note.")
     title: _text(200) = Field(
-        "", description="A title of the caller's own; empty shows «Note added»."
+        "", description="A title of the caller's own; empty: the history titles it by its kind, in the reader's language."
     )
     author_name: _text(200) = Field(
         "",

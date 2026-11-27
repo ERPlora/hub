@@ -15,6 +15,7 @@ from live.operations import get
 
 from apps.inventory.models import Product
 from apps.printing.models import PrintJob
+from apps.printing.tests.conftest import reaches
 
 from .conftest import HUB_DB, ctx_for, ctx_with
 
@@ -37,8 +38,8 @@ def shampoo() -> Product:
     return Product.objects.get(pk=created.id)
 
 
-def label_printer(name: str = "Labels") -> None:
-    run("printing.printer.create", {"name": name, "kind": "network", "address": "192.168.1.50", "usage": "label"})
+def label_printer(name: str = "Labels"):
+    return run("printing.printer.create", {"name": name, "kind": "network", "address": "192.168.1.50", "usage": "label"})
 
 
 def test_inventory_f25_the_label_goes_to_the_label_printer_with_name_code_and_price(shampoo):
@@ -76,9 +77,17 @@ def test_inventory_f25_without_a_label_printer_the_label_waits_in_the_queue_and_
 
     out = run("inventory.product.print_label", {"id": str(shampoo.id)})
 
-    assert out.printer_name is None
+    assert (out.printer_name, out.waits_for_device) == (None, True)
     job = PrintJob.objects.get(pk=out.job_id)
     assert (job.printer_id, job.status, job.usage) == (None, PrintJob.Status.PENDING, "label")
+
+
+def test_inventory_f25_a_label_no_device_prints_waits_and_one_a_device_on_prints_does_not(shampoo):
+    """hub#2563: the assistant said it printed a label that only waited in the queue of a printer nobody prints."""
+    labels = label_printer()
+    assert run("inventory.product.print_label", {"id": str(shampoo.id)}).waits_for_device is True
+    reaches(labels)
+    assert run("inventory.product.print_label", {"id": str(shampoo.id)}).waits_for_device is False
 
 
 def test_inventory_f25_whoever_sees_products_prints_it_the_employee_included(shampoo):

@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router';
 
 import { pendingApps, RETRY_BLOCKED_KEY, statusPill, stillLoading } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
-import type { ImportRow } from '../../operations/blueprints';
+import type { DatasetLoad, ImportRow } from '../../operations/blueprints';
 import '../../data.css';
 
 const props = withDefaults(
@@ -47,6 +47,15 @@ const blockedReason = computed(() => {
 function pill(status: string): { tone: ReturnType<typeof statusPill>['tone']; label: string; raw: string } {
   const look = statusPill(status);
   return { tone: look.tone, label: t(look.key), raw: look.raw ?? '' };
+}
+
+/** Each figure with its own singular or plural, in words that fit any part: «1 new row · 2 were already there». */
+function counts(dataset: DatasetLoad): string {
+  return [
+    t('base.data.report.counts.created', { n: dataset.created }),
+    t('base.data.report.counts.already', { n: dataset.already }),
+    t('base.data.report.counts.failed', { n: dataset.failed }),
+  ].join(' · ');
 }
 </script>
 
@@ -121,8 +130,7 @@ function pill(status: string): { tone: ReturnType<typeof statusPill>['tone']; la
             class="report-dataset"
           >
             <p class="data-row-detail">
-              {{ dataset.label }} ·
-              {{ t('base.data.report.counts', { created: dataset.created, already: dataset.already, failed: dataset.failed }) }}
+              {{ dataset.label }} · {{ counts(dataset) }}
             </p>
             <ul
               v-if="dataset.problems.length"
