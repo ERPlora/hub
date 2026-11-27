@@ -264,11 +264,11 @@ end, the card of the API's documentation.
 The page that shows at the address of a business erplora.com is still preparing; it refreshes by itself.
 
 ### Files
-<!-- from WORKBOOK.md sha256:fc8ee636158c -->
+<!-- from WORKBOOK.md sha256:317b019d4995 -->
 From "Files" in the side menu; the whole team sees it. On the left, "Folders": the tree of the business's folders,
 which starts at "Files" (the very top), with the open folder highlighted; on a narrow screen, the tree folds into the
 "Folders" selector. On the right, "Search files…", "List" and "Grid" and, for whoever administers the business, "New
-folder" and "Upload file". Below, what the open folder holds: tapping a file opens it.
+folder" and "Upload file" (its cloud alone). Below, what the open folder holds: tapping a file opens it.
 
 #### The open folder
 <!-- from WORKBOOK.md sha256:3e9218268628 -->
@@ -821,12 +821,13 @@ In ERPlora's own business, which has no plan and buys nothing, its owner has nei
 Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
-<!-- from WORKBOOK.md sha256:52b15eac53e3 -->
+<!-- from WORKBOOK.md sha256:89d11e47cb24 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
-  1. In "Finish setting up your business", they tap "Ask the assistant" (or ask it from its panel).
+  1. In "Finish setting up your business", they tap "Ask the assistant", its sparkles (or ask it from its
+     panel).
   2. The assistant reads the same list as the Home, with what that person may see, and tells them what is
      missing and where it is done; each step keeps its "Set up" in the list. If it names the list, it calls it as
      the Home shows it, in that person's language: "You have 4 steps left in Finish setting up your business".
@@ -2225,12 +2226,12 @@ moment." or "Check the connection and try again.") and "Retry"; a failure never 
 Involved: BASE-F40
 
 ### BASE-F73 Upload files and make folders
-<!-- from WORKBOOK.md sha256:66add13d9bb6 -->
+<!-- from WORKBOOK.md sha256:a56840ce257f -->
 Status: done
 Actor: owner, administrator
 Screen: Files
 Steps:
-  1. In the open folder, tap "Upload file" and choose one or several, or drag them onto the manager ("Drop the files
+  1. In the open folder, tap "Upload file" (the cloud) and choose one or several, or drag them onto the manager ("Drop the files
      to upload them here"). While they upload: "Uploading 2 of 5…".
   2. "Files uploaded." shows and they appear in the folder. If there was already one with the same name, it is not
      overwritten: the new one is kept as "menu (1).pdf" and "Uploaded as “menu (1).pdf”: there was already one with that
@@ -3230,12 +3231,13 @@ conversation that is too long says "This conversation is too long: start a new o
 Involved: BASE-F59, BASE-F60, BASE-F61
 
 ### BASE-F103 The assistant in the setup
-<!-- from WORKBOOK.md sha256:6bedff7bf9d6 -->
+<!-- from WORKBOOK.md sha256:506f16361b91 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
 Steps:
-  1. On the Home, while something is left, "Finish setting up your business" carries "Ask the assistant". It opens
+  1. On the Home, while something is left, "Finish setting up your business" carries "Ask the assistant", its
+     sparkles. It opens
      the panel with "Review your business's setup. Choose an option or write your question.".
   2. Opened from the bar, the empty conversation offers the same shortcuts: "What is left to set up?" and, for each
      pending step this person can do (up to four, in the list's order), "How do I set up “Your team”?", with the
@@ -3823,7 +3825,7 @@ hub#1355, hub#1356, hub#1364, hub#1365, hub#1373, hub#1375, hub#1429, hub#1431, 
 hub#1458, hub#1459, hub#1473, hub#1474, hub#1495, hub#1505, aws#77
 
 ### BASE-F115 See the help of the screen in view
-<!-- from WORKBOOK.md sha256:c36cfdd53265 -->
+<!-- from WORKBOOK.md sha256:f68e5101166a -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: the top bar of a module whose help is ready or of a screen of the Hub ("?" button, "Help") and the help window
@@ -3852,7 +3854,7 @@ Steps:
      capitals; if nothing matches, it says "Nothing matches your search" and "Clear search" shows them all again.
   6. "Other screens" brings the other tabs of the module, or the other screens of the Hub the person can see, folded,
      each with its short summary. A link of the help to a screen of the Hub goes there and closes the help.
-  7. "Ask the assistant" closes the help and opens the assistant with the question written, without sending it: "How
+  7. "Ask the assistant", the sparkles at the foot, closes the help and opens the assistant with the question written, without sending it: "How
      do I do this: <task>?" about the last task opened or, if none was opened, "How do I use <module> on <screen>?";
      if something was already written, the question goes below it. "Close" closes the help.
 In: the module, or the screen of the Hub, and the tab the person is on.
