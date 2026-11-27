@@ -477,7 +477,7 @@ Involved: APPOINTMENT-F01, SALE-F01, ONLINE_BOOKING-F01, ONLINE_BOOKING-F07, PRI
 WHATSAPP_INBOX-F21
 
 ### SERVICE-F11 Change the Services settings
-<!-- from WORKBOOK.md sha256:3a300e36522f -->
+<!-- from WORKBOOK.md sha256:e6a5e0b56f01 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings
@@ -492,8 +492,8 @@ booking and the default tax category are taken by every new service that does no
 assistant, API and add in one go); the form brings the default tax category chosen.
 "Show prices" and "Show duration" are used by the Online booking page: without them it does not show the
 price or the duration of each service.
-If it fails: "The settings could not be saved." and the reason below the field (a duration of 0, a tax
-category that does not exist). As in the form windows, the notice goes as soon as something is changed and
+If it fails: the reason below the field, once (a duration of 0, a tax category that does not exist): the
+notice "The settings could not be saved." above "Save" does not repeat it. As in the form windows, the notice goes as soon as something is changed and
 a field's reason as soon as that field is corrected; both come back if the next try is refused too. A
 refusal that names no field stays until the next try.
 Involved: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
