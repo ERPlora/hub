@@ -3242,7 +3242,7 @@ the network cut half way, BASE-F106.
 Involved: BASE-F97, BASE-F106
 
 ### BASE-F102 The conversation: what is kept, where and when it is deleted
-<!-- from WORKBOOK.md sha256:173ed0b9e97e -->
+<!-- from WORKBOOK.md sha256:f5261c5b264c -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -3253,8 +3253,9 @@ Steps:
      "Try again".
   3. "New conversation", at the top of the panel, empties it and starts from scratch.
   4. On signing out (also when the till closes by itself for inactivity) it is deleted, and the answer that was
-     arriving is cut. On switching user with a PIN, that of whoever left is deleted along with what they had written
-     without sending and their attachments, and whoever arrives finds the panel closed and empty.
+     arriving is cut. On switching user, with a PIN or a badge, that of whoever left is deleted along with what they
+     had written without sending and their attachments. Either way, whoever enters next finds the panel closed and
+     empty.
   5. What is kept: what the person wrote (of their attachments, only the name), what the assistant answered, its
      notices and its receipts.
 In: the panel's messages; the sign-outs and the user switches.
