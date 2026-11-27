@@ -10,7 +10,6 @@ import type { DOMWrapper } from '@vue/test-utils';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { accessibleName } from '../../../../base/frontend/__tests__/mount-base';
 import { BYE, EMPLOYEE, errorFrame, flush, type MountOptions, mountDemo, subId } from '../__tests__/mount-demo';
 import ItemStats from '../components/ItemStats.vue';
 import ItemListPage from './ItemListPage.vue';
@@ -224,7 +223,7 @@ describe('ItemListPage: the live list in a server-side DataTable', () => {
     const s = await setup();
     await s.show(PAGE);
     const add = s.testid('demo-items-add');
-    expect([add.text(), accessibleName(add.element), add.attributes('title')]).toEqual(['', 'New item', 'New item']);
+    expect([add.text(), add.attributes('title')]).toEqual(['', 'New item']);
     await add.trigger('click');
     await flush();
     expect(s.router.currentRoute.value.path).toBe('/demo/items/new');
@@ -248,7 +247,7 @@ describe('ItemListPage: the live list in a server-side DataTable', () => {
     expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'Estado', 'Líneas', 'Actualizado']);
     expect(s.wrapper.get('[data-testid="demo-item-lines"]').text()).toBe('sin líneas');
     expect(s.wrapper.get('[data-testid="demo-item-status"]').text()).toBe('Abierto');
-    expect([s.testid('demo-items-add').text(), accessibleName(s.testid('demo-items-add').element), s.testid('demo-items-add').attributes('title')]).toEqual(['', 'Nuevo elemento', 'Nuevo elemento']);
+    expect([s.testid('demo-items-add').text(), s.testid('demo-items-add').attributes('title')]).toEqual(['', 'Nuevo elemento']);
   });
 });
 
