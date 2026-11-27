@@ -224,8 +224,8 @@ reason and the reference, which in a sale is the number of its ticket or its inv
 movement is never edited or deleted. Search by product, SKU or ticket number and filter by type.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:be700bb98314 -->
-Read-only table: Date, Name, SKU, Type ("Initial", "Reception", "Sale", "Void", "Count", "Decrease",
+<!-- from WORKBOOK.md sha256:7cee624c978d -->
+Read-only table: Date, Name, SKU, Type ("Initial", "Reception", "Sale", "Void", "Count", "Write-off",
 "Refund"), Quantity (with its sign), Balance, Reason and Reference (in a sale, the number of its
 ticket, its invoice or the sale itself). Search box by product, SKU, reference or ticket number;
 filters by Type and by Reference; most recent first; 50 per page.
@@ -732,7 +732,7 @@ also the reason of any other refusal.
 Involved: none
 
 ### INVENTORY-F15 Write off stock without a sale (waste, breakage, own consumption)
-<!-- from WORKBOOK.md sha256:53dbde58d7b2 -->
+<!-- from WORKBOOK.md sha256:bbdd44bbb604 -->
 Status: done
 Actor: administrator, manager (screen); assistant
 Screen: Products ("Write-off" window, from the row or the card); assistant
@@ -745,10 +745,10 @@ Steps:
    ("three bottles of water got broken, and I just counted the soft drinks, there are 40 left"), the
    breakage is written off all the same and the count is only of what was counted: a count
    never records a breakage.
-3. In **Movements** "Decrease" shows with the quantity in negative and the reason.
+3. In **Movements** "Write-off" shows with the quantity in negative and the reason.
 In: the product, the quantity (in its unit's step) and the reason. It can also be asked for through the
 API.
-Out: the stock goes down and the "Decrease" movement stays; Inventory tells that the stock changed and,
+Out: the stock goes down and the "Write-off" movement stays; Inventory tells that the stock changed and,
 if it crosses the threshold, of the crossing (INVENTORY-F18). The manager and the administrator can ask
 for it.
 If it fails: if there is not enough and "Allow selling without stock" is off, "There is not enough stock

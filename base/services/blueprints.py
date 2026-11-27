@@ -21,6 +21,7 @@ from base.activation import CREATING
 from base.models.blueprints import ImportBatch
 from base.operations import business_country
 from base.permissions import ADMINISTER_HUB
+from base.queries.people import actor_name
 from base.schemas.apps import AppChangeIn
 from base.schemas.blueprints import (
     BlueprintImportIn,
@@ -33,10 +34,7 @@ from base.schemas.blueprints import (
 
 
 def _who(ctx: OperationContext) -> str:
-    actor = ctx.actor
-    if hasattr(actor, "get_username"):
-        return (actor.get_full_name() or actor.get_username())[:150]
-    return str(actor)[:150]
+    return actor_name(ctx.actor)[:150]
 
 
 def _import_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:

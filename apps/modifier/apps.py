@@ -69,6 +69,13 @@ class ModifierConfig(LiveAppConfig):
         },
     )
 
+    def blueprint_datasets(self) -> list:
+        """What of Modifiers travels in an export of the business (BASE-F35): its groups, each with its options and the
+        products and categories it applies to."""
+        from apps.modifier import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS
+
     def recoverable_from_copy(self) -> list:
         """What a separate copy of the business gives back when ERPlora's staff recovers from it (BASE-F114): each group
         the business no longer has, made again with its options by ``modifier.group.recover``; then each option a group

@@ -439,12 +439,12 @@ Actor: empleado (las suyas), responsable
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Historial** en la fila (en cualquier estado) o abre la ficha de la cita.
-2. Cada cambio con su hora en el reloj del negocio, quién lo hizo (una persona del equipo, por su nombre o, si
-   su cuenta no tiene, por lo que va antes de la @ de su correo, nunca el correo entero; «Lo pidió la clienta» si
-   fue ella; «Lo hizo la plataforma» si no fue una persona: el sistema, una automatización o una recuperación desde
-   una copia aparte; una API key, por su nombre) y qué cambió (de qué profesional o servicio a cuál, y la nueva hora). Una
-   cita borrada que el personal de ERPlora devolvió desde una copia aparte conserva sus líneas y suma «Borrada» y
-   «Recuperada».
+2. Cada cambio con su hora en el reloj del negocio, quién lo hizo (una persona del equipo, por su nombre, el de Mi
+   perfil o, sin él, el de su cuenta, o, si no tiene ninguno, por lo que va antes de la @ de su correo, nunca el
+   correo entero; «Lo pidió la clienta» si fue ella; «Lo hizo la plataforma» si no fue una persona: el sistema,
+   una automatización o una recuperación desde una copia aparte; una API key, por su nombre) y qué cambió (de qué
+   profesional o servicio a cuál, y la nueva hora). Una cita borrada que el personal de ERPlora devolvió desde una
+   copia aparte conserva sus líneas y suma «Borrada» y «Recuperada».
 3. Es solo de lectura: un único botón, **Cerrar**.
 Entra: una cita en cualquier estado.
 Sale: nada (solo lee).

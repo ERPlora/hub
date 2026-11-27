@@ -212,7 +212,7 @@
         "sale": "Sale",
         "void": "Void",
         "count": "Count",
-        "write_off": "Decrease",
+        "write_off": "Write-off",
         "refund": "Refund"
       },
       "filters": {

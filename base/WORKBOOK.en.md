@@ -1349,7 +1349,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:f4f311ae8d9b -->
+<!-- from WORKBOOK.md sha256:94ff4453084e -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1366,9 +1366,12 @@ Steps:
      done here, in Settings › Data and backups › Export, with "Template to share" or "Backup of this business", and
      what it takes: the products and the services go with their own photos inside. It does not make the file itself.
 In: the name, the language, what it is for and what is ticked.
-Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows, with the products' and
-the services' own photos inside (INVENTORY-F33); never the sales, people, PINs nor fiscal data. Nothing is kept in the
-business.
+Out: a .blueprint.zip with the apps ticked and, of those that take their data, their rows: of Inventory, the categories
+and the products, and of Services, the categories and the services, with their own photos inside (INVENTORY-F33); of
+Tables, the zones and the tables; of Modifiers, the groups, each with its options and the products (by their code) and
+categories it applies to; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
+into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
+the business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
 exported. Who does not administer the business reads "Only an administrator can export the business.". The
 administrator exports just like the owner: what is the owner's alone are the full copies ERPlora keeps before a reset.
@@ -2824,7 +2827,7 @@ shows over whatever screen is there (BASE-F97).
 Involved: BASE-F93, BASE-F97, BASE-F103, BASE-F104
 
 ### BASE-F93 Ask the assistant and read how it writes
-<!-- from WORKBOOK.md sha256:c35b194fa2da -->
+<!-- from WORKBOOK.md sha256:59c89f4cdd0b -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant
@@ -2866,7 +2869,8 @@ Steps:
      does not have to look them up for each question. Every date and time it says is in the business's time, the one the
      screens show, never in UTC: in a bar in Madrid, what happened at 16:18 it tells at 16:18, not at 15:18. Every
      amount it says is in the currency and with the decimals the screens show: what a customer's card says is «€3.60»
-     it tells as €3.60, never as €360.00.
+     it tells as €3.60, never as €360.00. An option of a closed list it says by the name the screens give it in the
+     person's language, never by its code: of a customer just added it says she came "Walk-in", not "walk_in".
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
