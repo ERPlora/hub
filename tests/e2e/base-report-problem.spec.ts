@@ -10,6 +10,7 @@ import { join } from 'node:path';
 
 import { expect, type Page, test } from '@playwright/test';
 
+import { openUserCard } from './access-door';
 import { A, login, MAIL_DIR, OWNER, psql, shot, shown, untilStill } from './helpers';
 
 const VIEWPORTS = [
@@ -20,29 +21,17 @@ const VIEWPORTS = [
   { label: '1440', width: 1440, height: 900 },
 ];
 
-/** The side menu is pinned from 992 px; below it is a drawer behind the bar's menu button. */
-const PINNED_MIN = 992;
-
 /** The Home painted (loaded again unless `reload` is false), then the person at the top of the side menu tapped: its
  *  popover presented. */
-async function openUserMenu(page: Page, width: number, reload = true): Promise<void> {
+async function openUserMenu(page: Page, reload = true): Promise<void> {
   if (reload) await page.goto(`${A}/`);
   await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
-  if (width < PINNED_MIN) {
-    const opened = page.evaluate(() => new Promise<void>((resolve) => document.addEventListener('ionDidOpen', () => resolve(), { once: true })));
-    await shown(page).locator('ion-menu-button').click();
-    await opened;
-  }
-  const presented = page.evaluate(
-    () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
-  );
-  await page.locator('ion-menu [data-testid="user-menu-trigger"] .sidebar-user-name').click();
-  await presented;
+  await openUserCard(page);
 }
 
 /** «Report a problem» of the user menu: the dialog presents itself in the hub, never a tab of erplora.com. */
-async function openReport(page: Page, width: number, reload = true): Promise<void> {
-  await openUserMenu(page, width, reload);
+async function openReport(page: Page, reload = true): Promise<void> {
+  await openUserMenu(page, reload);
   const popups: Page[] = [];
   page.context().on('page', (opened) => popups.push(opened));
   const presented = page.evaluate(
@@ -83,7 +72,7 @@ test('BASE-F108 — «Report a problem» opens in the hub at every size; «Send 
   await login(page, A, '/');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await openReport(page, vp.width);
+    await openReport(page);
     const modal = dialog(page);
     // Named by its title: Ionic moves the name into its own dialog, in its shadow root.
     await expect(page.getByRole('dialog', { name: 'Report a problem' })).toBeVisible();
@@ -118,7 +107,7 @@ test('BASE-F108 — the report reaches erplora.com\'s support «Reply-To» the a
   await page.setViewportSize({ width: 1440, height: 900 });
   const subject = `Printer stops ${Date.now()}`;
   const since = Date.now();
-  await openReport(page, 1440);
+  await openReport(page);
   await fill(page, subject);
   await dialog(page).getByTestId('report-problem-submit').click();
   const sent = dialog(page).getByTestId('report-problem-sent');
@@ -143,7 +132,7 @@ test('BASE-F108 — the report reaches erplora.com\'s support «Reply-To» the a
   );
   await dialog(page).getByTestId('report-problem-done').click();
   await dismissed;
-  await openReport(page, 1440, false);
+  await openReport(page, false);
   await expect(dialog(page).getByTestId('report-problem-subject').locator('input')).toHaveValue('');
   await expect(dialog(page).getByTestId('report-problem-submit')).toHaveAttribute('aria-disabled', 'true');
 });

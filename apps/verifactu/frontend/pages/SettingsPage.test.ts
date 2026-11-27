@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { outOfTheApp } from '../../../../base/frontend/__tests__/app-download';
 import { expectTapOpensInTheSystemBrowser, insideTheInstalledApp } from '../__tests__/system-browser';
 import { CONFIG as STARTING_CONFIG, CONFIG_WITHOUT_ERPLORA_ROUTE, LOADED_CERTIFICATE } from '../__tests__/config-fixture';
-import { click, EMPLOYEE, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
+import { ACCOUNTANT, click, EMPLOYEE, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { ConfigOut, DiagnosticOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
 
@@ -196,8 +196,14 @@ describe('SettingsPage', () => {
     for (const hook of ['test', 'test-invoice']) expect(disabled(s, hook), hook).toBe(false);
   });
 
-  it('the employee only reads', async () => {
+  it('who does not configure VeriFactu tests the connection and nothing else', async () => {
     const s = await setup({}, { session: EMPLOYEE });
+    expect(s.find('verifactu-settings-test').exists()).toBe(true);
+    for (const hook of ['go-live', 'test-invoice']) expect(s.find(`verifactu-settings-${hook}`).exists(), hook).toBe(false);
+  });
+
+  it('who may not send only reads', async () => {
+    const s = await setup({}, { session: ACCOUNTANT });
     for (const hook of ['go-live', 'test', 'test-invoice']) expect(s.find(`verifactu-settings-${hook}`).exists(), hook).toBe(false);
   });
 

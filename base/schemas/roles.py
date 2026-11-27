@@ -6,7 +6,7 @@ from django.utils.translation import gettext_noop
 from ninja import Schema
 from pydantic import Field
 
-from base.schemas.assistant import names
+from base.schemas.assistant import ReadOn, names
 from base.schemas.people import PersonIn
 
 #: What a role does with a permission, as ``base.roles`` keeps it.
@@ -48,6 +48,10 @@ class RoleListOut(Schema):
 
 class RoleIn(Schema):
     role: str = Field(title=gettext_noop("Role"), description=ROLE_SAID, json_schema_extra=NAMED)
+
+
+class RoleDetailIn(RoleIn):
+    offset: ReadOn = 0
 
 
 class RolePermissionOut(Schema):
