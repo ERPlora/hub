@@ -43,6 +43,11 @@ export interface SessionAccess {
   key: string;
 }
 
+/** `base.SessionIdleOut`: after how many idle minutes this device's till locks; null, it does not. */
+export interface SessionIdle {
+  idle_minutes: number | null;
+}
+
 /** `base.SupportVisitOut`: one time a person of ERPlora's support came into the business. */
 export interface SupportVisit {
   person: string;
@@ -64,6 +69,7 @@ declare module '@erplora/ui/sdk' {
   interface Operations {
     'base.access.grantors': { input: NoInput; output: Grantors };
     'base.session.access': { input: NoInput; output: SessionAccess };
+    'base.session.idle': { input: NoInput; output: SessionIdle };
     'base.access.door': { input: NoInput; output: AccessDoor };
     'base.access.faces': { input: NoInput; output: AccessDoor };
     'base.access.settings': { input: NoInput; output: AccessSettings };

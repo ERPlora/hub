@@ -1954,7 +1954,7 @@ If it fails: without a network, the screen does not take the session as ended.
 Involved: BASE-F13, BASE-F70
 
 ### BASE-F59 Close the session of a till nobody touches
-<!-- from WORKBOOK.md sha256:c212f35c2ffd -->
+<!-- from WORKBOOK.md sha256:5172da3679bb -->
 Status: done
 Actor: system
 Screen: Access
@@ -1963,10 +1963,13 @@ Steps:
      15 or 30) and this device is shared.
   2. Nobody touches the screen (no finger, key or wheel) for those minutes.
   3. The session closes and the till goes back to **Access**, to the PIN pad.
-In: the business's minutes, which come with the page itself (there is no separate read that could fail).
+In: the business's minutes, which come with the page itself. If the business changes them while the till is already
+open, or this device stops being shared, the till counts with the new ones from that moment, without reloading: with
+"1 min" it closes a minute later without being touched, and with "Until signing out" it stops closing.
 Out: the session closed in the business. The open check is kept by its app.
 If it fails: with "Until signing out", on a personal device or where no PIN is asked nothing closes; even if the
-screen hangs, a session opened while the business always asks for the PIN lasts no more than 1 hour.
+screen hangs, a session opened while the business always asks for the PIN lasts no more than 1 hour. If the till
+cannot read the new minutes, it keeps the ones it had.
 Involved: BASE-F67
 
 ### BASE-F60 Switch user without losing the sale

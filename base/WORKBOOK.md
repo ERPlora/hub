@@ -1871,10 +1871,13 @@ Pasos:
      10, 15 o 30) y este dispositivo es compartido.
   2. Nadie toca la pantalla (ni dedo, ni tecla, ni rueda) durante esos minutos.
   3. La sesión se cierra y la caja vuelve a **Acceso**, al pinpad.
-Entra: los minutos del negocio, que llegan con la propia página (no hay una lectura aparte que pueda fallar).
+Entra: los minutos del negocio, que llegan con la propia página. Si el negocio los cambia con la caja ya abierta, o
+este dispositivo deja de ser compartido, la caja cuenta con los nuevos desde ese momento, sin recargar: con «1 min»
+se cierra al minuto sin tocarla y con «Hasta cerrar sesión» deja de cerrarse.
 Sale: la sesión cerrada en el negocio. La cuenta abierta la conserva su app.
 Si falla: con «Hasta cerrar sesión», en un dispositivo personal o donde no se pide PIN no se cierra nada; aunque
-la pantalla se quede colgada, una sesión abierta mientras el negocio pide siempre el PIN no dura más de 1 hora.
+la pantalla se quede colgada, una sesión abierta mientras el negocio pide siempre el PIN no dura más de 1 hora. Si
+la caja no consigue leer los minutos nuevos, sigue con los que tenía.
 Implicados: BASE-F67
 
 ### BASE-F60 Cambiar de usuario sin perder la venta
