@@ -16,6 +16,7 @@ from live.operations import operation
 
 from apps.demo.models import Item, ItemLine
 from apps.demo.schemas import ItemCountOut, ItemDetailOut, ItemListIn, ItemPage, ItemRefIn, ItemStatsIn, ItemStatsOut
+from base.text_search import contains_text
 
 ITEM_NOT_FOUND = _("This item no longer exists.")
 NO_ITEM_CALLED = _("No item is called “%(said)s”.")
@@ -50,7 +51,7 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     """Most recently changed first, ``id`` as the tie-break so that pages never overlap."""
     items = Item.objects.all()
     if params.search:
-        items = items.filter(name__icontains=params.search)
+        items = items.filter(contains_text(params.search, "name"))
     if params.status:
         items = items.filter(status=params.status)
     rows = items.annotate(line_count=Count("lines")).order_by("-updated_at", "id")
@@ -151,7 +152,7 @@ def find_item(ref: ItemRefIn, *, lock: bool = False, rows: QuerySet[Item] | None
     if item_id is None:
         said = ref.called
         named = Item.objects.order_by("-updated_at", "id")
-        for fitting in (named.filter(name__iexact=said), named.filter(name__icontains=said)):
+        for fitting in (named.filter(name__iexact=said), named.filter(contains_text(said, "name"))):
             candidates = list(fitting[:MAX_CANDIDATES])
             if len(candidates) > 1:
                 names = ", ".join(candidate.name for candidate in candidates)
