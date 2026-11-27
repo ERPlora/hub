@@ -1,9 +1,10 @@
-"""The CSV of the working days (attendance.record.export): its header and lines, formulas defused, an employee's own
-days only, and its file name after the dates."""
+"""The CSV of the working days (attendance.record.export): its header and lines in the language of whoever exports,
+formulas defused, an employee's own days only, and its file name after the dates."""
 
 import csv
 import datetime as dt
 import io
+from dataclasses import replace
 
 import pytest
 from live.errors import PermissionDenied
@@ -52,7 +53,8 @@ def test_the_csv_header_and_its_lines(person, clock):
         3,
     )
     assert export.csv.split("\r\n")[0] == (
-        "date,user,clock_in,clock_out,break_minutes,worked_minutes,status,within_radius_in,within_radius_out"
+        "Date,Person,Clock-in,Clock-out,Break minutes,Worked minutes,Status,Clock-in within radius,"
+        "Clock-out within radius"
     )
     assert export.csv.endswith("\r\n")
     assert rows_of(export)[1:] == [
@@ -63,7 +65,7 @@ def test_the_csv_header_and_its_lines(person, clock):
             "",
             "0",
             "",
-            "needs_review",
+            "Needs review",
             "",
             "",
         ],
@@ -74,9 +76,9 @@ def test_the_csv_header_and_its_lines(person, clock):
             "2026-10-05 17:05",
             "30",
             "452",
-            "closed",
-            "1",
-            "0",
+            "Closed",
+            "Yes",
+            "No",
         ],
         # Open: worked until the export instant, the running break taken off.
         [
@@ -86,10 +88,40 @@ def test_the_csv_header_and_its_lines(person, clock):
             "",
             "30",
             "120",
-            "open",
+            "Open",
             "",
             "",
         ],
+    ]
+
+
+def test_the_csv_speaks_the_language_of_whoever_exports(person, clock):
+    """The accountant reads the header, the status and the radius in the words of the person who exported it."""
+    clock(NOW)
+    ana, _ = person()
+    bea, _ = person("Bea", "Ruiz")
+    day(ana, "2026-10-04T08:00", status="needs_review")
+    day(ana, "2026-10-05T07:00", "2026-10-05T15:00", in_within_radius=True, out_within_radius=False)
+    day(bea, "2026-10-06T08:00", in_within_radius=False)
+    in_spanish = replace(ctx_for("hub_manager"), language="es")
+
+    rows = rows_of(run("attendance.record.export", {"sort": "clock_in_at"}, in_spanish))
+
+    assert rows[0] == [
+        "Fecha",
+        "Persona",
+        "Entrada",
+        "Salida",
+        "Minutos de pausa",
+        "Minutos trabajados",
+        "Estado",
+        "Entrada dentro del radio",
+        "Salida dentro del radio",
+    ]
+    assert [row[6:] for row in rows[1:]] == [
+        ["Por revisar", "", ""],
+        ["Cerrada", "Sí", "No"],
+        ["Abierta", "No", ""],
     ]
 
 
@@ -150,4 +182,4 @@ def test_the_csv_writes_a_forgotten_day_as_needs_review_without_worked_time(pers
     ana, _ = person()
     day(ana, "2026-10-05T07:00")
     line = rows_of(run("attendance.record.export", {}, ctx_for("hub_manager")))[1]
-    assert line[4:7] == ["0", "", "needs_review"]
+    assert line[4:7] == ["0", "", "Needs review"]
