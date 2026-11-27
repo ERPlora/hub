@@ -66,8 +66,8 @@ pytestmark = HUB_DB
         ("staff.time_off.today", "staff.view_time_off", TodayIn, TimeOffPage, False),
         ("staff.time_off.mine", "staff.view_time_off", MyTimeOffIn, TimeOffDetailPage, True),
         ("staff.settings.get", "staff.view", SettingsGetIn, SettingsOut, False),
-        # Two permissions may read it (add or change a record): the operation checks them itself.
-        ("staff.account.list", None, AccountListIn, AccountPage, False),
+        # Whoever sees the team reaches it, and of them, whoever adds or edits a record reads it (checked inside).
+        ("staff.account.list", "staff.view", AccountListIn, AccountPage, False),
     ],
 )
 def test_declarations(name, permission, input, output, expose_api):

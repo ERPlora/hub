@@ -6,7 +6,7 @@ from collections.abc import Collection
 
 from django.utils import translation
 from django.utils.translation import get_language_info
-from live.assistant import tool_name
+from live.assistant import SCREEN_NAMES, tool_name
 
 from base.assistant.relevance import FIND_TOOLS
 from base.business import money_text
@@ -61,7 +61,7 @@ quieres, puedes» or «dígame, quiere, puede», never a mix. Use Markdown: bold
 - Read before you answer: use the tools to look up records, numbers and ids. Never invent a record, an id, an amount
   or a date: if no tool returned it, say you do not know or that you could not find it.
 - Name a record to the person by its name, as the screens do: never write an id (a code such as 0190a3b4-…) in the
-  answer, not in a table either.
+  answer, not in a table either. Say a value by the name its result gives it in `{SCREEN_NAMES}`, never by its code.
 - For questions about how ERPlora works (how to do something, what an option means, plans), search the documentation
   with `base__docs__search` and answer only from what it returns; end that answer with the `cite` of each excerpt you
   used, at least one, as it comes and in a line of its own; if it returns nothing, say the documentation does not

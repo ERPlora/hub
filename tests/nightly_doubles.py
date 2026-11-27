@@ -1,7 +1,7 @@
 """What the tests of scripts/nightly_e2e.py and scripts/nightly_stack.py share: the scripts and their doubles.
 
-Each night runs as launchd or a person runs it, on throwaway clones of a hub and a saas repository (real git), with
-fake uv, pnpm, node, docker, curl, lsof, gh and launchctl first on the PATH that record every call. Nothing real runs:
+Each night runs as GitHub Actions or a person runs it, on throwaway clones of a hub and a saas repository (real git),
+with fake uv, pnpm, node, docker, curl, lsof and gh first on the PATH that record every call. Nothing real runs:
 no server, database or browser. The scripts are loaded from their path, as the Mac runs them outside Django.
 """
 
@@ -154,10 +154,6 @@ if [ -n "${FAKE_GONE_LISTENER:-}" ] && [ -f "$FAKE_GONE_LISTENER" ]; then
 fi
 exit 1
 """
-FAKE_LAUNCHCTL = r"""#!/usr/bin/env bash
-echo "launchctl $*" >> "$FAKE_CALLS"
-exit "${FAKE_LAUNCHCTL_EXIT:-0}"
-"""
 # gh: records its calls, the repository it writes to and the bodies it is given, answers OPEN_ISSUES to
 # `issue list` and exits with FAKE_GH_EXIT.
 FAKE_GH = r"""#!/usr/bin/env bash
@@ -186,7 +182,7 @@ sleep 0.5
 exec "$REAL_TEE" "$@"
 """
 FAKES = {"git": FAKE_GIT, "tee": FAKE_TEE, "uv": FAKE_UV, "pnpm": FAKE_PNPM, "node": FAKE_NODE, "docker": FAKE_DOCKER, "curl": FAKE_CURL,
-         "lsof": FAKE_LSOF, "launchctl": FAKE_LAUNCHCTL, "gh": FAKE_GH}
+         "lsof": FAKE_LSOF, "gh": FAKE_GH}
 
 RED_REPORT = {
     "suites": [{"title": "sale-sales.spec.ts", "file": "sale-sales.spec.ts", "line": 0, "specs": [
@@ -260,7 +256,7 @@ class World:
         env = {name: value for name, value in os.environ.items()
                if name != "GITHUB_ACTIONS" and not name.startswith(("NIGHTLY_", "FAKE_"))}
         env.update(PATH=f"{self.root / 'bin'}:{os.environ['PATH']}", HOME=str(self.home), HUB_REPO=str(self.hub),
-                   ERPLORA_ROOT=str(self.erplora), GH_REPO="ERPlora/hub", NIGHTLY_START_SECONDS="5",
+                   ERPLORA_ROOT=str(self.erplora), NIGHTLY_START_SECONDS="5",
                    FAKE_E2E_EXIT="1", FAKE_RESULTS=str(self.root / "red.json"), FAKE_CALLS=str(self.logs["calls"]),
                    FAKE_PIDS=str(self.logs["pids"]), CALLS_LOG=str(self.logs["gh"]),
                    BODIES_LOG=str(self.logs["bodies"]), REAL_GIT=shutil.which("git"),
@@ -319,6 +315,10 @@ class World:
 
     def night_logs(self) -> list[Path]:
         return sorted(self.nightly.glob("runs/*/night.log"))
+
+    def log(self) -> str:
+        """The log of the night just run, with the report of what came out red."""
+        return self.night_logs()[-1].read_text()
 
     def stop(self) -> None:
         for pid in self.every_pid + self.pids():

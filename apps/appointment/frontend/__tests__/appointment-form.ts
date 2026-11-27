@@ -2,7 +2,7 @@ import { Combo, DateField, TimeField } from '@erplora/ui/components';
 
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import type { AppointmentOut } from '../operations';
-import { business, mountAppointment, page, settle } from './mount-appointment';
+import { business, click, ionValue, mountAppointment, page, settle } from './mount-appointment';
 import AppointmentFormModal from '../components/AppointmentFormModal.vue';
 
 export type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean; readonly?: boolean };
@@ -54,6 +54,28 @@ export const READS: Record<string, [number, unknown]> = {
   '/api/service/assignments/eligible': [200, page([])],
 };
 
+type Mounted = Awaited<ReturnType<typeof mountAppointment>>;
+
+/** The length the panel holds and «Other», and its folded parts. */
+function lengthAndFolds(m: Mounted, field: (name: string) => Control) {
+  /** Its pressed button, or what «Other» has typed. */
+  function held(): string {
+    const pressed = m.wrapper.find('[data-testid=appointment-form-duration] [aria-pressed=true]');
+    if (!pressed.exists()) return '';
+    return pressed.attributes('data-testid') === 'appointment-form-duration-other' ? String(field('minutes').value ?? '') : pressed.text();
+  }
+  /** «Other» and the minutes typed in its field. */
+  async function typeMinutes(value: string) {
+    await click(m.inDoc('appointment-form-duration-other'));
+    await ionValue(field('minutes'), value, 'ionInput');
+  }
+  /** Unfolds a folded part of the panel (`notes`, `internal_notes`, `history`). */
+  async function unfold(name: string) {
+    await click(m.inDoc(`appointment-form-${name}-fold-toggle`));
+  }
+  return { held, typeMinutes, unfold };
+}
+
 export async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountAppointment(AppointmentFormModal, {
     props: { open: false, appointment: null, businessNow: '2026-10-14T12:00', ...props },
@@ -95,7 +117,7 @@ export async function setup(props: Record<string, unknown> = {}, locale: 'en' | 
     await m.live();
     await m.result('base.business.get', business(fields));
   }
-  return { ...m, field, submit, servicePicker, staffPicker, addService, pickStaff, kept, pick, pickCustomer, businessIn };
+  return { ...m, field, submit, servicePicker, staffPicker, addService, pickStaff, kept, pick, pickCustomer, businessIn, ...lengthAndFolds(m, field) };
 }
 
 /** The services, the professional, the day and the time of a new appointment; the customer is chosen apart. */

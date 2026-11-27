@@ -10,7 +10,7 @@ from live.context import OperationContext
 from live.errors import OperationError
 
 from base import images
-from base.blueprint.calls import ROW_REFUSED, Loaded, _call, _reason
+from base.blueprint.calls import ROW_REFUSED, Loaded, call, reason
 
 PHOTO_MISSING = _("«%(row)s»: its photo is not in the file, so it loads without it.")
 
@@ -49,10 +49,10 @@ def _load_image(ctx: OperationContext, loaded: Loaded, dataset_key: str, pk: str
     name = images.own_name(image)
     try:
         if name is None:
-            _call(ctx, set_image, id=pk, image=image)
+            call(ctx, set_image, id=pk, image=image)
         elif name not in loaded.media:
             loaded.warn(str(PHOTO_MISSING) % {"row": label})
         else:
-            _call(ctx, upload_image, id=pk, data_base64=base64.b64encode(loaded.media[name]).decode("ascii"))
+            call(ctx, upload_image, id=pk, data_base64=base64.b64encode(loaded.media[name]).decode("ascii"))
     except (OperationError, pydantic.ValidationError) as exc:
-        loaded.warn(str(ROW_REFUSED) % {"row": label, "reason": _reason(exc)})
+        loaded.warn(str(ROW_REFUSED) % {"row": label, "reason": reason(exc)})
