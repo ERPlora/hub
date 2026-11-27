@@ -5,6 +5,7 @@
 // missing» (the business territory's tax: «IGIC missing», «IPSI missing»), looks blocked and still takes the tap (never the native `disabled`), as a product's tile.
 import { computed } from 'vue';
 
+import { useServicePrice } from '../../../../service/frontend/composables/useServicePrice';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
@@ -18,14 +19,11 @@ const t = useT();
 const locale = useLocale();
 const business = useBusinessMoney();
 const taxName = useTaxName();
+const servicePrice = useServicePrice();
 
 const blocked = computed(() => props.service.needs_tax_setup);
 const label = computed(() => (blocked.value ? `${props.service.name} · ${t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value })}` : undefined));
-const price = computed(() => {
-  const money = formatMoney(props.service.price, locale.value, business.value);
-  const type = props.service.pricing_type;
-  return type === 'fixed' ? money : t(`sale.pos.servicePrice.${type}`, { price: money });
-});
+const price = computed(() => servicePrice(formatMoney(props.service.price, locale.value, business.value), props.service.pricing_type));
 </script>
 
 <template>

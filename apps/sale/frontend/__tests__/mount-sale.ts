@@ -13,6 +13,8 @@ import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/sav
 import { HUB_ASSISTANT } from '../../../../base/frontend/lib/assistant-hub';
 import type { Business } from '../../../../base/frontend/operations/business';
 import type { SessionMeOut } from '../../../../frontend/sdk-types';
+import serviceEn from '../../../service/frontend/locale/en.json';
+import serviceEs from '../../../service/frontend/locale/es.json';
 import taxEn from '../../../tax/frontend/locale/en.json';
 import taxEs from '../../../tax/frontend/locale/es.json';
 import type { TaxSettingsOut, TerritoryTaxKind } from '../../../tax/frontend/operations';
@@ -84,7 +86,7 @@ export async function mountSale(component: Component, options: MountOptions = {}
   const mounted = await mountInShell(
     component,
     { ...options, business: undefined, api },
-    { path: '/sale/pos', session: MANAGER, messages: overBase({ ...taxEn, ...en }, { ...taxEs, ...es }), inDocFrom: 'component' },
+    { path: '/sale/pos', session: MANAGER, messages: overBase({ ...taxEn, ...serviceEn, ...en }, { ...taxEs, ...serviceEs, ...es }), inDocFrom: 'component' },
   );
 
   /** The business answers once a piece follows it (on opening the stream, or on reopening it when a piece of the

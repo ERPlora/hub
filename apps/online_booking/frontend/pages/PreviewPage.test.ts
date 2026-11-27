@@ -30,9 +30,17 @@ const PAGE: PageOut = {
 const ANA = { id: 'm1', name: 'Ana López' };
 const BEA = { id: 'm2', name: 'Bea Ruiz' };
 const SERVICES: PublicServiceOut[] = [
-  { id: 'v1', name: 'Haircut', description: '', category: 'Hair', price: 2000, duration_minutes: 30, professionals: [ANA, BEA] },
-  { id: 'v2', name: 'Colour', description: '', category: 'Hair', price: null, duration_minutes: null, professionals: [BEA] },
+  { id: 'v1', name: 'Haircut', description: '', category: 'Hair', price: 2000, pricing_type: 'fixed', duration_minutes: 30, professionals: [ANA, BEA] },
+  { id: 'v2', name: 'Colour', description: '', category: 'Hair', price: null, pricing_type: null, duration_minutes: null, professionals: [BEA] },
 ];
+/** One service of each pricing that is not a fixed price, all of 65.00 and two hours. */
+const PRICED: PublicServiceOut[] = (['from', 'hourly', 'variable', 'free'] as const).map((pricing_type) => ({
+  ...SERVICES[0],
+  id: pricing_type,
+  price: pricing_type === 'free' ? 0 : 6500,
+  pricing_type,
+  duration_minutes: 120,
+}));
 const SLOTS: PublicSlotsOut = {
   date: '2030-03-05',
   timezone: 'Europe/Madrid',
@@ -131,6 +139,25 @@ describe('PreviewPage', () => {
     await s.businessIn(POLISH);
     expect(s.el('service-v1')?.textContent).toContain('20,00\u00a0zł · 30 min');
     expect(s.find('ob-preview').text()).not.toContain('€');
+  });
+
+  it('a service not at a fixed price says how it is priced, as the till does, in both languages (hub#2626)', async () => {
+    const priced = { ...ROUTES, '/api/online_booking/public/services': [200, page(PRICED, 4, 100)] } as typeof ROUTES;
+    const es = await setup({ locale: 'es' }, priced);
+    await es.businessIn();
+    const spanish = (id: string) => es.el(`service-${id}`)?.textContent?.replace(/\u00a0/g, ' ');
+    expect(spanish('from')).toContain('Desde 65,00 € · 120 min');
+    expect(spanish('hourly')).toContain('65,00 € / hora · 120 min');
+    expect(spanish('variable')).toContain('Variable · 65,00 € · 120 min');
+    expect(spanish('free')).toContain('Gratis · 120 min');
+    es.wrapper.unmount();
+
+    const en = await setup({}, priced);
+    await en.businessIn();
+    expect(en.el('service-from')?.textContent).toContain('From €65.00 · 120 min');
+    expect(en.el('service-hourly')?.textContent).toContain('€65.00 / hour · 120 min');
+    expect(en.el('service-variable')?.textContent).toContain('Variable · €65.00 · 120 min');
+    expect(en.el('service-free')?.textContent).toContain('Free · 120 min');
   });
 
   it('opens with the page’s texts and the services booked online', async () => {

@@ -188,12 +188,6 @@
       "removeLine": "Take this line off",
       "services": "Services",
       "serviceMinutes": "{minutes} min",
-      "servicePrice": {
-        "hourly": "{price} / hour",
-        "from": "From {price}",
-        "variable": "Variable · {price}",
-        "free": "Free"
-      },
       "noServices": "No services.",
       "searchFoundNothing": "No product or service matches your search.",
       "servicesLoadFailed": "The services could not be loaded.",

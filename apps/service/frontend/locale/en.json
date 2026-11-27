@@ -27,6 +27,12 @@
       "variable": "Variable",
       "free": "Free"
     },
+    "price": {
+      "hourly": "{price} / hour",
+      "from": "From {price}",
+      "variable": "Variable · {price}",
+      "free": "Free"
+    },
     "counts": {
       "sessions": "{count} session | {count} sessions",
       "days": "{count} day | {count} days"

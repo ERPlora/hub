@@ -35,7 +35,7 @@ const PAGE: PageOut = {
 };
 const ANA = { id: 'm1', name: 'Ana López' };
 const SERVICES: PublicServiceOut[] = [
-  { id: 'v1', name: 'Haircut', description: '', category: 'Hair', price: 2000, duration_minutes: 30, professionals: [ANA] },
+  { id: 'v1', name: 'Haircut', description: '', category: 'Hair', price: 2000, pricing_type: 'fixed', duration_minutes: 30, professionals: [ANA] },
 ];
 const SLOTS: PublicSlotsOut = {
   date: '2030-03-05',

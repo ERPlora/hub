@@ -188,12 +188,6 @@
       "removeLine": "Quitar esta línea",
       "services": "Servicios",
       "serviceMinutes": "{minutes} min",
-      "servicePrice": {
-        "hourly": "{price} / hora",
-        "from": "Desde {price}",
-        "variable": "Variable · {price}",
-        "free": "Gratis"
-      },
       "noServices": "Sin servicios.",
       "searchFoundNothing": "Ningún producto ni servicio coincide con la búsqueda.",
       "servicesLoadFailed": "No se han podido cargar los servicios.",
