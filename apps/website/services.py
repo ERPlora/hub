@@ -20,7 +20,6 @@ it rather than failing on the duplicate.
 """
 
 import uuid
-from collections.abc import Iterator
 from functools import partial
 from typing import Any
 
@@ -35,12 +34,11 @@ from apps.website import events, reviews
 from apps.website.choices import SECTION_LABELS
 from apps.website.models import ACTOR_MAX_LENGTH, Image, Site
 from apps.website.queries.catalog import read_catalog
-from apps.website.queries.editor import IMAGE_NOT_FOUND, current_site, draft, site_out
+from apps.website.queries.editor import IMAGE_NOT_FOUND, current_site, draft, image_refs, kept, site_out
 from apps.website.queries.public import forget_cached
 from apps.website.schemas import (
     Content,
     ImageOut,
-    ImageRef,
     NoIn,
     PublicationOut,
     SaveIn,
@@ -50,10 +48,6 @@ from apps.website.storage import FOLDER, image_url
 from base import public_images
 from base.operations import business_currency, hub_id
 from base.schemas.public_images import ImageUploadIn
-
-#: The parts of the content that hold one image (the gallery holds a list of them).
-IMAGE_FIELDS = (("topbar", "logo"), ("hero", "cover"), ("about", "image"))
-
 
 def _actor(ctx: OperationContext) -> str:
     return str(ctx.actor)[:ACTOR_MAX_LENGTH] if ctx.actor is not None else ""
@@ -68,19 +62,9 @@ def _locked_site() -> tuple[Site, bool]:
     return Site.objects.select_for_update().get(), created
 
 
-def _image_refs(content: Content) -> Iterator[tuple[str, ImageRef]]:
-    """Each image the content names, with the path of its field (the 422's key)."""
-    for section, field in IMAGE_FIELDS:
-        ref = getattr(getattr(content, section), field)
-        if ref is not None:
-            yield f"content.{section}.{field}", ref
-    for index, ref in enumerate(content.gallery.images):
-        yield f"content.gallery.images.{index}", ref
-
-
 def _with_image_urls(hub: uuid.UUID, content: Content) -> Content:
     """``content`` with each image's URL written from its upload; 422 for an image that is no upload of the business."""
-    refs = list(_image_refs(content))
+    refs = list(image_refs(content))
     keys = dict(Image.objects.filter(id__in={ref.id for _path, ref in refs}).values_list("id", "key"))
     refused: dict[str, str] = {}
     for path, ref in refs:
@@ -104,7 +88,8 @@ NO_CHANGES = pgettext_lazy("assistant card", "No changes")
 
 def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
     before = draft(current_site())
-    sent = SaveIn.model_validate(arguments).model_dump(mode="json")
+    data = SaveIn.model_validate(arguments)
+    sent = {**data.model_dump(mode="json"), "content": kept(data.content)}
     by_name = {field["name"]: field for field in fields}
     parts = []
     if before["template"] != sent["template"]:
@@ -116,10 +101,22 @@ def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) ->
             values.append(str(CUSTOM_COLOURS))
         values.append(theme["mode"])
         parts.append(str(THEME_CHANGED) % {"theme": " · ".join(values)})
-    changed = []
+    parts.extend(_content_parts(before["content"], sent["content"]))
+    return [
+        {
+            "name": "summary",
+            "label": str(SUMMARY),
+            "kind": "text",
+            "value": " · ".join(parts) if parts else str(NO_CHANGES),
+        }
+    ]
+
+
+def _content_parts(before: dict, sent: dict) -> list[str]:
+    """What the card says of the content: each section hidden or shown again, then those whose content changes."""
+    parts, changed = [], []
     for name in Content.model_fields:
-        previous_section = before["content"][name]
-        sent_section = sent["content"][name]
+        previous_section, sent_section = before[name], sent[name]
         if previous_section == sent_section:
             continue
         label = str(SECTION_LABELS[name])
@@ -132,14 +129,7 @@ def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) ->
             changed.append(label)
     if changed:
         parts.append(str(CONTENT_CHANGED) % {"sections": ", ".join(changed)})
-    return [
-        {
-            "name": "summary",
-            "label": str(SUMMARY),
-            "kind": "text",
-            "value": " · ".join(parts) if parts else str(NO_CHANGES),
-        }
-    ]
+    return parts
 
 
 @operation(
@@ -182,7 +172,7 @@ def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) ->
 def save_site(ctx: OperationContext, data: SaveIn) -> dict:
     site, created = _locked_site()
     content = _with_image_urls(hub_id(ctx.scope), data.content)
-    new = {"template": data.template, "theme": data.theme.model_dump(), "content": content.model_dump(mode="json")}
+    new = {"template": data.template, "theme": data.theme.model_dump(), "content": kept(content)}
     place = reviews_place(new["content"])
     if place is not None and place != reviews_place(site.content or {}):
         on_commit(partial(refresh_reviews, ctx.scope, new["content"]), robust=True)
@@ -227,7 +217,7 @@ def publish_site(ctx: OperationContext, data: NoIn) -> dict:
     previous = site.published_version
     site.published_content = {
         **now,
-        "content": content.model_dump(mode="json"),
+        "content": kept(content),
         "catalog": read_catalog(ctx, content.catalog),
     }
     site.published_version = previous + 1

@@ -13,7 +13,8 @@ import pytest
 from django.conf import settings
 from live.operations import AI, registry
 
-from apps.website.tests.conftest import HUB_DB
+from apps.website.tests.conftest import HUB_DB, full_content
+from apps.website.tests.test_services import png_bytes, run, save, upload
 from base.models import Membership
 from base.tests.test_assistant_asks import assert_offered_or_found, comparable
 
@@ -101,3 +102,36 @@ SEARCHED = {"website.site.save": "cambiar el título de la web"}
 @pytest.mark.parametrize(("name", "phrase"), REPORTED)
 def test_the_reported_website_request_is_offered_its_tool_without_being_its_asks(catalog_of, name, phrase):
     assert_offered_or_found(catalog_of(Membership.Role.OWNER, "es"), name, phrase, SEARCHED.get(name))
+
+
+#: What the owner asks of a gallery of photos uploaded on the screen: the first, word for word what hub#2734's QA said,
+#: when the model read the page, saw each photo only by its id and its address, and answered that it could not tell
+#: which one was the beer.
+GALLERY_REQUESTS = [
+    "En la galería de la web, pon la foto de la caña la primera.",
+    "Quita la foto de la terraza de la galería de la web.",
+]
+#: The searches the model makes for them: the save, when the turn does not offer it, and the read the save's
+#: description sends it to first.
+GALLERY_SEARCHED = {"website.site.save": "galería de la web", "website.site.get": "leer la página web"}
+#: The files the QA's photos were uploaded with, in the gallery's order.
+GALLERY_FILES = ["croquetas_jamon.jpg", "cafe_cortado.jpg", "cerveza_cana.jpg"]
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("phrase", GALLERY_REQUESTS)
+def test_a_request_about_a_gallery_photo_brings_the_read_and_the_save(catalog_of, phrase):
+    tools = catalog_of(Membership.Role.OWNER, "es")
+    for name, task in GALLERY_SEARCHED.items():
+        assert_offered_or_found(tools, name, phrase, task)
+
+
+@HUB_DB
+def test_a_gallery_photo_said_by_what_it_shows_is_found_by_the_name_of_its_file(hub_files):
+    """The read names each photo by the file it was uploaded with: «la de la caña» is the one whose file says so, and
+    the model sends the gallery back in the order asked."""
+    photos = [upload(png_bytes(colour=(shade, 30, 30)), filename=name) for shade, name in enumerate(GALLERY_FILES)]
+    save(full_content(gallery={"images": [{"id": str(photo.id), "url": photo.url} for photo in photos]}))
+    read = run("website.site.get").model_dump(mode="json")["content"]["gallery"]["images"]
+    assert [photo.get("name") for photo in read] == GALLERY_FILES
+    assert [photo["id"] for photo in read if "cana" in photo.get("name", "")] == [str(photos[2].id)]

@@ -161,6 +161,28 @@ def test_a_gallery_image_that_is_no_upload_of_this_hub_is_refused_at_its_place(h
     assert not Site.objects.exists()
 
 
+
+def test_the_names_of_the_images_are_written_on_every_read_and_never_kept(hub_files):
+    """What the assistant sends back names each image; the server answers the name of its file and keeps none, so what
+    is kept and published stays as it always was and a published draft has no changes."""
+    photo = upload(png_bytes(), filename="terraza.png")
+    kept = [{"id": str(photo.id), "url": photo.url}]
+    out = save(full_content(gallery={"images": [{**kept[0], "name": "otra.png"}]}))
+    assert [image.name for image in out.content.gallery.images] == ["terraza.png"]
+    assert Site.objects.get().content["gallery"]["images"] == kept
+    run("website.site.publish")
+    assert Site.objects.get().published_content["content"]["gallery"]["images"] == kept
+    assert run("website.site.get").has_changes is False
+
+
+def test_saving_the_site_back_as_it_was_read_changes_nothing(hub_files):
+    photo = upload(png_bytes(), filename="terraza.png")
+    save(full_content(hero={"cover": {"id": str(photo.id), "url": photo.url}}))
+    read = run("website.site.get").model_dump(mode="json")
+    assert read["content"]["hero"]["cover"]["name"] == "terraza.png"  # positive control: the names were read
+    save(read["content"], template=read["template"], theme=read["theme"])
+    assert len(events("website.site.updated")) == 1
+
 # Publish
 
 
