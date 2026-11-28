@@ -170,6 +170,9 @@ def test_the_stack_has_the_tools_of_the_hub_pinned_to_a_commit(action):
     uses = {step["uses"].split("@")[0]: step for step in action["runs"]["steps"]
             if "uses" in step and not step["uses"].startswith("./")}
     assert set(uses) == {"astral-sh/setup-uv", "pnpm/action-setup", "actions/setup-node"}
+    assert [step["uses"] for step in action["runs"]["steps"] if step.get("uses", "").startswith("./")] == [
+        POSTGRES_CLIENT
+    ]
     assert all(PINNED.match(step["uses"]) for step in uses.values())
     assert uses["astral-sh/setup-uv"]["with"] == {"enable-cache": True, "cache-dependency-glob": "uv.lock"}
     package = json.loads((REPO / "package.json").read_text())
