@@ -18,6 +18,7 @@ import {
   openTillCart,
   restoreDrawer,
   saleByKey,
+  soldOutNotice,
   stamp,
   TILL_TILE,
   tillGrid,
@@ -88,7 +89,7 @@ test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap add
   // touchscreen would swallow a native `disabled`), so the mouse clicks it as a finger would.
   await soldOut.click({ force: true });
   const notice = shown(page).locator('[data-testid=pos-tap-notice]');
-  await expect(notice).toHaveText(new RegExp(`^«${croquettes.name}» (is sold out|está agotado)\\.$`));
+  await expect(notice).toHaveText(soldOutNotice(croquettes.name));
   await expect(linesOf(page, croquettes)).toHaveCount(0);
 
   // The search finds it and says it is sold out instead of its SKU; picking it adds nothing either.
@@ -102,7 +103,7 @@ test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap add
   await page.screenshot({ path: shot('FIX-SALE-SOLD-OUT-LINE-ACCEPTED-search-1440') });
   await row.click({ force: true });
   await expect(search).toBeHidden();
-  await expect(notice).toHaveText(new RegExp(`^«${croquettes.name}» (is sold out|está agotado)\\.$`));
+  await expect(notice).toHaveText(soldOutNotice(croquettes.name));
   await expect(linesOf(page, croquettes)).toHaveCount(0);
 
   // In each viewport, a till opened there (on a phone the check is the drawer behind the button): the
@@ -112,7 +113,7 @@ test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap add
     await page.goto(`${A}/sale/pos`);
     await tillReady(page);
     await tile(page, croquettes).click({ force: true });
-    await expect(notice).toHaveText(new RegExp(`^«${croquettes.name}» (is sold out|está agotado)\\.$`));
+    await expect(notice).toHaveText(soldOutNotice(croquettes.name));
     await expect(tile(page, croquettes).locator('.pos-tile__badge')).toBeVisible();
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.screenshot({ path: shot(`FIX-SALE-SOLD-OUT-LINE-ACCEPTED-${size.label}`) });
@@ -157,7 +158,7 @@ test('SALE-F07 (hub#442): the sold-out notice goes on its own once the article i
     expect(res.status, `sold_out=${soldOut}`).toBe(200);
   };
   const notice = shown(page).locator('[data-testid=pos-tap-notice]');
-  const said = new RegExp(`^«${bravas.name}» (is sold out|está agotado)\\.$`);
+  const said = soldOutNotice(bravas.name);
   await mark(true);
   await page.goto(`${A}/sale/pos`);
   await tillReady(page);

@@ -1,10 +1,10 @@
 // The business a spec runs on, emptied for it and put back after: what a template brings, the plan in its photo,
-// and who is signed in on it.
+// who is signed in on it and how its screens name a demo account.
 import { spawnSync } from 'node:child_process';
 
 import { type BrowserContext, expect } from '@playwright/test';
 
-import { A, api, HUB_DIR, psql } from './helpers';
+import { A, api, type Credentials, HUB_DIR, psql } from './helpers';
 
 /** Every row a template brings, through the server's own list of what travels (`base.blueprint.datasets`): each
  * dataset of an app that is on, last one loaded first (tables before their zones, a modifier group before the
@@ -61,6 +61,12 @@ export async function usernameOf(context: BrowserContext): Promise<string> {
   expect(id, 'the person signed in').not.toBe('');
   // `/api/me` names the person of the business's database (base.HubUser), whose username is the session's.
   return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
+}
+
+/** How the business's screens name a demo account of erplora.com («Who», the Hub user picker): the demo accounts
+ * have no name, so by what goes before the «@» of their email, never by the address. */
+export function nameOf(account: Credentials): string {
+  return account.email.split('@')[0];
 }
 
 /** Takes the plan out of `a`'s photo while a spec runs, keeping the photo in its scratch table `backup` (next to the

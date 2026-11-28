@@ -9,7 +9,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown, THREE_SIZES as VIEWPORTS } from './helpers';
 import { pickDay, pickTime } from './date-time-fields';
-import { pickMember, staffCleanUp } from './staff-helpers';
+import { pickAccount, pickMember, staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
@@ -152,9 +152,8 @@ test('STAFF-F03: «Hub user» links the record to an account of the business, se
       await expect(none).toHaveCount(0);
       await expect(page.locator('ion-modal[data-testid=staff-member-form]')).toBeVisible();
     }
-    await pickMember(page, 'staff-member-form-user_id', 'employee', 'employee@example.com');
+    await pickAccount(page, 'staff-member-form-user_id', EMPLOYEE);
     const picked = page.locator('[data-testid=staff-member-form-user_id]');
-    await expect(picked.locator('input')).toHaveValue('employee@example.com');
     await threeShots(page, 'STAFF-F03', () => picked, 'CLOSE-STAFF-member-form');
     await page.locator('[data-testid=staff-member-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-member-form]')).toBeHidden();

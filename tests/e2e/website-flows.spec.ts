@@ -213,7 +213,7 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async ({ browser }) => {
   // Places is paid: this spec must run where the Hub cannot ask Google at all.
   const env = join(HUB_DIR, '.env');
-  const configured = existsSync(env) && /^\s*GOOGLE_PLACES_API_KEY\s*=\s*\S/m.test(readFileSync(env, 'utf8'));
+  const configured = existsSync(env) && /^[ \t]*GOOGLE_PLACES_API_KEY[ \t]*=[ \t]*\S/m.test(readFileSync(env, 'utf8'));
   if (configured || process.env.GOOGLE_PLACES_API_KEY) {
     throw new Error('website-flows.spec.ts never asks Google: run it on a stack without GOOGLE_PLACES_API_KEY.');
   }

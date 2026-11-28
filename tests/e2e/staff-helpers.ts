@@ -1,8 +1,9 @@
-// What the e2e of Staff share: how a spec picks a member in a staff `Combo`, the staff record of an account, and how
-// it takes away the people, schedules, time off and roles it made.
+// What the e2e of Staff share: how a spec picks a member or an account in a staff `Combo`, the staff record of an
+// account, and how it takes away the people, schedules, time off and roles it made.
 import { type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { A, api, hubUserIdOf, psql } from './helpers';
+import { nameOf } from './business';
+import { A, api, type Credentials, hubUserIdOf, psql } from './helpers';
 
 /**
  * The staff record linked to the account `email`, made as `firstName` if it has none: one live record per account, so
@@ -27,6 +28,13 @@ export async function pickMember(page: Page, field: string, text: string, name: 
   await page.locator(`[data-testid^=${field}-option-]`, { hasText: name }).first().click();
   // Choosing closes the list: nothing of it is left over the next field.
   await expect(page.locator(`[data-testid^=${field}-option-]`)).toHaveCount(0);
+}
+
+/** Picks `account` in a Hub user `Combo`, searched and chosen by the name the business's screens give it (`nameOf`),
+ * which the field then reads. */
+export async function pickAccount(page: Page, field: string, account: Credentials): Promise<void> {
+  await pickMember(page, field, nameOf(account), nameOf(account));
+  await expect(page.locator(`[data-testid=${field}] input`)).toHaveValue(nameOf(account));
 }
 
 /** Deletes the people whose first name starts with `tag` (with their schedules and time off) and the roles named so. */

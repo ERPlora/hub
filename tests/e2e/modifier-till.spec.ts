@@ -195,7 +195,7 @@ test('MODIFIER-F06: the till asks the groups of the burger and of its category, 
   await sheet.locator(`[data-testid=pos-option-${ids.cheese}]`).click();
   await expect(sheet.locator(`[data-testid=pos-option-count-${ids.cheese}]`)).toContainText('2');
   await sheet.locator(`[data-testid=pos-option-${ids.onion}]`).click();
-  await expect(sheet.locator(`[data-testid=pos-options-group-${groups.extras}]`)).toContainText(`«${named('Extras')}» is full`);
+  await expect(sheet.locator(`[data-testid=pos-options-group-${groups.extras}]`)).toContainText(`“${named('Extras')}” is full`);
   await expect(add).toContainText(/10[.,]00/);
   // The chosen cheese, with its «× 2» and its «−», keeps its name on one line in every size (hub#143).
   const cheeseName = sheet.locator(`[data-testid=pos-option-name-${ids.cheese}]`);
