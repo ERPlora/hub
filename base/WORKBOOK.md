@@ -2002,20 +2002,23 @@ Pasos:
      defecto 100%) se guardan al elegir y se aplican al momento en cualquier dispositivo; «Usar la apariencia del
      negocio» deshace lo propio y devuelve el tamaño a 100%. El idioma pasa a toda la aplicación abierta, también a
      los textos que manda el servidor (el menú lateral, «Mis apps», el checklist, los paneles de Inicio y la campana),
-     sin recargar ni volver a Inicio.
+     sin recargar ni volver a Inicio, y lo mismo en sus otros dispositivos con la sesión abierta, al momento y al
+     recargar, aunque allí se eligiera otro idioma la última vez. Con «Usar el idioma del negocio», el dispositivo donde
+     lo elige pasa al del negocio; en los demás manda el idioma con el que se entró en ellos o el último que se eligió
+     allí.
   5. Si se lo pide al asistente («ponme el idioma en inglés»), la tarjeta dice solo lo que ha pedido, con el nombre de
      su dato («Idioma: English», «Tamaño de la interfaz: 110%»; lo que vuelve a ser del negocio, por su nombre: «El
      idioma del negocio»). Al confirmarla cambia solo eso, y el tema, la
      paleta y el tamaño que no nombra siguen como estaban. El idioma nuevo se aplica igual que desde el selector: la
-     aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla en este dispositivo. Con la
-     apariencia («ponme el modo oscuro»), igual: la aplicación abierta pasa al tema, la paleta o el tamaño nuevos sin
-     recargar.
+     aplicación abierta pasa a él sin recargar, y sigue en él al recargar o volver a abrirla, también en sus otros
+     dispositivos. Con la apariencia («ponme el modo oscuro»), igual: la aplicación abierta pasa al tema, la paleta o el
+     tamaño nuevos sin recargar.
 Entra: el perfil de quien tiene la sesión.
 Sale: su nombre en este negocio (el que sale en el menú lateral, en las caras y en «Dispositivos»; sin él, el menú
 lateral y las caras dicen el de su ficha de Personal vinculada, STAFF-F03), su foto, su idioma
 y su apariencia, incluido el tamaño de interfaz, que le siguen en cualquier dispositivo en el que entre, con su PIN,
-su placa o su cuenta. Con «Usar el idioma del negocio», entra con PIN en el del negocio y con su cuenta en el de su
-cuenta de erplora.com (BASE-F51). El correo es solo de contacto: no cambia la cuenta de erplora.com.
+su placa o su cuenta, o en el que ya tenga la sesión abierta. Con «Usar el idioma del negocio», entra con PIN en el
+del negocio y con su cuenta en el de su cuenta de erplora.com (BASE-F51). El correo es solo de contacto: no cambia la cuenta de erplora.com.
 Si falla: si el perfil no se pudo leer, «No se pudo cargar el perfil» — «Tus datos siguen igual. Comprueba la
 conexión y vuelve a intentarlo.» con «Reintentar». Al guardar: «No se pudo guardar el perfil»; foto rechazada:
 «No se pudo guardar la foto. Usa JPG, PNG o WebP de hasta 2 MB.»; preferencias: «No se pudieron guardar tus

@@ -2081,7 +2081,7 @@ itself as soon as the freeze is lifted and it is done.
 Involved: none
 
 ### BASE-F64 Change my details, photo, language and appearance
-<!-- from WORKBOOK.md sha256:e2999f5c0cdc -->
+<!-- from WORKBOOK.md sha256:a3ccb18723e0 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: My profile
@@ -2099,19 +2099,22 @@ Steps:
      100%) are saved on choosing and applied at once on any device; "Use the business’s appearance" undoes their own
      and returns the size to 100%. The language reaches the whole open application, also the texts the server sends
      (the side menu, "My apps", the checklist, the Home's panels and the bell), without reloading or going back to
-     Home.
+     Home, and the same on their other devices with the session open, at once and on reloading, even if another
+     language was chosen there the last time. With "Use the business’s language", the device where they choose it
+     switches to the business's; on the others it is the language they were entered with or the last one chosen
+     there.
   5. If they ask the assistant for it ("switch me to English"), the card says only what they asked for, with the name
      of its datum ("Language: English", "Interface scale: 110%"; what goes back to the business's, by its name: "The
      business's language"). On confirming it only that changes, and
      the theme, the palette and the size they did not name stay as they were. The new language applies just as from the
-     selector: the open application switches to it without reloading, and stays in it on reloading or opening it again
-     on this device. The same with the appearance ("put the app in dark mode"): the open application switches to the
-     new theme, palette or size without reloading.
+     selector: the open application switches to it without reloading, and stays in it on reloading or opening it again,
+     also on their other devices. The same with the appearance ("put the app in dark mode"): the open application
+     switches to the new theme, palette or size without reloading.
 In: the profile of whoever has the session.
 Out: their name in this business (the one in the side menu, on the faces and in "Devices"; without it, the side menu and the
 faces say the one of their linked Staff record, STAFF-F03), their photo, their language and their
-appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account. With "Use the
-business’s language", they enter with a PIN in the business's and with their account in their erplora.com
+appearance, including the interface size, which follow them on any device they enter, with their PIN, badge or account,
+or where they already have the session open. With "Use the business’s language", they enter with a PIN in the business's and with their account in their erplora.com
 account's (BASE-F51). The email is only for contact: it does not change the erplora.com account.
 If it fails: if the profile could not be read, "Could not load the profile" — "Your details stay the same. Check
 the connection and try again." with "Retry". On saving: "Could not save the profile"; a refused photo: "Could not

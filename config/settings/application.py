@@ -73,6 +73,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     # A session opened on another host (another hub's, the platform's) is no session here.
     "base.session_host.SessionHostMiddleware",
+    # The language a signed-in person chose in «My profile» rules this request, whatever this browser's cookie says.
+    "base.profile_language.ProfileLanguageMiddleware",
     # The platform host (hubs.localhost) is only the Hub admin for the staff.
     "base.middleware.PlatformHostMiddleware",
     # No login of its own: a browser without a session on a SPA route goes to the SaaS's login.
