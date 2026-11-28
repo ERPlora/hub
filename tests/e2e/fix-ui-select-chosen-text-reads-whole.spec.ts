@@ -33,13 +33,13 @@ interface Choice {
   /** How far the text runs past its own box, sideways and downwards: what `overflow: hidden` cuts. */
   pastWidth: number;
   pastHeight: number;
-  /** How far the painted text runs past the outlined box of the field. */
+  /** How far the painted text runs past the outlined box of the field (never its helper text, under the box). */
   pastField: number;
   /** How far the first line climbs into the label floating on the field's edge (negative: clear of it). */
   overLabel: number;
   /** The lines the painted text takes. */
   lines: number;
-  /** The field's height. */
+  /** The outlined box's height. */
   height: number;
 }
 
@@ -57,7 +57,9 @@ async function everyChoice(select: Element): Promise<Choice[]> {
     const range = document.createRange();
     range.selectNodeContents(text);
     const painted = range.getBoundingClientRect();
-    const box = field.getBoundingClientRect();
+    const outlined = root.querySelector<HTMLElement>('[part~="wrapper"]');
+    if (!outlined) throw new Error(`${field.dataset.testid}: no outlined box`);
+    const box = outlined.getBoundingClientRect();
     const label = root.querySelector<HTMLElement>('[part~="label"]')?.getBoundingClientRect();
     return {
       text: text.textContent!.trim(),

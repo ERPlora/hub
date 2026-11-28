@@ -121,7 +121,7 @@ interface Box {
 }
 
 /** Where a row's (or card's) status pill and its «Corrected» sit: the pill inside the link and the link's own box. */
-async function correctionCell(row: Locator): Promise<{ status: Box; pill: Box; link: Box; underline: boolean }> {
+async function correctionCell(row: Locator): Promise<{ status: Box; pill: Box; link: Box; underline: boolean; card: boolean }> {
   return row.evaluate((element) => {
     const box = (found: Element | null | undefined) => {
       if (!found) throw new Error('the status and «Corrected» are painted');
@@ -129,11 +129,13 @@ async function correctionCell(row: Locator): Promise<{ status: Box; pill: Box; l
       return { x, y, width, height };
     };
     const link = element.querySelector('[data-testid=verifactu-records-correction-corrected]');
+    const status = element.querySelector('[data-testid=verifactu-records-status]');
     return {
-      status: box(element.querySelector('[data-testid=verifactu-records-status]')),
+      status: box(status),
       pill: box(link?.querySelector('.status-pill')),
       link: box(link),
       underline: link ? getComputedStyle(link).textDecorationLine !== 'none' : false,
+      card: !!status?.closest('.data-table__card-status'),
     };
   });
 }
@@ -148,20 +150,22 @@ function clippingAncestor(element: Element): string | null {
   return null;
 }
 
-/** hub#865 - As the cell looked with the page's own sheet: the status and «Corrected» 4px apart, side by side and centred
- *  on one line (a card, a wide cell) or one under the other from the same left edge (a narrow cell); the link as tall
- *  as its pill, never a line of text around it that drops the pill below the status. */
+/** hub#865 - The status and «Corrected» apart as the box they sit in spaces its things (4px in a table cell, 6px in a
+ *  card's row of statuses, as every list's card), side by side and centred on one line (a card, a wide cell) or one
+ *  under the other from the same left edge (a narrow cell); the link as tall as its pill, never a line of text around
+ *  it that drops the pill below the status. */
 function expectCorrectionBeside(
-  { status, pill, link, underline }: { status: Box; pill: Box; link: Box; underline: boolean },
+  { status, pill, link, underline, card }: { status: Box; pill: Box; link: Box; underline: boolean; card: boolean },
   at: string,
 ): 'side by side' | 'stacked' {
-  const boxes = `${at}: ${JSON.stringify({ status, pill, link })}`;
+  const boxes = `${at}: ${JSON.stringify({ status, pill, link, card })}`;
   expect(underline, `«Corrected» is a pill, not underlined text (${at})`).toBe(false);
   const sideBySide = status.y < pill.y + pill.height && pill.y < status.y + status.height;
   if (sideBySide) {
     const gap = pill.x - (status.x + status.width);
-    expect(gap, `side by side, 4px apart (${boxes})`).toBeGreaterThanOrEqual(3);
-    expect(gap, `side by side, 4px apart (${boxes})`).toBeLessThanOrEqual(5);
+    const apart = card ? 6 : 4;
+    expect(gap, `side by side, ${apart}px apart (${boxes})`).toBeGreaterThanOrEqual(apart - 1);
+    expect(gap, `side by side, ${apart}px apart (${boxes})`).toBeLessThanOrEqual(apart + 1);
     expect(Math.abs(status.y + status.height / 2 - (pill.y + pill.height / 2)), `centred on one line (${boxes})`).toBeLessThanOrEqual(1);
   } else {
     const gap = pill.y - (status.y + status.height);

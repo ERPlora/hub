@@ -18,7 +18,6 @@ import { cleanUp as cleanCustomers, createCard, e2eName, spanishMobile } from '.
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { cleanSales, drawerOff, expectTakes, newestSaleOf, openTillCart, restoreDrawer, shots, stamp, VIEWPORTS } from './sale-helpers';
-import { toastSaying } from './toast-helpers';
 
 const RUN = stamp();
 let water: Product;
@@ -442,12 +441,16 @@ test('a check opened by its address (/sale/pos?order=<id>, as the agenda’s «C
   await expect(lineOf(page, juice.name)).toBeVisible();
   await expect(page).toHaveURL(/\/sale\/pos$/);
 
-  // One no longer open is said, and the till carries on with the one it had.
+  // One no longer open is said in the place of the catalog, so nothing is sold on it; «Continue» gives the till back
+  // with the check it had.
   const voided = await api<{ id: string }>(context, A, 'POST', '/sale/orders', { label: `e2e gone ${RUN}`, lines: [{ product_id: cake.id }] });
   expect((await api(context, A, 'POST', '/sale/orders/void', { order_id: voided.data.id })).status).toBe(200);
   await page.goto(`${A}/sale/pos?order=${voided.data.id}`);
+  const gone = shown(page).locator('[data-testid=pos-linked-error]');
+  await expect(gone).toContainText(/not open any more|ya no está abierta/);
+  await expect(shown(page).locator('.pos-catalog')).toHaveCount(0);
+  await shown(page).locator('[data-testid=pos-linked-action]').click();
   await tillReady(page);
-  await expect(toastSaying(page, /not open any more|ya no está abierta/)).toBeVisible();
   await expect(shown(page).locator('[data-testid=pos-check-title]')).toHaveValue(`e2e link ${RUN}`);
   // The check opened by its address goes, as every other this file opened (afterAll).
   expect((await api(context, A, 'POST', '/sale/orders/void', { order_id: opened.data.id })).status).toBe(200);
