@@ -150,11 +150,11 @@ def test_spanish_texts_of_the_workbook():
         assert str(services.orders.CART_EMPTY) == (
             "Este carrito no tiene líneas: añade un producto antes de iniciar el pedido."
         )
-        assert str(queries.CART_NOT_FOUND) == "Ese carrito no existe en este negocio."
+        assert str(queries.reads.CART_NOT_FOUND) == "Ese carrito no existe en este negocio."
         assert str(cart_admin.ERASE) == "Borrar los datos personales de sus clientes"
         assert str(services.items.LINE_TOO_LARGE) == (
             "El total de esta línea (cantidad × precio) supera lo que cabe en un carrito."
         )
-        assert str(queries.CART_AMBIGUOUS) % {"said": "Ana", "codes": "s1, s2"} == (
+        assert str(queries.reads.CART_AMBIGUOUS) % {"said": "Ana", "codes": "s1, s2"} == (
             "«Ana» encaja con varios carritos: s1, s2. Di cuál."
         )

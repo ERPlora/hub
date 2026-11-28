@@ -558,7 +558,7 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
   lector común de las listas (hub#1196): `filterCents` y `amountFilterErrors` de `base/frontend/lib/money.ts`
   (sobre `parseMoney` de `@erplora/ui`) sobre `TOTAL_BOUNDS`; las dos páginas corren la tabla de textos de
   `base/frontend/__tests__/amount-filter.ts` (pm#521).
-- Moneda (flujo `cart-checkout-business-currency`, BASE-F50): `queries.business_currency(ctx)` es
+- Moneda (flujo `cart-checkout-business-currency`, BASE-F50): `business_currency(ctx)` (`queries/reads.py`) es
   `base.operations.business_currency(ctx.scope)` (la del país del negocio; en el hub propio de ERPlora, la del
   país de su emisor) y solo la usa el alta de un carrito sin `currency`; el modelo no tiene valor por defecto
   (migración 0003, solo de estado). Cada fila de carrito y de pedido lleva `currency_decimals`

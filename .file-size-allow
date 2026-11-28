@@ -4,7 +4,6 @@
 # never grows past its number, the number comes down to the file's size as it shrinks, a file leaves the list once it
 # fits its cap, and no path or higher number is ever added.
 449 apps/appointment/frontend/operations.d.ts ERPlora/erplora-next#74
-557 apps/cart_checkout/queries.py ERPlora/erplora-next#74
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
 305 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
 541 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74

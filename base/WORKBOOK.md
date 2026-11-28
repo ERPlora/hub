@@ -4579,7 +4579,7 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `tests/test_guardrails_money.py` no deja llamar a `format_currency` ni a `get_currency_symbol` de Babel fuera de él.
   Ventas, Facturación, Inventario, Tarifas, Impresión, Pagos y
   Carrito y pago la leen con `base.operations.business_currency(ctx.scope)`, sin copia propia (las `business_currency(ctx)`
-  de `apps/sale/queries/business.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
+  de `apps/sale/queries/business.py` y `apps/cart_checkout/queries/reads.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
   Clientes, Menús y combos, Citas y la vista previa de Reserva online la leen con `useBusinessMoney` (ninguna fija
   una moneda; la ficha de prueba de `base.business.get` es `base/frontend/__tests__/business.ts`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/settings-tabs.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
