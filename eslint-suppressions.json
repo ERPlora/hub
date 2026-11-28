@@ -573,15 +573,25 @@
       "count": 1
     }
   },
-  "base/frontend/lib/home.ts": {
+  "base/frontend/lib/home-dates.ts": {
     "complexity": {
-      "count": 3
+      "count": 1
+    }
+  },
+  "base/frontend/lib/home-panels.ts": {
+    "complexity": {
+      "count": 1
     },
     "max-lines-per-function": {
       "count": 1
     },
     "max-params": {
       "count": 4
+    }
+  },
+  "base/frontend/lib/home.ts": {
+    "complexity": {
+      "count": 1
     }
   },
   "base/frontend/lib/office.ts": {

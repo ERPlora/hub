@@ -6,7 +6,7 @@
 // one is shown, it is the platform's `formatQuantity` of `@erplora/ui/components` (hub#974).
 import type { TransmitOut } from '../operations';
 
-export type { Money } from '../../../../base/frontend/lib/home';
+export type { Money } from '../../../../base/frontend/lib/money';
 export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 const CURRENCY = 'EUR';

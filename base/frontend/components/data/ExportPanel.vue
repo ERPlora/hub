@@ -31,7 +31,7 @@ import {
   travels,
 } from '../../lib/data';
 import { saveFile } from '../../lib/download';
-import { type HubHome, readJsonBlock } from '../../lib/home';
+import { type HubHome, readJsonBlock } from '../../lib/embedded';
 import { useBaseI18n } from '../../lib/i18n';
 import type { AppDatasets, BlueprintPurpose } from '../../operations/blueprints';
 import '../../data.css';

@@ -8,7 +8,7 @@
 // business's wall clock: `HH:MM:SS` on the wire, `HH:MM` on screen and in a time field.
 import { decimalMark } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';

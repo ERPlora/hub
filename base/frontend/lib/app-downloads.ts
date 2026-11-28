@@ -5,7 +5,7 @@
 import { useSurface } from '@erplora/ui/shell';
 import { computed, type ComputedRef } from 'vue';
 
-import { type HubHome, readJsonBlock } from './home';
+import { type HubHome, readJsonBlock } from './embedded';
 
 export const APP_PLATFORMS = ['windows', 'linux', 'android'] as const;
 export type AppPlatform = (typeof APP_PLATFORMS)[number];

@@ -5,7 +5,7 @@
 // (a purchase) is painted in it. An amount is written with the platform's `formatMoney` (`@erplora/ui/components`);
 // this is the one place the app says which money a record is in. What a person types in «Spent» is read by the
 // platform, as every amount filter of the Hub (`filterCents`, `amountFilterErrors`; hub#1196).
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';

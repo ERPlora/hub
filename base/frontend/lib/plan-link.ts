@@ -6,7 +6,7 @@
 import { useSession, useSurface } from '@erplora/ui/shell';
 import { computed, type ComputedRef } from 'vue';
 
-import { type HubHome, readJsonBlock } from './home';
+import { type HubHome, readJsonBlock } from './embedded';
 
 /** Owning the business, the owner's alone (`base.permissions.OWN_BUSINESS`). */
 export const OWN_BUSINESS = 'base.own_business';

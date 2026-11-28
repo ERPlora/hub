@@ -3,7 +3,7 @@
 // with one is said under that field, by a key of the app's catalogue; the server refuses the same anyway.
 import { moneyFieldText, parseMoney } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 import type { MethodSuggestionsOut, Suggestion } from '../operations';
 
 export type SuggestionKind = 'percent' | 'amount';

@@ -6,7 +6,7 @@
 // digits on, as every screen writes them. Until the business answers an amount is a dash, never
 // the euro by default nor guessed decimals. A percentage discount travels in basis points (1050 = 10,50 %): the form writes and reads
 // it as a percentage with at most two decimals.
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { filterCents, formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';

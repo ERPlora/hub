@@ -6,7 +6,7 @@ import type { Money } from '@erplora/ui/components';
 import { type ApiClient, createApiClient, createHeaderProvider, type HeaderDeps, type OperationRoutes, type SpaConfig } from '@erplora/ui/sdk';
 import { computed, type ComputedRef } from 'vue';
 
-import { readJsonBlock } from './home';
+import { readJsonBlock } from './embedded';
 
 /** What a public page calls the business with, and the money it writes its amounts in (unknown without it). */
 export interface PublicDoorClient {

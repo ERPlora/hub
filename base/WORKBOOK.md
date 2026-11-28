@@ -4187,17 +4187,17 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   `tests/e2e/base-sign-up-taxes-on.spec.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
   `Intl` en UTC, nunca con `new Date(<día>)` en la zona del navegador (`isoDay` y `formatDay` de
-  `base/frontend/lib/home.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su
+  `base/frontend/lib/home-dates.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su
   fecha (`17 oct`); una etiqueta que no es un día se queda tal cual. Encima de las barras salen el día entero y el
   importe (`options.format`) de la barra elegida: la última hasta que se toca o enfoca otra (`tests/e2e/fix-hub-home-chart-iso-day-labels.spec.ts`).
-- Un panel `bar-list` cuyo `map` declara `color` pinta cada barra con el color de su fila (`color: row[map.color]`), solo si es un hex `#rgb` o `#rrggbb` (`HEX_COLOR` de `base/frontend/lib/home.ts`):
+- Un panel `bar-list` cuyo `map` declara `color` pinta cada barra con el color de su fila (`color: row[map.color]`), solo si es un hex `#rgb` o `#rrggbb` (`HEX_COLOR` de `base/frontend/lib/home-panels.ts`):
   lo teclea una persona y va al estilo de la barra, así que cualquier otra cosa (un nombre CSS, `var(…)`, `url(…)`)
   pinta como sin `map.color`. Una barra negativa no lleva color: su rojo gana, porque una alarma pesa más que la
   categoría (las barras de datos de Excel con su relleno de negativo, el formato condicional de Power BI sobre los
   colores de categoría, los umbrales de Grafana sobre su color fijo).
   Un color claro casi no se ve sobre la pista gris: el contraste es el del color que eligió quien lo tecleó. Un
   `chart` no pinta `map.color`.
-- Un panel `timeline` dice cuándo pasó cada entrada con `formatMoment` de `base/frontend/lib/home.ts` (`Intl`, en
+- Un panel `timeline` dice cuándo pasó cada entrada con `formatMoment` de `base/frontend/lib/home-dates.ts` (`Intl`, en
   la zona del dispositivo: el Hub aún no tiene la del negocio en el navegador, gh:hub#1212): de hoy, la hora sola;
   de ayer, la palabra de `Intl.RelativeTimeFormat` y la hora; antes, la fecha corta y la hora (con el año si es de
   otro). Un día civil `YYYY-MM-DD` dice hoy, ayer o su fecha, en UTC y sin hora; lo que no es un ISO se pinta tal

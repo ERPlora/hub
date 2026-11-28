@@ -16,7 +16,7 @@ de `ERPlora/erplora-next` como `verifactu:ui-icons`, `verifactu:ui-money-format`
 | Registrar `ion:stats-chart-outline` | El icono del panel «Registros por estado» del Inicio del módulo actual | `ion:list-outline` |
 | Un formateador de dinero en `@erplora/ui/components/format` | Pintar importes en céntimos («€12.10», «-12,10 €») sin copia por app | `frontend/lib/format.ts`, copia del de Facturación |
 | Un componente de pestañas internas de una página (dos vías en Configuración) | Las pestañas «Lo remite ERPlora» / «Mi certificado» como las demás páginas | `ion-segment` con `mode="md"` |
-| El formateador de momentos de la cronología del Inicio (`formatMoment` de `base/frontend/lib/home.ts`) en `@erplora/ui/components/format` | Que «Eventos AEAT recientes» diga «16:37», «Ayer 16:37» o la fecha corta, como «Actividad reciente» de Ventas en el mismo tablero | `formatDateTime`: fecha y hora enteras, como la pestaña Eventos |
+| El formateador de momentos de la cronología del Inicio (`formatMoment` de `base/frontend/lib/home-dates.ts`) en `@erplora/ui/components/format` | Que «Eventos AEAT recientes» diga «16:37», «Ayer 16:37» o la fecha corta, como «Actividad reciente» de Ventas en el mismo tablero | `formatDateTime`: fecha y hora enteras, como la pestaña Eventos |
 | Un componente de subida de un fichero cualquiera con zona para soltarlo (`ImageUpload` es solo de imágenes y sin soltar) | Subir el `.p12` / `.pfx` en «Mi certificado» y los PDF del otorgamiento arrastrándolos, como el módulo actual | Un botón y el nombre del fichero (`frontend/lib/files.ts`) |
 
 Al registrar un icono, cambiar a la vez `apps.py` (`icon`, `navigation`, `setup` y `widgets`),

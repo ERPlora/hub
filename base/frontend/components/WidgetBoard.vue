@@ -25,7 +25,8 @@ import {
 import { computed, ref } from 'vue';
 
 import type { WidgetDef } from '../operations/home';
-import { activeWidgetKeys, BOARD_STORAGE_KEY, readJsonBlock } from '../lib/home';
+import { readJsonBlock } from '../lib/embedded';
+import { activeWidgetKeys, BOARD_STORAGE_KEY } from '../lib/home';
 import { livelyRow } from '../lib/home-figures';
 import { useBaseI18n } from '../lib/i18n';
 import WidgetPanel from './WidgetPanel.vue';

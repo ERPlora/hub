@@ -2,5 +2,5 @@
 // in, as `base.business.get` says it (`useBusinessMoney`, the platform's), never a fixed euro nor the browser's Intl
 // decimals. Until the business answers an amount is a dash. An amount is written with the
 // platform's `formatMoney`; pages never format by hand.
-export type { Money } from '../../../../base/frontend/lib/home';
+export type { Money } from '../../../../base/frontend/lib/money';
 export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
