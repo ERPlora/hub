@@ -645,3 +645,9 @@ msgstr "Quiero recibir ofertas y novedades de este negocio por este canal. Puedo
 
 msgid "Read it out loud"
 msgstr "Léelo en voz alta"
+
+msgid "Customer groups"
+msgstr "Grupos de clientes"
+
+msgid "Customer tags"
+msgstr "Etiquetas de clientes"

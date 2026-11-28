@@ -13,6 +13,13 @@ NOTICE_BODY = ["{dish_names}", _("Waiter: {waiter}")]
 class KitchenConfig(LiveAppConfig):
     name = "apps.kitchen"
     label = "kitchen"
+    blueprint_stays = {
+        "KitchenSettings": "settings",
+        "DayCounter": "internal",
+        "Ticket": "history",
+        "TicketItem": "history",
+        "LogEntry": "history",
+    }
     kind = "app"
     verbose_name = _("Kitchen")
     # Registered in the shell (ION_ICONS); `restaurant-outline` waits in UI-REQUESTS.md.
@@ -127,3 +134,9 @@ class KitchenConfig(LiveAppConfig):
             "KITCHEN-F14": {"es": ["zRBB-uH4PMU"], "en": ["U2OSH7MKZSA"]},
         },
     )
+
+    def blueprint_datasets(self) -> list:
+        """What of Kitchen travels in an export of the business (BASE-F35): its stations and what is routed to each."""
+        from apps.kitchen import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS

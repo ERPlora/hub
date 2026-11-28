@@ -17,6 +17,16 @@ NOTICE_ROUTE = "/appointment/agenda?date={start:.10}"
 class AppointmentConfig(LiveAppConfig):
     name = "apps.appointment"
     label = "appointment"
+    blueprint_stays = {
+        "Settings": "settings",
+        "Counter": "internal",
+        "Recurring": "history",
+        "RecurringService": "history",
+        "Appointment": "history",
+        "AppointmentService": "history",
+        "History": "history",
+        "BlockedTime": "pending",
+    }
     kind = "app"
     verbose_name = _("Appointments")
     icon = "ion:calendar-outline"

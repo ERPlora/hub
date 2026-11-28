@@ -42,6 +42,7 @@ una línea de import; lo que no importa ninguno de ellos está en los demás mó
 | `dev-server.ts` | el `runserver` y su Vite: si contestan, quién escucha en un puerto y arrancarlo otra vez |
 | `topbar.ts` | la barra de arriba: «Mis apps», el asistente y `compactBar` |
 | `live-streams.ts` | los `/api/live` que abre una página, con `decodeSubs` |
+| `backup-file.ts` | la copia del negocio: la captura cuando la pantalla está quieta y sin desborde (`snap`), cargar el archivo desde Importar (`importBack`) y las filas de una parte del archivo (`rowsIn`) |
 
 ## El login
 

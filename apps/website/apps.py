@@ -15,6 +15,10 @@ from apps.website.choices import CHOICES
 class WebsiteConfig(LiveAppConfig):
     name = "apps.website"
     label = "website"
+    blueprint_stays = {
+        "Site": "pending",
+        "Image": "pending",
+    }
     kind = "app"
     # With a context: Clientes translates a customer's «Website» field as «Web».
     verbose_name = pgettext_lazy("app name", "Website")

@@ -9,6 +9,10 @@ from live.meta import Category, Help, LiveAppConfig, Nav
 class OnlineBookingConfig(LiveAppConfig):
     name = "apps.online_booking"
     label = "online_booking"
+    blueprint_stays = {
+        "Settings": "settings",
+        "Booking": "history",
+    }
     kind = "app"
     # With a context: Citas translates «Online booking» as one booking's origin («Reserva online»).
     verbose_name = pgettext_lazy("app name", "Online booking")

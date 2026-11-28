@@ -403,7 +403,13 @@ Pasos:
 2. Pon el nombre (vacío, «Horario habitual»), la vigencia si solo vale en unas fechas, «Por defecto»
    si es el habitual y, día a día, Inicio, Fin y, si hay pausa, Inicio y Fin de descanso.
 3. Pulsa **Crear horario**.
-Entra: la persona (por id o por nombre) y la semana. Un día es un tramo con un descanso opcional.
+Entra: la persona (por id o por nombre) y la semana. Un día es un tramo con un descanso opcional. Un día
+que llega sin sus horas (al asistente no se le han dicho) toma la jornada por defecto de **Ajustes**
+(STAFF-F22) con el descanso en mitad del día, como la propone **Nuevo**; uno que dice solo una de las dos
+toma la otra de esa jornada, sin descanso. Nunca lleva unas horas que nadie ha dicho.
+Desde el asistente, la tarjeta dice primero de quién es y su semana: cada tramo de días seguidos con las
+mismas horas, en una línea con esas horas, las que se van a guardar («Martes – Sábado · 10:00–14:00,
+15:00–19:00»).
 Sale: el horario (`staff.schedule.created`). Si es «Por defecto», los demás de esa persona dejan de
 serlo. **Qué horario manda un día**: de los activos y vigentes ese día gana el que **no** es «Por
 defecto»; entre varios, el de «Vigente desde» más reciente y luego el más nuevo; si ninguno vale,
@@ -412,7 +418,8 @@ Si falla: debajo de cada campo: «Un horario necesita al menos un día de trabaj
 hora de inicio tiene que ser anterior a la de fin.», «El descanso necesita inicio y fin (o ninguno).»,
 «El descanso debe caer dentro del intervalo de trabajo.», «Cada día de la semana solo puede aparecer
 una vez.», «La vigencia del horario termina antes de empezar.»; «Ese miembro del personal no existe
-en este negocio.». Un turno que cruza la medianoche no se admite. «Un horario necesita al menos un día de
+en este negocio.». Un turno que cruza la medianoche no se admite, tampoco cuando una de sus horas la pone la
+jornada por defecto (una entrada a las 20:00 con la jornada acabando a las 19:00). «Un horario necesita al menos un día de
 trabajo con horas.» sale encima de la semana y se quita en cuanto se cambia cualquier día (se marca o se
 desmarca, o se elige una hora), sin volver a guardar. El motivo de un día sale debajo de ese día y
 se quita en cuanto se cambia ese día (se marca o se desmarca, o se elige una de sus horas), sin volver a
@@ -421,14 +428,15 @@ Implicados: ninguno
 
 ### STAFF-F14 Editar un horario
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable, asistente
 Pantalla: Horarios
 Pasos:
 1. Pulsa la fila del horario: se abre **Editar · Horario habitual** con su semana.
 2. Cambia el nombre, la vigencia, «Por defecto» o los días; un día que desmarcas queda «No
    trabaja». Guarda: **se sustituye la semana entera**; lo demás que no envíes se queda como estaba y
    una fecha vacía quita esa vigencia.
-Entra: el horario y su semana completa.
+Entra: el horario y su semana completa; un día sin sus horas toma las de la jornada por defecto, como al
+crearlo, y la tarjeta del asistente dice la semana igual.
 Sale: el horario cambiado (`staff.schedule.updated`), con la misma regla de «Por defecto» y de qué
 horario manda que al crearlo.
 Si falla: los mismos rechazos que al crear, que se quitan igual al cambiar lo rechazado, o «Ese horario no
@@ -584,7 +592,7 @@ Pasos:
 Entra: lo enviado; lo demás se queda como estaba.
 Sale: los ajustes del negocio (`staff.settings.updated`), con las horas siempre en HH:MM. Desde ese
 momento, un horario nuevo propone esa jornada de lunes a viernes, con el descanso en mitad del día
-(STAFF-F13).
+(STAFF-F13), y es la que toma un día que se le pide al asistente sin decir sus horas.
 Si falla: un valor fuera de su rango sale debajo de su campo y no se guarda nada. Una jornada que
 acaba antes de empezar dice «La hora de inicio tiene que ser anterior a la de fin.» debajo de «Fin de
 jornada (HH:MM)» (debajo de «Inicio de jornada (HH:MM)» si solo se cambió el inicio), y un descanso

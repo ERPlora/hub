@@ -405,7 +405,7 @@ If it fails: each app handles it its own way.
 Involved: SALE-F16, APPOINTMENT-F01, SERVICE-F33, TASK-F07
 
 ### STAFF-F13 Create a professional's weekly schedule
-<!-- from WORKBOOK.md sha256:cef9e38cdac3 -->
+<!-- from WORKBOOK.md sha256:d102c2d05881 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Schedules
@@ -417,7 +417,13 @@ Steps:
 2. Set the name (empty, "Regular schedule"), the validity if it only applies on some dates, "Default" if it
    is the usual one and, day by day, Start, End and, if there is a pause, Break start and Break end.
 3. Tap **Create schedule**.
-In: the person (by id or by name) and the week. A day is an interval with an optional break.
+In: the person (by id or by name) and the week. A day is an interval with an optional break. A day that
+comes without its hours (the assistant was not told them) takes the default working day of **Settings**
+(STAFF-F22) with the break in the middle of the day, as **New** proposes it; one that says only one of the
+two takes the other from that working day, without a break. It never carries hours nobody said.
+From the assistant, the card first says whose it is and its week: each run of days in a row with the same
+hours, on one line with those hours, the ones that will be saved ("Tuesday – Saturday · 10:00 AM – 2:00 PM,
+3:00 – 7:00 PM").
 Out: the schedule (`staff.schedule.created`). If it is "Default", the person's others stop being so.
 **Which schedule rules a day**: of the active schedules in force that day, the one that is **not**
 "Default" wins; among several, the one with the most recent "Effective from" and then the newest; if none
@@ -426,22 +432,24 @@ If it fails: under each field: "A schedule needs at least one working day with h
 must be before the end time.", "The break needs a start and an end, or neither.", "The break must fall
 inside the working hours.", "Each weekday can appear only once.", "The schedule's validity ends before it
 starts."; "That staff member does not exist in this business.". A shift that crosses midnight is not
-accepted. "A schedule needs at least one working day with hours." shows on top of the week and goes away
+accepted, not even when one of its hours comes from the default working day (a start at 20:00 with the
+working day ending at 19:00). "A schedule needs at least one working day with hours." shows on top of the week and goes away
 as soon as any day changes (ticked, unticked, or an hour picked), without saving again. A day's
 reason shows under that day and goes away as soon as that day changes (ticked, unticked, or one of its hours
 picked), without saving again; the other days' reasons stay until those days change.
 Involved: none
 
 ### STAFF-F14 Edit a schedule
-<!-- from WORKBOOK.md sha256:aff27bb3664e -->
+<!-- from WORKBOOK.md sha256:4a4966d137bf -->
 Status: done (server and screen)
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager, assistant
 Screen: Schedules
 Steps:
 1. Tap the schedule's row: **Edit · Regular schedule** opens with its week.
 2. Change the name, the validity, "Default" or the days; a day you untick becomes "Off". Save: **the whole
    week is replaced**; the rest you do not send stays as it was and an empty date removes that validity.
-In: the schedule and its whole week.
+In: the schedule and its whole week; a day without its hours takes those of the default working day, as
+when creating it, and the assistant's card says the week the same way.
 Out: the changed schedule (`staff.schedule.updated`), with the same "Default" rule and the same rule of
 which schedule rules as when creating it.
 If it fails: the same refusals as when creating, which go away the same way when what was refused
@@ -592,7 +600,7 @@ with only one day, "A period of your own needs its first and its last day."; wit
 Involved: SALE-F16, SALE-F27, SALE-F28
 
 ### STAFF-F22 Change the Staff settings
-<!-- from WORKBOOK.md sha256:2496eb28df18 -->
+<!-- from WORKBOOK.md sha256:c8ca9d47a928 -->
 Status: done (server and screen)
 Actor: owner, administrator, manager
 Screen: Settings
@@ -606,7 +614,7 @@ Steps:
 In: what was sent; the rest stays as it was.
 Out: the business's settings (`staff.settings.updated`), with the hours always in HH:MM. From that moment,
 a new schedule proposes that working day from Monday to Friday, with the break in the middle of the day
-(STAFF-F13).
+(STAFF-F13), and it is the one a day takes when the assistant is asked for it without its hours.
 If it fails: a value outside its range shows under its field and nothing is saved. A working day that ends
 before it starts says "The start time must be before the end time." under "Working day ends (HH:MM)"
 (under "Working day starts (HH:MM)" if only the start was changed), and a break that does not fit in the

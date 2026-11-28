@@ -224,7 +224,13 @@ class AppDatasetsOut(Schema):
     id: str
     label: str
     icon: str
-    datasets: list[DatasetCountOut] = Field(description="Empty: the app travels, with nothing of its own to copy.")
+    datasets: list[DatasetCountOut] = Field(description="Empty: the app travels without data of its own.")
+    keeps_data: bool = Field(
+        description=(
+            "It has data of its own that does not travel in the file: its history, its people, fiscal data, its "
+            "settings or what is bound to something outside the business."
+        )
+    )
 
 
 class DatasetListOut(Schema):

@@ -9,6 +9,11 @@ from live.meta import Category, Help, LiveAppConfig, Nav
 class ReservationConfig(LiveAppConfig):
     name = "apps.reservation"
     label = "reservation"
+    blueprint_stays = {
+        "Settings": "settings",
+        "Reservation": "history",
+        "WaitlistEntry": "history",
+    }
     kind = "app"
     verbose_name = _("Reservations")
     # Registered in the shell (ION_ICONS); a restaurant table of its own waits in UI-REQUESTS.md.
@@ -132,3 +137,10 @@ class ReservationConfig(LiveAppConfig):
             "RESERVATION-F23": {"es": ["dtI39MRe1gk"], "en": ["rFYllyUQe2Q"]},
         },
     )
+
+    def blueprint_datasets(self) -> list:
+        """What of Reservations travels in an export of the business (BASE-F35): the book's time slots and blocked
+        days."""
+        from apps.reservation import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS

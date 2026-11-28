@@ -9,6 +9,15 @@ from apps.service.events import SERVICE_EVENTS
 class ServiceConfig(LiveAppConfig):
     name = "apps.service"
     label = "service"
+    blueprint_stays = {
+        "ServiceSettings": "settings",
+        "Assignment": "people",
+        "Package": "pending",
+        "PackageItem": "pending",
+        "Grant": "history",
+        "GrantAdjustment": "history",
+        "Redemption": "history",
+    }
     kind = "app"
     verbose_name = _("Services")
     # The old module's `briefcase`, registered in the shell (ION_ICONS).

@@ -223,6 +223,7 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
                     {"key": part.key, "label": str(part.label), "rows": counts.get(part.key, 0), "personal": part.personal}
                     for part in blueprint.datasets.datasets_of(config.label)
                 ],
+                "keeps_data": bool(getattr(config, blueprint.calls.STAYS_HOOK, None)),
             }
             for config in home.shown_modules.shown_modules(demo_hub=bool(hub and hub.is_demo))
             if config.label in on

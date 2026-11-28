@@ -70,6 +70,7 @@ def _menu_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
 DATASETS = [
     Dataset(
         key="combo.combo",
+        models=("Combo", "ChoiceGroup", "ChoiceOption"),
         label=_("Menus"),
         rows=_menu_rows,
         ids=ids_of("combo.combo.list"),

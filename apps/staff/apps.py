@@ -22,6 +22,13 @@ BY_ROLE_EVENTS = [*ROLE_ALL, *MEMBER_ALL]
 class StaffConfig(LiveAppConfig):
     name = "apps.staff"
     label = "staff"
+    blueprint_stays = {
+        "Member": "people",
+        "Schedule": "people",
+        "ScheduleDay": "people",
+        "TimeOff": "people",
+        "StaffSettings": "settings",
+    }
     kind = "app"
     verbose_name = _("Staff")
     icon = "ion:id-card-outline"
@@ -211,3 +218,9 @@ class StaffConfig(LiveAppConfig):
         from apps.staff.queries.records import records_of  # the models are not loaded yet when this module is
 
         return records_of(username)
+
+    def blueprint_datasets(self) -> list:
+        """What of Staff travels in an export of the business (BASE-F35): its roles, never its people."""
+        from apps.staff import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS

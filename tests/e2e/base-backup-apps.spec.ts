@@ -7,7 +7,6 @@
 // offers no Taxes section. Each screen in 390×844, 834×1112 and 1440×900. Its data are named `E2E Backup …` /
 // `E2E-BAK-…` / `e2e_bak.…` and `afterAll` deletes exactly them, in `a` and `b`. In Spanish too, at each size:
 // «Grupos de suplementos», «Menús» and «Categorías fiscales propias», never «Nada propio que copiar».
-import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
@@ -17,16 +16,14 @@ import {
   api,
   B,
   ARTIFACTS,
-  capture,
-  horizontalOverflow,
   hostPage,
   psql,
   shown,
   signedInSpanish,
   testid,
   THREE_SIZES,
-  untilStill,
 } from './helpers';
+import { importBack, rowsIn, snap } from './backup-file';
 
 test.use({ actionTimeout: 30_000 });
 
@@ -109,13 +106,6 @@ async function now<T>(context: BrowserContext, app: keyof typeof APPS): Promise<
   return api<T>(context, A, 'GET', APPS[app].detail);
 }
 
-async function snap(page: Page, name: string): Promise<void> {
-  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
-  await untilStill(page);
-  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await capture(page, name);
-}
-
 /** Settings › Data › Export with the spec's rows there: neither app's row says `nothing` (in the page's language) and,
  *  with their data ticked, each part says its label with its rows. */
 async function partsOf(context: BrowserContext, page: Page, nothing: string, labels: Record<App, string>): Promise<void> {
@@ -129,11 +119,6 @@ async function partsOf(context: BrowserContext, page: Page, nothing: string, lab
     await expect(shown(page).locator(`[data-testid="export-table-${PARTS[app]}"]`)).toContainText(`${labels[app]} ·`);
   }
   await shown(page).locator('[data-testid="export-table-combo.combo"]').scrollIntoViewIfNeeded();
-}
-
-/** The rows of `part` the file `saved` carries. */
-function rowsIn(saved: string, part: string): { name: string; [key: string]: unknown }[] {
-  return JSON.parse(execFileSync('unzip', ['-p', saved, `data/${part}.json`], { encoding: 'utf8' }));
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -174,10 +159,7 @@ for (const size of THREE_SIZES) {
     const menuBefore = (await now<Menu>(context, 'combo')).data;
     expect((await api(context, A, 'POST', APPS.modifier.remove, { id: groupBefore.id })).status).toBe(200);
     expect((await api(context, A, 'POST', APPS.combo.remove, { id: menuBefore.id })).status).toBe(200);
-    await testid(page, 'data-section-import').click();
-    await testid(page, 'import-file').setInputFiles(saved);
-    await expect(testid(page, 'review')).toBeVisible();
-    await testid(page, 'review-import').click();
+    await importBack(page, saved);
     for (const app of Object.keys(APPS)) {
       const loaded = shown(page).locator(`[data-testid="report-app"][data-id="${app}"] [data-testid="report-app-status"]`);
       await expect(loaded).toContainText('Applied');

@@ -9,6 +9,12 @@ from live.meta import Category, Help, LiveAppConfig, Nav
 class CartCheckoutConfig(LiveAppConfig):
     name = "apps.cart_checkout"
     label = "cart_checkout"
+    blueprint_stays = {
+        "Cart": "history",
+        "CartItem": "history",
+        "Order": "history",
+        "OrderCounter": "internal",
+    }
     kind = "app"
     verbose_name = _("Cart & Checkout")
     icon = "lucide:shopping-bag"

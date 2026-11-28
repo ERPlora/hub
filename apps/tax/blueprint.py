@@ -79,6 +79,7 @@ def _category_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> N
 DATASETS = [
     Dataset(
         key="tax.category",
+        models=("TaxCategory", "TaxRule"),
         label=_("Own tax categories"),
         rows=_category_rows,
         count=count_of("tax.category.list", is_system=False),
