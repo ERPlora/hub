@@ -4,7 +4,7 @@ import { EmptyState } from '@erplora/ui/components';
 
 import { useLocale } from '../composables/useT';
 import { quantityWithUnit } from '../lib/format';
-import type { AllDayRowOut } from '../operations';
+import type { AllDayRowOut } from '../operations/board';
 
 defineProps<{
   /** `undefined` until the server answers. */

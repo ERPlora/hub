@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { mountKitchen } from '../__tests__/mount-kitchen';
-import type { AllDayRowOut } from '../operations';
+import type { AllDayRowOut } from '../operations/board';
 import KdsAllDayTable from './KdsAllDayTable.vue';
 
 const row = (fields: Partial<AllDayRowOut> = {}): AllDayRowOut => ({

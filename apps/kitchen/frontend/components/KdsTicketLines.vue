@@ -7,7 +7,7 @@ import { computed } from 'vue';
 
 import { useT } from '../composables/useT';
 import { type DishGroup, groupMenus } from '../lib/board';
-import type { ItemOut } from '../operations';
+import type { ItemOut } from '../operations/tickets';
 import KdsTicketLine from './KdsTicketLine.vue';
 
 const props = defineProps<{

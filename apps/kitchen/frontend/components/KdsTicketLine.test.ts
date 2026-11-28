@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 
 import { item } from '../__tests__/kitchen';
 import { click, mountKitchen, said } from '../__tests__/mount-kitchen';
-import type { ItemOut } from '../operations';
+import type { ItemOut } from '../operations/tickets';
 import KdsTicketLine from './KdsTicketLine.vue';
 
 async function setup(line: ItemOut, props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {

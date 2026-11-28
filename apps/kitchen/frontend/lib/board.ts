@@ -1,7 +1,8 @@
 // What the display remembers between updates (KITCHEN-F10, F16): the tickets it already showed — so it
 // rings for a new one or one just rushed, never for what was on the board when it opened — and the
 // station this device works at (Toast, Square and Fresh pin a screen to its station).
-import type { ItemOut, Priority, TicketOut } from '../operations';
+import type { Priority } from '../operations/fields';
+import type { ItemOut, TicketOut } from '../operations/tickets';
 
 /** Where the station of this device is kept (`''`: every station; `none`; or a station's id). */
 export const STATION_KEY = 'kitchen.display.station';

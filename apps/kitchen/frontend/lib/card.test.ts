@@ -4,7 +4,7 @@
 import { resolveIcon } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
-import type { ItemStatus, OrderType, Priority, TicketStatus } from '../operations';
+import type { ItemStatus, OrderType, Priority, TicketStatus } from '../operations/fields';
 import { ITEM_STATUS_ICONS, ORDER_TYPE_ICONS, PRIORITY_TONES, STATUS_TONES, waitOf } from './card';
 
 const ORDER_TYPES: OrderType[] = ['dine_in', 'takeaway', 'delivery'];

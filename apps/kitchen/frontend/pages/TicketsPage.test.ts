@@ -21,7 +21,7 @@ import {
 } from '../__tests__/mount-kitchen';
 import TicketDetailModal from '../components/TicketDetailModal.vue';
 import TicketFormModal from '../components/TicketFormModal.vue';
-import type { TicketRowOut } from '../operations';
+import type { TicketRowOut } from '../operations/tickets';
 import TicketsPage from './TicketsPage.vue';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
 

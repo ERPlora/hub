@@ -11,7 +11,8 @@ import { computed, ref, watch } from 'vue';
 import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
-import type { Destination, PrinterUsage, StationOut, StationPatchIn } from '../operations';
+import type { Destination, PrinterUsage } from '../operations/fields';
+import type { StationOut, StationPatchIn } from '../operations/stations';
 
 const props = defineProps<{
   /** The station being edited; `null` = «Add station». */

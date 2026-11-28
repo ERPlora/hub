@@ -3,7 +3,7 @@
 import type { SaleComboOut } from '../../../../../combo/frontend/operations';
 import type { CategoryOut, ProductOut } from '../../../../../inventory/frontend/operations';
 import { item as kitchenDish } from '../../../../../kitchen/frontend/__tests__/kitchen';
-import type { ItemOut, TicketOut } from '../../../../../kitchen/frontend/operations';
+import type { ItemOut, TicketOut } from '../../../../../kitchen/frontend/operations/tickets';
 import type { ServiceSaleOut } from '../../../../../service/frontend/operations';
 import type { OrderLineOut, OrderOut, OrderRow, PreviewOut, SettingsOut } from '../../../operations';
 

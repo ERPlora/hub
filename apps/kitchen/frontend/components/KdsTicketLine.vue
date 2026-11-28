@@ -8,7 +8,7 @@ import { computed } from 'vue';
 import { useLocale, useT } from '../composables/useT';
 import { ITEM_STATUS_ICONS } from '../lib/card';
 import { orderTicketQuantity } from '../lib/format';
-import type { ItemOut } from '../operations';
+import type { ItemOut } from '../operations/tickets';
 import KitchenAllergyNotice from './KitchenAllergyNotice.vue';
 
 const props = defineProps<{

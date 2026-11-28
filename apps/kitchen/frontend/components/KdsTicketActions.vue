@@ -6,7 +6,7 @@ import { IonButton, IonItem, IonLabel, IonList, IonPopover } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
 import { useT } from '../composables/useT';
-import type { TicketOut } from '../operations';
+import type { TicketOut } from '../operations/tickets';
 
 type Secondary = 'rush' | 'recall';
 

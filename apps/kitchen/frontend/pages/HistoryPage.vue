@@ -13,7 +13,8 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDateTime } from '../lib/format';
-import type { LogAction, LogOut } from '../operations';
+import type { LogAction } from '../operations/fields';
+import type { LogOut } from '../operations/history';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('kitchen');

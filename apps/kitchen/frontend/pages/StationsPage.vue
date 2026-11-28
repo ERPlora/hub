@@ -24,7 +24,8 @@ import StationFormModal from '../components/StationFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useT } from '../composables/useT';
-import type { RouteOut, StationOut } from '../operations';
+import type { RouteOut } from '../operations/routing';
+import type { StationOut } from '../operations/stations';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('kitchen');

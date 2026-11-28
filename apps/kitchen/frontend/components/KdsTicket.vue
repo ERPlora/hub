@@ -9,7 +9,8 @@ import { computed } from 'vue';
 
 import { useT } from '../composables/useT';
 import { semaphore } from '../lib/format';
-import type { SettingsOut, TicketOut } from '../operations';
+import type { SettingsOut } from '../operations/settings';
+import type { TicketOut } from '../operations/tickets';
 import KdsTicketActions from './KdsTicketActions.vue';
 import KdsTicketHeader from './KdsTicketHeader.vue';
 import KdsTicketLines from './KdsTicketLines.vue';

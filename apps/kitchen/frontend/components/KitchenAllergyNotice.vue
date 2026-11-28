@@ -4,7 +4,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import type { ItemOut } from '../operations';
+import type { ItemOut } from '../operations/tickets';
 
 const props = defineProps<{
   line: ItemOut;

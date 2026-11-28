@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { item } from '../__tests__/kitchen';
 import { mountKitchen } from '../__tests__/mount-kitchen';
-import type { ItemOut } from '../operations';
+import type { ItemOut } from '../operations/tickets';
 import KitchenAllergyNotice from './KitchenAllergyNotice.vue';
 
 async function setup(line: ItemOut, locale: 'en' | 'es' = 'en') {
