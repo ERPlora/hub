@@ -6,25 +6,12 @@ its title. Done or cancelled tasks, comments and who a task or a project is assi
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 
-from base.blueprint.calls import Dataset, Loaded, attempt, count_of, create_each, given, ids_of, natural_key, pages
-from base.blueprint.calls import remover, text_of
+from base.blueprint.calls import Dataset, Loaded, attempt, by_name, count_of, create_each, given, ids_of, natural_key
+from base.blueprint.calls import pages, remover, rows_of, text_of
 
 PROJECT_FIELDS = ("code", "name", "color")
 TASK_FIELDS = ("title", "description", "priority", "due_date", "project", "parent", "tags")
 OPEN = {"open": True}
-
-
-def _project_rows(ctx: OperationContext) -> list[dict]:
-    return [
-        {name: getattr(row, name) for name in PROJECT_FIELDS}
-        for row in pages(ctx, "task.project.list", is_active=True, sort="code")
-    ]
-
-
-def _project_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
-    existing = {natural_key(row.code) for row in pages(ctx, "task.project.list")}
-    create_each(ctx, rows, loaded, name="task.project.create", key=lambda row: natural_key(text_of(row, "code")),
-                existing=existing, build=lambda row: given(row, PROJECT_FIELDS), label=lambda row: text_of(row, "name"))
 
 
 def _task_rows(ctx: OperationContext) -> list[dict]:
@@ -66,10 +53,10 @@ DATASETS = [
     Dataset(
         key="task.project",
         label=_("Projects"),
-        rows=_project_rows,
+        rows=rows_of("task.project.list", PROJECT_FIELDS, is_active=True, sort="code"),
         ids=ids_of("task.project.list"),
         count=count_of("task.project.list", is_active=True),
-        load=_project_load,
+        load=by_name("task.project.list", "task.project.create", PROJECT_FIELDS, named="code"),
         remove=remover("task.project.delete"),
         models=("Project",),
     ),
