@@ -1004,7 +1004,7 @@ that the earlier one was rejected.
 Involved: INVOICE-F07
 
 ### VERIFACTU-F31 Watch the submissions from the screens
-<!-- from WORKBOOK.md sha256:4f1b275f738e -->
+<!-- from WORKBOOK.md sha256:d0de00813f89 -->
 Status: done — also from the four Home panels
 Actor: employee, manager, administrator
 Screen: Records, Contingency, Events, Home
@@ -1016,7 +1016,10 @@ Steps:
    contingency queue" under the figure, in orange if it waits and in red if an attempt has already failed),
    "Records by status" and "Recent AEAT events" (the last eight, with their time, their type and their sentence).
    All of them update by themselves and whoever can look up the records sees them.
-3. The summaries (pending, by status, queue and latest events) can be asked of the assistant or through the API.
+3. The summaries (pending, by status, queue and latest events) can be asked of the assistant or through the API. To
+   "how many invoices do we still have to reach the tax agency?", the assistant counts the same as the "VeriFactu
+   pending" panel, the rejected ones too, which are never in the queue: an empty queue does not mean everything is at
+   the AEAT.
 In: the records and the events.
 Out: nothing; it is a lookup.
 If it fails: the message with "Retry".
