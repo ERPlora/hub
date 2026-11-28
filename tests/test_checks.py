@@ -221,6 +221,28 @@ def test_a_sound_frontend_change_passes_with_the_borrowed_dependencies(head_tree
     assert f"checks: pnpm exec vitest related --run --passWithNoTests {PROBE_TS}" in output, output[-4000:]
 
 
+#: A Python test that reads the component library as it loads, as the assistant card's tests read its texts.
+READS_UI_TEST = """from pathlib import Path
+
+PACKAGE = (Path(__file__).resolve().parents[3] / "packages/ui/package.json").read_text(encoding="utf-8")
+
+
+def test_the_library_is_there():
+    assert '"name"' in PACKAGE
+"""
+
+
+@needs_lent_frontend
+def test_a_python_change_whose_tests_read_the_component_library_passes_with_it_borrowed(head_tree):
+    """The tree's packages/ui is an empty submodule: the touched Python tests get it lent, as the frontend checks do."""
+    assert not (head_tree / "packages/ui/package.json").exists()  # positive control: the tree lacks it, as the hook's
+    (head_tree / "apps/demo/tests/test_reads_ui.py").write_text(READS_UI_TEST, encoding="utf-8")
+    done = checks(head_tree, "fast", "HEAD", database=True, CHECKS_DEPENDENCIES_FROM=str(LENDER))
+    output = done.stdout + done.stderr
+    assert done.returncode == 0, output[-8000:]
+    assert "apps/demo/tests/test_reads_ui.py" in output and "checks: pnpm" not in output, output[-4000:]
+
+
 @needs_lent_frontend
 def test_a_change_to_a_json_file_alone_fails_on_the_vitest_tests_that_import_it(head_tree):
     """As a new route in frontend/generated/operations.json that operation-routes.test.ts does not expect."""
