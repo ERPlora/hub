@@ -49,6 +49,7 @@ from base import public_images
 from base.operations import business_currency, hub_id
 from base.schemas.public_images import ImageUploadIn
 
+
 def _actor(ctx: OperationContext) -> str:
     return str(ctx.actor)[:ACTOR_MAX_LENGTH] if ctx.actor is not None else ""
 
