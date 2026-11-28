@@ -1,5 +1,5 @@
-"""Fixtures of the reservation tests: contexts per role and scope, a pinned business clock, and builders of the data a
-test starts from.
+"""Fixtures of the reservation tests: contexts per role and scope, a pinned business clock, builders of the data a
+test starts from, and what the tests of the writes share (the outbox's events and a refusal).
 
 The book's own rows (slots, blocked dates, settings) are built straight on the models: the operations are
 under test. The tables of Tables, the cards of Customers and the hours of Schedules are the real apps' —
@@ -20,7 +20,9 @@ from zoneinfo import ZoneInfo
 import pytest
 from django.utils import translation
 from live.context import OperationContext, Scope, system_context
+from live.errors import Conflict
 from live.meta import all_live_app_configs, permissions_for_role
+from live.models import OutboxEvent
 from live.operations import get
 from pydantic import ValidationError
 
@@ -50,6 +52,9 @@ CLOCKS_BACK = dt.date(2026, 10, 25)
 CLOCKS_FORWARD = dt.date(2026, 3, 29)
 #: Thursday 15 October 2026 at 21:00, as each language writes a day and a time (the card's own CLDR words).
 WHEN = {"es": "15 oct 2026 · 21:00", "en": "Oct 15, 2026 · 9:00 PM"}
+
+EMPLOYEE = "hub_employee"
+MANAGER = "hub_manager"
 
 
 def ctx_for(
@@ -89,6 +94,24 @@ def errors(schema, data) -> dict[str, str]:
         ".".join(str(p) for p in e["loc"]) or "__root__": e["msg"]
         for e in caught.value.errors()
     }
+
+
+def events(prefix: str = "reservation.") -> list[str]:
+    return list(
+        OutboxEvent.objects.filter(name__startswith=prefix)
+        .order_by("created_at", "id")
+        .values_list("name", flat=True)
+    )
+
+
+def payload(name: str) -> dict:
+    return OutboxEvent.objects.filter(name=name).latest("created_at", "id").payload
+
+
+def refusal(call) -> Conflict:
+    with pytest.raises(Conflict) as caught:
+        call()
+    return caught.value
 
 
 def pin_clock(monkeypatch, instant: dt.datetime) -> None:
@@ -136,6 +159,11 @@ def open_week(max_reservations: int = 10, **fields) -> None:
     for day in range(7):
         make_slot(day, "13:00", "16:00", max_reservations, **fields)
         make_slot(day, "20:00", "23:30", max_reservations, **fields)
+
+
+@pytest.fixture
+def week(db):
+    open_week()
 
 
 def make_blocked(date: dt.date = TOMORROW, **fields):
