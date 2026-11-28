@@ -59,7 +59,7 @@ class PackageListIn(PageIn):
 
 class PackageLineIn(In):
     service_id: UUID | None = Field(None, description="The service, by id.", json_schema_extra=A_SERVICE)
-    service: Said | None = Field(None, description="The service, by name.")
+    service: Said | None = Field(None, description="The service, by name.", json_schema_extra={"name_of": "service_id"})
     sessions: int = Field(
         1, ge=1, le=1000, description="Sessions of this service the voucher includes."
     )

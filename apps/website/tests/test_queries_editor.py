@@ -22,7 +22,8 @@ from apps.website.tests.conftest import (
     source_off,
     with_language,
 )
-from apps.website.tests.test_services import run
+from apps.website.models import Image
+from apps.website.tests.test_services import png_bytes, run, upload
 from base.models import Hub
 from base.tests.test_qr import expected_dark, png_dark, svg_dark
 
@@ -52,6 +53,25 @@ def test_the_site_says_what_is_published_and_whether_the_draft_moved_on():
     assert (out.published_version, out.is_live, out.has_changes) == (1, True, False)
     save(full_content(hero={"title": "New"}))
     assert run("website.site.get").has_changes is True
+
+
+def an_upload(filename: str, shade: int) -> dict:
+    """An upload of its own (``shade`` makes its bytes another), as the content names it."""
+    image = upload(png_bytes(colour=(shade, 30, 30)), filename=filename)
+    return {"id": str(image.id), "url": image.url}
+
+
+def test_the_site_names_each_image_by_the_file_it_was_uploaded_with(hub_files):
+    # flow: WEBSITE-F04 — the name it was uploaded with is how the person and the assistant call it (WEBSITE-F11).
+    logo, cover, photo = an_upload("logo.png", 1), an_upload("portada.jpg", 2), an_upload("cocina.webp", 3)
+    first, second = an_upload("sala.png", 4), an_upload("terraza.png", 5)
+    Image.objects.filter(pk=second["id"]).update(filename="")  # an upload of before its name was kept
+    gallery = {"images": [first, second]}
+    save(full_content(topbar={"logo": logo}, hero={"cover": cover}, about={"image": photo}, gallery=gallery))
+    content = run("website.site.get", ctx=ctx_for("hub_manager")).content
+    names = (content.topbar.logo.name, content.hero.cover.name, content.about.image.name)
+    assert names == ("logo.png", "portada.jpg", "cocina.webp")
+    assert [image.name for image in content.gallery.images] == ["sala.png", "PNG 4 × 3"]
 
 
 def test_an_employee_does_not_see_the_website():

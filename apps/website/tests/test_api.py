@@ -169,6 +169,22 @@ def test_an_image_bigger_than_djangos_ceiling_still_uploads(admin_client, hub_fi
 
 
 @HUB_DB
+def test_the_site_over_http_names_each_photo_by_its_file_and_takes_it_back(admin_client, hub_files):
+    """What the editor and an integrator read names each photo; sending it back as read is accepted and kept as before."""
+    buffer = io.BytesIO()
+    PILImage.new("RGB", (4, 3), (200, 30, 30)).save(buffer, format="PNG")
+    body = {"filename": "terraza.png", "content_type": "image/png", "data_base64": base64.b64encode(buffer.getvalue()).decode()}
+    photo = post(admin_client, "/website/images", body).json()
+    gallery = {"images": [{"id": photo["id"], "url": photo["url"]}]}
+    assert post(admin_client, "/website/site", {"template": "classic", "theme": {}, "content": full_content(gallery=gallery)}).status_code == 200
+    read = get(admin_client, "/website/site").json()
+    assert [image["name"] for image in read["content"]["gallery"]["images"]] == ["terraza.png"]
+    sent = {"template": read["template"], "theme": read["theme"], "content": read["content"]}
+    assert post(admin_client, "/website/site", sent).json()["has_changes"] is True  # never published: a draft
+    assert get(admin_client, "/website/site").json()["content"]["gallery"]["images"][0]["name"] == "terraza.png"
+
+
+@HUB_DB
 def test_an_image_past_the_plans_space_answers_409_with_the_code_of_files(admin_client, hub_files):
     from apps.website.models import Image
     from base.models import Hub

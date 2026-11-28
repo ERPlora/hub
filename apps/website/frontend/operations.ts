@@ -16,10 +16,12 @@ export interface NoIn {
   [key: string]: never;
 }
 
-/** An uploaded image: its id; the server writes its URL on every save. */
+/** An uploaded image: its id; the server writes its URL on every save and the name of its file on every read. */
 export interface ImageRef {
   id: string;
   url: string;
+  /** The name of the file it was uploaded with, as `website.site.get` reads it; never kept. */
+  name?: string;
 }
 
 export type PaletteId = 'ocean' | 'forest' | 'terracotta' | 'slate' | 'rose' | 'sand' | 'midnight' | 'olive';

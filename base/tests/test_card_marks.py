@@ -102,3 +102,43 @@ def test_a_price_by_the_unit_is_said_alone(sent):
     """By the unit, a price says nothing more, as the till writes «1,50 €»: the screen names it as its own."""
     card = assistant.cards.card(get("inventory.product.create"), {"name": "Café", "price": 150, **sent}, "es")
     assert "titled" not in shown(card, "price")
+
+
+# ── A figure with decimals, as the person's language writes it ───────────────────────────────────────────────────────
+
+
+@HUB_DB
+@pytest.mark.parametrize(
+    ("operation", "datum", "sent", "language", "said"),
+    [
+        ("tax.rule.create", "rate_pct", "5.2", "es", "5,2"),
+        ("tax.rule.create", "rate_pct", "5.2", "en", "5.2"),
+        ("sale.order.add_line", "quantity", "0.5", "es", "0,5"),
+        ("sale.order.add_line", "quantity", "2.000", "es", "2"),
+        ("inventory.stock.count", "stock", "1500.250", "es", "1.500,25"),
+        ("inventory.stock.count", "stock", "1500.250", "en", "1,500.25"),
+        ("attendance.settings.update", "workplace_lat", 40.4168, "es", "40,4168"),
+    ],
+    ids=["a rate", "a rate in English", "half a kilo", "a whole quantity", "thousands", "thousands in English", "a float"],
+)
+def test_a_figure_with_decimals_is_written_as_the_persons_language_writes_it(operation, datum, sent, language, said):
+    """An equivalence surcharge of 5,2 % reached the card as «Tipo (%): 5.2», with the point of English, and half a kilo
+    of prawns as «Cantidad: 0.5»: a figure is written as the screens write it in the person's language, without the
+    zeros it does not need, and named even first, since it says nothing of which datum it is."""
+    card = assistant.cards.card(get(operation), {datum: sent}, language)
+    assert (shown(card, datum)["kind"], shown(card, datum)["value"], shown(card, datum)["choice"]) == ("text", said, True)
+
+
+@HUB_DB
+def test_a_text_that_looks_like_a_figure_is_said_as_sent():
+    """A phone number or a postal code is a text, not a figure: never regrouped as one."""
+    card = assistant.cards.card(get("staff.member.create"), {"first_name": "Ana", "phone": "600000201"}, "es")
+    assert shown(card, "phone")["value"] == "600000201"
+    assert "choice" not in shown(card, "phone")
+
+
+@HUB_DB
+def test_a_figure_the_write_refuses_is_said_as_sent():
+    card = assistant.cards.card(get("sale.order.add_line"), {"quantity": "medio"}, "es")
+    assert shown(card, "quantity")["value"] == "medio"
+    assert "choice" not in shown(card, "quantity")

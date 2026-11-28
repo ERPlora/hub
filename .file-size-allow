@@ -21,7 +21,6 @@
 318 apps/pricing/frontend/operations.d.ts ERPlora/erplora-next#74
 331 apps/printing/frontend/operations.d.ts ERPlora/erplora-next#74
 390 apps/reservation/frontend/operations.d.ts ERPlora/erplora-next#74
-1035 apps/reservation/tests/test_services.py ERPlora/erplora-next#74
 594 apps/sale/frontend/components/checkout/CheckoutPanel.test.ts ERPlora/erplora-next#74
 971 apps/sale/frontend/operations.d.ts ERPlora/erplora-next#74
 564 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74

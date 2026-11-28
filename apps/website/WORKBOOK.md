@@ -379,7 +379,8 @@ Implicados: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BAS
 
 ### WEBSITE-F11 Mostrar una galería de fotos
 Estado: hecho (servidor, pantalla y e2e)
-Actor: propietario, administrador, asistente (ordenar o quitar fotos ya subidas), API
+Actor: propietario, administrador, asistente (ordenar o quitar fotos ya subidas, que reconoce por el nombre del
+archivo con el que se subieron: «pon primero la de la caña»), API
 Pantalla: Página web
 Pasos:
 1. Despliega **Galería** y pulsa **Añadir una foto** (una a una, hasta 12; «3 de 12 fotos» dice cuántas lleva).
@@ -458,8 +459,12 @@ borrador lleva su descripción (nombre, lema, texto de Sobre nosotros, galería,
 contacto, horario, ubicación, plantilla, paleta y fondo), y la descripción de guardar le dice que el borrador se manda entero: lo lee primero con `website.site.get`,
 cambia solo lo pedido y lo devuelve. Ejemplo: «Ponme en la web el horario de lunes a viernes de 9 a 20» → lee el
 borrador, pone en `contact.hours` los cinco días con la franja `09:00`–`20:00` (deja el resto como estaba) y llama a
-`website.site.save`; si además dice «y publícala», `website.site.publish`. No son herramientas del asistente, a
-propósito: la vista previa (`website.site.preview`, una página HTML), la subida de imágenes (`website.image.upload`,
+`website.site.save`; si además dice «y publícala», `website.site.publish`. En lo que lee, cada imagen (logotipo,
+portada, foto de Sobre nosotros y cada foto de la galería) lleva en `name` el nombre del archivo con el que se subió, o su
+formato y tamaño si se subió antes de guardarse ese nombre: «En la galería de la web, pon la foto de la caña la primera»
+→ lee el borrador, encuentra la foto cuyo archivo dice «caña» (`cerveza_cana.jpg`) y la devuelve la primera en
+`gallery.images`. Ese nombre lo escribe el servidor en cada lectura y no se guarda: lo que se manda en `name` no cuenta
+como cambio. No son herramientas del asistente, a propósito: la vista previa (`website.site.preview`, una página HTML), la subida de imágenes (`website.image.upload`,
 un fichero en base64 de hasta 5 MB) y el QR (`website.qr.get`, una imagen en base64), que se usan desde la pantalla, ni
 las tres lecturas públicas de los visitantes (`website.public.*`), ni las dos con las que su tarjeta nombra una imagen
 o una categoría (`website.image.get` y `website.category.get`).

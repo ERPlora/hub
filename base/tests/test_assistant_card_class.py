@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from base import assistant
 from base.tenancy.tests.business import HUB_DB, in_business_a
+from base.tests import card_values
 from base.tests.card_values import writes
 
 __all__ = ["in_business_a"]
@@ -205,3 +206,126 @@ def test_every_price_beside_its_unit_of_sale_says_it():
 def test_the_check_reads_what_a_value_means_from_its_description(description, value):
     said = NO_LIMIT_WORDS.search(description)
     assert (int(said.group(1)) if said else None) == value
+
+
+# ── A figure with decimals, as the person's language writes it ───────────────────────────────────────────────────────
+
+
+def takes_a_fraction(prop: dict, defs: dict) -> bool:
+    """Whether a datum takes a number that may carry decimals (a quantity, a percentage, a coordinate)."""
+    prop = shared.resolved(prop, defs)
+    branches = [shared.resolved(branch, defs) for branch in (*prop.get("anyOf", []), *prop.get("oneOf", []))]
+    return any(branch.get("type") == "number" for branch in branches or [prop])
+
+
+def fractions_as_sent(op: Operation) -> list[str]:
+    """The figures with decimals of ``op`` its card writes with the point of English to a person who reads Spanish, or
+    with no name before them."""
+    props, defs = schema_of(op)
+    found = []
+    for name, prop in props.items():
+        if not takes_a_fraction(prop, defs) or refuses(op, name, "5.2"):
+            continue
+        for language, written in (("es", "5,2"), ("en", "5.2")):
+            card = assistant.cards.card(op, {name: "5.2"}, language, card_values.ctx(language=language))
+            field = next((field for field in card["fields"] if field["name"] == name), None)
+            if field is not None and (field["value"], field.get("choice")) != (written, True):
+                found.append(f"{op.name}:{name}:{language}")
+    return found
+
+
+@HUB_DB
+def test_every_figure_with_decimals_is_written_as_the_persons_language_writes_it():
+    """An equivalence surcharge of 5,2 % reached the card as «Tipo (%): 5.2»: every figure with decimals of every write
+    is written as the screens write it in the person's language, and named even when it goes first."""
+    assert [found for op in writes() for found in fractions_as_sent(op)] == []
+
+
+# ── A list by what it carries ────────────────────────────────────────────────────────────────────────────────────────
+
+
+def by_name(prop: dict) -> bool:
+    """Whether a datum of a line is one a model sends when it names things by their names: a record by the words the
+    write finds it by (``as_said``), not by its id or its key — the card names those by reading them —, nor a yes or no,
+    a list or an object inside the line, which the card counts by design (a yes or no says nothing without its name)."""
+    by_words = prop.get("refers", {}).get("as_said") is True
+    is_id = prop.get("format") == "uuid" or SAYS_AN_ID.search(str(prop.get("description", ""))) or "refers" in prop
+    return (by_words or not is_id) and prop.get("type") not in ("boolean", "array", "object") and not prop.get("attempt_key")
+
+
+def item_by_name(prop: dict, defs: dict):
+    """An item of a list as a model sends it naming its records by their names: a text, or a line of what ``by_name``
+    takes; ``None`` when it carries nothing of the kind."""
+    prop = shared.resolved(prop, defs)
+    branches = [shared.resolved(branch, defs) for branch in prop.get("oneOf", [])]
+    prop = next((branch for branch in branches if "properties" in branch), prop)
+    if "properties" not in prop:
+        return sample(prop, defs, 1) if by_name(prop) else None
+    line = {key: sample(inner, defs, 1) for key, inner in prop["properties"].items() if by_name(shared.resolved(inner, defs))}
+    return line or None
+
+
+#: The lists the card still counts, because saying them needs what only their app knows: what a figure of a line means.
+COUNTED_UNTIL_THEIR_APP_SAYS_THEM = {
+    "pricing.rule.create:tiers": "a tier is two figures: from how many, and how much off",
+    "pricing.rule.update:tiers": "a tier is two figures: from how many, and how much off",
+}
+
+
+def another(item):
+    """A second item unlike ``item`` in its words, as two items of a list are (a list may refuse the same one twice)."""
+    if isinstance(item, dict):
+        return {key: another(value) for key, value in item.items()}
+    return "Otro texto" if item == "Texto" else item
+
+
+def lists_by_name(op: Operation):
+    """Each list of ``op`` a model may send naming things by their names: its datum, two items of it and whether the
+    write takes them."""
+    props, defs = schema_of(op)
+    for name, prop in props.items():
+        if shared.resolved(prop, defs).get("type") != "array":
+            continue
+        item = item_by_name(shared.resolved(prop, defs).get("items") or {}, defs)
+        if item is not None:
+            items = [item, another(item)]
+            yield name, items, not refuses(op, name, items)
+
+
+def counted(op: Operation) -> list[str]:
+    """The lists of ``op`` its card says as «N items» when the model names their records by their names."""
+    found = []
+    for name, items, taken in lists_by_name(op):
+        card = assistant.cards.card(op, {name: items}, "es", card_values.ctx()) if taken else {"fields": []}
+        if any(field["kind"] == "list" and not field.get("named") for field in card["fields"]):
+            found.append(f"{op.name}:{name}")
+    return found
+
+
+@HUB_DB
+def test_every_list_a_write_sends_is_said_item_by_item():
+    """A menu added to a check reached the card as «Platos: 3 elementos», a bundle as «Servicios incluidos: 1
+    elemento»: the person confirmed without seeing what. Every list of every write says each item it carries (its
+    name, a record by its name, its figures beside them); the ones that need their app to say them are listed."""
+    found = [found for op in writes() for found in counted(op)]
+    assert sorted(found) == sorted(COUNTED_UNTIL_THEIR_APP_SAYS_THEM)
+
+
+#: The lists the check above draws no card of: the write refuses the two items it makes up, because the data of a line
+#: go together (a day with its hours, a step with its settings). A new one falls here, never out of the check unseen.
+NOT_DRAWN = {
+    "customer.customer.update:field_values",
+    "flow.flow.create:steps",
+    "flow.flow.update:steps",
+    "sale.sale.refund:allocations",
+    "sale.sale.refund:lines",
+    "schedule.week.set_day:intervals",
+    "staff.schedule.create:days",
+    "staff.schedule.update:days",
+    "tax.rule.bulk_create:rules",
+}
+
+
+def test_the_lists_the_check_draws_no_card_of_are_listed():
+    found = [f"{op.name}:{name}" for op in writes() for name, _, taken in lists_by_name(op) if not taken]
+    assert sorted(found) == sorted(NOT_DRAWN)

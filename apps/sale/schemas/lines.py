@@ -31,6 +31,7 @@ from apps.sale.schemas.fields import (
     _text,
 )
 from apps.tax.schemas.references import A_TAX_CATEGORY
+from base.schemas.assistant import IN_OWN_WORDS
 
 
 class LineFields(Closed):
@@ -39,7 +40,7 @@ class LineFields(Closed):
         description="Quantity, in the product's unit (0.532 kg); 1 by default.",
     )
     notes: Note = Field(
-        "", description="A note for the kitchen and the ticket, e.g. no salt."
+        "", description="A note for the kitchen and the ticket, e.g. no salt.", json_schema_extra=IN_OWN_WORDS
     )
     staff_id: UUID | None = Field(
         None,
@@ -47,7 +48,7 @@ class LineFields(Closed):
         json_schema_extra=A_MEMBER,
     )
     is_gift: bool = Field(False, description="True: a comp, charged at 0.")
-    gift_reason: _text(200) = Field("", description="Why it is a comp.")
+    gift_reason: _text(200) = Field("", description="Why it is a comp.", json_schema_extra=IN_OWN_WORDS)
 
 
 class ProductLineIn(LineFields):
@@ -80,10 +81,12 @@ class ComboChoiceIn(Closed):
 
     option_id: UUID | None = Field(None, description="The choice's id (combo.combo.for_sale).", json_schema_extra=A_DISH)
     product: Said | None = Field(
-        None, description="The SKU or name of the product picked, when the choice's id is not known."
+        None,
+        description="The SKU or name of the product picked, when the choice's id is not known.",
+        json_schema_extra={"name_of": "option_id"},
     )
     group: Said | None = Field(
-        None, description="The course it is picked in, when the product is in several."
+        None, description="The course it is picked in, when the product is in several.", json_schema_extra=IN_OWN_WORDS
     )
     quantity: int = Field(
         1, ge=1, le=MAX_OPTIONS, description="How many times it is picked in one menu (two coffees: 2)."
@@ -107,7 +110,9 @@ class ComboLineFields(LineFields):
     """A menu of Menus with the dishes picked: Menus checks it and prices it, and the line keeps its answer."""
 
     combo_id: UUID | None = Field(None, description="The menu's id (combo.combo.for_sale).", json_schema_extra=A_MENU)
-    combo: Said | None = Field(None, description="The menu's name, when its id is not known.")
+    combo: Said | None = Field(
+        None, description="The menu's name, when its id is not known.", json_schema_extra={"name_of": "combo_id"}
+    )
     choices: list[ComboChoiceIn] = Field(
         default_factory=list,
         max_length=MAX_OPTIONS,
@@ -134,7 +139,10 @@ class OpenLineFields(LineFields):
         None, title=gettext_noop("Section"), description="The department it is charged at.", json_schema_extra=A_DEPARTMENT
     )
     department: _text(60, 1) | None = Field(
-        None, title=gettext_noop("Section"), description="The department's name, when its id is not known."
+        None,
+        title=gettext_noop("Section"),
+        description="The department's name, when its id is not known.",
+        json_schema_extra={"name_of": "department_id"},
     )
     tax_category_key: _text(80, 1) | None = Field(
         None,
@@ -142,7 +150,7 @@ class OpenLineFields(LineFields):
         json_schema_extra=A_TAX_CATEGORY,
     )
     name: _text(200) = Field(
-        "", description="The line's name; the department's by default."
+        "", description="The line's name; the department's by default.", json_schema_extra=IN_OWN_WORDS
     )
 
     @model_validator(mode="after")
@@ -167,7 +175,7 @@ class ServiceLineFields(LineFields):
         None, title=gettext_noop("Service"), description="The service's id (Services).", json_schema_extra=A_SERVICE
     )
     service: Said | None = Field(
-        None, description="The service's name, when its id is not known."
+        None, description="The service's name, when its id is not known.", json_schema_extra={"name_of": "service_id"}
     )
     unit_price: Cents | None = Field(
         None,
