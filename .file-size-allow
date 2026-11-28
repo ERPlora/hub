@@ -28,7 +28,6 @@
 564 apps/sale/frontend/pages/SalesPage.test.ts ERPlora/erplora-next#74
 862 apps/sale/models.py ERPlora/erplora-next#74
 686 apps/service/frontend/operations.d.ts ERPlora/erplora-next#74
-1083 apps/service/tests/test_services.py ERPlora/erplora-next#74
 600 apps/staff/frontend/components/MemberFormModal.test.ts ERPlora/erplora-next#74
 512 apps/staff/frontend/operations.d.ts ERPlora/erplora-next#74
 409 apps/table/frontend/operations.d.ts ERPlora/erplora-next#74

@@ -39,6 +39,10 @@ BAD_URL = _(
     "data can only go after the name, in the path or the query."
 )
 BAD_HEADER = _("«%(name)s» is no header this step can send.")
+KEY_IN_STEP = _(
+    "A key written in «%(name)s» would be on view to whoever opens the automation: save it in «Secrets», in the step "
+    "«Call another system», and write {{secret.NAME}} in its place, or use a secret already saved."
+)
 
 TriggerKind = Literal["event", "schedule", "at", "manual"]
 RunStatus = Literal[*FlowRun.Status.values]
