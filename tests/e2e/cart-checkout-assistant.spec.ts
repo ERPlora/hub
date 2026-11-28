@@ -112,9 +112,9 @@ test('cart-checkout-assistant-card — in Spanish marking an order paid names it
 // flow: base-assistant-money-mark (BASE-F97)
 // A line added to a cart in dollars must not read «12,50 €»: the write names the cart, not its currency. The card
 // reads the cart as the person and sends the price in its currency,
-// with its decimals (none in yen), as Shopify or Stripe show it. A normal card says its first three data in one line and
-// the price is the sixth: the screen that shows every datum (an automation's question, FLOW-F29) gets it from what the
-// server sends, checked here as it arrives. Cancelled: nothing is added.
+// with its decimals (none in yen), as Shopify or Stripe show it, inside the line it says right after the cart (the
+// product, how many and the price of one, CART_CHECKOUT-F02): the screen that shows every datum (an automation's
+// question, FLOW-F29) gets it from what the server sends, checked here as it arrives. Cancelled: nothing is added.
 test('base-assistant-money-mark — in Spanish a line added to a cart in another currency carries its price in it', async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -131,7 +131,8 @@ test('base-assistant-money-mark — in Spanish a line added to a cart in another
     const sent = sentCard(page);
     await askForACard(page, `E2E-ASK cart_checkout__item__add ${JSON.stringify({ cart_id: cart.id, ...line })}`);
     await expect(card(page)).toContainText(`Añadir en Carrito y pago: ${cart.session_token}`);
-    expect((await sent).fields.find((field) => field.name === 'unit_price')).toMatchObject({ kind: 'money', value: 1250, money });
+    const item = (await sent).fields.find((field) => field.name === 'item');
+    expect(item?.value).toMatchObject({ product_name: MASK, unit_price: { kind: 'money', value: 1250, money } });
     await cancelInSpanish(page);
   }
   for (const cart of [dollars, yen]) expect((await detail(context, cart)).items).toEqual([]);

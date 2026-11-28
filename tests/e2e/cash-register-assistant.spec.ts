@@ -44,7 +44,7 @@ let provider: Provider;
 let shirt: Product;
 let drawerId = '';
 /** Money as the card shows it to an English or a Spanish reader: the business's currency and decimals (base's
- *  `formatValue`). */
+ *  `formatValue`). The close's summary reaches the model written the same way (`money_text`). */
 let cardMoney: (cents: number, locale?: string) => string;
 /** The sessions this file opened: the only ones its cleanup deletes. */
 const mine = new Set<string>();
@@ -192,8 +192,6 @@ function toldSummary(): { raw: string; summary: Record<string, unknown> } {
   return { raw, summary: JSON.parse(raw || '{}') as Record<string, unknown> };
 }
 
-const euros = (cents: number) => `${(cents / 100).toFixed(2)} €`;
-
 test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summary first, then the dangerous card; «Cancel» leaves it open, the typed word closes it', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await login(page, A, '/cash_register/sessions');
@@ -207,11 +205,11 @@ test('CASH_REGISTER-F09 — «close the drawer with 250 € counted»: the summa
   // The summary, before the card: the session, the counted cash, the expected and the difference.
   const summary = lastAnswer(page);
   await expect(summary.locator('strong').first()).toHaveText(shift.number);
-  await expect(summary).toContainText(`Counted: ${euros(25000)}`);
-  await expect(summary).toContainText(`Expected: ${euros(expected)}`);
-  await expect(summary).toContainText(`Difference: +${euros(25000 - expected)}`);
+  await expect(summary).toContainText(`Counted: ${cardMoney(25000)}`);
+  await expect(summary).toContainText(`Expected: ${cardMoney(expected)}`);
+  await expect(summary).toContainText(`Difference: +${cardMoney(25000 - expected)}`);
   // The summary was the Hub's own reading, sent to the model as it is: never a figure the model made up.
-  expect(toldSummary().summary).toMatchObject({ number: shift.number, closing_balance: '250.00 EUR', expected_balance: `${(expected / 100).toFixed(2)} EUR` });
+  expect(toldSummary().summary).toMatchObject({ number: shift.number, closing_balance: cardMoney(25000), expected_balance: cardMoney(expected) });
   // The read never says it closed anything; the card is the dangerous one, naming the session and the count.
   await expect(receipts(page).filter({ hasText: 'Close in Cash register' })).toHaveCount(0);
   await expect(card(page)).toContainText('Close in Cash register. Check each detail before you continue.');
@@ -327,13 +325,13 @@ test('CASH_REGISTER-F07 — with the blind count on, a cashier asking to close g
   await askForACard(page, 'E2E-CLOSE-CASH 25000 cierra la caja con 250 € contados', { timeout: 30_000 });
   const summary = lastAnswer(page);
   await expect(summary.locator('strong').first()).toHaveText(shift.number);
-  await expect(summary).toContainText(`Counted: ${euros(25000)}`);
+  await expect(summary).toContainText(`Counted: ${cardMoney(25000)}`);
   await expect(summary).toContainText('Blind count');
   await expect(summary).not.toContainText('Expected');
   await expect(summary).not.toContainText('Difference');
   // Not even the model got them: the summary sent to it carries neither.
   const told = toldSummary();
-  expect(told.summary).toMatchObject({ number: shift.number, closing_balance: '250.00 EUR', expected_balance: null, difference: null, expected_hidden: true });
+  expect(told.summary).toMatchObject({ number: shift.number, closing_balance: cardMoney(25000), expected_balance: null, difference: null, expected_hidden: true });
   expect([told.raw.includes(String(expected)), told.raw.includes((expected / 100).toFixed(2))]).toEqual([false, false]);
   await expect(card(page)).toContainText('Counted cash: €250.00');
   // Nor does the card: what will happen names the session and its drawer, never the expected nor the difference.
