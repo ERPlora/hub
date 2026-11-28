@@ -10,7 +10,7 @@ from live.operations import get, operation
 from apps.appointment.queries.booking import bookable_members, check_member
 from apps.appointment.schemas.availability import SlotsIn
 from apps.online_booking.models import Settings
-from apps.online_booking.schemas import PublicServicePage, PublicServicesIn, PublicSlotsIn, PublicSlotsOut
+from apps.online_booking.schemas.public import PublicServicePage, PublicServicesIn, PublicSlotsIn, PublicSlotsOut
 from apps.online_booking.service_price import shown_price
 from apps.service.models.catalog import Service
 from apps.service.queries.settings import current_settings as service_settings

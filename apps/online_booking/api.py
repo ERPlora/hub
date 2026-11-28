@@ -12,17 +12,9 @@ from ninja import Query, Router
 from ninja.decorators import decorate_view
 
 from apps.online_booking import queries, services
-from apps.online_booking.schemas import (
-    BookingListIn,
-    BookingRefIn,
-    CancelIn,
-    PublicBookIn,
-    PublicCancelIn,
-    PublicServicesIn,
-    PublicSlotsIn,
-    SettingsIn,
-    TokenIn,
-)
+from apps.online_booking.schemas.bookings import BookingListIn, BookingRefIn, CancelIn
+from apps.online_booking.schemas.public import PublicBookIn, PublicCancelIn, PublicServicesIn, PublicSlotsIn, TokenIn
+from apps.online_booking.schemas.settings import SettingsIn
 from base.public_images import MAX_UPLOAD_BODY
 from base.request_body import accept_body_up_to
 from base.schemas.public_images import ImageUploadIn

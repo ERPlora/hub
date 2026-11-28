@@ -5,7 +5,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.appointment.queries.business import current_settings as current_rules
-from apps.online_booking.schemas import NoIn, PageOut
+from apps.online_booking.schemas.fields import NoIn
+from apps.online_booking.schemas.public import PageOut
 from base.business import zone_name
 
 from .settings import page_settings

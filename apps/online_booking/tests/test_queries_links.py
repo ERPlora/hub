@@ -8,7 +8,7 @@ from live.errors import NotFound
 from apps.online_booking.models import Booking
 from apps.online_booking.queries.links import public_booking
 from apps.online_booking.queries.visitors import hash_token
-from apps.online_booking.schemas import TokenIn
+from apps.online_booking.schemas.public import TokenIn
 
 from .conftest import HUB_DB, MONDAY, TUESDAY, at, make_appointment, make_page, make_rules, public, public_ctx
 

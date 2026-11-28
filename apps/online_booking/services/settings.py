@@ -8,7 +8,7 @@ from apps.appointment.schemas import settings as diary_settings
 from apps.online_booking.events import SETTINGS_UPDATED
 from apps.online_booking.models import Settings
 from apps.online_booking.queries.settings import RULE_FIELDS, settings_out
-from apps.online_booking.schemas import SettingsIn, SettingsOut
+from apps.online_booking.schemas.settings import SettingsIn, SettingsOut
 from base.queries.people import actor_name
 
 from .logo import check_logo
