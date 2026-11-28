@@ -2,14 +2,13 @@
 // server-side DataTable — Code (with «General»), Name, Currency, Customer group, Tax, Validity, Prices and
 // Status —, «Search code or name…», column filters, 50 a page by name. A row and its «Open» open the list;
 // whoever manages gets «+», Edit, Make general, Deactivate and Activate, each where it applies.
-import { DataTable, EmptyState } from '@erplora/ui/components';
+import { EmptyState } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
-import type { Component } from 'vue';
 
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { EMPLOYEE, flush, mountPricing, type MountOptions, page } from '../__tests__/mount-pricing';
-import { itRetriesAFailedLoad, itStartsOnTheActiveOnes } from '../__tests__/table-checks';
+import { itRetriesAFailedLoad, itStartsOnTheActiveOnes, tableOf } from '../__tests__/table-checks';
 import ListConfirm from './ListConfirm.vue';
 import PriceListFormModal from './PriceListFormModal.vue';
 import PriceListsTable from './PriceListsTable.vue';
@@ -19,19 +18,13 @@ const GENERAL = priceList({ id: 'l0', code: 'GEN', name: 'General', customer_gro
 const VIP = priceList({ tax_included: true, valid_from: '2026-07-01', valid_until: '2026-08-31' });
 const OLD = priceList({ id: 'l2', code: 'OLD', name: 'Old', customer_group_id: null, customer_group_name: null, is_active: false, currency: 'USD', tax_included: false, item_count: 0 });
 
-type Action = { id: string; label: string; hidden?: (row: unknown) => boolean };
 
 /** The table live, with the hub's business answered (`null`: it has not answered yet). */
 async function setup(options: MountOptions = {}, owner: Business | null = business()) {
   const m = await mountPricing(PriceListsTable, options);
   await m.live();
   if (owner) await m.result('base.business.get', owner);
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const rows = () => m.wrapper.findAll('[data-testid="pricing-lists-row"]');
-  const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => c.text().trim());
-  const shownFor = (row: unknown) => prop<Action[]>('actions').filter((a) => !a.hidden?.(row)).map((a) => a.id);
-  return { ...m, table, prop, rows, cells, shownFor, show: (data: unknown) => m.result(OP, data) };
+  return tableOf(m, 'pricing-lists', OP);
 }
 
 describe('PriceListsTable', () => {

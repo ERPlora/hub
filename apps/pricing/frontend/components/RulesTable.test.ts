@@ -2,14 +2,14 @@
 // server-side DataTable — Code, Name, Type, Value (with its unit), Applies to, Validity, Priority and
 // Status —, «Search code or name…», column filters, 50 a page by name. Whoever manages gets «+», Edit,
 // Deactivate (asking first), Activate and Delete (asking first).
-import { ConfirmDialog, DataTable, EmptyState } from '@erplora/ui/components';
+import { ConfirmDialog, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, rule } from '../__tests__/fixtures';
 import { click, EMPLOYEE, flush, mountPricing, type MountOptions, page, settle } from '../__tests__/mount-pricing';
-import { itRetriesAFailedLoad, itStartsOnTheActiveOnes } from '../__tests__/table-checks';
+import { itRetriesAFailedLoad, itStartsOnTheActiveOnes, tableOf } from '../__tests__/table-checks';
 import RuleFormModal from './RuleFormModal.vue';
 import RulesTable from './RulesTable.vue';
 
@@ -18,19 +18,13 @@ const TEN = rule();
 const FIX = rule({ id: 'r2', code: 'FIX', name: 'Fifty off', rule_type: 'fixed', percent: null, amount: 50, applies_to: 'product', product_id: 'p1', product_name: 'Shampoo', priority: 5 });
 const OFF = rule({ id: 'r3', code: 'OFF', name: 'Old', rule_type: 'buy_x_get_y', percent: null, buy_quantity: 2, get_quantity: 1, is_active: false, customer_group_id: 'g1', customer_group_name: 'VIP', valid_until: '2026-06-30' });
 
-type Action = { id: string; hidden?: (row: unknown) => boolean };
 
 /** The table live, with the hub's business answered. */
 async function setup(options: MountOptions = {}, owner: Business = business()) {
   const m = await mountPricing(RulesTable, options);
   await m.live();
   await m.result('base.business.get', owner);
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const rows = () => m.wrapper.findAll('[data-testid="pricing-rules-row"]');
-  const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => c.text().trim());
-  const shownFor = (row: unknown) => prop<Action[]>('actions').filter((a) => !a.hidden?.(row)).map((a) => a.id);
-  return { ...m, table, prop, rows, cells, shownFor, show: (data: unknown) => m.result(OP, data) };
+  return tableOf(m, 'pricing-rules', OP);
 }
 
 /** The rule's «Delete» confirmation (open or closed). */
