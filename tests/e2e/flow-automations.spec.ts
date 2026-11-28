@@ -2,10 +2,12 @@
 // from the gallery opens on its Permissions and is allowed what it needs; another is built from
 // scratch — «Do something» → «Create a task» with its title —, saved, allowed, turned on and run by hand,
 // and its history says it finished well while the task is in Tasks; the list turns one off, copies one
-// and deletes the copy (asked first). The list and the editor are captured in the three viewports.
+// and deletes the copy (asked first). «Try it», Permissions and the steps of the run say everything in words, never an
+// internal code (`expectInWords`, hub#2629). The list and the editor are captured in the three viewports.
 // What it creates is removed after it by its ids (the task by its unique title).
 import { expect, type Page, test } from '@playwright/test';
 
+import { expectInWords, grantAllAndSwitchOn, openRun } from './flow-helpers';
 import { A, api, psql, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { signedIn, VIEWPORTS } from './task-helpers';
@@ -82,21 +84,21 @@ test('an automation from the gallery and one from scratch, allowed, on, run by h
     await shown(page).locator('[data-testid=flow-editor-test]').click();
     await expect(shown(page).locator('[data-testid=flow-test-banner]')).toContainText('None of this is real.');
     await expect(shown(page).locator('[data-testid=flow-test-step-s1]')).toHaveAttribute('data-outcome', 'not_allowed');
+    await expectInWords(page, context);
 
     // FLOW-F12, F14: allowed, on, saved.
-    await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
-    await shown(page).locator('[data-testid=flow-perm-grantall]').click();
+    await grantAllAndSwitchOn(page);
     await expect(shown(page).locator('[data-testid^="flow-perm-granted-task.task.create"]')).toBeVisible();
-    await shown(page).locator('[data-testid=flow-editor-enabled]').click();
-    await shown(page).locator('[data-testid=flow-editor-save]').click();
-    await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
+    await expectInWords(page, context);
     await expect(shown(page).locator('[data-testid=flow-editor-state]')).toContainText('Active');
 
     // FLOW-F15, F16: run by hand, asked first; the history says it finished well; the task is in Tasks.
     await shown(page).locator('[data-testid=flow-editor-run]').click();
     await confirmDialog(page, 'Run it now?');
     await shown(page).locator('[data-testid=flow-editor-tab-history]').click();
-    await expect(shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: 'Finished well' }).first()).toBeVisible();
+    const run = await openRun(page, 'Finished well');
+    await expect(run.locator('[data-testid^=flow-run-steps-] li')).toHaveText(['Did: Create a task']);
+    await expectInWords(page, context);
     const tasks = await api<{ rows: { title: string }[] }>(context, A, 'GET', `/task/tasks?search=${encodeURIComponent(title)}`);
     expect(tasks.data.rows.map((row) => row.title)).toEqual([title]);
 

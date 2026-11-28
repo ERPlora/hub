@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import type { CatalogOut, RunOut, Step } from '../operations';
+import { catalogNames, internalCodesIn } from '../__tests__/internal-codes';
 import { click, errorFrame, mountFlow, settle } from '../__tests__/mount-flow';
 import HistoryPanel from './HistoryPanel.vue';
 
@@ -134,6 +135,28 @@ describe('HistoryPanel', () => {
     expect(m.find('flow-run-steps-r1').exists()).toBe(false);
     await click(m.find('flow-run-toggle-r1').element);
     expect(m.find('flow-run-steps-r1').text()).toContain('Did: Create a task');
+  });
+
+  it('a call that failed says once what it called and why, never the id of its step (hub#2586)', async () => {
+    const call: Step = { id: 's4', kind: 'http', method: 'POST', url: 'https://qa.invalid/notice', headers: {}, body: '', timeout: 5 };
+    const why = 'It could not reach «qa.invalid», so it stopped.';
+    const at = '2026-10-15T10:00:00+02:00';
+    const failed = run('r4', {
+      status: 'failed',
+      error_code: 'flow.http_unreachable',
+      error_message: why,
+      log: [
+        { step: 's4', kind: 'http', outcome: 'calling', host: 'qa.invalid', at },
+        { step: 's4', kind: 'http', outcome: 'failed', at, error: { code: 'flow.http_unreachable', message: why } },
+      ],
+    });
+    const m = await mountFlow(HistoryPanel, { props: { flowId: 'f1', steps: [call], catalog: CATALOG } });
+    await m.live();
+    await m.result(OP, { rows: [failed], total: 1, limit: 20, offset: 0, failed: 1 });
+    await click(m.find('flow-run-toggle-r4').element);
+    const lines = m.find('flow-run-steps-r4').findAll('li').map((line) => line.text());
+    expect(lines).toEqual([`Call qa.invalid: ${why}`]);
+    expect(internalCodesIn(m.find('flow-run-r4').text(), catalogNames(CATALOG))).toEqual([]);
   });
 
   it('copies its reference for support', async () => {

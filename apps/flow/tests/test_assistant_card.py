@@ -141,3 +141,42 @@ def test_a_draft_that_runs_once_says_its_moment_at_the_businesss_hour():
     arguments = {**REVIEW, "definition": {"trigger": {"kind": "at", "at": "2026-12-01T09:00:00+00:00"}, "steps": [TASK]}}
     said = dict(its_line(drawn("flow.draft.propose", arguments, "es")))["when"]
     assert said.startswith(when("es", "at", date="")) and "1 dic 2026" in said and "09:00:00" not in said
+
+
+#: What the card must never show, whatever the step: the id of a step, a name in snake case or the permission to call
+#: another system («http:https://…»), as the screens' check of Automations reads it (``internal-codes.ts``).
+INTERNAL = re.compile(r"(?<![\w.-])s\d+(?!\w)|(?<![\w.@/-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![\w@])|http:https?://")
+
+
+def said_on(fields: list[dict]) -> str:
+    """What the owner reads on the card: each field's label and value."""
+    def texts(value: object) -> list[str]:
+        if isinstance(value, list):
+            return [text for item in value for text in texts(item)]
+        return [str(value)] if value not in (None, "") else []
+
+    return " · ".join(text for field in fields for text in [*texts(field.get("label")), *texts(field.get("value"))])
+
+
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_no_kind_of_step_shows_an_internal_code_on_the_card(language):
+    """Every kind of step, with ids that would show if a step were named by its id (hub#2629): a draft takes the
+    conditions, waits and actions, a new automation every kind."""
+    steps = [
+        {"id": "s1", "kind": "condition", "when": {"input.difference": {"neq": 0}}},
+        {"id": "s2", "kind": "delay", "seconds": 3600},
+        {**TASK, "id": "s3"},
+        {"id": "s4", "kind": "query", "operation": "customer.customer.list", "params": {}, "result": "count"},
+        {"id": "s5", "kind": "http", "method": "POST", "url": "https://api.example.com/x", "headers": {}, "body": "", "timeout": 10},
+        {"id": "s6", "kind": "ask", "title": "¿Seguro?", "details": "", "role": "manager", "hours": 24, "on_no": "stop", "on_timeout": "no"},
+        {"id": "s7", "kind": "assistant", "prompt": "Resume el día", "tools": [], "mode": "ask", "max_rounds": 6},
+    ]
+    proposed = {**REVIEW, "definition": {"trigger": CLOSED, "steps": steps[:3]}}
+    created = {"name": "Repasar el cierre de caja", "trigger": CLOSED, "steps": steps}
+    for write, arguments, said in (("flow.draft.propose", proposed, 3), ("flow.flow.create", created, 7)):
+        fields = drawn(write, arguments, language)
+        assert len(dict(its_line(fields))["steps"]) == said, write
+        shown = said_on(fields)
+        assert INTERNAL.findall(shown) == [], write
+        assert [code for code in CODES if code.strip('"') in shown.split(" · ")] == [], write
+    assert "api.example.com" in shown

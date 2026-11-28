@@ -3,11 +3,12 @@
 // («Create a task», never «task.task.create») and says «Open Permissions and allow what it needs.» once: in the
 // editor's notice after «Run now», on its card in History and with its steps open after it was resumed and stopped
 // again. Read in Spanish, the card says «Crear una tarea» and «Abre Permisos y concédele lo que necesita.» once.
+// Nothing on those screens is an internal code (`expectInWords`, hub#2629).
 // The owner of hub `a` runs a manual automation that creates a task but was granted nothing, at 390, 834 and 1440 px;
 // each size leaves its captures. Its automations are deleted however the test ends.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { confirmDialog, deleteFlowsNamed, manualFlow, ownerOnAutomations } from './flow-helpers';
+import { confirmDialog, deleteFlowsNamed, expectInWords, manualFlow, ownerOnAutomations } from './flow-helpers';
 import { A, capture, saveSessionForTheSweep, shown } from './helpers';
 import { noHorizontalScroll, VIEWPORTS } from './schedule-helpers';
 
@@ -43,6 +44,7 @@ for (const viewport of VIEWPORTS) {
       await runNow(page);
       const notice = shown(page).locator('[data-testid=flow-editor-error]');
       await expect(notice).toHaveText(`It ran and stopped by an error: ${WHY} ${ADVICE}`);
+      await expectInWords(page, context);
       await noHorizontalScroll(page, viewport.label);
       await capture(page, `${KEY}-editor-${viewport.label}`);
 
@@ -62,6 +64,7 @@ for (const viewport of VIEWPORTS) {
       await expect(steps).toContainText('Resumed here, from the step that had failed');
       expect(await timesIn(card, ADVICE)).toBe(1);
       await expect(card).not.toContainText('task.task.create');
+      await expectInWords(page, context);
       await noHorizontalScroll(page, viewport.label);
       await capture(page, `${KEY}-history-${viewport.label}`);
 
@@ -70,6 +73,7 @@ for (const viewport of VIEWPORTS) {
       const inSpanish = shown(page).locator('[data-testid^=flow-run-]').filter({ hasText: 'Se paró por un error' }).first();
       await expect(inSpanish.locator('[data-testid^=flow-run-trouble-]')).toContainText(WHY_ES);
       expect(await timesIn(inSpanish, ADVICE_ES)).toBe(1);
+      await expectInWords(page, context);
       await capture(page, `${KEY}-history-es-${viewport.label}`);
       await saveSessionForTheSweep(context);
     } finally {

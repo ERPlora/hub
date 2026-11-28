@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
+import { type CatalogShape, catalogNames, internalCodesIn } from '../../apps/flow/frontend/__tests__/internal-codes';
 import { A, api, type Credentials, HUB_DIR, login, OWNER, psql, saveSessionForTheSweep, shown } from './helpers';
 import { settledCapture } from './screen';
 import { toastSaying } from './toast-helpers';
@@ -201,4 +202,15 @@ export async function questionSays(stage: { context: BrowserContext; page: Page;
 
   await card.locator('[data-testid^=flow-question-reject-]').click();
   await expect(card).toHaveCount(0);
+}
+
+/** Fails if what the owner sees on Automations — the page shown and a dialog or a list open over it — shows an internal
+ *  code instead of its words: the name of an operation or an event of this business's catalog, the id of a step, a name
+ *  in snake case or the values of a closed list as the action keeps them (`internalCodesIn`). */
+export async function expectInWords(page: Page, context: BrowserContext): Promise<void> {
+  const catalog = await api<CatalogShape>(context, A, 'GET', '/flow/catalog');
+  expect(catalog.status, JSON.stringify(catalog.data)).toBe(200);
+  const overlays = page.locator('ion-modal:not(.overlay-hidden), ion-popover:not(.overlay-hidden)');
+  const texts = [await shown(page).innerText(), ...(await overlays.allInnerTexts())];
+  expect(internalCodesIn(texts.join('\n'), catalogNames(catalog.data))).toEqual([]);
 }
