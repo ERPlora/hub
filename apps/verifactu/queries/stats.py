@@ -29,8 +29,9 @@ from .route import config_row
     output=ComplianceSummaryOut,
     expose_api=True,
     ai={
-        "description": "How many VeriFactu records are not in the AEAT yet, rejected, accepted and in total: whether "
-        "everything reached the AEAT.",
+        "description": "How many VeriFactu records of invoices are not in the AEAT yet (pending, sent without an "
+        "answer or rejected, as the Home's «VeriFactu pending» panel counts them), accepted and in total: whether "
+        "every invoice reached the AEAT.",
         "asks": {
             "en": (
                 "has everything reached the AEAT?",
@@ -39,6 +40,7 @@ from .route import config_row
             "es": (
                 "¿ha llegado todo a Hacienda o falta algo?",
                 "¿queda algo pendiente o rechazado sin llegar a la AEAT?",
+                "¿tenemos facturas rechazadas o sin enviar a Hacienda?",
             ),
         },
     },
@@ -94,7 +96,9 @@ def records_by_status(ctx: OperationContext, data: NoInput) -> RecordsByStatusOu
     input=NoInput,
     output=ContingencySummaryOut,
     ai={
-        "description": "The queue in short: how many records wait, how many are due now, and whether it is failing.",
+        "description": "The queue in short: how many records wait, how many are due now, and whether it is failing. "
+        "The rejected are never in it: how many invoices are not in the AEAT yet is "
+        "verifactu.stats.compliance_summary.",
         "asks": {
             "en": (
                 "sum up the VeriFactu contingency: is it failing?",

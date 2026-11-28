@@ -970,7 +970,10 @@ Pasos:
    que espera en la cola, con «En cola de contingencia» bajo la cifra, en naranja si espera y en rojo si ya ha
    fallado algún intento), «Registros por estado» y «Eventos AEAT recientes» (los ocho últimos, con su hora, su tipo
    y su frase). Todos se ponen al día solos y los ve quien puede consultar los registros.
-3. Los resúmenes (pendientes, por estado, cola y últimos eventos) se pueden pedir al asistente o por la API.
+3. Los resúmenes (pendientes, por estado, cola y últimos eventos) se pueden pedir al asistente o por la API. A
+   «¿cuántas facturas nos quedan por llegar a Hacienda?», el asistente cuenta lo mismo que el panel «Pendientes
+   VeriFactu», también las rechazadas, que nunca están en la cola: una cola vacía no quiere decir que todo esté en la
+   AEAT.
 Entra: los registros y los eventos.
 Sale: nada; es consulta.
 Si falla: el mensaje con «Reintentar».
