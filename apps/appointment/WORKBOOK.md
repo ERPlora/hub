@@ -1003,7 +1003,7 @@ agenda tuya que enseñar.».
   reservar o mover nunca podía («You may only book your own appointments.»), y una API key abierta sobre
   `appointment.appointment.create` tampoco. No presta nada: sin el permiso, `@operation` lo rechaza; una persona sigue
   con «las suyas». Lo usan los pasos de Automatizaciones (FLOW-F12) y desbloquea la cita por WhatsApp
-  (WHATSAPP_INBOX-F21 y F22, hub#514). Tests: `test_services.py` (`test_what_is_not_a_person_*`,
+  (WHATSAPP_INBOX-F21 y F22, hub#514). Tests: `test_services_writes.py` (`test_what_is_not_a_person_*`,
   `test_a_person_with_their_own_permission_*`) y `apps/flow/tests/test_services_appointment_steps.py`.
 - **Cancelar desde una automatización** (hub#634): `appointment.appointment.cancel` sigue siendo `risk: "high"`, así que
   solo lo recibe un paso que pregunta antes (`ASK_FIRST` de Automatizaciones). Como `is_own` le da a la automatización
