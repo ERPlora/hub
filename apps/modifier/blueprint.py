@@ -69,6 +69,7 @@ def _group_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None
 DATASETS = [
     Dataset(
         key="modifier.group",
+        models=("ModifierGroup", "ModifierOption", "ModifierLink"),
         label=_("Modifier groups"),
         rows=_group_rows,
         ids=ids_of("modifier.group.list"),

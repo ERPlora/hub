@@ -14,6 +14,15 @@ from apps.schedule.events import WEEK_UPDATED
 class ScheduleConfig(LiveAppConfig):
     name = "apps.schedule"
     label = "schedule"
+    blueprint_stays = {
+        "WeekDay": "pending",
+        "WeekDayInterval": "pending",
+        "SpecialDay": "pending",
+        "SpecialDayInterval": "pending",
+        "Override": "pending",
+        "OverrideInterval": "pending",
+        "ScheduleSettings": "settings",
+    }
     kind = "app"
     verbose_name = _("Schedules")
     icon = "ion:time-outline"

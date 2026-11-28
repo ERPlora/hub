@@ -11,6 +11,10 @@ from apps.tax.events import RULE_IN_FORCE_EVENTS
 class TaxConfig(LiveAppConfig):
     name = "apps.tax"
     label = "tax"
+    blueprint_stays = {
+        "TaxAlias": "internal",
+        "TaxSettings": "settings",
+    }
     kind = "app"
     verbose_name = _("Taxes")
     icon = "ion:calculator-outline"

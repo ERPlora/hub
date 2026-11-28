@@ -11,6 +11,13 @@ from apps.invoice.events import ISSUER_UPDATED, SERIES_EVENTS
 class InvoiceConfig(LiveAppConfig):
     name = "apps.invoice"
     label = "invoice"
+    blueprint_stays = {
+        "InvoiceEmail": "history",
+        "InvoiceSeries": "fiscal",
+        "Issuer": "fiscal",
+        "Invoice": "fiscal",
+        "InvoiceLine": "fiscal",
+    }
     kind = "app"
     verbose_name = _("Invoicing")
     icon = "ion:receipt-outline"

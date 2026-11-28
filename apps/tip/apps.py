@@ -8,6 +8,10 @@ from live.meta import Category, CheckoutStep, LiveAppConfig, Nav
 class TipConfig(LiveAppConfig):
     name = "apps.tip"
     label = "tip"
+    blueprint_stays = {
+        "Settings": "settings",
+        "Tip": "history",
+    }
     kind = "app"
     verbose_name = _("Tips")
     icon = "ion:wallet-outline"

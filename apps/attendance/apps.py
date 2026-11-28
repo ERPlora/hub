@@ -11,6 +11,12 @@ from apps.attendance.events import WHO_IS_IN
 class AttendanceConfig(LiveAppConfig):
     name = "apps.attendance"
     label = "attendance"
+    blueprint_stays = {
+        "Record": "history",
+        "Break": "history",
+        "Correction": "history",
+        "AttendanceSettings": "settings",
+    }
     kind = "app"
     verbose_name = _("Time clock")
     # Not `ion:time-outline`: that is the Schedules app's icon on the apps page.

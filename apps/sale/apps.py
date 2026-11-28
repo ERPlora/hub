@@ -12,6 +12,20 @@ from base.allergens import ALLERGENS
 class SaleConfig(LiveAppConfig):
     name = "apps.sale"
     label = "sale"
+    blueprint_stays = {
+        "PaymentMethod": "settings",
+        "Settings": "settings",
+        "Order": "history",
+        "OrderLine": "history",
+        "Sale": "history",
+        "SaleLine": "history",
+        "SalePayment": "history",
+        "SaleCounter": "internal",
+        "Refund": "history",
+        "RefundPayment": "history",
+        "RefundLine": "history",
+        "VoucherSession": "history",
+    }
     kind = "app"
     verbose_name = _("Sales & POS")
     icon = "ion:cart-outline"
@@ -220,3 +234,10 @@ class SaleConfig(LiveAppConfig):
         from apps.sale import queries  # the models are not loaded yet when this module is
 
         return queries.sales.keeps_fiscal_documents()
+
+    def blueprint_datasets(self) -> list:
+        """What of Sales travels in an export of the business (BASE-F35): the open price departments and the quick
+        notes, never a sale."""
+        from apps.sale import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS

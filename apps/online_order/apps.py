@@ -8,6 +8,11 @@ from live.meta import Category, LiveAppConfig, Nav
 class OnlineOrderConfig(LiveAppConfig):
     name = "apps.online_order"
     label = "online_order"
+    blueprint_stays = {
+        "TableCode": "outside",
+        "Order": "history",
+        "OrderLine": "history",
+    }
     kind = "app"
     verbose_name = _("Online orders")
     icon = "ion:qr-code-outline"
