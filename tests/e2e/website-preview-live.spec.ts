@@ -34,7 +34,9 @@ test('WEBSITE-F06: a draft saved outside the editor reloads the preview on its o
       await saveTaglineElsewhere(page, found, tagline);
       await expect(page.getByTestId('website-field-hero-tagline').locator('input')).toHaveValue(tagline);
       if (await tabs.isVisible()) await tabs.locator('ion-segment-button').filter({ hasText: 'Preview' }).click();
-      await expect(preview(page).getByText(tagline, { exact: true })).toBeVisible({ timeout: 15_000 });
+      const shown = preview(page).getByText(tagline, { exact: true });
+      await expect(shown).toBeVisible({ timeout: 15_000 });
+      await shown.scrollIntoViewIfNeeded();
       expect(await horizontalOverflow(page), `sideways scroll at ${label}`).toBeLessThanOrEqual(1);
       await atRest(page);
       await capture(page, `APP-WEBSITE-PREVIEW-LIVE-${label}`);
