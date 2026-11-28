@@ -1,6 +1,6 @@
 """Fixtures of the service tests: contexts per role and scope, users with a role on a host, a raw DSN,
 builders of the data a test starts from (straight to the models: the operations are under test) and the
-helpers the tests of the writes share.
+helpers the tests of the reads and the writes share.
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
@@ -164,15 +164,20 @@ def refused(**create) -> bool:
     return False
 
 
-# Helpers of the writes' tests
+# Helpers the tests of the reads and the writes share
 
 
-def run(name, data, role="hub_admin", **ctx):
+def run(name, data=None, role="hub_admin", **ctx):
     op = get(name)
-    return op(
-        ctx_for(role, **ctx),
-        op.input.model_validate(data) if isinstance(data, dict) else data,
-    )
+    if data is None:
+        data = op.input()
+    elif isinstance(data, dict):
+        data = op.input.model_validate(data)
+    return op(ctx_for(role, **ctx), data)
+
+
+def names(page) -> list[str]:
+    return [row.name for row in page.rows]
 
 
 def events() -> list[str]:
@@ -185,4 +190,4 @@ def payload(name: str) -> dict:
 
 @pytest.fixture
 def tax():
-    return make_tax("test.service", "Service — test")
+    return make_tax()
