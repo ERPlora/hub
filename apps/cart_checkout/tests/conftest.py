@@ -1,6 +1,7 @@
 """Fixtures of the cart_checkout tests: contexts per role and scope, a fixed clock, builders of the data a test
-starts from (straight to the models: the operations are under test), and the helpers that run an operation and read
-the events it left, which the tests of every module of services/ share.
+starts from (straight to the models: the operations are under test), the helpers that run an operation and read
+the events it left, which the tests of every module of services/ share, and the shop of carts and orders the tests of
+every module of queries/ read.
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
@@ -134,12 +135,54 @@ def make_order(
     )
 
 
+# The shop the reads start from
+
+
+def at(moment: dt.datetime, **fields) -> Cart:
+    """A cart created at ``moment`` (created_at is set by the database on insert)."""
+    cart = make_cart(**fields)
+    Cart.objects.filter(pk=cart.pk).update(created_at=moment)
+    return Cart.objects.get(pk=cart.pk)
+
+
+@pytest.fixture
+def shop():
+    """Four live carts and a deleted one, created an hour apart (the newest last)."""
+    start = NOW - dt.timedelta(hours=5)
+    hour = dt.timedelta(hours=1)
+    ana = at(start, session_token="sess_ana", customer_email="ana@example.com", customer_name="Ana García",
+             total_items=Decimal("2"), total_amount=2500, notes="VIP")
+    bea = at(start + hour, session_token="sess_bea", customer_email="bea@example.com", customer_name="Bea López",
+             status="abandoned", total_items=Decimal("1"), total_amount=900, currency="USD")
+    old = at(start + 2 * hour, session_token="anon_1", expires_at=EARLIER, total_items=Decimal("0.5"), total_amount=300)
+    fresh = at(start + 3 * hour, session_token="anon_2", expires_at=LATER)
+    at(start + 4 * hour, session_token="sess_gone", deleted_at=EARLIER)
+    return {"ana": ana, "bea": bea, "old": old, "fresh": fresh}
+
+
+@pytest.fixture
+def orders(shop):
+    first = make_order(shop["ana"], order_number="OS-20261013-0001", customer_email="ana@example.com",
+                       total_amount=2500, payment_method="Card", status="completed",
+                       placed_at=NOW - dt.timedelta(days=1), paid_at=NOW - dt.timedelta(days=1))
+    second = make_order(shop["bea"], order_number="OS-20261014-0001", customer_email="bea@example.com",
+                        total_amount=900, currency="USD", payment_method="Transfer", status="paid",
+                        placed_at=EARLIER, paid_at=NOW)
+    third = make_order(shop["ana"], order_number="OS-20261014-0002", customer_email="ana@example.com",
+                       total_amount=300, shipping_method="Courier", placed_at=NOW)
+    return [first, second, third]
+
+
+def tokens(page) -> list[str]:
+    return [row.session_token for row in page.rows]
+
+
 # Running the operations
 
 
-def run(name, data: dict, role="hub_admin", **ctx):
+def run(name, data: dict | None = None, role="hub_admin", **ctx):
     op = get(name)
-    return op(ctx_for(role, **ctx), op.input.model_validate(data))
+    return op(ctx_for(role, **ctx), op.input.model_validate(data or {}))
 
 
 def events() -> list[str]:

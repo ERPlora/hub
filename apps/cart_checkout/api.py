@@ -33,12 +33,12 @@ router = Router(tags=["cart_checkout"])
 
 @bind(router, "cart_checkout.cart.list", "/cart_checkout/carts")
 async def cart_list(request, params: Query[CartListIn]):
-    return await run_operation(request, queries.list_carts, params)
+    return await run_operation(request, queries.carts.list_carts, params)
 
 
 @bind(router, "cart_checkout.cart.get", "/cart_checkout/carts/detail")
 async def cart_get(request, params: Query[CartRefIn]):
-    return await run_operation(request, queries.get_cart, params)
+    return await run_operation(request, queries.carts.get_cart, params)
 
 
 @bind(router, "cart_checkout.cart.create", "/cart_checkout/carts", status=201)
@@ -71,12 +71,12 @@ async def cart_cleanup_expired(request, data: CleanupIn):
 
 @bind(router, "cart_checkout.item.list", "/cart_checkout/items")
 async def item_list(request, params: Query[ItemListIn]):
-    return await run_operation(request, queries.list_items, params)
+    return await run_operation(request, queries.items.list_items, params)
 
 
 @bind(router, "cart_checkout.item.get", "/cart_checkout/items/detail")
 async def item_get(request, params: Query[ItemRefIn]):
-    return await run_operation(request, queries.get_item, params)
+    return await run_operation(request, queries.items.get_item, params)
 
 
 @bind(router, "cart_checkout.item.add", "/cart_checkout/items", status=201)
@@ -104,12 +104,12 @@ async def checkout_initiate(request, data: CheckoutIn):
 
 @bind(router, "cart_checkout.order.list", "/cart_checkout/orders")
 async def order_list(request, params: Query[OrderListIn]):
-    return await run_operation(request, queries.list_orders, params)
+    return await run_operation(request, queries.orders.list_orders, params)
 
 
 @bind(router, "cart_checkout.order.get", "/cart_checkout/orders/detail")
 async def order_get(request, params: Query[OrderRefIn]):
-    return await run_operation(request, queries.get_order, params)
+    return await run_operation(request, queries.orders.get_order, params)
 
 
 @bind(router, "cart_checkout.order.mark_paid", "/cart_checkout/orders/mark_paid")
