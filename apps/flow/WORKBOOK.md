@@ -830,7 +830,9 @@ Pasos:
    «Secreto «STRIPE_KEY»» en **Secretos**.
 4. Para borrarlo, pulsa su **×** y confirma «¿Borrar STRIPE_KEY?» con **Sí, borrarlo** o **Conservarlo**.
 Entra: el nombre y el valor de cada secreto, tecleados en esta pantalla. El asistente no guarda secretos: un
-valor dicho en una conversación ya habría salido al historial.
+valor dicho en una conversación ya habría salido al historial. Si le dictas una clave para una llamada, tampoco la
+escribe en el paso, donde la leería quien abra la automatización: te pide que la guardes aquí y la pone por su
+nombre (`Bearer {{secret.NOMBRE}}`), o te pregunta cuál de los secretos guardados usar.
 Sale: el secreto sellado con la clave del servidor (`flow.secret.saved`, `flow.secret.deleted`). Su valor
 solo se abre en el momento de llamar y nunca sale: ni en la lista, ni en **Probar** (que enseña «••••»), ni
 en el historial, ni en un fallo; lo que el otro sistema responda con el secreto dentro también sale tapado.

@@ -1232,6 +1232,7 @@
       "sale__order__split_line": "Split a line of a check",
       "sale__order__update_line": "Change a line of a check",
       "sale__order_line__check": "Check the product of a new line of a check",
+      "sale__order__check_void": "Check that a check may be voided",
       "sale__order__add_combo_line": "Add a set menu to a check",
       "sale__order__print_bill": "Print the bill of a check",
       "sale__order__note_bill": "Note the bill of a check the device printed",

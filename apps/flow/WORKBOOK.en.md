@@ -831,7 +831,7 @@ read…", and that run is not resumed: the step has to be corrected.
 Involved: FLOW-F11, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F26 Keep secrets that cannot be read again
-<!-- from WORKBOOK.md sha256:ec5e1f8ac241 -->
+<!-- from WORKBOOK.md sha256:95169825ab41 -->
 Status: done
 Actor: owner, administrator
 Screen: Automation editor
@@ -845,7 +845,9 @@ Steps:
    "Secret "STRIPE_KEY"" in **Secrets**.
 4. To delete it, press its **×** and confirm "Delete STRIPE_KEY?" with **Yes, delete it** or **Keep it**.
 In: the name and value of each secret, typed on this screen. The assistant does not keep secrets: a value
-said in a conversation would already have gone into the history.
+said in a conversation would already have gone into the history. If you dictate a key for a call to it, it does not
+write it in the step either, where whoever opens the automation would read it: it asks you to save it here and puts
+it by its name (`Bearer {{secret.NAME}}`), or asks you which of the saved secrets to use.
 Out: the secret sealed with the server's key (`flow.secret.saved`, `flow.secret.deleted`). Its value is
 only opened at the moment of calling and never comes out: not in the list, nor in **Try it** (which shows
 "••••"), nor in the history, nor in a failure; whatever the other system answers with the secret inside
