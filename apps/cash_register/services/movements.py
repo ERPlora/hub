@@ -14,7 +14,7 @@ from apps.cash_register.queries.movements import line_row
 from apps.cash_register.queries.people import actor
 from apps.cash_register.queries.sessions import session_to_close
 from apps.cash_register.queries.settings import current_settings
-from apps.cash_register.schemas import MovementAddIn, MovementRow
+from apps.cash_register.schemas.movements import MovementAddIn, MovementRow
 
 NEGATIVE_BALANCE = _(
     "This cash-out would leave the drawer below zero and a negative balance is not allowed."

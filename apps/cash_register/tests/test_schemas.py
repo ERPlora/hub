@@ -3,19 +3,11 @@
 import pydantic
 import pytest
 
-from apps.cash_register.schemas import (
-    CountAddIn,
-    CountListIn,
-    MovementAddIn,
-    MovementListIn,
-    RegisterIn,
-    RegisterUpdateIn,
-    SessionCloseIn,
-    SessionGetIn,
-    SessionListIn,
-    SessionOpenIn,
-    SettingsPatchIn,
-)
+from apps.cash_register.schemas.counts import CountAddIn, CountListIn
+from apps.cash_register.schemas.movements import MovementAddIn, MovementListIn
+from apps.cash_register.schemas.registers import RegisterIn, RegisterUpdateIn
+from apps.cash_register.schemas.sessions import SessionCloseIn, SessionGetIn, SessionListIn, SessionOpenIn
+from apps.cash_register.schemas.settings import SettingsPatchIn
 
 
 def refused(schema, **data) -> list[str]:

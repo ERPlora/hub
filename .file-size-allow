@@ -8,7 +8,6 @@
 557 apps/cart_checkout/queries.py ERPlora/erplora-next#74
 504 apps/cart_checkout/schemas.py ERPlora/erplora-next#74
 305 apps/cash_register/frontend/operations.d.ts ERPlora/erplora-next#74
-618 apps/cash_register/schemas/__init__.py ERPlora/erplora-next#74
 541 apps/customer/frontend/operations.d.ts ERPlora/erplora-next#74
 533 apps/customer/frontend/pages/CustomerListPage.test.ts ERPlora/erplora-next#74
 506 apps/demo/frontend/pages/ItemListPage.test.ts ERPlora/erplora-next#74

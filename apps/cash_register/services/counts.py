@@ -10,7 +10,7 @@ from apps.cash_register.queries.counts import count_row
 from apps.cash_register.queries.currency import count_total, normalized_count
 from apps.cash_register.queries.people import actor
 from apps.cash_register.queries.sessions import session_to_close
-from apps.cash_register.schemas import CountAddIn, CountOut
+from apps.cash_register.schemas.counts import CountAddIn, CountOut
 from apps.sale.queries.business import business_currency
 
 

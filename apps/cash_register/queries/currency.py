@@ -9,7 +9,8 @@ from live.context import OperationContext
 from live.errors import InvalidPayload
 from live.operations import operation
 
-from apps.cash_register.schemas import CurrencyOut, EmptyIn
+from apps.cash_register.schemas.currency import CurrencyOut
+from apps.cash_register.schemas.fields import EmptyIn
 from apps.sale.queries.business import business_currency
 
 UNKNOWN_DENOMINATION = _("%(value)s is not a note or coin of %(currency)s.")
