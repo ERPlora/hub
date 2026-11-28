@@ -3,7 +3,9 @@ description: >-
   What scripts/nightly_e2e.py expects around a checkout of the Hub with its whole history, for the smoke of test.yml
   and the nightly: uv, pnpm and node; the SaaS of origin/main in ../saas (every login goes through erplora.com), the
   shared image library in ../blueprints and compose.yaml's Postgres in .., which the specs reach with
-  `docker compose exec`. Each checkout gets the .env of a new one. The job's token only needs to read.
+  `docker compose exec`, with PostgreSQL's client of its version, which copies a business's database; and Roboto as
+  the browser's system-ui and sans-serif, as on the Android tablets the Hub is made for. Each checkout gets the .env of
+  a new one. The job's token only needs to read.
 
 runs:
   using: composite
@@ -19,6 +21,19 @@ runs:
       with:
         node-version: 24
         cache: pnpm
+    - uses: ./.github/actions/postgres-client
+    # Ubuntu draws system-ui with DejaVu Sans, much wider than Roboto: the specs that measure whether a text fits would
+    # fail here and pass on a tablet. The step fails when fontconfig still picks another font.
+    - name: Roboto, the tablets' font
+      shell: bash
+      run: |
+        bash .github/scripts/apt-install.sh "$RUNNER_TEMP/apt-fonts" fonts-roboto-unhinted
+        sudo install -m 644 "$GITHUB_ACTION_PATH/fonts.conf" /etc/fonts/local.conf
+        for generic in system-ui sans-serif; do
+          drawn="$(fc-match -f '%{family[0]}' "$generic")"
+          echo "$generic is drawn with $drawn"
+          [ "$drawn" = Roboto ] || { echo "::error::fontconfig draws $generic with $drawn, not Roboto"; exit 1; }
+        done
     - name: The SaaS, the image library and Postgres beside the Hub
       shell: bash
       env:
