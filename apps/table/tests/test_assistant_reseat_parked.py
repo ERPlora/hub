@@ -77,3 +77,17 @@ def test_a_parked_check_is_not_linked_to_another_table_and_the_refusal_never_cal
     assert "table.order_parked" in outcome.content
     assert "Parked." not in outcome.content
 
+
+
+def test_a_parked_check_already_charged_in_sales_is_not_seated_by_bringing_it(parked_beers):
+    """A parked check whose check of Sales was charged meanwhile stays off the floor: bringing it to a table is
+    refused as no longer open, and the table stays free."""
+    order = parked_beers["order"]
+    Order.objects.filter(pk=order.id).update(status=Order.Status.COMPLETED)
+    arguments = {"table": "3", "order_id": str(order.id)}
+
+    outcome = assistant.tools.run(ctx_for(MANAGER), get("table.session.open"), json.dumps(arguments))
+
+    assert outcome.outcome == "error"
+    assert "table.order_not_open" in outcome.content
+    assert run("table.table.get", {"id": str(parked_beers["three"].id)}).status == "available"
