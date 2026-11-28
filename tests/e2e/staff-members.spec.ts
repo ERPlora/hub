@@ -8,7 +8,7 @@
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
-import { staffCleanUp } from './staff-helpers';
+import { pickAccount, staffCleanUp } from './staff-helpers';
 import { rowAction } from './service-helpers';
 
 const TAG = 'E2E';
@@ -90,11 +90,7 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
 
     // STAFF-F03: linked to the employee's account, picked by searching the server.
     await fillNew(page, linked.first, linked.last);
-    const user = page.locator('[data-testid=staff-member-form-user_id] input');
-    await user.click();
-    await user.fill('employee');
-    await page.locator('[data-testid^=staff-member-form-user_id-option-]', { hasText: 'employee@example.com' }).first().click();
-    await expect(user).toHaveValue('employee@example.com');
+    await pickAccount(page, 'staff-member-form-user_id', EMPLOYEE);
     await expect(page.locator('[data-testid=staff-member-form-hub-user-hint]')).toHaveCount(0);
     await page.locator('[data-testid=staff-member-form-hourly_rate] input').fill('12,50');
     await page.screenshot({ path: shot('staff-members-new-linked') });
