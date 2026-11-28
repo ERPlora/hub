@@ -24,10 +24,19 @@ function shell(code: string): void {
 }
 
 const forget = "from base.models import Hub\nHub.objects.filter(slug__startswith='e2egate-').delete()";
+/** A suspended business has a database of its own (without one it is under maintenance, a 503 the gate says first);
+ *  the gate refuses it before opening it, so its name is enough. */
+const ownDatabase = [
+  'from django.db import connections',
+  'from base.tenancy.names import hub_db_name',
+  `suspended = Hub.objects.get(slug='${HUBS.suspended.slug}')`,
+  "suspended.db_name = hub_db_name(connections.settings['default']['NAME'], suspended.pk)",
+  "suspended.save(update_fields=['db_name'])",
+];
 
 test.beforeAll(() => {
   const rows = Object.values(HUBS).map(({ slug, fields }) => `Hub.objects.create(slug='${slug}', ${fields})`);
-  shell([forget, ...rows].join('\n'));
+  shell([forget, ...rows, ...ownDatabase].join('\n'));
 });
 
 test.afterAll(() => shell(forget));
