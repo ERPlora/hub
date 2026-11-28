@@ -24,6 +24,7 @@ ROUTES = {
     ("POST", "/pricing/price_lists/set_default", "pricing.price_list.set_default"),
     ("POST", "/pricing/price_lists/deactivate", "pricing.price_list.deactivate"),
     ("POST", "/pricing/price_lists/activate", "pricing.price_list.activate"),
+    ("POST", "/pricing/price_lists/delete", "pricing.price_list.delete"),
     ("GET", "/pricing/price_items", "pricing.price_item.list"),
     ("GET", "/pricing/price_items/detail", "pricing.price_item.get"),
     ("POST", "/pricing/price_items", "pricing.price_item.add"),
@@ -35,6 +36,7 @@ ROUTES = {
     ("POST", "/pricing/rules/update", "pricing.rule.update"),
     ("POST", "/pricing/rules/deactivate", "pricing.rule.deactivate"),
     ("POST", "/pricing/rules/activate", "pricing.rule.activate"),
+    ("POST", "/pricing/rules/delete", "pricing.rule.delete"),
     ("GET", "/pricing/prices/resolve", "pricing.price.resolve"),
     ("GET", "/pricing/catalog/detail", "pricing.catalog.get"),
 }
@@ -192,3 +194,18 @@ def test_the_general_list_and_its_switches_over_http(admin_client):
     refused = post(admin_client, "/pricing/price_lists/deactivate", {"price_list": "NEW"})
     assert (refused.status_code, refused.json()["error"]["code"]) == (409, "pricing.price_list_is_default")
     assert post(admin_client, "/pricing/price_lists/deactivate", {"price_list": "OLD"}).status_code == 200
+
+
+@HUB_DB
+def test_a_list_and_a_rule_are_deleted_over_http_but_never_the_general_list(admin_client):
+    make_list("GEN", is_default=True)
+    make_list("SUMMER")
+    make_rule("HAPPY")
+    refused = post(admin_client, "/pricing/price_lists/delete", {"price_list": "GEN"})
+    assert (refused.status_code, refused.json()["error"]["code"]) == (409, "pricing.price_list_is_default")
+    deleted = post(admin_client, "/pricing/price_lists/delete", {"price_list": "SUMMER"})
+    assert (deleted.status_code, deleted.json()["code"]) == (200, "SUMMER")
+    rule = post(admin_client, "/pricing/rules/delete", {"rule": "HAPPY"})
+    assert (rule.status_code, rule.json()["code"]) == (200, "HAPPY")
+    gone = post(admin_client, "/pricing/rules/delete", {"rule": "HAPPY"})
+    assert (gone.status_code, gone.json()["error"]["code"]) == (404, "pricing.rule_not_found")

@@ -5,7 +5,7 @@
 // column filters behind the funnel (Status opens on the active ones), list or cards, 50 a page by name. A row and its «Open»
 // open the list's detail; whoever manages gets «+» (New price list), Edit, Make general (an active list
 // in the business's currency, its country's, without group that is not general; none until the business
-// answers), Deactivate (not the general one, asking first) and Activate.
+// answers), Deactivate (not the general one, asking first), Activate and Delete (not the general one, asking first).
 import {
   DataTable,
   type DataTableAction,
@@ -147,6 +147,14 @@ const actions = computed<DataTableAction<PriceListOut>[]>(() => [
           color: 'success',
           hidden: (row: PriceListOut) => row.is_active,
         },
+        {
+          id: 'delete',
+          label: t('pricing.lists.actions.delete'),
+          icon: 'trash-outline',
+          color: 'danger',
+          menuOnly: true,
+          hidden: (row: PriceListOut) => row.is_default,
+        },
       ]
     : []),
 ]);
@@ -172,9 +180,9 @@ async function onAction({ actionId, row }: { actionId: string; row: PriceListOut
   rowError.value = null;
   if (actionId === 'open') openList(row);
   if (actionId === 'edit') openForm(row);
-  if (actionId === 'makeDefault' || actionId === 'deactivate') {
+  if (actionId === 'makeDefault' || actionId === 'deactivate' || actionId === 'delete') {
     confirming.value = row;
-    confirmAction.value = actionId === 'makeDefault' ? 'default' : 'deactivate';
+    confirmAction.value = actionId === 'makeDefault' ? 'default' : actionId;
   }
   if (actionId === 'activate') {
     try {

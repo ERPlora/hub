@@ -1,7 +1,8 @@
 <script setup lang="ts">
-// A price list's detail (WORKBOOK «Pantallas · Tarifa (detalle)»; PRICING-F03 to F08), the screen the old
+// A price list's detail (WORKBOOK «Pantallas · Tarifa (detalle)»; PRICING-F03 to F08 and F16), the screen the old
 // module did not have: the live `pricing.price_list.get` — Code with «General», Customer group, Currency,
-// Tax, Validity and Status, with Edit, Make general and Deactivate / Activate for whoever manages — and
+// Tax, Validity and Status, with Edit, Make general, Deactivate / Activate and Delete (back to the lists once it
+// is gone) for whoever manages — and
 // its «Prices», the live `pricing.price_item.list` of this list in a server-side DataTable: Item, Type,
 // SKU, From (with the product's unit), Price (in the list's currency) and Catalog price, «Search product
 // or service…», a Type filter, 50 a page by item. «+» adds a price; a row is edited or removed (asking
@@ -19,9 +20,10 @@ import {
   StatusPill,
 } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, useSession } from '@erplora/ui/shell';
+import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 import ListConfirm, { type ListAction } from '../components/ListConfirm.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -39,6 +41,7 @@ const KINDS: readonly Kind[] = ['product', 'service'];
 const props = defineProps<{ id: string }>();
 
 const session = useSession();
+const router = useRouter();
 const t = useT();
 const locale = useLocale();
 const canManage = computed(() => session.can('pricing.manage'));
@@ -195,6 +198,19 @@ function onAction({ actionId, row }: { actionId: string; row: PriceItemOut }): v
       >
         {{ $t('pricing.lists.actions.activate') }}
       </ion-button>
+      <ion-button
+        v-if="!list.is_default"
+        data-testid="pricing-detail-delete"
+        color="danger"
+        :aria-label="$t('pricing.lists.actions.delete')"
+        :title="$t('pricing.lists.actions.delete')"
+        @click="confirmAction = 'delete'"
+      >
+        <HubIcon
+          slot="icon-only"
+          name="ion:trash-outline"
+        />
+      </ion-button>
     </template>
 
     <div class="pricing-detail">
@@ -345,6 +361,7 @@ function onAction({ actionId, row }: { actionId: string; row: PriceItemOut }): v
       <ListConfirm
         v-model:action="confirmAction"
         :list="list ?? null"
+        @deleted="router.replace('/pricing/lists')"
       />
       <PriceItemFormModal
         v-model:open="itemFormOpen"

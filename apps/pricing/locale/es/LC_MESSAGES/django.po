@@ -234,6 +234,9 @@ msgstr "Una tarifa desactivada no puede ser la general."
 msgid "This is the general price list: make another one general or take its mark off before deactivating it."
 msgstr "Esta es la tarifa general: elige otra como general o quítale la marca antes de desactivarla."
 
+msgid "This is the general price list: make another one general or take its mark off before deleting it."
+msgstr "Esta es la tarifa general: elige otra como general o quítale la marca antes de borrarla."
+
 msgid "That price list is already deactivated."
 msgstr "Esa tarifa ya está desactivada."
 

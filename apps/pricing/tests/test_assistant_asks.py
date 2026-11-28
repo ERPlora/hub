@@ -31,6 +31,7 @@ NOT_THE_EMPLOYEES = {
     "pricing.price_list.set_default",
     "pricing.price_list.deactivate",
     "pricing.price_list.activate",
+    "pricing.price_list.delete",
     "pricing.price_item.add",
     "pricing.price_item.update",
     "pricing.price_item.remove",
@@ -38,6 +39,7 @@ NOT_THE_EMPLOYEES = {
     "pricing.rule.update",
     "pricing.rule.deactivate",
     "pricing.rule.activate",
+    "pricing.rule.delete",
 }
 #: Its reads: the price lists, their prices, the discount rules, what they point at in another app and a line's price.
 READS = {
@@ -92,6 +94,7 @@ OWN_WORDS = [
     ("pricing.price_list.set_default", "Distribuidores pasa a ser la de todo el que no tenga otra"),
     ("pricing.price_list.deactivate", "congela lo de verano hasta el año que viene"),
     ("pricing.price_list.activate", "que vuelva a contar lo de invierno para los distribuidores"),
+    ("pricing.price_list.delete", "lo de Hostelería ya sobra, bórralo entero"),
     ("pricing.price_item.list", "¿cómo tengo puesto el croissant en Hostelería y en las demás?"),
     ("pricing.price_item.get", "¿desde cuántas unidades vale lo del croissant en Socios?"),
     ("pricing.price_item.add", "agrega la caña a los socios a 1,10"),
@@ -103,6 +106,7 @@ OWN_WORDS = [
     ("pricing.rule.update", "modifica lo de verano para que quite un cuarto"),
     ("pricing.rule.deactivate", "aparca el dos por uno de los zumos hasta que vuelva el calor"),
     ("pricing.rule.activate", "recupera el 2x1 de zumos de otros veranos"),
+    ("pricing.rule.delete", "la rebaja de los zumos ya sobra, bórrala del todo"),
     ("pricing.catalog.get", "¿a qué grupo corresponde ese identificador de lo de Socios?"),
     ("pricing.price.resolve", "Nuria quiere dos cañas, ¿cuánto le cuestan a ella?"),
 ]
@@ -114,7 +118,7 @@ def test_price_lists_is_listed_so_layer_1_sweeps_every_ask_of_it():
     assert "pricing" in settings.LIVE_ASSISTANT_ASKS_REQUIRED
 
 
-def test_pricing_offers_its_twenty_tools():
+def test_pricing_offers_its_twenty_two_tools():
     """Price lists' tools are its reads and its writes (``AI``, never ``INTERNAL``; its reactions to other apps are no
     tool): a silent drop of a tool fails."""
     tools = {name for name, op in registry.items() if op.app_label == "pricing" and assistant.tools.is_tool(op)}
@@ -181,6 +185,7 @@ OWN_WORDS_EN = [
     ("pricing.price_list.activate", "the winter one should apply again for distributors"),
     ("pricing.price_list.create", "a separate one for the club, call it Club Oro"),
     ("pricing.price_list.deactivate", "switch off the summer one until next year, keep what it has"),
+    ("pricing.price_list.delete", "we no longer need the Hospitality one, delete the whole thing"),
     ("pricing.price_list.get", "does Hospitality end at some point this year?"),
     ("pricing.price_list.list", "what special treatment do I give the distributors?"),
     ("pricing.price_list.set_default", "make the partners' one apply to everybody else"),
@@ -188,6 +193,7 @@ OWN_WORDS_EN = [
     ("pricing.rule.activate", "bring back the 2x1 on juices from other summers"),
     ("pricing.rule.create", "a reduction on toasts for partners who take three"),
     ("pricing.rule.deactivate", "put the juice deal aside, but keep it for next summer"),
+    ("pricing.rule.delete", "the juice reduction is no longer needed, delete it for good"),
     ("pricing.rule.get", "what exactly does the summer promo do and how long does it last?"),
     ("pricing.rule.list", "what's running now in the shop that applies by itself?"),
     ("pricing.rule.update", "raise what the summer one takes off to a quarter"),

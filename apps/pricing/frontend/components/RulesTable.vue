@@ -4,7 +4,8 @@
 // neither sorted nor filtered, its units differ), Applies to (with the customer
 // group), Validity, Priority and Status —, «Search code or name…», column filters behind the funnel (Status
 // opens on the active ones), list or cards, 50 a page by name. Whoever manages gets «+» (New discount rule), Edit,
-// Deactivate (asking first) and Activate. An amount per unit is in the business's currency (its country's).
+// Deactivate (asking first), Activate and Delete (asking first). An amount per unit is in the business's currency
+// (its country's).
 import {
   ConfirmDialog,
   DataTable,
@@ -121,16 +122,22 @@ const actions = computed<DataTableAction<RuleOut>[]>(() =>
           color: 'success',
           hidden: (row: RuleOut) => row.is_active,
         },
+        { id: 'delete', label: t('pricing.rules.actions.delete'), icon: 'trash-outline', color: 'danger', menuOnly: true },
       ]
     : [],
 );
 
-// The form, the confirmation and the row actions
+// The form, the confirmations and the row actions
+type Confirmed = 'deactivate' | 'delete';
+const CONFIRMS = [
+  { id: 'deactivate', texts: 'deactivateConfirm' },
+  { id: 'delete', texts: 'deleteConfirm' },
+] as const;
 const editing = ref<RuleOut | null>(null);
 const formOpen = ref(false);
-const deactivating = ref<RuleOut | null>(null);
-const deactivateOpen = ref(false);
-const deactivate = useCommand('pricing.rule.deactivate');
+const confirming = ref<RuleOut | null>(null);
+const confirmAction = ref<Confirmed | null>(null);
+const commands = { deactivate: useCommand('pricing.rule.deactivate'), delete: useCommand('pricing.rule.delete') };
 const activate = useCommand('pricing.rule.activate');
 const rowError = ref<ApiError | null>(null);
 
@@ -139,24 +146,27 @@ function openForm(row: RuleOut | null): void {
   formOpen.value = true;
 }
 
-async function confirmDeactivate(): Promise<void> {
-  if (!deactivating.value) return;
+function ask(action: Confirmed, row: RuleOut): void {
+  commands[action].error.value = null;
+  confirming.value = row;
+  confirmAction.value = action;
+}
+
+async function confirm(): Promise<void> {
+  const chosen = confirmAction.value;
+  if (!confirming.value || !chosen) return;
   try {
-    await deactivate.run({ id: deactivating.value.id });
+    await commands[chosen].run({ id: confirming.value.id });
   } catch {
     return; // The dialog says why.
   }
-  deactivateOpen.value = false;
+  confirmAction.value = null;
 }
 
 async function onAction({ actionId, row }: { actionId: string; row: RuleOut }): Promise<void> {
   rowError.value = null;
   if (actionId === 'edit') openForm(row);
-  if (actionId === 'deactivate') {
-    deactivate.error.value = null;
-    deactivating.value = row;
-    deactivateOpen.value = true;
-  }
+  if (actionId === 'deactivate' || actionId === 'delete') ask(actionId, row);
   if (actionId === 'activate') {
     try {
       await activate.run({ id: row.id });
@@ -241,20 +251,24 @@ async function onAction({ actionId, row }: { actionId: string; row: RuleOut }): 
       v-model:open="formOpen"
       :rule="editing"
     />
-    <ConfirmDialog
-      v-if="canManage"
-      v-model:open="deactivateOpen"
-      testid="pricing-rules-deactivate"
-      tone="danger"
-      :title="deactivating ? t('pricing.rules.deactivateConfirm.title', { name: deactivating.name }) : ''"
-      :message="deactivating ? t('pricing.rules.deactivateConfirm.message', { name: deactivating.name }) : ''"
-      :confirm-label="t('pricing.rules.deactivateConfirm.confirm')"
-      :cancel-label="t('pricing.cancel')"
-      :pending="deactivate.pending.value"
-      :error="deactivate.error.value"
-      @confirm="confirmDeactivate"
-      @cancel="deactivateOpen = false"
-    />
+    <template v-if="canManage">
+      <ConfirmDialog
+        v-for="dialog in CONFIRMS"
+        :key="dialog.id"
+        :open="confirmAction === dialog.id"
+        :testid="`pricing-rules-${dialog.id}`"
+        tone="danger"
+        :title="confirming ? t(`pricing.rules.${dialog.texts}.title`, { name: confirming.name }) : ''"
+        :message="confirming ? t(`pricing.rules.${dialog.texts}.message`, { name: confirming.name }) : ''"
+        :confirm-label="t(`pricing.rules.${dialog.texts}.confirm`)"
+        :cancel-label="t('pricing.cancel')"
+        :pending="commands[dialog.id].pending.value"
+        :error="commands[dialog.id].error.value"
+        @update:open="(open: boolean) => { if (!open) confirmAction = null }"
+        @confirm="confirm"
+        @cancel="confirmAction = null"
+      />
+    </template>
   </section>
 </template>
 

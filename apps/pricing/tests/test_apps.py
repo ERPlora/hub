@@ -28,6 +28,7 @@ COMMANDS = {
     "pricing.price_list.set_default",
     "pricing.price_list.deactivate",
     "pricing.price_list.activate",
+    "pricing.price_list.delete",
     "pricing.price_item.add",
     "pricing.price_item.update",
     "pricing.price_item.remove",
@@ -35,6 +36,7 @@ COMMANDS = {
     "pricing.rule.update",
     "pricing.rule.deactivate",
     "pricing.rule.activate",
+    "pricing.rule.delete",
     "pricing.catalog.forget_product",
     "pricing.catalog.recall_product",
     "pricing.catalog.forget_category",
@@ -48,14 +50,16 @@ SYSTEM = {
     "pricing.catalog.forget_group",
     "pricing.catalog.refresh_service",
 }
-# What the assistant confirms before running: the general list, switching a list, removing a price,
-# switching a rule off.
+# What the assistant confirms before running: the general list, switching or deleting a list, removing a price,
+# switching a rule off and deleting one.
 HIGH_RISK = {
     "pricing.price_list.set_default",
     "pricing.price_list.deactivate",
     "pricing.price_list.activate",
+    "pricing.price_list.delete",
     "pricing.price_item.remove",
     "pricing.rule.deactivate",
+    "pricing.rule.delete",
 }
 # What an API key (erpk_live) reaches: the reads and the price sync.
 EXPOSED = QUERIES | {

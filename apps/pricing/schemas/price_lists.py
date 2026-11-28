@@ -142,3 +142,8 @@ class PriceListOut(Schema):
     is_active: bool = Field(description="Whether it applies to new sales.")
     item_count: int = Field(description="How many prices it has.")
     updated_at: dt.datetime = Field(description="Its last change.")
+
+
+class PriceListDeletedOut(Schema):
+    id: UUID = Field(description=D_LIST_ID)
+    code: str = Field(description="The code it had, free now for a new price list.")

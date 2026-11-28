@@ -19,6 +19,7 @@ PRICE_LIST_UPDATED = "pricing.price_list.updated"
 PRICE_LIST_DEFAULT_CHANGED = "pricing.price_list.default_changed"
 PRICE_LIST_DEACTIVATED = "pricing.price_list.deactivated"
 PRICE_LIST_ACTIVATED = "pricing.price_list.activated"
+PRICE_LIST_DELETED = "pricing.price_list.deleted"
 PRICE_ITEM_ADDED = "pricing.price_item.added"
 PRICE_ITEM_UPDATED = "pricing.price_item.updated"
 PRICE_ITEM_REMOVED = "pricing.price_item.removed"
@@ -26,6 +27,7 @@ RULE_CREATED = "pricing.rule.created"
 RULE_UPDATED = "pricing.rule.updated"
 RULE_DEACTIVATED = "pricing.rule.deactivated"
 RULE_ACTIVATED = "pricing.rule.activated"
+RULE_DELETED = "pricing.rule.deleted"
 
 ALL = [
     PRICE_LIST_CREATED,
@@ -33,6 +35,7 @@ ALL = [
     PRICE_LIST_DEFAULT_CHANGED,
     PRICE_LIST_DEACTIVATED,
     PRICE_LIST_ACTIVATED,
+    PRICE_LIST_DELETED,
     PRICE_ITEM_ADDED,
     PRICE_ITEM_UPDATED,
     PRICE_ITEM_REMOVED,
@@ -40,6 +43,7 @@ ALL = [
     RULE_UPDATED,
     RULE_DEACTIVATED,
     RULE_ACTIVATED,
+    RULE_DELETED,
 ]
 
 #: The amount a price added to a list brings, in cents of the list's currency (beside it): an automation says it
@@ -51,9 +55,10 @@ PRICE_LIST_EVENTS = [
     PRICE_LIST_DEFAULT_CHANGED,
     PRICE_LIST_DEACTIVATED,
     PRICE_LIST_ACTIVATED,
+    PRICE_LIST_DELETED,
 ]
 PRICE_ITEM_EVENTS = [PRICE_ITEM_ADDED, PRICE_ITEM_UPDATED, PRICE_ITEM_REMOVED]
-RULE_EVENTS = [RULE_CREATED, RULE_UPDATED, RULE_DEACTIVATED, RULE_ACTIVATED]
+RULE_EVENTS = [RULE_CREATED, RULE_UPDATED, RULE_DEACTIVATED, RULE_ACTIVATED, RULE_DELETED]
 
 # Other apps' events (their WORKBOOKs fix the payload: ``{"id": …}`` and more).
 PRODUCT_UPDATED = "inventory.product.updated"

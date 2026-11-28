@@ -1651,6 +1651,10 @@
     "method": "post",
     "path": "/api/pricing/price_lists/activate"
   },
+  "pricing.price_list.delete": {
+    "method": "post",
+    "path": "/api/pricing/price_lists/delete"
+  },
   "pricing.price_item.list": {
     "method": "get",
     "path": "/api/pricing/price_items"
@@ -1694,6 +1698,10 @@
   "pricing.rule.activate": {
     "method": "post",
     "path": "/api/pricing/rules/activate"
+  },
+  "pricing.rule.delete": {
+    "method": "post",
+    "path": "/api/pricing/rules/delete"
   },
   "pricing.price.resolve": {
     "method": "get",

@@ -77,7 +77,7 @@ describe('PriceListsTable', () => {
     const orphan = priceList({ customer_group_id: 'g9', customer_group_name: null });
     await s.show(page([orphan]));
     expect(s.cells(0)[3]).toBe('Deleted group');
-    expect(s.shownFor(orphan)).toEqual(['open', 'edit', 'deactivate']);
+    expect(s.shownFor(orphan)).toEqual(['open', 'edit', 'deactivate', 'delete']);
   });
 
   it('filters by column and searches and sorts on the server', async () => {
@@ -114,28 +114,28 @@ describe('PriceListsTable', () => {
   it('in Poland a zloty list can be made general and a euro one not; until the business answers, none', async () => {
     const s = await setup({}, business(POLISH));
     await s.show(page([GENERAL]));
-    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN' }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate']);
-    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN' }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate', 'delete']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate', 'delete']);
     const before = await setup({}, null);
     await before.show(page([GENERAL]));
-    expect(before.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate']);
+    expect(before.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate', 'delete']);
   });
 
   it('an inactive list in the business’s currency is not offered «Make general» (PRICING-F04)', async () => {
     const s = await setup({}, business(POLISH));
     await s.show(page([GENERAL]));
-    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN', is_active: false }))).toEqual(['open', 'edit', 'activate']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN', is_active: false }))).toEqual(['open', 'edit', 'activate', 'delete']);
   });
 
   it('offers each action where it applies, and opens a list by its row or «Open»', async () => {
     const s = await setup();
     await s.show(page([GENERAL, VIP, OLD]));
     expect(s.shownFor(GENERAL)).toEqual(['open', 'edit']);
-    expect(s.shownFor(priceList({ customer_group_id: null }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate']);
-    expect(s.shownFor(VIP)).toEqual(['open', 'edit', 'deactivate']);
-    expect(s.shownFor(OLD)).toEqual(['open', 'edit', 'activate']);
+    expect(s.shownFor(priceList({ customer_group_id: null }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate', 'delete']);
+    expect(s.shownFor(VIP)).toEqual(['open', 'edit', 'deactivate', 'delete']);
+    expect(s.shownFor(OLD)).toEqual(['open', 'edit', 'activate', 'delete']);
     // A list in another currency cannot be the general one (the till sells in the business's, here euros).
-    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'USD' }))).toEqual(['open', 'edit', 'deactivate']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'USD' }))).toEqual(['open', 'edit', 'deactivate', 'delete']);
     s.table().vm.$emit('rowClick', VIP);
     await flush();
     expect(s.router.currentRoute.value.path).toBe('/pricing/lists/l1');
@@ -144,7 +144,7 @@ describe('PriceListsTable', () => {
     expect(s.router.currentRoute.value.path).toBe('/pricing/lists/l0');
   });
 
-  it('«+» and Edit open the form; Make general and Deactivate ask first; Activate runs at once', async () => {
+  it('«+» and Edit open the form; Make general, Deactivate and Delete ask first; Activate runs at once', async () => {
     const s = await setup();
     await s.show(page([GENERAL, VIP, OLD]));
     s.table().vm.$emit('add');
@@ -156,6 +156,9 @@ describe('PriceListsTable', () => {
     s.table().vm.$emit('action', { actionId: 'deactivate', row: VIP });
     await flush();
     expect(s.wrapper.findComponent(ListConfirm).props()).toMatchObject({ action: 'deactivate', list: VIP });
+    s.table().vm.$emit('action', { actionId: 'delete', row: OLD });
+    await flush();
+    expect(s.wrapper.findComponent(ListConfirm).props()).toMatchObject({ action: 'delete', list: OLD });
     s.answer(200, { ...OLD, is_active: true });
     s.table().vm.$emit('action', { actionId: 'activate', row: OLD });
     await flush();

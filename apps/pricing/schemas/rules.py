@@ -266,3 +266,8 @@ class RuleOut(Schema):
     priority: int = Field(description="With equal discounts, the lower number wins.")
     is_active: bool = Field(description="Whether it applies to new sales.")
     updated_at: dt.datetime = Field(description="Its last change.")
+
+
+class RuleDeletedOut(Schema):
+    id: UUID = Field(description=D_RULE_ID)
+    code: str = Field(description="The code it had, free now for a new discount rule.")
