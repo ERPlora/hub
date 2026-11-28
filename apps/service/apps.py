@@ -12,8 +12,6 @@ class ServiceConfig(LiveAppConfig):
     blueprint_stays = {
         "ServiceSettings": "settings",
         "Assignment": "people",
-        "Package": "pending",
-        "PackageItem": "pending",
         "Grant": "history",
         "GrantAdjustment": "history",
         "Redemption": "history",
@@ -211,3 +209,10 @@ class ServiceConfig(LiveAppConfig):
                 create="service.category.return_to_parent",
             ),
         ]
+
+    def blueprint_datasets(self) -> list:
+        """What of Services travels in an export of the business (BASE-F35) besides its categories and services, which
+        the platform carries: its vouchers."""
+        from apps.service import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS
