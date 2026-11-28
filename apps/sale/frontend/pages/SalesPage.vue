@@ -27,6 +27,7 @@ import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, onMounted, ref, shallowRef } from 'vue';
 
 import DocumentModal from '../components/document/DocumentModal.vue';
+import ReconnectingNotice from '../components/ReconnectingNotice.vue';
 import ReprintJob from '../components/document/ReprintJob.vue';
 import { type DayBounds, type Period, PERIODS, periodBounds } from '../components/sales/period';
 import RefundModal from '../components/sales/RefundModal.vue';
@@ -283,14 +284,11 @@ function beginRefund(row: SaleRow): void {
       :bounds="bounds"
     />
     <SalesWeek v-if="!blocked && segmentValue === 'week'" />
-    <InlineFeedback
-      v-if="status === 'reconnecting'"
+    <ReconnectingNotice
       class="sales-page__notice"
-      tone="warning"
-      data-testid="sales-reconnecting"
-    >
-      {{ $t('sale.live.reconnecting') }}
-    </InlineFeedback>
+      :status="status"
+      testid="sales"
+    />
     <InlineFeedback
       v-if="blocked"
       tone="warning"

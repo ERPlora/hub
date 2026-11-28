@@ -33,11 +33,14 @@ test('SALE-F01: offline, the till says «Reconectando…» and a tap on a produc
     await checkWithDish(page, context, 'es', dish);
     if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
     const band = shown(page).locator('[data-testid=pos-reconnecting]');
+    const total = shown(page).locator('[data-testid=pos-total]');
+    await expect(total).toContainText('7,00');
     await expect(band).toHaveCount(0);
 
     await context.setOffline(true);
     await expect(band).toHaveText('Reconectando…', { timeout: NOTICED_MS });
     await expect(linesOf(page, dish), 'the check stays as it was').toHaveCount(1);
+    await expect(total, 'and so does its total').toContainText('7,00');
     await capturedAtEachSize(page, KEY, 'pos-reconnecting');
 
     await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
