@@ -1,11 +1,11 @@
 // Price Lists, deleting a price list and a discount rule (apps/pricing/WORKBOOK.md), in Chrome against the real
 // Inventory app, each flow with its screenshots at 390, 834 and 1440:
 //   - PRICING-F16: «Delete» in the row's «⋮» asks first and the list goes with its prices, its code free again; from
-//     its detail, the bin asks the same and goes back to Price Lists;
+//     its detail, the bin (on a phone, the row «Delete» of the bar's «⋮») asks the same and goes back to Price Lists;
 //   - PRICING-F17: «Delete» in the rule's «⋮» asks first and the rule goes, its code free again.
 import { expect, test } from '@playwright/test';
 
-import { A, login, psql } from './helpers';
+import { A, capture, login, psql, saveSessionForTheSweep } from './helpers';
 import {
   cleanPricing,
   CODE,
@@ -58,17 +58,26 @@ test('PRICING-F16: «Delete» asks first and the list goes with its prices, from
   await page.goto(`${A}/pricing/lists/${again.id}`);
   await expect(page.locator('[data-testid=pricing-detail-summary]')).toBeVisible();
   await shootFlow(page, 'PRICING-F16-detail');
-  await page.locator('[data-testid=pricing-detail-delete]').click();
+  // On a phone the bar's actions go to its «⋮», where the bin is a row with its icon and its label, and the
+  // confirmation opens once the menu has gone.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.locator('[data-testid=topbar-more]').click();
+  const bin = page.locator('[data-testid=topbar-more-menu] [data-testid=pricing-detail-delete]');
+  await expect(bin).toHaveText('Delete');
+  await capture(page, 'APP-PRICING-PRICING-F16-detail-menu-390');
+  await bin.click();
   await expect(dialog(page, 'pricing-list-delete')).toContainText(`${list.name} disappears with all its prices.`);
   await page.locator('[data-testid=pricing-list-delete-submit]').click();
   await expect(page).toHaveURL(`${A}/pricing/lists`);
   expect(psql(`select count(*) from pricing_pricelist where id = '${again.id}'`)).toBe('0');
+  await page.setViewportSize(DESKTOP);
 });
 
 test('PRICING-F17: «Delete» asks first and the rule goes, its code free again', async ({ page }) => {
   // flow: PRICING-F17
   const s = stamp();
   await login(page, A, '/pricing/lists');
+  await saveSessionForTheSweep(page.context());
   const rule = await newRule(page, s, 'GONE', { rule_type: 'percent', percent: '15' });
   await ready(page, RULES);
   await search(page, RULES, rule.code);
