@@ -16,12 +16,15 @@ from base.tests.blueprint_round_trip import app_report, call, ctx, data_of, expo
 __all__ = ["ctx", "in_business_a"]
 pytestmark = HUB_DB
 
-SOON = dt.date.today() + dt.timedelta(days=10)
 SHOWN = ("title", "block_type", "start", "end", "all_day", "staff_name", "reason")
 
 
+def soon() -> dt.date:
+    return dt.date.today() + dt.timedelta(days=10)
+
+
 def day(offset: int) -> str:
-    return (SOON + dt.timedelta(days=offset)).isoformat()
+    return (soon() + dt.timedelta(days=offset)).isoformat()
 
 
 def a_diary(ctx):
@@ -34,12 +37,12 @@ def a_diary(ctx):
 
 def the_blocks(ctx) -> list[tuple]:
     """The agenda's blocks of the coming weeks as the business reads them, without ids."""
-    rows = call(ctx, "appointment.blocked_time.list", date_from=SOON - dt.timedelta(days=5), date_to=day(30), limit=100)
+    rows = call(ctx, "appointment.blocked_time.list", date_from=soon() - dt.timedelta(days=5), date_to=day(30), limit=100)
     return sorted(tuple(getattr(row, name) for name in SHOWN) for row in rows.rows)
 
 
 def emptied(ctx) -> None:
-    rows = call(ctx, "appointment.blocked_time.list", date_from=SOON - dt.timedelta(days=40), date_to=day(20), limit=100)
+    rows = call(ctx, "appointment.blocked_time.list", date_from=soon() - dt.timedelta(days=40), date_to=day(20), limit=100)
     for row in rows.rows:
         call(ctx, "appointment.blocked_time.delete", id=row.id)
 
