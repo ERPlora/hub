@@ -7,6 +7,8 @@ from decimal import Decimal
 import pydantic
 import pytest
 from django.utils import translation
+from live.assistant import tool_spec
+from live.operations import get
 
 from apps.staff.schemas.availability import AvailabilityIn, AvailabilityOut
 from apps.staff.schemas.commissions import CommissionOut, CommissionPage
@@ -448,12 +450,16 @@ def test_a_day():
         dt.time(11, 30),
         True,
     )
-    # The defaults: 09:00 to 18:00.
-    assert (DayIn(weekday=0).start_time, DayIn(weekday=0).end_time) == (
-        dt.time(9),
-        dt.time(18),
-    )
+    # Hours not said stay unsaid: the write takes them from the business's default working day (Staff › Settings).
+    assert (DayIn(weekday=0).start_time, DayIn(weekday=0).end_time) == (None, None)
     assert DayIn(weekday=5, is_working=False).is_working is False
+
+
+def test_the_assistant_reads_no_hours_of_a_day_it_could_copy():
+    """With 09:00 and 18:00 as the defaults of a day's hours, the assistant copied them into a schedule asked for without
+    hours instead of the business's working day (hub#2716)."""
+    day = tool_spec(get("staff.schedule.create"))["parameters"]["$defs"]["DayIn"]["properties"]
+    assert (day["start_time"].get("default"), day["end_time"].get("default")) == (None, None)
 
 
 @pytest.mark.parametrize(
