@@ -3,7 +3,7 @@
 // language, in both directions, without reloading the document.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, hostPage, shown } from './helpers';
+import { A, hostPage, saveSessionForTheSweep, shown } from './helpers';
 
 async function openProfile(page: Page): Promise<void> {
   await page.locator('ion-menu [data-testid="user-menu-trigger"]').click();
@@ -151,6 +151,7 @@ test('BASE-F64: a language chosen on one device is the one another open device s
     await lastChosenThere(tablet.context, 'en');
     await tablet.page.reload();
     await homeIn(tablet.page, 'en');
+    await saveSessionForTheSweep(tablet.context);
 
     await chooseLanguage(page, 'Español');
     await homeIn(tablet.page, 'es');
