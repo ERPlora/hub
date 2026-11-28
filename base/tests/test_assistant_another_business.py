@@ -15,11 +15,13 @@ import pytest
 from django.conf import settings
 from live import assistant as shared
 from live.context import OperationContext
+from live.meta import module_configs
 from live.operations import get
 
 from apps.inventory.queries.exports import PRODUCT_HEADERS
 from base import assistant
 from base.assistant.tools import NOT_FROM_CHAT
+from base.blueprint.calls import STAYS_HOOK, Stays
 from base.blueprint.datasets import dataset, every_dataset
 from base.models import Membership
 from base.permissions import access_for
@@ -47,6 +49,16 @@ def screen_labels(language: str) -> list[str]:
             label = label[key]
         labels.append(label)
     return labels
+
+
+def kept(*reasons: Stays) -> set[tuple[str, str]]:
+    """Every model an app keeps out of the file for one of ``reasons``, as ``(app, model)``."""
+    return {
+        (config.label, model)
+        for config in module_configs()
+        for model, reason in getattr(config, STAYS_HOOK, {}).items()
+        if reason in reasons
+    }
 
 
 def tells_where_to_export(said: str) -> bool:
@@ -87,8 +99,10 @@ def test_what_the_tool_says_of_the_export_is_what_the_export_does(name):
     assert "products and services go with their own photos" in said
     assert dataset("customer.customer").personal
     assert "never the customers" in said
-    assert "sale" not in {part.app for part in every_dataset()}
-    assert "never the business's history" in said
+    never = kept(Stays.HISTORY, Stays.PEOPLE, Stays.FISCAL)
+    assert {("sale", "Sale"), ("sale", "SaleLine"), ("staff", "Member"), ("invoice", "Invoice")} <= never
+    assert not never & {(part.app, model) for part in every_dataset() for model in part.models}
+    assert "never the business's history, people, PINs or fiscal data" in said
 
 
 def test_the_products_csv_says_it_takes_no_photos_as_it_has_no_photo_column():
