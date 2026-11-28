@@ -388,6 +388,7 @@
       },
       "wait": "Esperar {amount} {unit}",
       "insert": "Insertar un dato",
+      "chooseValue": "Elige uno…",
       "removeData": "Quitar este dato",
       "describe": {
         "noCondition": "todavía nada",
@@ -418,6 +419,8 @@
       "step": "Lo que dejó el paso {n}",
       "none": "Todavía no hay datos que insertar aquí: elige primero qué pasa, o añade antes una acción.",
       "example": "p. ej. {value}",
+      "yes": "Sí",
+      "no": "No",
       "noExample": "aún no hay ejemplo",
       "close": "Cerrar",
       "secret": "Secreto «{name}»",
@@ -2847,7 +2850,612 @@
       "other": "Otras formas",
       "shift_id": "Jornada",
       "week": "Esta semana",
-      "week_from": "Semana desde"
+      "week_from": "Semana desde",
+      "assigned_to": "Asignada a",
+      "starts_at": "Fecha y hora"
+    },
+    "choices": {
+      "action": {
+        "cancelled": "Cancelada",
+        "created": "Creada",
+        "deleted": "Borrada",
+        "item_ready": "Plato listo",
+        "item_recalled": "Plato recuperado",
+        "item_voided": "Plato anulado",
+        "ready": "Lista",
+        "recalled": "Recuperada",
+        "received": "Recibida",
+        "reprinted": "Reimpresa",
+        "rushed": "Marcada urgente",
+        "served": "Servida",
+        "started": "Lanzada",
+        "unrushed": "Urgencia quitada"
+      },
+      "applies_to": {
+        "all": "Todo",
+        "category": "Una categoría",
+        "product": "Un producto",
+        "products": "Todos los productos",
+        "service": "Un servicio",
+        "services": "Todos los servicios"
+      },
+      "block_type": {
+        "break": "Descanso",
+        "holiday": "Festivo",
+        "maintenance": "Mantenimiento",
+        "other": "Otro",
+        "vacation": "Vacaciones"
+      },
+      "by": {
+        "person": "Por persona",
+        "shift": "Por turno"
+      },
+      "category": {
+        "AUTHENTICATION": "Autenticación",
+        "MARKETING": "Marketing",
+        "UTILITY": "Utilidad"
+      },
+      "channel": {
+        "delivery": "A domicilio",
+        "dine_in": "En sala",
+        "email": "Email",
+        "phone": "Teléfono",
+        "postal": "Correo postal",
+        "sms": "SMS",
+        "takeaway": "Para llevar",
+        "whatsapp": "WhatsApp"
+      },
+      "color": {
+        "danger": "Rojo",
+        "medium": "Gris",
+        "primary": "Azul",
+        "secondary": "Cian",
+        "success": "Verde",
+        "tertiary": "Morado",
+        "warning": "Ámbar"
+      },
+      "content_type": {
+        "image_jpeg": "Imagen JPEG",
+        "image_png": "Imagen PNG",
+        "image_webp": "Imagen WebP"
+      },
+      "correction_status": {
+        "corrected": "Subsanado",
+        "pending": "Pendiente de subsanar"
+      },
+      "customer_id_type": {
+        "02": "NIF-IVA de la UE",
+        "03": "Pasaporte",
+        "04": "Identificación fiscal de su país",
+        "05": "Certificado de residencia",
+        "06": "Otro documento",
+        "07": "No censado"
+      },
+      "default_document_type": {
+        "invoice": "Factura",
+        "ticket": "Tique"
+      },
+      "default_order_type": {
+        "delivery": "A domicilio",
+        "dine_in": "En sala",
+        "takeaway": "Para llevar"
+      },
+      "destination": {
+        "both": "Pantalla y papel",
+        "display": "Solo pantalla",
+        "printer": "Solo papel"
+      },
+      "dir": {
+        "asc": "Ascendente",
+        "desc": "Descendente"
+      },
+      "discount_type": {
+        "fixed": "Importe fijo",
+        "percentage": "Porcentaje"
+      },
+      "document_type": {
+        "barcode_label": "Etiqueta de código de barras",
+        "cash_session_report": "Cierre de caja",
+        "delivery_note": "Albarán",
+        "generic": "Documento",
+        "invoice": "Factura",
+        "kitchen_order": "Comanda de cocina",
+        "prebill": "Cuenta preliminar",
+        "receipt": "Recibo",
+        "ticket": "Tique"
+      },
+      "environment": {
+        "production": "Producción",
+        "testing": "Pruebas (AEAT de pruebas)"
+      },
+      "field_type": {
+        "boolean": "Sí/No",
+        "date": "Fecha",
+        "number": "Número",
+        "select": "Selección",
+        "text": "Texto",
+        "textarea": "Texto largo"
+      },
+      "format": {
+        "a4": "A4",
+        "png": "Imagen PNG",
+        "receipt": "Recibo",
+        "svg": "Imagen SVG"
+      },
+      "frequency": {
+        "biweekly": "Cada dos semanas",
+        "daily": "Cada día",
+        "monthly": "Cada mes",
+        "weekly": "Cada semana"
+      },
+      "header_format": {
+        "DOCUMENT": "Documento",
+        "IMAGE": "Foto",
+        "TEXT": "Texto",
+        "VIDEO": "Vídeo"
+      },
+      "invoice_type": {
+        "F1": "Factura (F1)",
+        "F2": "Tique (F2)",
+        "F3": "Factura en sustitución de un tique (F3)",
+        "R1": "Rectificativa (R1)",
+        "R2": "Rectificativa (R2)",
+        "R3": "Rectificativa (R3)",
+        "R4": "Rectificativa (R4)",
+        "R5": "Rectificativa (R5)"
+      },
+      "kind": {
+        "accepted": "Envío aceptado",
+        "accepted_with_errors": "Aceptado con errores",
+        "aeat_queried": "Consulta a la AEAT",
+        "bluetooth": "Bluetooth",
+        "chain_broken": "Cadena rota",
+        "chain_recovered": "Cadena recuperada",
+        "chain_valid": "Cadena verificada",
+        "config_changed": "Configuración cambiada",
+        "connection_test": "Prueba de conexión",
+        "deferred": "Envío aplazado",
+        "failed": "Envío fallido",
+        "network": "Red",
+        "product": "Producto",
+        "queue_processed": "Cola procesada",
+        "queue_retried": "Registro reprogramado",
+        "record_created": "Registro creado",
+        "service": "Servicio",
+        "system": "Impresora del sistema (A4)",
+        "usb": "USB"
+      },
+      "leave_type": {
+        "other": "Otros",
+        "personal": "Asuntos propios",
+        "sick": "Baja por enfermedad",
+        "training": "Formación",
+        "vacation": "Vacaciones"
+      },
+      "lifecycle_stage": {
+        "active": "Activo",
+        "at_risk": "En riesgo",
+        "churned": "Perdido",
+        "dormant": "Inactivo",
+        "first_purchase": "Primera compra",
+        "lead": "Contacto",
+        "prospect": "Prospecto",
+        "vip": "VIP"
+      },
+      "method_type": {
+        "card": "Tarjeta",
+        "cash": "Efectivo",
+        "check": "Cheque",
+        "other": "Otro",
+        "sepa": "Domiciliación SEPA",
+        "transfer": "Transferencia"
+      },
+      "movement_type": {
+        "count": "Recuento",
+        "initial": "Existencias iniciales",
+        "reception": "Recepción",
+        "refund": "Devolución",
+        "sale": "Venta",
+        "void": "Anulación",
+        "write_off": "Baja"
+      },
+      "operation_class": {
+        "exempt": "Exenta",
+        "not_subject": "No sujeta",
+        "not_subject_location": "No sujeta (reglas de localización)",
+        "subject": "Sujeta",
+        "subject_reverse": "Inversión del sujeto pasivo"
+      },
+      "order_type": {
+        "delivery": "A domicilio",
+        "dine_in": "En sala",
+        "takeaway": "Para llevar"
+      },
+      "period": {
+        "this_month": "Este mes",
+        "this_week": "Esta semana",
+        "today": "Hoy",
+        "yesterday": "Ayer"
+      },
+      "preferred_channel": {
+        "email": "Email",
+        "none": "Ninguno",
+        "phone": "Teléfono",
+        "sms": "SMS",
+        "whatsapp": "WhatsApp"
+      },
+      "pricing_type": {
+        "fixed": "Precio fijo",
+        "free": "Gratis",
+        "from": "Desde un precio",
+        "hourly": "Por hora",
+        "variable": "Variable"
+      },
+      "pricing_unit": {
+        "g": "Gramo",
+        "h": "Hora",
+        "kg": "Kilogramo",
+        "l": "Litro",
+        "min": "Minuto",
+        "ml": "Mililitro",
+        "t": "Tonelada",
+        "ud": "Unidad"
+      },
+      "printer_usage": {
+        "bar": "Barra",
+        "kitchen": "Cocina"
+      },
+      "priority": {
+        "high": "Alta",
+        "low": "Baja",
+        "medium": "Media",
+        "normal": "Normal",
+        "rush": "Urgente",
+        "urgent": "Urgente",
+        "vip": "VIP"
+      },
+      "product_type": {
+        "physical": "Producto físico",
+        "service": "Servicio"
+      },
+      "record_type": {
+        "alta": "Alta",
+        "anulacion": "Anulación"
+      },
+      "rectification_type": {
+        "R1": "R1 · Error fundado en derecho, devoluciones (art. 80 Uno, Dos y Seis)",
+        "R2": "R2 · Concurso de acreedores (art. 80 Tres)",
+        "R3": "R3 · Créditos incobrables (art. 80 Cuatro)",
+        "R4": "R4 · Resto de causas"
+      },
+      "rule_type": {
+        "buy_x_get_y": "Compra X, llévate Y",
+        "fixed": "Importe por unidad",
+        "percent": "Porcentaje",
+        "tiered": "Por tramos"
+      },
+      "sensitivity_test_result": {
+        "negative": "Negativa",
+        "positive": "Positiva"
+      },
+      "severity": {
+        "critical": "Crítico",
+        "debug": "Depuración",
+        "error": "Error",
+        "info": "Información",
+        "warning": "Aviso"
+      },
+      "shape": {
+        "rectangle": "Rectangular",
+        "round": "Redonda",
+        "square": "Cuadrada"
+      },
+      "signer_document_type": {
+        "dni": "DNI",
+        "nie": "NIE"
+      },
+      "sound_tone": {
+        "bell": "Timbre",
+        "buzzer": "Zumbador",
+        "chime": "Campanilla"
+      },
+      "source": {
+        "counter": "En el mostrador",
+        "email": "Por email",
+        "import": "Importación",
+        "in_person": "En el local",
+        "inventory": "Productos",
+        "learned": "Aprendido",
+        "manual": "A mano",
+        "online": "Internet",
+        "other": "Otro",
+        "phone": "Teléfono",
+        "receipt": "En el tique",
+        "referral": "Recomendación",
+        "reservation": "Reserva",
+        "service": "Servicios",
+        "shipped": "De fábrica",
+        "social": "Redes sociales",
+        "walk_in": "En el local",
+        "web_form": "Formulario web",
+        "website": "Web",
+        "whatsapp": "WhatsApp"
+      },
+      "source_type": {
+        "manual": "Alta manual",
+        "rectification": "Rectificación",
+        "refund": "Devolución de la venta",
+        "sale": "Venta del TPV",
+        "substitution": "Sustituye a una factura simplificada",
+        "void": "Anulación de la venta"
+      },
+      "state": {
+        "AceptadoConErrores": "Aceptado con errores",
+        "Anulado": "Anulado",
+        "Correcto": "Correcto"
+      },
+      "supply_kind": {
+        "goods": "Para llevar",
+        "service": "En el local"
+      },
+      "target": {
+        "catalog": "Catálogo",
+        "page": "Página web"
+      },
+      "tax_basis": {
+        "business": "Según el negocio",
+        "excluded": "Impuesto no incluido",
+        "included": "Impuesto incluido"
+      },
+      "tax_type": {
+        "excise": "Especial",
+        "igic": "IGIC (Canarias)",
+        "import_duty": "Arancel",
+        "ipsi": "IPSI (Ceuta/Melilla)",
+        "sales_tax": "Impuesto sobre las ventas",
+        "surcharge": "Recargo",
+        "vat": "IVA",
+        "withholding": "Retención"
+      },
+      "template": {
+        "bold": "Llamativa",
+        "classic": "Clásica",
+        "minimal": "Minimalista",
+        "modern": "Moderna"
+      },
+      "trigger_kind": {
+        "at": "Una vez, en una fecha y hora",
+        "event": "Pasa algo",
+        "manual": "Solo a mano",
+        "schedule": "Según un horario"
+      },
+      "type": {
+        "card": "Tarjeta",
+        "cash": "Efectivo",
+        "closing": "Cierre",
+        "in": "Entrada",
+        "opening": "Apertura",
+        "other": "Otra",
+        "out": "Salida",
+        "refund": "Devolución",
+        "sale": "Venta",
+        "transfer": "Transferencia",
+        "void": "Anulación"
+      },
+      "unit": {
+        "g": "Gramo",
+        "h": "Hora",
+        "kg": "Kilogramo",
+        "l": "Litro",
+        "min": "Minuto",
+        "ml": "Mililitro",
+        "t": "Tonelada",
+        "ud": "Unidad"
+      },
+      "usage": {
+        "bar": "Barra",
+        "kitchen": "Cocina",
+        "label": "Etiqueta",
+        "receipt": "Recibo"
+      }
+    },
+    "statuses": {
+      "appointment__appointment": {
+        "cancelled": "Cancelada",
+        "completed": "Completada",
+        "confirmed": "Confirmada",
+        "in_progress": "En curso",
+        "no_show": "No-show",
+        "pending": "Pendiente"
+      },
+      "attendance__record": {
+        "closed": "Cerrada",
+        "needs_review": "Por revisar",
+        "open": "Abierta"
+      },
+      "cart_checkout__cart": {
+        "abandoned": "Abandonado",
+        "active": "Activo",
+        "converted": "Convertido",
+        "expired": "Expirado"
+      },
+      "cart_checkout__order": {
+        "completed": "Completado",
+        "failed": "Fallido",
+        "initiated": "Iniciado",
+        "paid": "Pagado"
+      },
+      "cash_register__session": {
+        "closed": "Cerrada",
+        "open": "Abierta"
+      },
+      "customer__purchase": {
+        "confirmed": "Cobrada",
+        "refunded": "Devolución",
+        "voided": "Anulada"
+      },
+      "demo__item": {
+        "done": "Hecho",
+        "open": "Abierto"
+      },
+      "flow__run": {
+        "asking": "Esperando una respuesta",
+        "calling": "Llamando a otro sistema",
+        "cancelled": "Cancelada",
+        "failed": "Se paró por un error",
+        "running": "En marcha",
+        "stopped": "Terminó: no se cumplía la condición",
+        "succeeded": "Terminó bien",
+        "waiting": "Esperando"
+      },
+      "inventory__product": {
+        "active": "Activo",
+        "inactive": "Inactivo",
+        "needs_tax_setup": "Falta la categoría fiscal",
+        "sold_out": "Agotado"
+      },
+      "invoice__invoice": {
+        "cancelled": "Cancelada",
+        "issued": "Emitida",
+        "overdue": "Vencida",
+        "paid": "Pagada"
+      },
+      "kitchen__ticket": {
+        "cancelled": "Cancelada",
+        "pending": "Por preparar",
+        "preparing": "En preparación",
+        "ready": "Lista",
+        "served": "Servida"
+      },
+      "online_booking__booking": {
+        "cancelled": "Cancelada",
+        "completed": "Completada",
+        "confirmed": "Confirmada",
+        "in_progress": "En curso",
+        "no_show": "No-show",
+        "pending": "Pendiente"
+      },
+      "payment__payment": {
+        "approved": "Aprobado",
+        "cancelled": "Cancelado",
+        "completed": "Completado",
+        "draft": "Borrador",
+        "sent": "Enviado"
+      },
+      "pricing__price_list": {
+        "active": "Activa",
+        "all": "Todo",
+        "inactive": "Inactiva"
+      },
+      "pricing__rule": {
+        "active": "Activa",
+        "all": "Todo",
+        "inactive": "Inactiva"
+      },
+      "printing__job": {
+        "cancelled": "Cancelado",
+        "done": "Impreso",
+        "failed": "Fallido",
+        "pending": "Pendiente",
+        "sent": "Enviado"
+      },
+      "reservation__reservation": {
+        "cancelled": "Cancelada",
+        "completed": "Completada",
+        "confirmed": "Confirmada",
+        "no_show": "No presentada",
+        "pending": "Pendiente",
+        "seated": "Sentada"
+      },
+      "sale__order": {
+        "completed": "Completada",
+        "open": "Abierta",
+        "voided": "Anulada"
+      },
+      "sale__sale": {
+        "completed": "Completada",
+        "refunded": "Devuelta",
+        "voided": "Anulada"
+      },
+      "service__grant": {
+        "active": "Activo",
+        "voided": "Anulado"
+      },
+      "service__package": {
+        "active": "Activo",
+        "archived": "Archivado",
+        "deleted": "Eliminado"
+      },
+      "service__service": {
+        "active": "Activo",
+        "archived": "Archivado",
+        "unconfigured": "Sin configurar"
+      },
+      "staff__member": {
+        "active": "Activo",
+        "inactive": "Inactivo",
+        "on_leave": "De baja"
+      },
+      "staff__time_off": {
+        "approved": "Aprobada",
+        "cancelled": "Cancelada",
+        "pending": "Pendiente",
+        "rejected": "Rechazada"
+      },
+      "table__session": {
+        "closed": "Cerrada",
+        "merged": "Fusionada",
+        "open": "Abierta",
+        "parked": "Aparcada",
+        "transferred": "Trasladada"
+      },
+      "table__table": {
+        "available": "Disponible",
+        "blocked": "Bloqueada",
+        "occupied": "Ocupada",
+        "reserved": "Reservada"
+      },
+      "task__task": {
+        "blocked": "Bloqueada",
+        "cancelled": "Cancelada",
+        "done": "Hecha",
+        "in_progress": "En curso",
+        "todo": "Por hacer"
+      },
+      "tax__rule": {
+        "active": "Activas",
+        "all": "Todas",
+        "inactive": "Desactivadas"
+      },
+      "tip__tip": {
+        "active": "Activa",
+        "voided": "Anulada"
+      },
+      "verifactu__record": {
+        "accepted": "Aceptado",
+        "accepted_with_errors": "Aceptado con errores",
+        "pending": "Pendiente",
+        "rejected": "Rechazado",
+        "sent": "Enviado, sin respuesta"
+      },
+      "whatsapp_inbox__conversation": {
+        "closed": "Cerrada",
+        "open": "Abierta",
+        "pending": "Pendiente"
+      },
+      "whatsapp_inbox__template": {
+        "APPROVED": "Aprobada",
+        "DELETED": "Borrada en WhatsApp Manager",
+        "DISABLED": "Desactivada por Meta",
+        "DRAFT": "Sin enviar a Meta",
+        "PAUSED": "Pausada por Meta",
+        "PENDING": "En revisión",
+        "REJECTED": "Rechazada"
+      }
+    },
+    "choiceOrder": {
+      "asc": "{field}, ascendente",
+      "desc": "{field}, descendente"
     },
     "catalogError": "No se ha podido leer lo que pueden usar aquí las automatizaciones.",
     "errors": {

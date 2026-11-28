@@ -3,7 +3,7 @@
 // the editor's one picker and adds what it answers.
 import { describe, expect, it } from 'vitest';
 
-import { click, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__/mount-flow';
+import { click, ionValue, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__/mount-flow';
 import ValueBox from './ValueBox.vue';
 
 async function setup(modelValue: unknown, pick: () => Promise<string | null> = async () => 'input.customer_name') {
@@ -58,5 +58,46 @@ describe('ValueBox', () => {
   it('shows the server’s refusal of this value', async () => {
     const m = await mountFlow(ValueBox, { props: { modelValue: '', label: 'Title', testid: 'vb', steps: [], catalog: null, pick: async () => null, errorText: 'Required.' } });
     expect(m.find('vb-error').text()).toBe('Required.');
+  });
+
+  describe('a closed list (a task’s priority, hub#2729)', () => {
+    const OPTIONS = [
+      { value: 'low', label: 'Low' },
+      { value: 'high', label: 'High' },
+    ];
+    async function choice(modelValue: unknown, pick: () => Promise<string | null> = async () => 'input.priority') {
+      const m = await mountFlow(ValueBox, { props: { modelValue, label: 'Priority', testid: 'vb', steps: TASK_STEPS, catalog: TASK_CATALOG, pick, options: OPTIONS } });
+      const emitted = () => (m.wrapper.emitted('update:modelValue') ?? []).map(([value]) => value);
+      return { ...m, emitted };
+    }
+
+    it('is chosen by the words of its values, never typed as the action keeps them', async () => {
+      const s = await choice('high');
+      const select = s.find('vb-choice');
+      expect((select.element as unknown as { value: string }).value).toBe('high');
+      expect(select.findAll('ion-select-option').map((option) => [(option.element as unknown as { value: string }).value, option.text()])).toEqual([
+        ['low', 'Low'],
+        ['high', 'High'],
+      ]);
+      expect(s.wrapper.find('[data-testid="vb-text-0"]').exists()).toBe(false);
+      await ionValue(select.element, 'low');
+      expect(s.emitted()).toEqual(['low']);
+    });
+
+    it('takes a datum instead with «Insert data», shown as its pill until it is taken out', async () => {
+      const empty = await choice('');
+      await click(empty.find('vb-insert').element);
+      await settle();
+      expect(empty.emitted()).toEqual(['input.priority']);
+      const picked = await choice('input.priority');
+      expect(picked.wrapper.find('[data-testid="vb-choice"]').exists()).toBe(false);
+      expect(picked.find('vb-pill-1').text()).toBe('Priority');
+    });
+
+    it('a value that is not one of the list is shown as it is, to be corrected', async () => {
+      const s = await choice('High');
+      expect(s.wrapper.find('[data-testid="vb-choice"]').exists()).toBe(false);
+      expect((s.find('vb-text-0').element as HTMLInputElement).value).toBe('High');
+    });
   });
 });

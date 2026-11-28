@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { CatalogOut, TestOut } from '../operations';
+import { catalogNames, internalCodesIn } from '../__tests__/internal-codes';
 import { click, mountFlow, settle } from '../__tests__/mount-flow';
 import TestPanel from './TestPanel.vue';
 
@@ -53,6 +54,19 @@ async function setup(answer: [number, unknown] = [200, ANSWER], flowId: string |
 }
 
 describe('TestPanel', () => {
+  it('says a value of a closed list it would send by its words, and a step by what it does, never by its id (hub#2729)', async () => {
+    const priority = { name: 'priority', type: 'choice', required: false, description: '', choices: ['low', 'medium', 'high', 'urgent'] };
+    const catalog = { ...CATALOG, actions: [{ ...CATALOG.actions[0], fields: [priority] }] } as unknown as CatalogOut;
+    const would = { ...ANSWER.steps[2], outcome: 'would_run' as const, params: { title: 'Hi', priority: 'high' }, empty: [], errors: {} };
+    const gone = { ...would, id: 's9' };
+    const answer = { ...ANSWER, steps: [would, gone] };
+    const m = await mountFlow(TestPanel, { props: { document: DOC, flowId: 'f1', catalog }, answers: { '/api/flow/flows/test': [200, answer] }, locale: 'es' });
+    await settle();
+    expect(m.find('flow-test-step-s3').text()).toContain('PrioridadAlta');
+    expect(m.find('flow-test-step-s9').find('strong').text()).toBe('Hacer algo');
+    expect(internalCodesIn(m.find('flow-test-step-s9').text(), catalogNames(catalog))).toEqual([]);
+  });
+
   it('asks the server with the editor’s document and the saved automation’s permissions', async () => {
     const m = await setup();
     const [call] = m.sent();

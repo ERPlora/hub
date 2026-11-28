@@ -9,7 +9,8 @@ import { click, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__
 import FieldPicker from './FieldPicker.vue';
 
 async function setup(choices: unknown[], more: Record<string, unknown> = {}) {
-  const m = await mountFlow(FieldPicker, { props: { open: true, choices, steps: TASK_STEPS, catalog: TASK_CATALOG, ...more } });
+  const { locale, ...props } = more as { locale?: 'en' | 'es' };
+  const m = await mountFlow(FieldPicker, { props: { open: true, choices, steps: TASK_STEPS, catalog: TASK_CATALOG, ...props }, locale });
   await settle();
   return m;
 }
@@ -25,6 +26,23 @@ describe('FieldPicker', () => {
     expect(m.find('flow-picker-input.total').text()).toContain('Total');
     expect(m.find('flow-picker-input.total').text()).toContain('e.g. 12500');
     expect(m.find('flow-picker-steps.s1.number').text()).toContain('1. Create a task › Number');
+  });
+
+  it('says each example as the screen says it: a yes or a no, a date at the business’s clock, nothing for an empty one (hub#2729)', async () => {
+    const m = await setup(
+      [
+        { path: 'input.tax_included', group: 'input', example: true },
+        { path: 'input.is_test', group: 'input', example: false },
+        { path: 'input.appointment_id', group: 'input', example: null },
+        { path: 'input.created_at', group: 'input', example: '2026-11-27T23:38:51.945538+00:00' },
+      ],
+      { locale: 'es' },
+    );
+    expect(m.find('flow-picker-input.tax_included').text()).toContain('p. ej. Sí');
+    expect(m.find('flow-picker-input.is_test').text()).toContain('p. ej. No');
+    expect(m.find('flow-picker-input.appointment_id').text()).not.toContain('p. ej.');
+    expect(m.find('flow-picker-input.created_at').text()).toMatch(/p\. ej\. 2\d nov 2026, \d{1,2}:38$/);
+    expect(m.wrapper.text()).not.toMatch(/true|false|null|T23:38/);
   });
 
   it('a tap picks the datum and closes', async () => {
