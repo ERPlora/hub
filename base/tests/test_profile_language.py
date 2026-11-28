@@ -55,6 +55,8 @@ def test_a_language_chosen_on_one_device_is_the_one_every_open_device_speaks(cli
     page = tablet.get("/", **HOST, HTTP_ACCEPT="text/html")
     assert page.status_code == 200
     assert f'<html lang="{chosen}"' in page.content.decode()
+    # The language every text the server writes in this request comes in, also an error's.
+    assert page["Content-Language"] == chosen
     assert COOKIE not in page.cookies
 
 
