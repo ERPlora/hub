@@ -242,3 +242,19 @@ def test_the_save_card_says_when_the_draft_did_not_change(language, expected):
     save_draft()
 
     assert summary(a_save(), language) == {"summary": expected}
+
+
+def test_the_save_card_of_the_site_sent_back_as_read_says_nothing_changed(hub_files):
+    """The read names each image by its file and the assistant sends those names back: they are no change."""
+    photo = an_image("terraza.png", 1)
+    save_draft(full_content(gallery={"images": [photo]}))
+    read = assistant_read()
+    assert read["content"]["gallery"]["images"][0]["name"] == "terraza.png"  # positive control: the names were read
+    assert summary(a_save(read["content"])) == {"summary": "No changes"}
+    moved = full_content(hero={"cover": photo}, gallery={"images": []})
+    assert summary(a_save(moved)) == {"summary": "Content: Header, Gallery"}
+
+
+def assistant_read() -> dict:
+    """What website.site.get answers the assistant, as JSON."""
+    return get("website.site.get")(ctx_for(), get("website.site.get").input()).model_dump(mode="json")

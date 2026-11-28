@@ -383,9 +383,10 @@ same page: **Log in** leads to its address on erplora.com and, with no page to s
 Involved: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
 ### WEBSITE-F11 Show a photo gallery
-<!-- from WORKBOOK.md sha256:b58c66403d0a -->
+<!-- from WORKBOOK.md sha256:a2cf25adf8c6 -->
 Status: done (server, screen and e2e)
-Actor: owner, administrator, assistant (ordering or removing photos already uploaded), API
+Actor: owner, administrator, assistant (ordering or removing photos already uploaded, which it tells apart by the
+name of the file each was uploaded with: «put the beer one first»), API
 Screen: Website
 Steps:
 1. Unfold **Gallery** and tap **Add a photo** (one by one, up to 12; «3 of 12 photos» says how many there are).
@@ -461,15 +462,19 @@ The three public ones answer only with the page online (otherwise, 404 `website.
 | Uploads an image (base64, up to 5 MB) | manage | F04 | `website.image.upload` |
 
 ### Assistant
-<!-- from WORKBOOK.md sha256:69673197851c -->
+<!-- from WORKBOOK.md sha256:a7a71f3d050f -->
 The assistant (by voice or by text) uses, with the session and permissions of whoever speaks, `website.site.get`,
 `website.site.save`, `website.site.publish`, `website.site.unpublish` and `website.catalog.categories`. Every field of
 the draft carries its description (name, tagline, about text, gallery, Google reviews link, contact, opening hours,
 location, template, palette and background), and the save's description tells it the draft is sent whole: it reads it
 first with `website.site.get`, changes only what was asked and sends it back. Example: «Put on the website the opening hours Monday to Friday from 9
 to 8 pm» → it reads the draft, puts the five days with the interval `09:00`–`20:00` in `contact.hours` (leaving the
-rest as it was) and calls `website.site.save`; if she adds «and publish it», `website.site.publish`. Not assistant
-tools, on purpose: the preview (`website.site.preview`, an HTML page), the image upload (`website.image.upload`, a
+rest as it was) and calls `website.site.save`; if she adds «and publish it», `website.site.publish`. In what it reads,
+every image (the logo, the cover, the photo of About us and each photo of the gallery) carries in `name` the name of
+the file it was uploaded with, or its format and size if it was uploaded before that name was kept: «En la galería de
+la web, pon la foto de la caña la primera» → it reads the draft, finds the photo whose file says «caña»
+(`cerveza_cana.jpg`) and sends it back first in `gallery.images`. The server writes that name on every read and never
+keeps it: what is sent in `name` is no change. Not assistant tools, on purpose: the preview (`website.site.preview`, an HTML page), the image upload (`website.image.upload`, a
 file in base64 up to 5 MB) and the QR (`website.qr.get`, an image in base64), which are used from the screen, nor the
 visitors' three public reads (`website.public.*`), nor the two with which its card names an image or a category
 (`website.image.get` and `website.category.get`).
