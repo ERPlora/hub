@@ -1376,7 +1376,7 @@ import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:6adc295f239e -->
+<!-- from WORKBOOK.md sha256:1f90a41e11b3 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1409,7 +1409,11 @@ projects and the open tasks, with their project, the task they hang from, their 
 of Automations, the automations, which arrive paused and with no permission given, for the owner to review them; of
 Kitchen, the stations with the products and categories that go to each; of Sales, the open price departments and the
 quick notes; of Customers, the groups, tags and own fields in use; of Cash register, the drawers in
-use; of Demo, its items with their lines; and, only in a backup, the customers, with what each card keeps in its own
+use; of Demo, its items with their lines; of Website, the page as it is being edited (the template, the colours and what
+each section says), with its own images inside, as WebP of at most 2560 px a side, and the categories of its catalog by
+their name: it arrives as an unpublished draft and what Google says of the reviews is read again (a website the business
+never saved neither travels nor counts, a saved website is never overwritten by a file, and an image or a category that
+does not go in is told by the report); and, only in a backup, the customers, with what each card keeps in its own
 fields (a value whose field is not in the business loading it does not go in and the report says so). Never the history (sales, payments, cash sessions, reservations and
 appointments, clock-ins, kitchen tickets, done tasks, runs), the people and their access, PINs, fiscal data, each
 app's settings (like the Sales payment methods) nor what is bound to something outside the business (WhatsApp, printers, QR codes already printed,

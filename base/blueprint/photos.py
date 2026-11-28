@@ -1,5 +1,6 @@
 """The images of the rows that show one: one of the shared library travels as its reference, a photo of the
-row's own inside the file, and loading it copies the photo through the app's own upload.
+row's own inside the file, and loading it copies the photo through the app's own upload. An app that keeps its images
+itself (the website's) gives the file those its rows name, each as ``base.images.carried`` makes it.
 """
 
 import base64
@@ -15,23 +16,33 @@ from base.blueprint.calls import ROW_REFUSED, Dataset, Loaded, call, reason
 
 PHOTO_MISSING = _("«%(row)s»: its photo is not in the file, so it loads without it.")
 
+
 def export_media(ctx: OperationContext, data: dict[str, list[dict]], parts: Iterable[Dataset]) -> dict[str, bytes]:
-    """The photos of its own that the rows of ``data`` show, of the ``parts`` whose rows show an image, by name, read
-    from ``ctx``'s hub; a row whose photo the store no longer has travels without it (its ``image`` dropped), never
-    with a reference the file cannot keep."""
+    """The images of their own that the rows of ``data`` show, by name, read from ``ctx``'s hub: the photos of the
+    ``parts`` whose rows show one of ``base.images``, and what the ``parts`` whose app keeps its images itself give."""
     media = {}
     for part in parts:
-        if part.images is None:
+        rows = data.get(part.key, [])
+        if part.media is not None and rows:
+            media |= part.media(ctx, rows)
+        elif part.images is not None:
+            media |= _own_photos(ctx, rows)
+    return media
+
+
+def _own_photos(ctx: OperationContext, rows: list[dict]) -> dict[str, bytes]:
+    """The photos of ``base.images`` the ``rows`` show; a row whose photo the store no longer has travels without it
+    (its ``image`` dropped), never with a reference the file cannot keep."""
+    media = {}
+    for row in rows:
+        name = images.own_name(row.get("image", ""))
+        if name is None:
             continue
-        for row in data.get(part.key, []):
-            name = images.own_name(row.get("image", ""))
-            if name is None:
-                continue
-            content = images.read_photo(ctx.scope, row["image"])
-            if content is None:
-                del row["image"]
-            else:
-                media[name] = content
+        content = images.read_photo(ctx.scope, row["image"])
+        if content is None:
+            del row["image"]
+        else:
+            media[name] = content
     return media
 
 

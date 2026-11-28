@@ -15,10 +15,6 @@ from apps.website.choices import CHOICES
 class WebsiteConfig(LiveAppConfig):
     name = "apps.website"
     label = "website"
-    blueprint_stays = {
-        "Site": "pending",
-        "Image": "pending",
-    }
     kind = "app"
     # With a context: Clientes translates a customer's «Website» field as «Web».
     verbose_name = pgettext_lazy("app name", "Website")
@@ -73,6 +69,13 @@ class WebsiteConfig(LiveAppConfig):
             "WEBSITE-F11": {"es": ["CpHm3c5LpF8"], "en": ["CJc3ij7WhNM"]},
         },
     )
+
+    def blueprint_datasets(self) -> list:
+        """What of Website travels in an export of the business (BASE-F35): the page being edited, with its images."""
+        from apps.website import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS
+
     # The closed lists kept inside the site's JSON (the palette, the background, the catalog's source, the days of the
     # opening hours), by the word the editor shows: the assistant's card says each value by it.
     choices = CHOICES

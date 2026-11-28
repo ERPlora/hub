@@ -6,7 +6,7 @@ import base64
 import pytest
 from django.core.cache import cache
 from django.test import RequestFactory
-from live.errors import PermissionDenied
+from live.errors import NotFound, PermissionDenied
 
 from apps.website import reviews
 from apps.website.tests.conftest import (
@@ -15,6 +15,7 @@ from apps.website.tests.conftest import (
     NAMELESS,
     PLACE_ID,
     A,
+    B,
     ctx_for,
     full_content,
     google_reviews,
@@ -25,6 +26,7 @@ from apps.website.tests.conftest import (
 from apps.website.models import Image
 from apps.website.tests.test_services import png_bytes, run, upload
 from base.models import Hub
+from base.tenancy.context import use_hub
 from base.tests.test_qr import expected_dark, png_dark, svg_dark
 
 pytestmark = HUB_DB
@@ -188,3 +190,40 @@ def test_the_sites_last_good_reviews_stand_in_when_nothing_is_kept(settings, no_
     Site.objects.update(reviews_snapshot=google_reviews(count=9))
     assert run("website.site.get").reviews.count == 9
     assert "9 reviews on Google" in run("website.site.preview").html
+
+
+# An image as its file, for an export of the business (BASE-F35)
+
+
+def test_an_image_is_read_as_its_file_with_its_type_and_its_name(hub_files):
+    raw = png_bytes(colour=(9, 9, 9))
+    image = upload(raw, filename="logo.png")
+
+    out = run("website.image.download", {"id": str(image.id)}, ctx_for("hub_manager"))
+
+    assert (base64.b64decode(out.data_base64), out.content_type, out.name) == (raw, "image/png", "logo.png")
+
+
+def test_an_image_of_another_business_is_not_read(hub_files, hub_b):
+    with use_hub(hub_b):
+        theirs = upload(png_bytes(), ctx=ctx_for(scope=B))
+
+    with pytest.raises(NotFound) as refused:
+        run("website.image.download", {"id": str(theirs.id)})
+    assert refused.value.code == "website.image_not_found"
+
+
+def test_an_image_whose_file_the_store_lost_is_not_read(hub_files):
+    image = upload(png_bytes())
+    hub_files.delete(Image.objects.get(id=image.id).key)
+
+    with pytest.raises(NotFound) as refused:
+        run("website.image.download", {"id": str(image.id)})
+    assert refused.value.code == "website.image_not_found"
+
+
+def test_an_employee_does_not_read_the_websites_images(hub_files):
+    image = upload(png_bytes())
+
+    with pytest.raises(PermissionDenied):
+        run("website.image.download", {"id": str(image.id)}, ctx_for("hub_employee"))
