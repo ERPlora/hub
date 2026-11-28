@@ -20,7 +20,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from apps.customer.models import OrderLink
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.table.models import Hold, Table, TableSession
 from base.business import business_zone
 

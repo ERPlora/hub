@@ -10,7 +10,7 @@ from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict
 
 from apps.printing.models import PrintJob
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.queries.business import business_currency as sales_business_currency
 from apps.sale.queries.business import money_text
 from apps.sale.tests.conftest import HUB_DB, A, B, ctx_for, run

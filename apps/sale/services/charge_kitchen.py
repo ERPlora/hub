@@ -6,7 +6,8 @@ from live.context import OperationContext
 from live.errors import AppInactive, Conflict
 from live.operations import UnknownOperation, get
 
-from apps.sale.models import Order, Sale
+from apps.sale.models.orders import Order
+from apps.sale.models.sales import Sale
 from apps.sale.queries.orders import find_order
 from apps.sale.schemas.checkout import CompleteIn
 from base.operations import call

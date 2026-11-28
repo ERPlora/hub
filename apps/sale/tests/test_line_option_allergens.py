@@ -9,7 +9,7 @@ import pytest
 from live.context import system_context
 from live.models import OutboxEvent
 
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from apps.sale.tests.conftest import HUB_DB, A, run
 
 pytestmark = HUB_DB

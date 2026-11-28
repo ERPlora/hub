@@ -183,7 +183,7 @@ def test_an_invoice_is_read_by_its_id_or_its_number_with_its_links(issuer):
 
 
 def test_a_sale_without_its_invoice_answers_none(issuer, today):
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     sale = Sale.objects.create(
         number="20261014-0099", business_day=today, sequence=99, idempotency_key="k-99"
@@ -359,7 +359,7 @@ def test_nobody_without_seeing_invoices_reads_a_series(issuer, today):
 
 def a_refund(product, charge, amount=500):
     """A sale of the shampoo charged by card and ``amount`` cents of it given back, with the till's own operations."""
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     product()
     sale = charge()

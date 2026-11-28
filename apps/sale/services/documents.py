@@ -8,7 +8,8 @@ from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, OperationError
 from live.operations import AI, operation
 
-from apps.sale.models import FiscalStatus, Sale, Settings
+from apps.sale.models.sales import FiscalStatus, Sale
+from apps.sale.models.settings import Settings
 from apps.sale.queries.other_apps import call_app
 from apps.sale.queries.sales import sale_detail, visible_sale
 from apps.sale.schemas.sales import SaleOut, SaleRefIn

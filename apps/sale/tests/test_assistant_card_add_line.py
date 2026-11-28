@@ -11,7 +11,7 @@ from live.context import OperationContext, system_context
 from live.errors import Conflict
 from live.operations import get, registry
 
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from base import activation, assistant
 

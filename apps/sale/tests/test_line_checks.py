@@ -13,7 +13,7 @@ from django.utils import translation
 from live.errors import Conflict, InvalidPayload
 from live.operations import INTERNAL, get, registry
 
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from base import assistant
 from base.tests.test_assistant_yes_for_its_card import no_card_but_the_model_hears, the_model_hears, turn_as

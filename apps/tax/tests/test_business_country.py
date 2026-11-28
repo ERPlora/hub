@@ -18,7 +18,7 @@ from live.meta import all_live_app_configs, permissions_for_role
 from live.operations import get
 
 from apps.invoice.tests.conftest import ISSUER
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.tax import queries
 from apps.tax.models import TaxRule, TaxSettings
 from apps.tax.schemas.rules import FACTORY_COUNTRIES

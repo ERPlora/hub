@@ -8,7 +8,8 @@ from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 from apps.cash_register.models import Session
-from apps.sale.models import PaymentMethod, Sale
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.sales import Sale
 from apps.staff.models import Member
 from base.models.access import ACTOR_MAX_LENGTH
 

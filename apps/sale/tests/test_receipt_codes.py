@@ -8,7 +8,7 @@ from django.test import override_settings
 from django.utils import timezone
 from live.context import system_context
 
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.queries.receipt_codes import CODE_LIFETIME, expired, receipt_code, sale_of_code
 from apps.sale.tests.conftest import HUB_DB, B, ctx_for, run
 from base.tenancy.context import use_hub

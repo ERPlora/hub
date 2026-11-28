@@ -15,7 +15,7 @@ from apps.kitchen.schemas.tickets import TicketOut
 from apps.kitchen.services.paper import _print_round
 from apps.kitchen.services.settling import begin, out, settle
 from apps.kitchen.services.writes import _ticket_event, locked_row, locked_settings
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from base.queries.people import actor_name
 
 NOTHING_TO_COOK = _("Nothing on this check is cooked: services do not go to the kitchen.")

@@ -17,7 +17,8 @@ from live.errors import Conflict
 from live.operations import get, registry
 
 from apps.printing.models import PrintJob
-from apps.sale.models import Order, Sale
+from apps.sale.models.orders import Order
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, confirmed_by_the_assistant, ctx_for, run
 from base import assistant
 from base.business import paper_date

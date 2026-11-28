@@ -12,7 +12,11 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.sale import events
-from apps.sale.models import Order, OrderLine, Sale, SaleCounter, SaleLine, SalePayment, Settings, sale_number
+from apps.sale.models.numbering import SaleCounter, sale_number
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.sales import Sale, SaleLine
+from apps.sale.models.settings import Settings
 from apps.sale.queries.business import (
     LIMITS_CURRENCY,
     TICKET_LIMIT,

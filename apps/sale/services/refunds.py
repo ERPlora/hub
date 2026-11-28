@@ -10,7 +10,9 @@ from live.operations import AI, atomic, operation
 from live.outbox import record_event
 
 from apps.sale import events
-from apps.sale.models import PaymentMethod, Refund, RefundLine, RefundPayment, Sale, SaleLine
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.refunds import Refund, RefundLine, RefundPayment
+from apps.sale.models.sales import Sale, SaleLine
 from apps.sale.queries.business import actor, money_text
 from apps.sale.queries.other_apps import call_services
 from apps.sale.queries.payment_methods import held_methods, method_display_name

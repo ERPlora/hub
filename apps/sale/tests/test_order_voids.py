@@ -7,7 +7,7 @@ import pytest
 from live.errors import NotFound, PermissionDenied
 from live.operations import INTERNAL, get
 
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from base import assistant
 

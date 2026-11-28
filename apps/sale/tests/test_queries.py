@@ -12,7 +12,8 @@ from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 from live.errors import NotFound, PermissionDenied
 
-from apps.sale.models import PaymentMethod, Sale
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.sales import Sale
 from apps.sale.schemas.checkout import BreakdownOut, PreviewLineOut, PreviewOut
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from base.tenancy.context import current_alias
@@ -140,7 +141,7 @@ def test_a_partly_refunded_sale_says_what_is_left(catalog):
 def test_a_row_says_whether_the_sale_has_refunds_also_one_of_no_money(catalog):
     # A refund that gave back only a voucher's session moves no money: the row still says the sale has
     # refunds, so the screen offers «Refund» and never «Void» (the server refuses voiding it).
-    from apps.sale.models import Refund
+    from apps.sale.models.refunds import Refund
 
     plain = charge("list-key-0002", payments=[{"method": "card"}])
     session_only = charge("list-key-0003", payments=[{"method": "card"}])

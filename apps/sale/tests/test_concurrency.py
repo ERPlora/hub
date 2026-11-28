@@ -24,16 +24,12 @@ from live.operations import atomic
 
 from apps.customer.models import Customer
 from apps.customer.tests.conftest import card_protected, reads, writes
-from apps.sale.models import (
-    Department,
-    Order,
-    OrderLine,
-    PaymentMethod,
-    Refund,
-    Sale,
-    SaleCounter,
-    SaleLine,
-)
+from apps.sale.models.departments import Department
+from apps.sale.models.numbering import SaleCounter
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.refunds import Refund
+from apps.sale.models.sales import Sale, SaleLine
 from apps.sale.tests.conftest import A, run
 from base.tenancy import context
 from base.tenancy.tests.business import HUB_DB_COMMITTED

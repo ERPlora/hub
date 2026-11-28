@@ -12,7 +12,7 @@ from live.errors import Conflict
 
 from apps.inventory.models import Product
 from apps.sale.apps import SaleConfig
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from apps.tax.models import TaxRule
 
@@ -239,7 +239,7 @@ def test_without_a_region_the_business_charges_the_national_rule(product):
 def test_a_category_without_its_territorys_rule_is_not_charged_with_the_national_vat(product, region):
     # Outside the VAT territory the national rule of the category (restaurant.food, 10 % VAT) never stands in for
     # the missing IGIC or IPSI: the till refuses it as a category without any rule in the peninsula.
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     regional_rule("ES-CN", "7", "igic")
     run("tax.settings.update", {"region_code": region})

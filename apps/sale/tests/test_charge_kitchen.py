@@ -7,7 +7,8 @@ from live.context import OperationContext
 from live.errors import Conflict, PermissionDenied
 
 from apps.kitchen.services import rounds
-from apps.sale.models import Order, OrderLine, Sale
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, charged_by_the_assistant, ctx_for, run
 
 pytestmark = HUB_DB

@@ -16,7 +16,8 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.sale import paper
-from apps.sale.models import Order, OrderLine, SaleLine
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.sales import SaleLine
 from apps.sale.schemas.checkout import PreviewLineOut
 from apps.sale.tests.conftest import HOST, HUB_DB, B, ctx_for, run
 from apps.sale.tests.test_assistant_card_records import fields_of

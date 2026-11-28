@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.errors import PermissionDenied
 from live.operations import registry
 
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, A, B, ctx_for, run

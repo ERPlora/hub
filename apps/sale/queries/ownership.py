@@ -4,7 +4,8 @@ professional's who did it."""
 
 from django.db.models import Q
 
-from apps.sale.models import Sale, VoucherSession
+from apps.sale.models.sales import Sale
+from apps.sale.models.voucher_sessions import VoucherSession
 from base.queries.ownership import Owned
 
 SALES = Owned(

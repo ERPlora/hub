@@ -11,7 +11,7 @@ from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict
 
 from apps.sale import pricing
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from base.business import babel_locale
 
 GRID_FALLBACK = Decimal("0.001")

@@ -140,7 +140,7 @@ def open_check(label: str = "", ctx=None, **more):
 
 def end_order(order_id, status: str = "completed"):
     """Sales ended the check (charged it whole or voided it): what its own operations leave behind."""
-    from apps.sale.models import Order
+    from apps.sale.models.orders import Order
 
     Order.objects.filter(pk=order_id).update(status=status, closed_at=timezone.now())
 

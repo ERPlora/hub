@@ -14,7 +14,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.db.models import ProtectedError
 
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.tax.models import TaxCategory
 from base.models import HubUser, Membership
 from base.models.api_keys import ApiKey

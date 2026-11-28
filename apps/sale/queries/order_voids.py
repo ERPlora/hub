@@ -7,7 +7,7 @@ from live.context import OperationContext
 from live.errors import PermissionDenied
 from live.operations import INTERNAL, operation
 
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.sale.queries.orders import find_order
 from apps.sale.schemas.orders import OrderRefIn
 from apps.sale.schemas.records import CheckFoundOut

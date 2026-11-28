@@ -9,7 +9,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get, registry
 
-from apps.sale.models import SaleLine
+from apps.sale.models.sales import SaleLine
 from apps.sale.tests.conftest import HUB_DB, by_staff, charge, charged_open, check, ctx_for, grant_for, last_event, pay_with, refund, run, spend_session, svc, voucher_of_100
 from apps.service.models.grants import Grant
 

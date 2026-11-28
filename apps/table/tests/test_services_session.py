@@ -18,7 +18,7 @@ import pytest
 from django.utils import timezone
 from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.table.models import Hold, SessionMove, Table, TableSession
 
 from .conftest import (

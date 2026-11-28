@@ -10,7 +10,7 @@ from live.ninja import ensure_api_parity
 from live.operations import registry
 
 from apps.flow.tests.test_api import get, post
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 from apps.tip.api import router
 from base.tests.routes import bound_routes, spa_routes
 from config.api import api

@@ -13,7 +13,7 @@ from live.errors import Conflict
 from live.operations import atomic, registry
 
 from apps.invoice.models import Invoice, InvoiceSeries
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
 pytestmark = HUB_DB
@@ -123,7 +123,7 @@ def test_every_line_of_the_ticket_declares_what_its_line_of_the_sale_charged(iss
     # Line by line, not only in total: the sale shares each key's base by weight as Invoicing does, so
     # the base and the tax of every sale line are those of its invoice line.
     from apps.invoice.models import InvoiceLine
-    from apps.sale.models import SaleLine
+    from apps.sale.models.sales import SaleLine
 
     sale = charge("chain-0050", {"product": "TAP"}, {"product": "CAN"}, {"product": "CAN"})
     lines = SaleLine.objects.filter(sale_id=sale.id).order_by("position")
@@ -601,7 +601,8 @@ def test_a_refusal_after_numbering_gives_the_number_back_and_the_document_waits(
 
 
 def test_an_unexpected_error_inside_invoicing_undoes_the_whole_charge(issuer, bar, monkeypatch):
-    from apps.sale.models import Order, SaleCounter
+    from apps.sale.models.numbering import SaleCounter
+    from apps.sale.models.orders import Order
 
     def broken(ctx, data):
         raise RuntimeError("a bug in Invoicing")

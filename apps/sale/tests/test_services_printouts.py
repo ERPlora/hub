@@ -12,7 +12,7 @@ import pytest
 from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.sale.tests.conftest import HUB_DB, answered_yes_to_the_assistant, ctx_for, run
 from base import assistant
 
