@@ -125,7 +125,7 @@ shows the inactive ones. **+** in each table creates a price list or a rule, and
 detail with its prices.
 
 #### Price lists
-<!-- from WORKBOOK.md sha256:262e86ebf9d4 -->
+<!-- from WORKBOOK.md sha256:d5e057f06894 -->
 
 **Price lists**: search box "Search code or name…", columns **Code** (with the tag
 **General** if it is the general price list), **Name**, **Currency**, **Customer group** ("Everybody" if it is
@@ -142,11 +142,12 @@ name before it ("Code QA-TERRAZA", "Currency EUR", "Prices 1").
   **Until**, and **General list** (a toggle; not possible with a group).
 - Row actions: **Open** (also by tapping the row), **Edit**, **Make general** (in the "⋮" menu;
   only on an active one, without a group, in the business's currency and that is not general yet; asks for
-  confirmation), **Deactivate** (in the "⋮" menu; asks for confirmation; not on the general one) or **Activate** (on the inactive ones). The employee only sees
-  **Open**.
+  confirmation), **Deactivate** (in the "⋮" menu; asks for confirmation; not on the general one), **Activate** (on the
+  inactive ones) and **Delete** (in the "⋮" menu; asks for confirmation; not on the general one). The employee only
+  sees **Open**.
 
 #### Discount rules
-<!-- from WORKBOOK.md sha256:975a3c739438 -->
+<!-- from WORKBOOK.md sha256:9b4c61963a95 -->
 
 **Discount rules**: search box "Search code or name…", columns **Code**, **Name**, **Type**
 (Percentage, Amount per unit, Buy X, get Y, Tiered), **Value** ("10%", "€0.50 per
@@ -158,14 +159,16 @@ Code, Name, Type, Applies to and Status (as in the price lists: **Active** on op
 
 - **+** opens **New discount rule** (PRICING-F10).
 - Row actions: **Edit** (also by tapping the row), **Deactivate** (asks for confirmation) or
-  **Activate** (on the inactive ones). The employee has no actions.
+  **Activate** (on the inactive ones), and **Delete** (in the "⋮" menu; asks for confirmation). The employee has no
+  actions.
 
 #### Price list (detail)
-<!-- from WORKBOOK.md sha256:87b132cd9811 -->
+<!-- from WORKBOOK.md sha256:7af69e5682b3 -->
 It opens from the row and has **Back**; its title is the price list's name. At the top, the price list:
 **Code** with the tag **General**, **Customer group** ("Everybody" on the general one), **Currency**,
-**Tax**, **Validity** and **Status**, and in the bar **Edit**, **Make general** and **Deactivate /
-Activate** (whichever applies; with the same confirmations as in the table).
+**Tax**, **Validity** and **Status**, and in the bar **Edit**, **Make general**, **Deactivate /
+Activate** and **Delete**, the bin (whichever applies; with the same confirmations as in the table). Deleting it goes
+back to **Price Lists**.
 
 Below, **Prices**: search box "Search product or service…", columns **Item** (name),
 **Type** (Product or Service), **SKU**, **From** (the minimum quantity, with its unit), **Price** and
@@ -200,7 +203,7 @@ or chosen has not been saved: "Keep editing" keeps it and "Discard changes" clos
 With the window as it opened, Back closes it without asking (BASE-F05); the currency proposed by itself and an amount rewritten in the business's are no change.
 
 ## Flows
-<!-- from WORKBOOK.md sha256:a190d06a541d -->
+<!-- from WORKBOOK.md sha256:86f7a5ece74a -->
 
 | ID | Flow | Status |
 |---|---|---|
@@ -219,8 +222,8 @@ With the window as it opened, Back closes it without asking (BASE-F05); the curr
 | PRICING-F13 | Look up the price of a line | done |
 | PRICING-F14 | When a product is deleted or comes back, a category or a group is deleted, or a service changes | done |
 | PRICING-F15 | Recover the price list prices from a separate copy | done |
-| PRICING-F16 | Delete a price list | not done |
-| PRICING-F17 | Delete a discount rule | not done |
+| PRICING-F16 | Delete a price list | done |
+| PRICING-F17 | Delete a discount rule | done |
 
 ### PRICING-F01 See the price lists
 <!-- from WORKBOOK.md sha256:f015a50d781f -->
@@ -542,12 +545,13 @@ service an earlier recovery brought back before this rule does not keep it, and 
 Involved: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14, SERVICE-F01
 
 ### PRICING-F16 Delete a price list
-<!-- from WORKBOOK.md sha256:b4c6da0a98ed -->
-Status: not done — the delete action, its route, its assistant phrase and **Delete** on the screen are missing
+<!-- from WORKBOOK.md sha256:32b588f138d2 -->
+Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists, Price list (detail)
 Steps:
-1. **Delete** in the "⋮" menu of the price list's row or in the bar of its detail, on an active or a deactivated one.
+1. **Delete** in the "⋮" menu of the price list's row or in the bar of its detail (the bin), on an active or a
+   deactivated one.
    It is not offered on the general price list.
 2. Confirm "VIP members disappears with all its prices. Sales already made do not change.".
 3. From the detail, deleting it goes back to **Price Lists**.
@@ -561,12 +565,12 @@ list does not exist.". The refusal shows inside the confirmation.
 Involved: none
 
 ### PRICING-F17 Delete a discount rule
-<!-- from WORKBOOK.md sha256:7678687e399f -->
-Status: not done — the delete action, its route, its assistant phrase and **Delete** on the screen are missing
+<!-- from WORKBOOK.md sha256:6a2177cc095d -->
+Status: done (server and screen)
 Actor: owner, administrator, manager, assistant
 Screen: Price Lists
 Steps:
-1. **Delete** in the rule's row, active or deactivated.
+1. **Delete** in the "⋮" menu of the rule's row, active or deactivated.
 2. Confirm "Happy hour disappears and stops applying to new sales. Sales already made do not change.".
 In: the rule, by its id, its code or its name.
 Out: the rule deleted and `pricing.rule.deleted` (with `id` and `code`). Its code is free for a new rule. Sales already
@@ -600,7 +604,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | The name of the service, the category or the customer group a price list, a price or a rule points at, by its id (a service's, with the Services permission of whoever asks) | view | F02, F03, F07, F08, F10, F11 | `pricing.catalog.get` | no |
 
 ### What it offers: actions (they change data)
-<!-- from WORKBOOK.md sha256:64aa464ad656 -->
+<!-- from WORKBOOK.md sha256:ab4d010df40f -->
 
 | What it does | Who can | Flows | Service |
 |---|---|---|---|
@@ -609,6 +613,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | Chooses or takes off the general price list | manage | F04 | `pricing.price_list.set_default` |
 | Deactivates a price list | manage | F05 | `pricing.price_list.deactivate` |
 | Reactivates a price list | manage | F05 | `pricing.price_list.activate` |
+| Deletes a price list with all its prices (not the general one) | manage | F16 | `pricing.price_list.delete` |
 | Puts the price of a product or a service in a price list | manage | F07, F15 | `pricing.price_item.add` |
 | Changes a price | manage | F08 | `pricing.price_item.update` |
 | Removes a price | manage | F08 | `pricing.price_item.remove` |
@@ -616,6 +621,7 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | Changes a rule | manage | F11 | `pricing.rule.update` |
 | Deactivates a rule | manage | F12 | `pricing.rule.deactivate` |
 | Reactivates a rule | manage | F12 | `pricing.rule.activate` |
+| Deletes a rule | manage | F17 | `pricing.rule.delete` |
 | Forgets a deleted product | only the platform | F14 | `pricing.catalog.forget_product` |
 | Switches back on the rules of a recovered product | only the platform | F14 | `pricing.catalog.recall_product` |
 | Forgets a deleted category | only the platform | F14 | `pricing.catalog.forget_category` |
@@ -624,10 +630,10 @@ by their id, their name, their phone or their email. If a name fits several, it 
 
 The Hub's API keys (`erpk_live`) reach the queries, creating and changing price lists and
 putting, changing and removing prices (to sync prices from another system); choosing the general one,
-deactivating and the rules, only from the Hub or the assistant.
+deactivating, deleting and the rules, only from the Hub or the assistant.
 
 ### What it announces
-<!-- from WORKBOOK.md sha256:fa0d66ddfcaa -->
+<!-- from WORKBOOK.md sha256:c4648669a28d -->
 
 | Notice | When | What it carries | Service |
 |---|---|---|---|
@@ -635,12 +641,14 @@ deactivating and the rules, only from the Hub or the assistant.
 | Price list changed | Edit with some change, or its group deleted | `id` | `pricing.price_list.updated` |
 | General price list changed | Choose it or take it off | `id`, `is_default`, `previous_id` | `pricing.price_list.default_changed` |
 | Price list deactivated / reactivated | Deactivate / activate | `id` | `pricing.price_list.deactivated`, `…activated` |
+| Price list deleted | Delete, with all its prices | `id`, `code` | `pricing.price_list.deleted` |
 | Price put | Add, or recover it from a separate copy | `id`, `price_list_id`, `product_id` or `service_id`, `min_quantity`, `price`, `currency` (its list's) | `pricing.price_item.added` |
 | Price changed | Edit, or a service's new name | `id` (or `service_id`) | `pricing.price_item.updated` |
 | Price removed | Remove, or the product deleted | `id`, `price_list_id` | `pricing.price_item.removed` |
 | New rule | Create | `id`, `code` | `pricing.rule.created` |
 | Rule changed | Edit, or a service's new name | `id` | `pricing.rule.updated` |
 | Rule deactivated / reactivated | Deactivate / activate, or its product, category or group deleted (reactivated: its product recovered) | `id` | `pricing.rule.deactivated`, `…activated` |
+| Rule deleted | Delete | `id`, `code` | `pricing.rule.deleted` |
 
 No app listens to them except **Automations**, which can start an automation with any
 of them (FLOW-F21). Its steps can also look up price lists, prices, rules and the price of a
@@ -687,9 +695,9 @@ Sales does **not** require Price Lists and Price Lists does not touch Sales. Wha
    ruling.
 
 ### Who can do what
-<!-- from WORKBOOK.md sha256:7550af69dcc5 -->
+<!-- from WORKBOOK.md sha256:45f006e7990d -->
 
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
 | See price lists, prices and rules, and look up the price of a line | yes | yes | yes | yes | `pricing.view` |
-| Create, change, choose the general one, deactivate and reactivate | yes | yes | yes | no | `pricing.manage` |
+| Create, change, choose the general one, deactivate, reactivate and delete | yes | yes | yes | no | `pricing.manage` |

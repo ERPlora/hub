@@ -1,4 +1,4 @@
-"""Writes of the discount rules: create and edit one, deactivate and activate it."""
+"""Writes of the discount rules: create and edit one, deactivate, activate and delete it."""
 
 from typing import Any
 
@@ -18,6 +18,7 @@ from apps.pricing.queries.rows import rule_row, snapshot_values
 from apps.pricing.schemas.rules import (
     SCOPE_TARGETS,
     TYPE_VALUES,
+    RuleDeletedOut,
     RuleIn,
     RuleOut,
     RulePatchIn,
@@ -291,3 +292,37 @@ def deactivate_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
 )
 def activate_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
     return _switch_rule(ctx, data, active=True)
+
+
+@operation(
+    "pricing.rule.delete",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission="pricing.manage",
+    input=RuleRefIn,
+    output=RuleDeletedOut,
+    ai={
+        "asks": {
+            "en": (
+                "delete the juice 2-for-1",
+                "remove the summer promotion, we no longer want it",
+                "get rid of the happy hour discount for good",
+            ),
+            "es": (
+                "borra el 2x1 de zumos",
+                "elimina la promoción de verano, ya no la queremos",
+                "quita para siempre el descuento de happy hour",
+            ),
+        },
+        "description": "Delete a discount rule (by its id, code or name) for good: it no longer takes anything off new "
+        "sales and its code is free again for a new one; sales already made do not change. To stop it for a while "
+        "and keep it, deactivate it instead (pricing.rule.deactivate).",
+        "risk": "high",
+    },
+)
+def delete_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
+    rule = find_rule(data.id, data.rule, lock=True)
+    deleted = {"id": rule.id, "code": rule.code}
+    rule.delete()
+    record_event(ctx, events.RULE_DELETED, {"id": str(deleted["id"]), "code": deleted["code"]})
+    return deleted

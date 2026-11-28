@@ -44,7 +44,8 @@
         "edit": "Edit",
         "makeDefault": "Make general",
         "deactivate": "Deactivate",
-        "activate": "Activate"
+        "activate": "Activate",
+        "delete": "Delete"
       },
       "defaultConfirm": {
         "title": "Make {name} the general list?",
@@ -55,6 +56,11 @@
         "title": "Deactivate {name}?",
         "message": "{name} will stop applying to new sales. Its prices are kept.",
         "confirm": "Deactivate"
+      },
+      "deleteConfirm": {
+        "title": "Delete {name}?",
+        "message": "{name} disappears with all its prices. Sales already made do not change.",
+        "confirm": "Delete"
       },
       "form": {
         "titleNew": "New price list",
@@ -161,11 +167,16 @@
       },
       "targetDeleted": "{name} (deleted)",
       "forGroup": "{target} · {group}",
-      "actions": { "edit": "Edit", "deactivate": "Deactivate", "activate": "Activate" },
+      "actions": { "edit": "Edit", "deactivate": "Deactivate", "activate": "Activate", "delete": "Delete" },
       "deactivateConfirm": {
         "title": "Deactivate {name}?",
         "message": "{name} will stop applying to new sales.",
         "confirm": "Deactivate"
+      },
+      "deleteConfirm": {
+        "title": "Delete {name}?",
+        "message": "{name} disappears and stops applying to new sales. Sales already made do not change.",
+        "confirm": "Delete"
       },
       "form": {
         "titleNew": "New discount rule",

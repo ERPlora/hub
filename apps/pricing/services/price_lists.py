@@ -1,4 +1,4 @@
-"""Writes of the price lists: create and edit one, make it the general list, deactivate and activate it."""
+"""Writes of the price lists: create and edit one, make it the general list, deactivate, activate and delete it."""
 
 from typing import Any
 
@@ -18,6 +18,7 @@ from apps.pricing.schemas.price_lists import (
     DEFAULT_CURRENCY,
     DEFAULT_HAS_GROUP,
     PriceListDefaultIn,
+    PriceListDeletedOut,
     PriceListIn,
     PriceListOut,
     PriceListPatchIn,
@@ -31,6 +32,9 @@ LIST_INACTIVE = _("A deactivated price list cannot be the general one.")
 DEFAULT_BUSY = _("Someone else is changing the general price list right now. Try again in a moment.")
 LIST_IS_DEFAULT = _(
     "This is the general price list: make another one general or take its mark off before deactivating it."
+)
+LIST_DEFAULT_KEPT = _(
+    "This is the general price list: make another one general or take its mark off before deleting it."
 )
 LIST_ALREADY_INACTIVE = _("That price list is already deactivated.")
 LIST_ALREADY_ACTIVE = _("That price list is already active.")
@@ -328,3 +332,40 @@ def deactivate_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
 )
 def activate_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
     return _switch_list(ctx, data, active=True)
+
+
+@operation(
+    "pricing.price_list.delete",
+    kind="command",
+    repeatable=True,  # Only its database: a cut before the COMMIT runs it again (live.database_cut, BASE-F111).
+    permission="pricing.manage",
+    input=PriceListRefIn,
+    output=PriceListDeletedOut,
+    ai={
+        "asks": {
+            "en": (
+                "delete the summer one entirely",
+                "remove the Christmas one, we no longer use it",
+                "get rid of the Hospitality one for good",
+            ),
+            "es": (
+                "borra entera la de verano",
+                "elimina la de Navidad, ya no la usamos",
+                "quita para siempre la de Hostelería",
+            ),
+        },
+        "description": "Delete a price list (by its id, code or name) for good, with all its prices: its code is free "
+        "again for a new one and sales already made do not change. Not the general list. To stop applying a list and "
+        "keep it, deactivate it instead (pricing.price_list.deactivate).",
+        "risk": "high",
+    },
+)
+def delete_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
+    """Its prices go with it (the database's cascade); no other app points at a list: a sale keeps its own price."""
+    price_list = find_list(data.id, data.price_list, lock=True)
+    if price_list.is_default:
+        raise Conflict(str(LIST_DEFAULT_KEPT), code="pricing.price_list_is_default")
+    deleted = {"id": price_list.id, "code": price_list.code}
+    price_list.delete()
+    record_event(ctx, events.PRICE_LIST_DELETED, {"id": str(deleted["id"]), "code": deleted["code"]})
+    return deleted

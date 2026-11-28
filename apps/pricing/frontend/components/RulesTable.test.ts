@@ -1,15 +1,15 @@
-// The «Discount rules» table of Price Lists (PRICING-F09 to F12): the live `pricing.rule.list` in a
+// The «Discount rules» table of Price Lists (PRICING-F09 to F12 and F17): the live `pricing.rule.list` in a
 // server-side DataTable — Code, Name, Type, Value (with its unit), Applies to, Validity, Priority and
 // Status —, «Search code or name…», column filters, 50 a page by name. Whoever manages gets «+», Edit,
-// Deactivate (asking first) and Activate.
-import { DataTable, EmptyState } from '@erplora/ui/components';
+// Deactivate (asking first), Activate and Delete (asking first).
+import { ConfirmDialog, EmptyState } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 import type { Component } from 'vue';
 
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, rule } from '../__tests__/fixtures';
 import { click, EMPLOYEE, flush, mountPricing, type MountOptions, page, settle } from '../__tests__/mount-pricing';
-import { itRetriesAFailedLoad, itStartsOnTheActiveOnes } from '../__tests__/table-checks';
+import { itKeepsDeleteInTheRowMenu, itRetriesAFailedLoad, itStartsOnTheActiveOnes, tableOf } from '../__tests__/table-checks';
 import RuleFormModal from './RuleFormModal.vue';
 import RulesTable from './RulesTable.vue';
 
@@ -18,19 +18,18 @@ const TEN = rule();
 const FIX = rule({ id: 'r2', code: 'FIX', name: 'Fifty off', rule_type: 'fixed', percent: null, amount: 50, applies_to: 'product', product_id: 'p1', product_name: 'Shampoo', priority: 5 });
 const OFF = rule({ id: 'r3', code: 'OFF', name: 'Old', rule_type: 'buy_x_get_y', percent: null, buy_quantity: 2, get_quantity: 1, is_active: false, customer_group_id: 'g1', customer_group_name: 'VIP', valid_until: '2026-06-30' });
 
-type Action = { id: string; hidden?: (row: unknown) => boolean };
 
 /** The table live, with the hub's business answered. */
 async function setup(options: MountOptions = {}, owner: Business = business()) {
   const m = await mountPricing(RulesTable, options);
   await m.live();
   await m.result('base.business.get', owner);
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const rows = () => m.wrapper.findAll('[data-testid="pricing-rules-row"]');
-  const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => c.text().trim());
-  const shownFor = (row: unknown) => prop<Action[]>('actions').filter((a) => !a.hidden?.(row)).map((a) => a.id);
-  return { ...m, table, prop, rows, cells, shownFor, show: (data: unknown) => m.result(OP, data) };
+  return tableOf(m, 'pricing-rules', OP);
+}
+
+/** The rule's «Delete» confirmation (open or closed). */
+function deleteDialog(s: { wrapper: { findAllComponents: (c: Component) => Array<{ props: (n: string) => unknown }> } }) {
+  return s.wrapper.findAllComponents(ConfirmDialog as unknown as Component).find((d) => d.props('testid') === 'pricing-rules-delete')!;
 }
 
 describe('RulesTable', () => {
@@ -86,6 +85,7 @@ describe('RulesTable', () => {
   });
 
   itRetriesAFailedLoad(setup, OP, 'The discount rules could not be loaded.', page([TEN]));
+  itKeepsDeleteInTheRowMenu(setup, page([TEN]));
 
   it('no rule at all says «No discount rules.»', async () => {
     const s = await setup();
@@ -96,8 +96,8 @@ describe('RulesTable', () => {
   it('«+» and Edit open the form; Deactivate asks first; Activate runs at once', async () => {
     const s = await setup();
     await s.show(page([TEN, OFF]));
-    expect(s.shownFor(TEN)).toEqual(['edit', 'deactivate']);
-    expect(s.shownFor(OFF)).toEqual(['edit', 'activate']);
+    expect(s.shownFor(TEN)).toEqual(['edit', 'deactivate', 'delete']);
+    expect(s.shownFor(OFF)).toEqual(['edit', 'activate', 'delete']);
     s.table().vm.$emit('add');
     await flush();
     expect(s.wrapper.findComponent(RuleFormModal).props()).toMatchObject({ open: true, rule: null });
@@ -117,6 +117,27 @@ describe('RulesTable', () => {
     ]);
   });
 
+  it('Delete asks first, runs and closes; a rule someone else deleted first is refused inside the dialog', async () => {
+    const s = await setup();
+    await s.show(page([TEN, OFF]));
+    s.table().vm.$emit('action', { actionId: 'delete', row: OFF });
+    await settle();
+    const dialog = s.inDoc('pricing-rules-delete');
+    expect(dialog?.getAttribute('aria-label')).toBe(`Delete ${OFF.name}?`);
+    expect(dialog?.textContent).toContain(`${OFF.name} disappears and stops applying to new sales. Sales already made do not change.`);
+    s.answer(404, { error: { code: 'pricing.rule_not_found', message: 'This discount rule does not exist.' } });
+    await click(s.inDoc('pricing-rules-delete-submit'));
+    expect(s.inDoc('pricing-rules-delete-error')?.textContent).toContain('This discount rule does not exist.');
+    expect(deleteDialog(s).props('open')).toBe(true);
+    s.answer(200, { id: OFF.id, code: OFF.code });
+    await click(s.inDoc('pricing-rules-delete-submit'));
+    expect(s.sent().map((call) => [call.path, call.body])).toEqual([
+      ['/api/pricing/rules/delete', { id: OFF.id }],
+      ['/api/pricing/rules/delete', { id: OFF.id }],
+    ]);
+    expect(deleteDialog(s).props('open')).toBe(false);
+  });
+
   it('an employee reads the rules without acting on them', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(page([TEN]));
@@ -127,6 +148,12 @@ describe('RulesTable', () => {
     const s = await setup({ locale: 'es' });
     await s.show(page([FIX]));
     expect(s.cells(0).slice(2, 4)).toEqual(['Importe por unidad', '0,50 € por unidad']);
+    s.table().vm.$emit('action', { actionId: 'delete', row: FIX });
+    await settle();
+    expect(s.inDoc('pricing-rules-delete')?.getAttribute('aria-label')).toBe(`¿Borrar ${FIX.name}?`);
+    expect(s.inDoc('pricing-rules-delete')?.textContent).toContain(
+      `${FIX.name} desaparece y deja de aplicarse a las ventas nuevas. Las ventas ya hechas no cambian.`,
+    );
   });
 
   it('an amount per unit is in the business’s currency: in Poland, zlotys and no euro', async () => {

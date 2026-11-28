@@ -1,6 +1,6 @@
-// A price list's detail (WORKBOOK «Pantallas · Tarifa (detalle)»; PRICING-F03 to F08): the live list —
-// Code with «General», Customer group, Currency, Tax, Validity and Status, with Edit, Make general and
-// Deactivate / Activate for whoever manages — and its «Prices» in a server-side DataTable: Item, Type,
+// A price list's detail (WORKBOOK «Pantallas · Tarifa (detalle)»; PRICING-F03 to F08 and F16): the live list —
+// Code with «General», Customer group, Currency, Tax, Validity and Status, with Edit, Make general,
+// Deactivate / Activate and Delete for whoever manages — and its «Prices» in a server-side DataTable: Item, Type,
 // SKU, From (with its unit), Price and Catalog price, «Search product or service…», 50 a page by item.
 // «+» adds a price, a row is edited or removed (asking first). A list that does not exist says so.
 import { DataTable, EmptyState } from '@erplora/ui/components';
@@ -186,7 +186,21 @@ describe('ListDetailPage', () => {
     await s.result(LIST, priceList({ is_default: true, customer_group_id: null, customer_group_name: null }));
     expect(s.summary()[1]).toBe('Everybody');
     expect(s.find('pricing-detail-code').text()).toContain('General');
-    expect([s.find('pricing-detail-default').exists(), s.find('pricing-detail-deactivate').exists()]).toEqual([false, false]);
+    expect(['default', 'deactivate', 'delete'].map((id) => s.find(`pricing-detail-${id}`).exists())).toEqual([false, false, false]);
+  });
+
+  it('a list, active or not, is deleted from its detail asking first, and the page goes back to Price lists', async () => {
+    const s = await setup();
+    await s.result(LIST, VIP);
+    const button = s.find('pricing-detail-delete');
+    // The bin says what it does: its label is its accessible name and its title, with no visible text.
+    expect([button.attributes('aria-label'), button.attributes('title'), button.text()]).toEqual(['Delete', 'Delete', '']);
+    await s.result(LIST, { ...VIP, is_active: false }, {}, 2);
+    await click(s.find('pricing-detail-delete').element);
+    expect(s.wrapper.findComponent(ListConfirm).props()).toMatchObject({ action: 'delete', list: { ...VIP, is_active: false } });
+    s.wrapper.findComponent(ListConfirm).vm.$emit('deleted');
+    await flush();
+    expect(s.router.currentRoute.value.path).toBe('/pricing/lists');
   });
 
   it('a group deleted in Customers says so', async () => {

@@ -62,6 +62,11 @@ async def price_list_activate(request, data: PriceListRefIn):
     return await run_operation(request, services.price_lists.activate_price_list, data)
 
 
+@bind(router, "pricing.price_list.delete", "/pricing/price_lists/delete")
+async def price_list_delete(request, data: PriceListRefIn):
+    return await run_operation(request, services.price_lists.delete_price_list, data)
+
+
 # Prices
 
 
@@ -121,6 +126,11 @@ async def rule_deactivate(request, data: RuleRefIn):
 @bind(router, "pricing.rule.activate", "/pricing/rules/activate")
 async def rule_activate(request, data: RuleRefIn):
     return await run_operation(request, services.rules.activate_rule, data)
+
+
+@bind(router, "pricing.rule.delete", "/pricing/rules/delete")
+async def rule_delete(request, data: RuleRefIn):
+    return await run_operation(request, services.rules.delete_rule, data)
 
 
 # The price of a line

@@ -1,9 +1,9 @@
-"""Writes of the discount rules (WORKBOOK PRICING-F10 to F12): create, edit, deactivate and activate one. A refusal
-writes nothing and records no event."""
+"""Writes of the discount rules (WORKBOOK PRICING-F10 to F12 and F17): create, edit, deactivate, activate and delete
+one. A refusal writes nothing and records no event."""
 
 from decimal import Decimal
 
-from live.errors import Conflict, InvalidPayload, NotFound
+from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 
 from apps.pricing.models import DiscountRule
 
@@ -104,3 +104,34 @@ def test_a_rule_of_a_deleted_group_is_not_activated_again():
     # Taking the group off (or choosing another) lets it apply again.
     run("pricing.rule.update", {"id": str(rule.id), "customer_group_id": None})
     assert run("pricing.rule.activate", {"id": str(rule.id)}).is_active is True
+
+
+# Rules: delete (F17)
+
+
+def test_a_rule_is_deleted_active_or_not_and_its_code_is_free_again():
+    happy = make_rule("HAPPY", name="Happy hour")
+    old = make_rule("OLD", is_active=False)
+    kept = make_rule("KEPT")
+    row = run("pricing.rule.delete", {"rule": "happy hour"})
+    assert (row.id, row.code) == (happy.id, "HAPPY")
+    run("pricing.rule.delete", {"id": str(old.id)})
+    assert list(DiscountRule.objects.values_list("pk", flat=True)) == [kept.pk]
+    assert events("pricing.rule.deleted") == [{"id": str(happy.id), "code": "HAPPY"}, {"id": str(old.id), "code": "OLD"}]
+    assert run("pricing.rule.create", {"code": "happy", "name": "Happy", "rule_type": "percent", "percent": "5"}).code == "happy"
+
+
+def test_a_rule_someone_else_deleted_first_is_not_found():
+    rule = make_rule("TEN")
+    run("pricing.rule.delete", {"id": str(rule.id)})
+    error = refused(NotFound, "pricing.rule.delete", {"id": str(rule.id)})
+    assert (error.code, error.message) == ("pricing.rule_not_found", "This discount rule does not exist.")
+    assert len(events("pricing.rule.deleted")) == 1
+
+
+def test_a_manager_deletes_a_rule_and_an_employee_does_not():
+    make_rule("M")
+    make_rule("E")
+    run("pricing.rule.delete", {"rule": "M"}, role="hub_manager")
+    refused(PermissionDenied, "pricing.rule.delete", {"rule": "E"}, role="hub_employee")
+    assert list(DiscountRule.objects.values_list("code", flat=True)) == ["E"]

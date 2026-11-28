@@ -2,14 +2,13 @@
 // server-side DataTable — Code (with «General»), Name, Currency, Customer group, Tax, Validity, Prices and
 // Status —, «Search code or name…», column filters, 50 a page by name. A row and its «Open» open the list;
 // whoever manages gets «+», Edit, Make general, Deactivate and Activate, each where it applies.
-import { DataTable, EmptyState } from '@erplora/ui/components';
+import { EmptyState } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
-import type { Component } from 'vue';
 
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { EMPLOYEE, flush, mountPricing, type MountOptions, page } from '../__tests__/mount-pricing';
-import { itRetriesAFailedLoad, itStartsOnTheActiveOnes } from '../__tests__/table-checks';
+import { itKeepsDeleteInTheRowMenu, itRetriesAFailedLoad, itStartsOnTheActiveOnes, tableOf } from '../__tests__/table-checks';
 import ListConfirm from './ListConfirm.vue';
 import PriceListFormModal from './PriceListFormModal.vue';
 import PriceListsTable from './PriceListsTable.vue';
@@ -19,19 +18,13 @@ const GENERAL = priceList({ id: 'l0', code: 'GEN', name: 'General', customer_gro
 const VIP = priceList({ tax_included: true, valid_from: '2026-07-01', valid_until: '2026-08-31' });
 const OLD = priceList({ id: 'l2', code: 'OLD', name: 'Old', customer_group_id: null, customer_group_name: null, is_active: false, currency: 'USD', tax_included: false, item_count: 0 });
 
-type Action = { id: string; label: string; hidden?: (row: unknown) => boolean };
 
 /** The table live, with the hub's business answered (`null`: it has not answered yet). */
 async function setup(options: MountOptions = {}, owner: Business | null = business()) {
   const m = await mountPricing(PriceListsTable, options);
   await m.live();
   if (owner) await m.result('base.business.get', owner);
-  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
-  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
-  const rows = () => m.wrapper.findAll('[data-testid="pricing-lists-row"]');
-  const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => c.text().trim());
-  const shownFor = (row: unknown) => prop<Action[]>('actions').filter((a) => !a.hidden?.(row)).map((a) => a.id);
-  return { ...m, table, prop, rows, cells, shownFor, show: (data: unknown) => m.result(OP, data) };
+  return tableOf(m, 'pricing-lists', OP);
 }
 
 describe('PriceListsTable', () => {
@@ -77,7 +70,7 @@ describe('PriceListsTable', () => {
     const orphan = priceList({ customer_group_id: 'g9', customer_group_name: null });
     await s.show(page([orphan]));
     expect(s.cells(0)[3]).toBe('Deleted group');
-    expect(s.shownFor(orphan)).toEqual(['open', 'edit', 'deactivate']);
+    expect(s.shownFor(orphan)).toEqual(['open', 'edit', 'deactivate', 'delete']);
   });
 
   it('filters by column and searches and sorts on the server', async () => {
@@ -104,6 +97,7 @@ describe('PriceListsTable', () => {
   });
 
   itRetriesAFailedLoad(setup, OP, 'The price lists could not be loaded.', page([VIP]));
+  itKeepsDeleteInTheRowMenu(setup, page([VIP]));
 
   it('no list at all says «No price lists.»', async () => {
     const s = await setup();
@@ -114,28 +108,28 @@ describe('PriceListsTable', () => {
   it('in Poland a zloty list can be made general and a euro one not; until the business answers, none', async () => {
     const s = await setup({}, business(POLISH));
     await s.show(page([GENERAL]));
-    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN' }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate']);
-    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN' }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate', 'delete']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate', 'delete']);
     const before = await setup({}, null);
     await before.show(page([GENERAL]));
-    expect(before.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate']);
+    expect(before.shownFor(priceList({ customer_group_id: null, currency: 'EUR' }))).toEqual(['open', 'edit', 'deactivate', 'delete']);
   });
 
   it('an inactive list in the business’s currency is not offered «Make general» (PRICING-F04)', async () => {
     const s = await setup({}, business(POLISH));
     await s.show(page([GENERAL]));
-    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN', is_active: false }))).toEqual(['open', 'edit', 'activate']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'PLN', is_active: false }))).toEqual(['open', 'edit', 'activate', 'delete']);
   });
 
   it('offers each action where it applies, and opens a list by its row or «Open»', async () => {
     const s = await setup();
     await s.show(page([GENERAL, VIP, OLD]));
     expect(s.shownFor(GENERAL)).toEqual(['open', 'edit']);
-    expect(s.shownFor(priceList({ customer_group_id: null }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate']);
-    expect(s.shownFor(VIP)).toEqual(['open', 'edit', 'deactivate']);
-    expect(s.shownFor(OLD)).toEqual(['open', 'edit', 'activate']);
+    expect(s.shownFor(priceList({ customer_group_id: null }))).toEqual(['open', 'edit', 'makeDefault', 'deactivate', 'delete']);
+    expect(s.shownFor(VIP)).toEqual(['open', 'edit', 'deactivate', 'delete']);
+    expect(s.shownFor(OLD)).toEqual(['open', 'edit', 'activate', 'delete']);
     // A list in another currency cannot be the general one (the till sells in the business's, here euros).
-    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'USD' }))).toEqual(['open', 'edit', 'deactivate']);
+    expect(s.shownFor(priceList({ customer_group_id: null, currency: 'USD' }))).toEqual(['open', 'edit', 'deactivate', 'delete']);
     s.table().vm.$emit('rowClick', VIP);
     await flush();
     expect(s.router.currentRoute.value.path).toBe('/pricing/lists/l1');
@@ -144,7 +138,7 @@ describe('PriceListsTable', () => {
     expect(s.router.currentRoute.value.path).toBe('/pricing/lists/l0');
   });
 
-  it('«+» and Edit open the form; Make general and Deactivate ask first; Activate runs at once', async () => {
+  it('«+» and Edit open the form; Make general, Deactivate and Delete ask first; Activate runs at once', async () => {
     const s = await setup();
     await s.show(page([GENERAL, VIP, OLD]));
     s.table().vm.$emit('add');
@@ -156,6 +150,9 @@ describe('PriceListsTable', () => {
     s.table().vm.$emit('action', { actionId: 'deactivate', row: VIP });
     await flush();
     expect(s.wrapper.findComponent(ListConfirm).props()).toMatchObject({ action: 'deactivate', list: VIP });
+    s.table().vm.$emit('action', { actionId: 'delete', row: OLD });
+    await flush();
+    expect(s.wrapper.findComponent(ListConfirm).props()).toMatchObject({ action: 'delete', list: OLD });
     s.answer(200, { ...OLD, is_active: true });
     s.table().vm.$emit('action', { actionId: 'activate', row: OLD });
     await flush();

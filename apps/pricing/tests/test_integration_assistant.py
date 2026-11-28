@@ -175,11 +175,13 @@ NAMED = {
     "pricing.price_list.activate": ("id",),
     "pricing.price_list.create": ("customer_group_id",),
     "pricing.price_list.deactivate": ("id",),
+    "pricing.price_list.delete": ("id",),
     "pricing.price_list.set_default": ("id",),
     "pricing.price_list.update": ("id", "customer_group_id"),
     "pricing.rule.activate": ("id",),
     "pricing.rule.create": ("category_id", "product_id", "service_id", "customer_group_id"),
     "pricing.rule.deactivate": ("id",),
+    "pricing.rule.delete": ("id",),
     "pricing.rule.update": ("id", "category_id", "product_id", "service_id", "customer_group_id"),
 }
 #: Services is no requirement of pricing, and its tables stay out of a hub's database until each hub has its own staff
@@ -418,6 +420,6 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
                 reads = [marked["read"], *(["service.service.get"] if datum == "service_id" else [])] if marked else []
                 if not reads or not all(mine.has(registry[read].permission) for read in reads):
                     unread.append((role, name, datum))
-    # Positive control: the employee runs none of them; the manager, the admin and the owner every one of the 25.
-    assert checked == 25 * 3
+    # Positive control: the employee runs none of them; the manager, the admin and the owner every one of the 27.
+    assert checked == 27 * 3
     assert unread == []

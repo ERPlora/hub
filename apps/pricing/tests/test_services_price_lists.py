@@ -1,13 +1,17 @@
-"""Writes of the price lists (WORKBOOK PRICING-F02 to F05): create, edit, make one the general list, deactivate and
-activate it. A refusal writes nothing and records no event."""
+"""Writes of the price lists (WORKBOOK PRICING-F02 to F05 and F16): create, edit, make one the general list, deactivate
+and activate it, and delete it. A refusal writes nothing and records no event."""
 
 import datetime as dt
 
-from live.errors import Conflict, InvalidPayload, PermissionDenied
+import pytest
+from live.context import Scope
+from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
+from live.operations import get
 
-from apps.pricing.models import PriceList
+from apps.pricing.models import PriceItem, PriceList
+from base.tenancy.context import use_hub
 
-from .conftest import HUB_DB, make_group, make_list
+from .conftest import HUB_DB, ctx_for, make_group, make_item, make_list, make_product
 from .test_services import events, no_events, refused, run
 
 pytestmark = HUB_DB
@@ -158,3 +162,65 @@ def test_a_list_is_deactivated_and_activated_again_but_never_the_general_one():
     make_list("GEN", is_default=True)
     error = refused(Conflict, "pricing.price_list.deactivate", {"price_list": "GEN"})
     assert error.code == "pricing.price_list_is_default"
+
+
+# Price lists: delete (F16)
+
+
+def test_a_list_is_deleted_with_all_its_prices_and_its_code_is_free_again():
+    summer = make_list("SUMMER", "Summer")
+    make_item(summer, make_product("Shampoo", "SH-1"))
+    make_item(summer, make_product("Conditioner", "CO-1"))
+    kept = make_item(make_list("VIP"), make_product("Mask", "MA-1"))
+    row = run("pricing.price_list.delete", {"price_list": "summer"})
+    assert (row.id, row.code) == (summer.id, "SUMMER")
+    assert not PriceList.objects.filter(pk=summer.pk).exists()
+    assert list(PriceItem.objects.values_list("pk", flat=True)) == [kept.pk]
+    assert events("pricing.price_list.deleted") == [{"id": str(summer.id), "code": "SUMMER"}]
+    assert run("pricing.price_list.create", {"code": "summer", "name": "Summer again"}).code == "summer"
+
+
+def test_a_deactivated_list_is_deleted_too():
+    winter = make_list("WINTER", is_active=False)
+    run("pricing.price_list.delete", {"id": str(winter.id)})
+    assert not PriceList.objects.exists()
+
+
+def test_the_general_list_is_never_deleted():
+    general = make_list("GEN", is_default=True)
+    error = refused(Conflict, "pricing.price_list.delete", {"id": str(general.id)})
+    assert (error.code, error.message) == (
+        "pricing.price_list_is_default",
+        "This is the general price list: make another one general or take its mark off before deleting it.",
+    )
+    assert PriceList.objects.filter(pk=general.pk).exists() and no_events()
+
+
+def test_a_list_someone_else_deleted_first_is_not_found():
+    summer = make_list("SUMMER")
+    run("pricing.price_list.delete", {"id": str(summer.id)})
+    error = refused(NotFound, "pricing.price_list.delete", {"id": str(summer.id)})
+    assert (error.code, error.message) == ("pricing.price_list_not_found", "This price list does not exist.")
+    assert len(events("pricing.price_list.deleted")) == 1
+
+
+def test_a_manager_deletes_a_list_and_an_employee_does_not():
+    make_list("M")
+    make_list("E")
+    run("pricing.price_list.delete", {"price_list": "M"}, role="hub_manager")
+    refused(PermissionDenied, "pricing.price_list.delete", {"price_list": "E"}, role="hub_employee")
+    assert list(PriceList.objects.values_list("code", flat=True)) == ["E"]
+
+
+def test_deleting_a_list_never_touches_another_business_s(hub_a, hub_b):
+    with use_hub(hub_b):
+        theirs = make_list("SUMMER")
+    op = get("pricing.price_list.delete")
+    with use_hub(hub_a):
+        with pytest.raises(NotFound):
+            op(ctx_for(scope=Scope("host", hub_a.slug)), op.input.model_validate({"id": str(theirs.id)}))
+        ours = make_list("SUMMER")
+        op(ctx_for(scope=Scope("host", hub_a.slug)), op.input.model_validate({"price_list": "summer"}))
+        assert not PriceList.objects.filter(pk=ours.pk).exists()
+    with use_hub(hub_b):  # positive control: the other business keeps its own list of the same code
+        assert PriceList.objects.filter(pk=theirs.pk).exists()

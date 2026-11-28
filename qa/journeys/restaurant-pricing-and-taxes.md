@@ -32,3 +32,5 @@ Para qué: que cada producto lleve su IVA y que la terraza y las horas tranquila
 17. PRICING-F09, PRICING-F10 — una regla de descuento en las bebidas.
 18. PRICING-F11 — la regla, cambiada.
 19. PRICING-F12 — la regla, desactivada y reactivada.
+20. PRICING-F17 — una regla de prueba que ya no sirve, borrada.
+21. PRICING-F16 — una tarifa de prueba, borrada con sus precios.

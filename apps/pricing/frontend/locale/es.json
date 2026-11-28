@@ -44,7 +44,8 @@
         "edit": "Editar",
         "makeDefault": "Hacer general",
         "deactivate": "Desactivar",
-        "activate": "Activar"
+        "activate": "Activar",
+        "delete": "Borrar"
       },
       "defaultConfirm": {
         "title": "¿Hacer general {name}?",
@@ -55,6 +56,11 @@
         "title": "¿Desactivar {name}?",
         "message": "{name} dejará de aplicarse a las ventas nuevas. Sus precios se guardan.",
         "confirm": "Desactivar"
+      },
+      "deleteConfirm": {
+        "title": "¿Borrar {name}?",
+        "message": "{name} desaparece con todos sus precios. Las ventas ya hechas no cambian.",
+        "confirm": "Borrar"
       },
       "form": {
         "titleNew": "Nueva tarifa",
@@ -161,11 +167,16 @@
       },
       "targetDeleted": "{name} (borrado)",
       "forGroup": "{target} · {group}",
-      "actions": { "edit": "Editar", "deactivate": "Desactivar", "activate": "Activar" },
+      "actions": { "edit": "Editar", "deactivate": "Desactivar", "activate": "Activar", "delete": "Borrar" },
       "deactivateConfirm": {
         "title": "¿Desactivar {name}?",
         "message": "{name} dejará de aplicarse a las ventas nuevas.",
         "confirm": "Desactivar"
+      },
+      "deleteConfirm": {
+        "title": "¿Borrar {name}?",
+        "message": "{name} desaparece y deja de aplicarse a las ventas nuevas. Las ventas ya hechas no cambian.",
+        "confirm": "Borrar"
       },
       "form": {
         "titleNew": "Nueva regla de descuento",

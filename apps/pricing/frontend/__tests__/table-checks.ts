@@ -1,7 +1,9 @@
 // What the tests of Pricing's two tables, price lists and discount rules, check alike: they open on the active rows,
-// and a load that fails says so with «Retry». Each table's test passes its own setup.
+// a load that fails says so with «Retry», and «Delete» waits in a row's «⋮». Each table's test passes its own setup.
+import { DataTable } from '@erplora/ui/components';
 import type { OpName } from '@erplora/ui/sdk';
 import { expect, it } from 'vitest';
+import type { Component } from 'vue';
 
 import { errorFrame, flush, type mountPricing } from './mount-pricing';
 
@@ -11,6 +13,20 @@ export type PricingTable = Awaited<ReturnType<typeof mountPricing>> & {
   prop: <T = unknown>(name: string) => T;
   show: (data: unknown) => Promise<void>;
 };
+
+type Mounted = Awaited<ReturnType<typeof mountPricing>>;
+type RowAction = { id: string; hidden?: (row: unknown) => boolean };
+
+/** What a test reads of the mounted table `testid` of a Pricing screen: its DataTable and its props, its rows and their
+ *  cells, the actions a row offers, and how it shows a page of `op`. */
+export function tableOf(m: Mounted, testid: string, op: OpName) {
+  const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
+  const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
+  const rows = () => m.wrapper.findAll(`[data-testid="${testid}-row"]`);
+  const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => c.text().trim());
+  const shownFor = (row: unknown) => prop<RowAction[]>('actions').filter((a) => !a.hidden?.(row)).map((a) => a.id);
+  return { ...m, table, prop, rows, cells, shownFor, show: (data: unknown) => m.result(op, data) };
+}
 
 /** The table of `op`, whose blank Status option is every `noun`. */
 export function itStartsOnTheActiveOnes(setup: () => Promise<PricingTable>, op: OpName, noun: string): void {
@@ -53,5 +69,15 @@ export function itRetriesAFailedLoad(setup: () => Promise<PricingTable>, op: OpN
     await s.show(firstPage);
     expect(s.prop('error')).toBeUndefined();
     expect(s.prop('loading')).toBe(false);
+  });
+}
+
+/** «Delete» of a table that shows `firstPage`: a delicate action, so always in the row's «⋮» and in red, with the bin. */
+export function itKeepsDeleteInTheRowMenu(setup: () => Promise<PricingTable>, firstPage: unknown): void {
+  it('«Delete» is a delicate action: always in the row’s «⋮», never a button of its own', async () => {
+    const s = await setup();
+    await s.show(firstPage);
+    const actions = s.prop<Array<{ id: string; menuOnly?: boolean; color?: string; icon?: string }>>('actions');
+    expect(actions.find((a) => a.id === 'delete')).toMatchObject({ menuOnly: true, color: 'danger', icon: 'trash-outline' });
   });
 }

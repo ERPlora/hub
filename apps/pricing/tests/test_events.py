@@ -32,6 +32,7 @@ def test_the_events_of_the_workbook():
         "PRICE_LIST_DEFAULT_CHANGED": "pricing.price_list.default_changed",
         "PRICE_LIST_DEACTIVATED": "pricing.price_list.deactivated",
         "PRICE_LIST_ACTIVATED": "pricing.price_list.activated",
+        "PRICE_LIST_DELETED": "pricing.price_list.deleted",
         "PRICE_ITEM_ADDED": "pricing.price_item.added",
         "PRICE_ITEM_UPDATED": "pricing.price_item.updated",
         "PRICE_ITEM_REMOVED": "pricing.price_item.removed",
@@ -39,6 +40,7 @@ def test_the_events_of_the_workbook():
         "RULE_UPDATED": "pricing.rule.updated",
         "RULE_DEACTIVATED": "pricing.rule.deactivated",
         "RULE_ACTIVATED": "pricing.rule.activated",
+        "RULE_DELETED": "pricing.rule.deleted",
     }
 
 
