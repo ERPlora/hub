@@ -1,6 +1,7 @@
 // One value composed of text the owner types and data they pick (WORKBOOK FLOW-F11): a picked datum is
 // a pill with its words (never a path on screen), each piece of text its own box; «Insert data» asks
 // the editor's one picker and adds what it answers.
+import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__/mount-flow';
@@ -92,6 +93,19 @@ describe('ValueBox', () => {
       const picked = await choice('input.priority');
       expect(picked.wrapper.find('[data-testid="vb-choice"]').exists()).toBe(false);
       expect(picked.find('vb-pill-1').text()).toBe('Priority');
+    });
+
+    it('a long one (the countries) is searched by its names, in the order of the language', async () => {
+      const countries = ['ES', 'DE', 'FR', 'IT', 'PT', 'GB', 'IE', 'NL', 'BE', 'AT', 'CH', 'SE', 'AD'].map((value) => ({ value, label: `Country ${value}` }));
+      countries[0] = { value: 'ES', label: 'Spain' };
+      countries[12] = { value: 'AD', label: 'Andorra' };
+      const m = await mountFlow(ValueBox, { props: { modelValue: 'ES', label: 'Country', testid: 'vb', steps: [], catalog: null, pick: async () => null, options: countries } });
+      const combo = m.wrapper.findComponent(Combo);
+      expect(combo.props('modelValue')).toEqual({ id: 'ES', label: 'Spain' });
+      expect((combo.props('options') as { label: string }[]).map((option) => option.label).slice(0, 2)).toEqual(['Andorra', 'Country AT']);
+      expect(m.wrapper.find('[data-testid="vb-choice"]').exists()).toBe(false);
+      combo.vm.$emit('update:modelValue', { id: 'AD', label: 'Andorra' });
+      expect((m.wrapper.emitted('update:modelValue') ?? []).map(([value]) => value)).toEqual(['AD']);
     });
 
     it('a value that is not one of the list is shown as it is, to be corrected', async () => {

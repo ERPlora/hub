@@ -4,7 +4,9 @@
 // work exists only in the value —; every piece of text is its own box, so a typo in the middle of a
 // sentence is fixed without rebuilding the line; there is no expression mode. «Insert data» asks the
 // editor's one picker (`pick`) and adds what it answers at the end. A datum that takes a closed list (a task's
-// priority, `options`) is chosen by the words of its values instead, or is one datum inserted in its place.
+// priority, `options`) is chosen by the words of its values instead, or is one datum inserted in its place; a long
+// one (the countries) is searched by name.
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed } from 'vue';
@@ -38,6 +40,14 @@ const phrasing = usePhrasing();
 const choosing = computed(
   () => !!props.options?.length && (props.modelValue === '' || props.modelValue == null || props.options.some((option) => option.value === String(props.modelValue))),
 );
+
+/** Past this many values a closed list is searched by its names, in the order of the language, not scrolled. */
+const LONG_LIST = 12;
+const searching = computed(() => choosing.value && (props.options?.length ?? 0) > LONG_LIST);
+const searchOptions = computed<ComboOption[]>(() =>
+  (props.options ?? []).map((option) => ({ id: option.value, label: option.label })).sort((a, b) => a.label.localeCompare(b.label, phrasing.value.locale)),
+);
+const searched = computed(() => searchOptions.value.find((option) => option.id === String(props.modelValue)) ?? null);
 
 /** Text, pill, text, pill, …, text: a box before, between and after every pill. */
 const segments = computed<ValuePart[]>(() => {
@@ -86,13 +96,25 @@ async function insert(): Promise<void> {
     :data-testid="testid"
   >
     <span
+      v-if="!searching"
       class="flow-value__label"
       :data-testid="`${testid}-label`"
     >{{ label }}<span
       v-if="required"
       class="flow-value__required"
     > · {{ $t('flow.steps.required') }}</span></span>
+    <Combo
+      v-if="searching"
+      :model-value="searched"
+      :options="searchOptions"
+      :label="label"
+      :placeholder="$t('flow.steps.chooseValue')"
+      :error-text="errorText"
+      :testid="`${testid}-search`"
+      @update:model-value="emit('update:modelValue', $event?.id ?? '')"
+    />
     <div
+      v-else
       class="flow-value__box"
       :class="{ 'flow-value__box--invalid': !!errorText }"
     >
@@ -159,7 +181,7 @@ async function insert(): Promise<void> {
       >{{ helper }}</span>
     </div>
     <span
-      v-if="errorText"
+      v-if="errorText && !searching"
       class="flow-value__error"
       :data-testid="`${testid}-error`"
     >{{ errorText }}</span>
