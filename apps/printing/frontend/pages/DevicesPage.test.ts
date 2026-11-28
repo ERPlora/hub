@@ -40,6 +40,7 @@ const device = (id: string, more: Partial<DeviceOut> = {}): DeviceOut => ({
   registered_by: 'Ana',
   last_seen_at: null,
   this_device: false,
+  signed_out: false,
   ...more,
 });
 const THIS = device('d1', {
@@ -98,6 +99,24 @@ describe('DevicesPage', () => {
     ]);
     expect(words(s.find('printing-devices-name-d1').element)).toBe('Counter till This device');
     expect(words(s.find('printing-devices-name-d2').element)).toBe('Kitchen tablet');
+  });
+
+  it('marks a device whose session the plan’s cap of devices closed and says why it prints nothing', async () => {
+    // The bar tablet was signed out when the owner entered on a browser (BASE-F57): it is on, its app open.
+    const s = await setup({ locale: 'es' });
+    await s.result(LIST, page([THIS, { ...OTHER, name: 'Tableta barra', signed_out: true }]));
+    expect(words(s.find('printing-devices-name-d2').element)).toBe('Tableta barra Sesión cerrada');
+    expect(words(s.find('printing-devices-name-d1').element)).toBe('Counter till Este dispositivo');
+    expect(words(s.find('printing-devices-signed-out-d2').element)).toBe(
+      '«Tableta barra» no imprime: perdió la sesión al entrar alguien en otro dispositivo. Tu plan no cubre más dispositivos a la vez: vuelve a entrar en él, o amplía los dispositivos de tu plan.',
+    );
+    expect(s.wrapper.find('[data-testid="printing-devices-signed-out-d1"]').exists()).toBe(false);
+    const en = await setup();
+    await en.result(LIST, page([{ ...OTHER, signed_out: true }]));
+    expect(words(en.find('printing-devices-name-d2').element)).toBe('Kitchen tablet Session closed');
+    expect(words(en.find('printing-devices-signed-out-d2').element)).toBe(
+      '“Kitchen tablet” is not printing: it lost its session when someone entered on another device. Your plan covers no more devices at a time: enter on it again, or add devices to your plan.',
+    );
   });
 
   it('says what the device the page runs on prints, or that it prints nothing and who sets it up', async () => {

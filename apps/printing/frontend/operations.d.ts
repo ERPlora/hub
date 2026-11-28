@@ -1,8 +1,8 @@
-// Types of the printing app's operations for the SDK (`useLive`, `useCommand`), from apps/printing/schemas.py. Written
-// by hand, as `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep it in step with
-// schemas.py and with `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
-// parameters. Dates are ISO 8601 strings.
+// Types of the printing app's operations for the SDK (`useLive`, `useCommand`), written by hand from its schemas/ as
+// `frontend/sdk-types.ts` is: nothing generates them from `/api/openapi.json`. Keep them in step with the schemas and
+// `frontend/generated/operations.json`. One input per operation (ninja's parity), no path parameters; ISO 8601 dates.
 import type { Page } from '../../../frontend/sdk-types';
+import type { SignedOut } from './signed-out';
 
 export type SortDir = 'asc' | 'desc';
 export type Usage = 'receipt' | 'kitchen' | 'bar' | 'label';
@@ -202,7 +202,7 @@ export interface JobCancelIn extends JobRefIn {
   reason?: string;
 }
 
-export interface UsageSummary {
+export interface UsageSummary extends SignedOut {
   usage: Usage;
   printers: number;
   default_printer: string | null;
@@ -275,7 +275,7 @@ export interface CoverageOut {
 }
 
 /** A device set up to print. Its own id (X-Device-Id) is never sent back: it proves the device. */
-export interface DeviceOut {
+export interface DeviceOut extends SignedOut {
   /** The registration's id: what «Edit» and «Retire» name. */
   id: string;
   name: string;

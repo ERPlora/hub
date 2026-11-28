@@ -8,7 +8,7 @@ from django.utils import timezone
 
 from apps.printing.models import PrintDevice, Printer, PrintJob
 
-from .device_reads import active_devices, devices_on
+from .device_reads import active_devices, devices_on, signed_out_by_the_plan
 
 #: A job that has waited this long with no device there to print it rings the bell: not every till that restarts
 #: (the old hub's ``UNDRAINED_ALERT_SECONDS``).
@@ -64,6 +64,13 @@ def stalled(usages: list[str]) -> dict[str, int]:
     _papers, takeable = _takeable(devices_on(now), usages)
     jobs = _waiting_for_nobody(usages, takeable, since=now - STALLED_AFTER)
     return {usage: jobs.get(usage, 0) for usage in usages}
+
+
+def signed_out_usages(usages: list[str]) -> set[str]:
+    """The functions with an active printer that a device signed out by the plan's cap of devices reaches: when their
+    jobs wait for nobody, that is why, and not a device switched off."""
+    reached = Printer.objects.filter(is_active=True, usage__in=usages, devices__in=signed_out_by_the_plan())
+    return set(reached.values_list("usage", flat=True))
 
 
 def waits_for_device(job: PrintJob) -> bool:

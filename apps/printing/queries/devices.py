@@ -16,6 +16,7 @@ from apps.printing.schemas.devices import (
     DeviceRefIn,
 )
 from apps.printing.schemas.fields import Page
+from base.queries.devices import ended_by_the_device_limit
 
 from .device_reads import active_devices, device_row, find_device, this_device_key
 from .waiting import coverage, stalled
@@ -51,8 +52,9 @@ def list_devices(ctx: OperationContext, params: DeviceListIn) -> dict:
     devices = active_devices()
     total = devices.count()
     page = devices.prefetch_related(_BY_NAME).order_by(Lower("name"), "id")[params.offset : params.offset + params.limit]
-    key = this_device_key(ctx)
-    return {"rows": [device_row(device, key) for device in page], "total": total, "limit": params.limit, "offset": params.offset}
+    key, signed_out = this_device_key(ctx), frozenset(ended_by_the_device_limit())
+    rows = [device_row(device, key, signed_out) for device in page]
+    return {"rows": rows, "total": total, "limit": params.limit, "offset": params.offset}
 
 
 @operation(

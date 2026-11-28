@@ -41,6 +41,10 @@ class DeviceOut(Schema):
         "never yet. Without news for 90 s it counts as off."
     )
     this_device: bool = Field(description="It is the device asking.")
+    signed_out: bool = Field(
+        description="Its session was closed because someone entered on another device and the plan covers no more "
+        "devices at a time: it prints nothing until someone enters on it again."
+    )
 
 
 class DeviceRegisterIn(Closed):

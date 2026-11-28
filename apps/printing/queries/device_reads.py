@@ -1,5 +1,6 @@
 """A device set up to print (PRINTING-F18), as the reads and the writes share it, without operations: the key of the
-one that asks, the live ones, one by its id and how the screens read it."""
+one that asks, the hub's device it prints with, the live ones, those signed out by the plan, one by its id and how the
+screens read it."""
 
 import datetime as dt
 import uuid
@@ -11,6 +12,7 @@ from live.context import OperationContext
 from live.errors import NotFound
 
 from apps.printing.models import PrintDevice
+from base.queries.devices import device_of, ended_by_the_device_limit
 
 #: A device set up here is there while its last news is this recent: its hello or a beat on base's /ws/print, asking for
 #: a job or being set up from it (the old hub's ``HOST_TTL_SECONDS``: three missed beats of 30 s).
@@ -31,6 +33,12 @@ def this_device_key(ctx: OperationContext) -> str | None:
     return PrintDevice.key_of(device_id) if device_id else None
 
 
+def hub_device_of(ctx: OperationContext) -> uuid.UUID | None:
+    """The hub's device the caller entered on (its ``hub_device`` cookie); none without one (an API key, the assistant)."""
+    device = device_of(ctx.request)
+    return device.pk if device is not None else None
+
+
 def active_devices() -> QuerySet[PrintDevice]:
     return PrintDevice.objects.filter(retired_at__isnull=True)
 
@@ -38,6 +46,12 @@ def active_devices() -> QuerySet[PrintDevice]:
 def devices_on(now: dt.datetime) -> QuerySet[PrintDevice]:
     """The devices set up here that are there at ``now``: their last news is within :data:`SEEN_WITHIN`."""
     return active_devices().filter(last_seen_at__gte=now - SEEN_WITHIN)
+
+
+def signed_out_by_the_plan() -> QuerySet[PrintDevice]:
+    """The devices set up here whose session was closed because someone entered on another device and the plan covers
+    no more devices at a time (BASE-F57): they print nothing until someone enters on them again."""
+    return active_devices().filter(hub_device__in=ended_by_the_device_limit())
 
 
 def find_device(device_id: uuid.UUID, *, lock: bool = False) -> PrintDevice:
@@ -48,8 +62,12 @@ def find_device(device_id: uuid.UUID, *, lock: bool = False) -> PrintDevice:
     return found
 
 
-def device_row(device: PrintDevice, this_key: str | None) -> dict:
-    """A device as the screens read it: its printers by name, and whether it is the one asking. Never its key."""
+def device_row(device: PrintDevice, this_key: str | None, signed_out: frozenset | None = None) -> dict:
+    """A device as the screens read it: its printers by name, whether it is the one asking and whether the plan's cap
+    of devices closed its session (``signed_out``: the hub's devices it left without one, read once for a whole list).
+    Never its key."""
+    if signed_out is None:
+        signed_out = frozenset(ended_by_the_device_limit().filter(pk=device.hub_device)) if device.hub_device else frozenset()
     prefetched = "printers" in getattr(device, "_prefetched_objects_cache", {})
     printers = device.printers.all() if prefetched else device.printers.order_by(Lower("name"), "id")
     return {
@@ -63,4 +81,5 @@ def device_row(device: PrintDevice, this_key: str | None) -> dict:
         "registered_by": device.registered_by,
         "last_seen_at": device.last_seen_at,
         "this_device": this_key is not None and device.key == this_key,
+        "signed_out": device.hub_device in signed_out,
     }
