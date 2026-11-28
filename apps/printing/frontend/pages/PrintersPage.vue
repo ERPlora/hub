@@ -14,6 +14,7 @@ import { computed, shallowRef } from 'vue';
 import DiscoverPrintersModal from '../components/DiscoverPrintersModal.vue';
 import PrinterModal from '../components/PrinterModal.vue';
 import QueueSummary from '../components/QueueSummary.vue';
+import { useListBlock } from '../composables/useListBlock';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import type { PrinterDraft } from '../lib/discovery';
@@ -42,11 +43,7 @@ const update = useCommand('printing.printer.update');
 const test = useCommand('printing.printer.test');
 
 const rows = computed(() => list.data.value?.rows ?? []);
-const blocked = computed(() => {
-  const code = list.error.value?.code;
-  return code === 'app_inactive' || code === 'permission_denied' ? code : null;
-});
-const tableError = computed(() => (list.status.value === 'error' && !blocked.value ? t('printing.printers.loadError') : undefined));
+const { blocked, tableError } = useListBlock(list, () => t('printing.printers.loadError'));
 
 const columns = computed<DataTableColumn<PrinterOut>[]>(() => [
   { key: 'name', label: t('printing.printers.columns.name'), priority: 'high' },

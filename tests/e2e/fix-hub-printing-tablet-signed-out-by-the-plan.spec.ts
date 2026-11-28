@@ -11,7 +11,7 @@ import { type Browser, type BrowserContext, expect, type Page, test } from '@pla
 
 import { dropPlanFromPhoto, restorePhotoFrom } from './business';
 import { A, api, login, OWNER, psql, shown } from './helpers';
-import { fleetShots, forgetDevices, printHostHello } from './printing-helpers';
+import { fleetShots, forgetTagged, printHostHello } from './printing-helpers';
 import { stamp } from './sale-helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -26,11 +26,7 @@ const TABLET = `${TAG} tablet ${RUN}`;
 /** Longer than the card's reading by the clock (30 s) and a read. */
 const BY_THE_CLOCK = { timeout: 45_000 };
 
-function cleanUp(): void {
-  psql(`delete from printing_printjob where printer_id in (select id from printing_printer where name like '${TAG} %')`);
-  forgetDevices(`${TAG} %`, { names: [`${TAG} %`] });
-  psql(`delete from printing_printer where name like '${TAG} %'`);
-}
+const cleanUp = (): void => forgetTagged(TAG);
 
 test.beforeAll(() => {
   cleanUp();

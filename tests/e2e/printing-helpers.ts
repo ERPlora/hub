@@ -106,6 +106,13 @@ export async function printHostHello(page: Page, device: string, printer: string
   expect(ready).toBe('ready');
 }
 
+/** Lets go of what a spec made under `tag`: the jobs of its printers, the devices named after it and its printers. */
+export function forgetTagged(tag: string): void {
+  psql(`delete from printing_printjob where printer_id in (select id from printing_printer where name like '${tag} %')`);
+  forgetDevices(`${tag} %`, { names: [`${tag} %`] });
+  psql(`delete from printing_printer where name like '${tag} %'`);
+}
+
 /** Switches off every printer of the business that is on, for a run where nothing may be queued (the device prints);
  *  returns them, for `printersBackOn` after it. */
 export function printersOff(): string[] {

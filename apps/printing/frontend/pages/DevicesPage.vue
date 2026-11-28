@@ -13,6 +13,7 @@ import { computed, shallowRef } from 'vue';
 
 import AppDownloadButtons from '../components/AppDownloadButtons.vue';
 import DeviceModal from '../components/DeviceModal.vue';
+import { useListBlock } from '../composables/useListBlock';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import { waited } from '../lib/format';
@@ -42,11 +43,7 @@ const activePrinters = computed(() => (printerList.data.value?.rows ?? []).filte
 const thisDevice = computed(() => rows.value.find((row) => row.this_device) ?? null);
 /** Devices the plan's cap of devices left without a session: on, their app open, and printing nothing. */
 const signedOut = computed(() => rows.value.filter((row) => row.signed_out));
-const blocked = computed(() => {
-  const code = list.error.value?.code;
-  return code === 'app_inactive' || code === 'permission_denied' ? code : null;
-});
-const tableError = computed(() => (list.status.value === 'error' && !blocked.value ? t('printing.devices.loadError') : undefined));
+const { blocked, tableError } = useListBlock(list, () => t('printing.devices.loadError'));
 
 function printerNames(device: DeviceOut): string {
   return device.printers

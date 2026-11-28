@@ -14,7 +14,7 @@ import { bellSays, bellTotal, featureNotice, noticeButton } from './action-cente
 import { A, api, login, psql, shown } from './helpers';
 import { capturedFitting } from './screen';
 import { streamsQuiet as settled } from './home-helpers';
-import { FLOW_VIEWPORTS, forgetDevices, printHostHello } from './printing-helpers';
+import { FLOW_VIEWPORTS, forgetDevices, forgetTagged, printHostHello } from './printing-helpers';
 import { stamp } from './sale-helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -30,11 +30,7 @@ const CARD_READ = '/api/printing/jobs/summary';
 /** Longer than the bell's period (30 s) and a read: what the bell takes to notice by itself. */
 const BY_THE_CLOCK = { timeout: 45_000 };
 
-function cleanUp(): void {
-  psql(`delete from printing_printjob where printer_id in (select id from printing_printer where name like '${TAG} %')`);
-  forgetDevices(`${TAG} %`, { names: [`${TAG} %`] });
-  psql(`delete from printing_printer where name like '${TAG} %'`);
-}
+const cleanUp = (): void => forgetTagged(TAG);
 
 /** The receipt printer of this run. */
 let printer = '';
