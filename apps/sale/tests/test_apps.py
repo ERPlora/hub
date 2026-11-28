@@ -148,6 +148,7 @@ def test_every_operation_is_described_for_the_assistant():
     assert internal == {
         "sale.checkout.steps",
         "sale.customer.reassign",
+        "sale.order.check_void",
         "sale.order.note_bill",
         "sale.order_line.check",
         "sale.record.get",

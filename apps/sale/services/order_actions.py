@@ -5,16 +5,16 @@ title and appointment."""
 from django.db import IntegrityError
 from django.db.models import F, Max
 from django.utils import timezone
-from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, NotFound, PermissionDenied
+from live.errors import Conflict, NotFound
 from live.operations import AI, atomic, operation
 from live.outbox import record_event
 
 from apps.sale import events
 from apps.sale.models import Order, OrderLine
 from apps.sale.queries.business import actor
+from apps.sale.queries.order_voids import VOID_PERMISSION, refuse_unpermitted_void
 from apps.sale.queries.orders import ORDER_CHANGED, ORDER_NOT_FOUND, dish_allergens, find_order, order_detail
 from apps.sale.queries.people import member_name
 from apps.sale.schemas.orders import (
@@ -260,10 +260,6 @@ def merge(ctx: OperationContext, data: OrderMergeIn) -> dict:
     return _out(target)
 
 
-#: Voiding a check with something ordered or charged on it is a manager's (SALE-F18).
-VOID_PERMISSION = "sale.void_sale"
-
-
 @operation(
     "sale.order.void",
     kind="command",
@@ -273,12 +269,14 @@ VOID_PERMISSION = "sale.void_sale"
     permission="sale.add_sale",
     input=OrderRefIn,
     output=OrderOut,
-    ai=AI(
-        description="Void (delete) an open check before it is charged: it is kept as voided, never erased. What was already "
-        "charged from it stays in its sales. An empty check (nothing ordered, nothing charged) can be voided by whoever "
-        "builds checks; one with lines or charges needs the void permission.",
-        risk="high",
-        asks={
+    ai={
+        "description": "Void (delete) an open check before it is charged: it is kept as voided, never erased. What was "
+        "already charged from it stays in its sales. An empty check (nothing ordered, nothing charged) can be voided by "
+        "whoever builds checks; one with lines or charges needs the void permission: whoever lacks it voids it with "
+        "sale.order.void_ordered, which a manager approves. Find the check with sale.order.list(search=...).",
+        "risk": "high",
+        "check": "sale.order.check_void",
+        "asks": {
             "en": (
                 "delete that empty check",
                 "cancel table 5's check, they left without ordering",
@@ -288,7 +286,9 @@ VOID_PERMISSION = "sale.void_sale"
                 "cancela la cuenta de la mesa 5, que se fueron sin pedir",
             ),
         },
-    ),
+        # The till calls it deleting the check («Delete check»), as people do.
+        "does": ("delete",),
+    },
 )
 def void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
     return _void_order(ctx, data)
@@ -329,13 +329,7 @@ def _void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
         return order_detail(order)
     if order.status != Order.Status.OPEN:
         raise Conflict(str(ORDER_UNAVAILABLE), code="sale.order_unavailable")
-    if not ctx.has(VOID_PERMISSION) and (
-        order.lines.live().exists() or order.sales.exists()
-    ):
-        raise PermissionDenied(
-            gettext("Permission “%(permission)s” is required.")
-            % {"permission": VOID_PERMISSION}
-        )
+    refuse_unpermitted_void(ctx, order)
     _release_vouchers(ctx, order.lines.live().unpaid().exclude(voucher_session_id=None))
     order.status = Order.Status.VOIDED
     order.voided_by = actor(ctx)

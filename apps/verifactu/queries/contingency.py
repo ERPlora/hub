@@ -37,8 +37,9 @@ def _queue_row(record: Record) -> dict:
     input=ContingencyListIn,
     output=Page[QueueRowOut],
     ai={
-        "description": "The queue: the VeriFactu records that are not in the AEAT yet (pending, or sent without "
-        "answer), in the order they go out, with their attempts, next attempt and last error.",
+        "description": "The queue: the VeriFactu records still to be sent (pending, or sent without answer), in the "
+        "order they go out, with their attempts, next attempt and last error. The rejected are never in it: how many "
+        "invoices are not in the AEAT yet is verifactu.stats.compliance_summary.",
         "asks": {
             "en": (
                 "what is queued for the AEAT?",

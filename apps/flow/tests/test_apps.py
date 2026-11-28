@@ -30,6 +30,7 @@ QUERIES = {
     "flow.question.list",
     "flow.question.get",
     "flow.recipe.list",
+    "flow.flow.check",
 }
 COMMANDS = {
     "flow.flow.create",
@@ -93,8 +94,9 @@ SYSTEM = {
     "flow.run.record_assistant",
     "flow.question.expire_due",
 }
-# Only the card of a grant reads it: no route, API key or assistant tool.
-CARD_ONLY = {"flow.operation.get"}
+# Only the assistant's card reads them, a grant's for its permissions and a create's or a change's to check its calls
+# first: no route, API key or assistant tool.
+CARD_ONLY = {"flow.operation.get", "flow.flow.check"}
 
 
 def flow_app():
@@ -201,6 +203,8 @@ def test_the_scheduled_tasks_run_as_the_platform_two_every_minute_and_the_prune_
 
 #: The writes whose card says when the automation starts and its steps in words, not its definition (hub#2300).
 SAID_IN_WORDS = {"flow.draft.propose", "flow.flow.create"}
+#: The writes whose calls are checked before the assistant's card: a key told in the chat is never written in a step.
+CHECKED_FIRST = {"flow.flow.create", "flow.flow.update"}
 
 
 def test_the_operations_of_the_app(flow_operations):
@@ -224,6 +228,9 @@ def test_every_operation_tells_the_assistant_what_it_does(flow_operations):
             expected |= {"asks"}
         if name in SAID_IN_WORDS:
             expected |= {"summary"}
+        if name in CHECKED_FIRST:
+            expected |= {"check"}
+            assert op.ai["check"] == "flow.flow.check", name
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name
@@ -259,8 +266,8 @@ def test_people_need_view_to_read_and_manage_to_change(flow_operations):
         if name in {"flow.question.list", "flow.question.get", "flow.question.answer"}:
             # FLOW-F29: whoever may answer something; each question then asks for its own role.
             assert op.permission == "flow.answer", name
-        elif name in {"flow.flow.test", "flow.event.sample", "flow.secret.list"}:
-            # They read the outbox's payloads as they came, or the secrets' names: only who manages.
+        elif name in {"flow.flow.test", "flow.event.sample", "flow.secret.list", "flow.flow.check"}:
+            # They read the outbox's payloads as they came or the secrets' names, or check a write of who manages.
             assert op.permission == "flow.manage", name
         elif op.kind == "query":
             assert op.permission == "flow.view", name
