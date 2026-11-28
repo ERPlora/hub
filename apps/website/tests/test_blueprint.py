@@ -197,6 +197,33 @@ def test_an_image_the_file_does_not_carry_is_left_out_and_told(ctx, hub_files):
     assert len(site_part(report)["problems"]) == 1 and "terrace.png" in site_part(report)["problems"][0]
 
 
+def test_an_image_whose_file_the_store_lost_stays_out_of_the_file_and_its_load_says_so(ctx, hub_files):
+    ids = our_page(ctx, our_catalog(ctx))
+    hub_files.delete(Image.objects.get(id=ids["terrace.png"]).key)
+
+    file = exported(ctx, ["website", "service"])
+
+    kept = sorted(f"website/img/{pk.hex}.webp" for name, pk in ids.items() if name != "terrace.png")
+    assert sorted(blueprint.archive.read_base64(file).media) == kept
+    born_again(ctx)
+    report = loaded_back(ctx, file)
+    assert the_page(ctx)["content"]["gallery"]["images"] == ["dining-room.png"]
+    assert len(site_part(report)["problems"]) == 1 and "terrace.png" in site_part(report)["problems"][0]
+
+
+def test_a_page_the_business_would_not_save_is_refused_and_told_by_its_name(ctx, hub_files):
+    our_page(ctx, our_catalog(ctx))
+    bundle = blueprint.archive.read_base64(exported(ctx, ["website", "service"]))
+    bundle.data["website.site"][0]["template"] = "no-such-template"
+    born_again(ctx)
+
+    report = loaded_back(ctx, base64.b64encode(blueprint.archive.write_zip(bundle)).decode("ascii"))
+
+    assert counts(ctx)["website.site"] == 0
+    assert site_part(report)["created"] == 0
+    assert len(site_part(report)["problems"]) == 1 and "Design, texts and images" in site_part(report)["problems"][0]
+
+
 def test_a_load_leaves_the_rows_it_is_given_as_they_were(ctx, hub_files):
     """A template's rows are read once per process and loaded into every business that picks it: loading the same rows
     again brings the page back again, with its images."""

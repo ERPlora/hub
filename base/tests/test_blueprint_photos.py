@@ -70,6 +70,12 @@ def test_an_image_heavier_than_a_file_takes_even_as_a_webp_is_not_carried(monkey
     assert images.carried(picture((400, 300), fmt="JPEG")) is None
 
 
+def test_a_webp_within_the_side_but_heavier_than_a_file_takes_does_not_travel_as_it_is(monkeypatch):
+    monkeypatch.setattr(images, "MAX_UPLOAD_BYTES", 100)
+
+    assert images.carried(picture((400, 300), fmt="WEBP")) is None
+
+
 def a_part(key: str, *, media=None, images=None) -> Dataset:
     return Dataset(key=key, label=key, rows=list, count=len, load=print, models=("Row",), media=media, images=images)
 
@@ -86,3 +92,14 @@ def test_a_part_whose_app_keeps_its_images_gives_the_file_those_its_rows_name():
     media = photos.export_media(None, {"pages.site": [{"file": "a.webp"}]}, parts)
 
     assert (media, seen) == ({"pages/img/a.webp": b"RIFF"}, [[{"file": "a.webp"}]])
+
+
+def test_the_images_one_part_gives_do_not_take_the_place_of_another_parts():
+    parts = [
+        a_part("pages.site", media=lambda ctx, rows: {"pages/img/a.webp": b"RIFF"}),
+        a_part("shop.products", media=lambda ctx, rows: {"shop/img/b.webp": b"RIFF"}),
+    ]
+
+    media = photos.export_media(None, {"pages.site": [{}], "shop.products": [{}]}, parts)
+
+    assert sorted(media) == ["pages/img/a.webp", "shop/img/b.webp"]
