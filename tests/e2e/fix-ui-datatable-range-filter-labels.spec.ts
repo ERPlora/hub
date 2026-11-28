@@ -123,6 +123,18 @@ async function painted(end: Locator): Promise<Painted> {
   });
 }
 
+/** The ends still say «From» / «To»: a day as the label of the field the calendar fills in, a figure as the example
+ *  text of the box it is typed in. */
+function expectEndsSaid(own: Painted, range: Range, language: Language, what: string): void {
+  if (range.field === 'day') {
+    expect(own.ends.map((end) => end.label), `${what}: the ends' labels`).toEqual(HINTS[language]);
+    expect(own.ends.map((end) => [end.type, end.typed]), `${what}: the ends' fields`).toEqual([['text', false], ['text', false]]);
+    return;
+  }
+  expect(own.ends.map((end) => end.placeholder), `${what}: the ends' example texts`).toEqual(HINTS[language]);
+  expect(own.ends.map((end) => [end.type, end.typed]), `${what}: the ends' fields`).toEqual([[range.field, true], [range.field, true]]);
+}
+
 for (const size of SIZES) {
   test(`UI DataTable etiquetas de rango at ${size.label}: each range says its column on screen, «From» / «To» after it, in English and in Spanish`, async ({
     browser,
@@ -147,15 +159,7 @@ for (const size of SIZES) {
             expect(own.box!.width, `${what}: the column is painted`).toBeGreaterThan(0);
             expect(own.cut, `${what}: the column is whole or ends in «…»`).toBe(false);
             expect(own.before, `${what}: the column comes before its ends`).toBe(true);
-            // Its ends still say «From» / «To»: a day as the label of the field the calendar fills in, a figure as the
-            // example text of the box it is typed in.
-            if (range.field === 'day') {
-              expect(own.ends.map((end) => end.label), `${what}: the ends' labels`).toEqual(HINTS[language]);
-              expect(own.ends.map((end) => [end.type, end.typed]), `${what}: the ends' fields`).toEqual([['text', false], ['text', false]]);
-            } else {
-              expect(own.ends.map((end) => end.placeholder), `${what}: the ends' example texts`).toEqual(HINTS[language]);
-              expect(own.ends.map((end) => [end.type, end.typed]), `${what}: the ends' fields`).toEqual([[range.field, true], [range.field, true]]);
-            }
+            expectEndsSaid(own, range, language, what);
             // Nothing runs past the panel or the sheet.
             for (const box of [own.box!, ...own.ends]) {
               expect(box.x, `${what}: starts inside the panel`).toBeGreaterThanOrEqual(area.x - 0.5);

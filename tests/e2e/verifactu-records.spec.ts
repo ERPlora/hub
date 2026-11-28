@@ -129,13 +129,12 @@ async function correctionCell(row: Locator): Promise<{ status: Box; pill: Box; l
       return { x, y, width, height };
     };
     const link = element.querySelector('[data-testid=verifactu-records-correction-corrected]');
-    const status = element.querySelector('[data-testid=verifactu-records-status]');
     return {
-      status: box(status),
+      status: box(element.querySelector('[data-testid=verifactu-records-status]')),
       pill: box(link?.querySelector('.status-pill')),
       link: box(link),
       underline: link ? getComputedStyle(link).textDecorationLine !== 'none' : false,
-      card: !!status?.closest('.data-table__card-status'),
+      card: !!element.querySelector('.data-table__card-status [data-testid=verifactu-records-status]'),
     };
   });
 }
@@ -150,10 +149,9 @@ function clippingAncestor(element: Element): string | null {
   return null;
 }
 
-/** hub#865 - The status and «Corrected» apart as the box they sit in spaces its things (4px in a table cell, 6px in a
- *  card's row of statuses, as every list's card), side by side and centred on one line (a card, a wide cell) or one
- *  under the other from the same left edge (a narrow cell); the link as tall as its pill, never a line of text around
- *  it that drops the pill below the status. */
+/** hub#865 - The status and «Corrected» as far apart as their box spaces its things (a table cell 4px, a card's statuses
+ *  6px), side by side and centred on one line (a card, a wide cell) or one under the other from the same left edge (a
+ *  narrow cell); the link as tall as its pill, never a line of text around it that drops the pill below the status. */
 function expectCorrectionBeside(
   { status, pill, link, underline, card }: { status: Box; pill: Box; link: Box; underline: boolean; card: boolean },
   at: string,
@@ -164,13 +162,11 @@ function expectCorrectionBeside(
   if (sideBySide) {
     const gap = pill.x - (status.x + status.width);
     const apart = card ? 6 : 4;
-    expect(gap, `side by side, ${apart}px apart (${boxes})`).toBeGreaterThanOrEqual(apart - 1);
-    expect(gap, `side by side, ${apart}px apart (${boxes})`).toBeLessThanOrEqual(apart + 1);
+    expect(Math.abs(gap - apart), `side by side, ${apart}px apart (${boxes})`).toBeLessThanOrEqual(1);
     expect(Math.abs(status.y + status.height / 2 - (pill.y + pill.height / 2)), `centred on one line (${boxes})`).toBeLessThanOrEqual(1);
   } else {
     const gap = pill.y - (status.y + status.height);
-    expect(gap, `one under the other, 4px apart (${boxes})`).toBeGreaterThanOrEqual(3);
-    expect(gap, `one under the other, 4px apart (${boxes})`).toBeLessThanOrEqual(5);
+    expect(Math.abs(gap - 4), `one under the other, 4px apart (${boxes})`).toBeLessThanOrEqual(1);
     expect(Math.abs(pill.x - status.x), `from the same left edge (${boxes})`).toBeLessThanOrEqual(0.5);
   }
   expect(Math.abs(link.height - pill.height), `the link is as tall as its pill (${boxes})`).toBeLessThanOrEqual(0.5);
