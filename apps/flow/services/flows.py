@@ -47,9 +47,11 @@ NUMBERED = "%(name)s (%(n)s)"
         },
         "description": "Create an automation from scratch, from a gallery card or from the assistant's draft "
         "(`draft_id`, which is marked as used in the same step). It is born paused and with no permission "
-        "(`flow.flow.set_enabled` turns it on); prefer `flow.draft.propose` when somebody asks you for one.",
+        "(`flow.flow.set_enabled` turns it on); prefer `flow.draft.propose` when somebody asks you for one. A key "
+        "the person tells you for a call never goes in a step as it is (a call's `headers`).",
         "risk": "normal",
         "summary": assistant_card.automation,
+        "check": "flow.flow.check",
     },
 )
 def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
@@ -98,8 +100,10 @@ def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
         "description": "Change an automation, by its id or its name: its name, what starts it or its steps (to turn "
         "it on or pause it, `flow.flow.set_enabled`). Only what is sent changes; its permissions stay. Changing the trigger or the steps "
         "raises its version, and what is already running goes on with the version it started with. What its app fixes "
-        "on one built from a recipe (`fixed_by_app` of `flow.flow.detail`) cannot be left out: give it another value.",
+        "on one built from a recipe (`fixed_by_app` of `flow.flow.detail`) cannot be left out: give it another value. "
+        "A key the person tells you for a call never goes in a step as it is (a call's `headers`).",
         "risk": "normal",
+        "check": "flow.flow.check",
     },
 )
 def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:

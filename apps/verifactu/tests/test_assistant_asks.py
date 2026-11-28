@@ -203,6 +203,30 @@ def test_sealing_the_record_of_an_issued_invoice_comes_before_creating_another_t
     assert ranked.index("verifactu.record.create") < later
 
 
+#: An employee's question of the real-model QA, word for word, and the search the model made for it.
+LEFT_FOR_THE_AEAT = "¿Cuántas facturas nos quedan por llegar a Hacienda?"
+LEFT_FOR_THE_AEAT_SEARCHED = "VeriFactu registros pendientes de enviar a Hacienda"
+
+
+@HUB_DB  # the catalogue is of the apps on in the business (base.activation) and of the person's role
+def test_what_is_left_to_reach_the_aeat_is_answered_by_the_summary_that_counts_the_rejected(catalog_of):
+    """The search brought the queue, which holds no rejected record, and not the summary that counts them as the Home's
+    «VeriFactu pending» panel does, so the model answered that nothing was left while the AEAT had rejected two. That
+    search finds the summary too: everything it finds is offered in the next round."""
+    tools = catalog_of(Membership.Role.EMPLOYEE, "es")
+    found = [op.name for op in assistant.relevance.found(tools, LEFT_FOR_THE_AEAT_SEARCHED, "es")]
+    assert "verifactu.contingency.list" in found  # positive control: the search finds the queue the model called
+    assert "verifactu.stats.compliance_summary" in found, found
+    assert_offered_or_found(tools, "verifactu.stats.compliance_summary", LEFT_FOR_THE_AEAT, LEFT_FOR_THE_AEAT_SEARCHED)
+
+
+@pytest.mark.parametrize("name", ["verifactu.contingency.list", "verifactu.stats.contingency_summary"])
+def test_the_queue_sends_the_model_to_the_summary_for_what_is_not_in_the_aeat(name):
+    """The model picks a tool by what it says it does: the queue holds no rejected record, so its tools name the
+    summary that counts them, and an empty queue is not read as everything in the AEAT."""
+    assert "verifactu.stats.compliance_summary" in registry[name].ai_spec().description
+
+
 #: The task the model searches for when a person's words bring its tool past the places of a turn.
 SEARCHED = {"verifactu.stats.contingency_summary": "resumen de los registros pendientes de envío"}
 
