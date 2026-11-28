@@ -30,8 +30,8 @@ from .route import config_row
     expose_api=True,
     ai={
         "description": "How many VeriFactu records of invoices are not in the AEAT yet (pending, sent without an "
-        "answer or rejected, as the Home's «VeriFactu pending» panel counts them), accepted and in total: whether "
-        "every invoice reached the AEAT.",
+        "answer or rejected, as the Home's panel of what VeriFactu has pending counts them), accepted and in total: "
+        "whether every invoice reached the AEAT.",
         "asks": {
             "en": (
                 "has everything reached the AEAT?",
