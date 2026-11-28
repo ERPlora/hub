@@ -31,7 +31,9 @@ def refuse_unpermitted_void(ctx: OperationContext, order: Order) -> None:
     ai=INTERNAL,
 )
 def check_void(ctx: OperationContext, data: OrderRefIn) -> dict:
-    """The open check ``sale.order.void`` voids, once its person may void it."""
+    """The open check ``sale.order.void`` voids, once its person may void it. One no longer open is the void's to
+    answer, as it does before it looks at who asks."""
     order = find_order(data.order_id)
-    refuse_unpermitted_void(ctx, order)
+    if order.status == Order.Status.OPEN:
+        refuse_unpermitted_void(ctx, order)
     return {"id": order.id}
