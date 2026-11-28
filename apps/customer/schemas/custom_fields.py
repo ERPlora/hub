@@ -98,3 +98,16 @@ class FieldRow(Schema):
 
 
 FieldPage = Page[FieldRow]
+
+
+class FieldValueRow(Schema):
+    """What a card keeps in one of its custom fields, with the card and the field by name."""
+
+    customer: str = Field(description="The card's name.")
+    phone: str = Field(description="The card's phone, in international format.")
+    email: str = Field(description="The card's email.")
+    field: str = Field(description="The custom field's name.")
+    value: str = Field(description="What the card keeps in it.")
+
+
+FieldValuePage = Page[FieldValueRow]

@@ -8,7 +8,6 @@ class CustomerConfig(LiveAppConfig):
     name = "apps.customer"
     label = "customer"
     blueprint_stays = {
-        "CustomFieldValue": "pending",
         "Activity": "history",
         "Purchase": "history",
         "Consent": "history",
@@ -172,7 +171,7 @@ class CustomerConfig(LiveAppConfig):
 
     def blueprint_datasets(self) -> list:
         """What of Customers travels in an export of the business (BASE-F35) besides the customers: its groups, tags
-        and custom fields."""
+        and custom fields, and, in a backup only, what each card keeps in those fields."""
         from apps.customer import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
 
         return blueprint.DATASETS
