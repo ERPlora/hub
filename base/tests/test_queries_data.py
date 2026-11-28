@@ -327,6 +327,7 @@ def test_every_app_on_is_listed_with_what_of_it_travels_and_how_many_rows(owner)
         ("customer.group", False),
         ("customer.tag", False),
         ("customer.field", False),
+        ("customer.field_value", True),
     ]
     assert apps["printing"].datasets == []  # on, registered by an export, with nothing of its own that travels
     assert "base" not in apps
