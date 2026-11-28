@@ -4,7 +4,8 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.cash_register.models import Settings
-from apps.cash_register.schemas import EmptyIn, SettingsOut
+from apps.cash_register.schemas.fields import EmptyIn
+from apps.cash_register.schemas.settings import SettingsOut
 
 SETTINGS_FIELDS = [
     "enable_cash_register",

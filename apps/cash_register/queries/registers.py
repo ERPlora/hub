@@ -9,12 +9,7 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.cash_register.models import Register
-from apps.cash_register.schemas import (
-    RegisterGetIn,
-    RegisterListIn,
-    RegisterOut,
-    RegisterPage,
-)
+from apps.cash_register.schemas.registers import RegisterGetIn, RegisterListIn, RegisterOut, RegisterPage
 from base.text_search import contains_text
 
 REGISTER_NOT_FOUND = _("That drawer is not available.")

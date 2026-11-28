@@ -20,14 +20,8 @@ from apps.cash_register.queries.unassigned import (
     unassigned_totals,
     unassigned_window,
 )
-from apps.cash_register.schemas import (
-    CurrentOut,
-    EmptyIn,
-    SessionGetIn,
-    SessionListIn,
-    SessionOut,
-    SessionPage,
-)
+from apps.cash_register.schemas.fields import EmptyIn
+from apps.cash_register.schemas.sessions import CurrentOut, SessionGetIn, SessionListIn, SessionOut, SessionPage
 from base.business import business_zone
 from base.ordering import list_order
 from base.sensitive import VIEW_COSTS

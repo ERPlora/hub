@@ -10,7 +10,7 @@ from apps.cash_register.queries.lines import Line
 from apps.cash_register.queries.sessions import find_session, hides_expected, lines_of
 from apps.cash_register.queries.settings import current_settings
 from apps.cash_register.queries.unassigned import unassigned_lines
-from apps.cash_register.schemas import MovementListIn, MovementPage
+from apps.cash_register.schemas.movements import MovementListIn, MovementPage
 from base.system import app_name
 
 

@@ -12,7 +12,7 @@ from apps.cash_register.queries.sessions import (
     session_to_close,
 )
 from apps.cash_register.queries.settings import current_settings
-from apps.cash_register.schemas import ClosingSummaryIn, ClosingSummaryOut
+from apps.cash_register.schemas.closing import ClosingSummaryIn, ClosingSummaryOut
 
 
 #: What the shift review reads of other apps, by their operations' names (none is a requirement but Sales):

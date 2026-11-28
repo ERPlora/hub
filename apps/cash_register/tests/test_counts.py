@@ -4,7 +4,7 @@ A count that counts nothing is refused before the operation runs, from the windo
 import pydantic
 import pytest
 
-from apps.cash_register.schemas import CountAddIn
+from apps.cash_register.schemas.counts import CountAddIn
 
 
 def refused(**data) -> list[str]:

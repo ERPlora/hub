@@ -16,7 +16,7 @@ from apps.cash_register.models import Session
 from apps.cash_register.queries.currency import currency_decimals
 from apps.cash_register.queries.sessions import find_session, hides_expected, session_detail
 from apps.cash_register.queries.settings import current_settings
-from apps.cash_register.schemas import SessionGetIn, SessionPrintOut
+from apps.cash_register.schemas.sessions import SessionGetIn, SessionPrintOut
 from apps.sale.queries.business import business_currency
 from base.business import paper_date
 
