@@ -137,6 +137,13 @@ describe('RulesTable', () => {
     expect(deleteDialog(s).props('open')).toBe(false);
   });
 
+  it('«Delete» is a delicate action: always in the row’s «⋮», never a button of its own', async () => {
+    const s = await setup();
+    await s.show(page([TEN]));
+    const actions = s.prop<Array<{ id: string; menuOnly?: boolean; color?: string; icon?: string }>>('actions');
+    expect(actions.find((a) => a.id === 'delete')).toMatchObject({ menuOnly: true, color: 'danger', icon: 'trash-outline' });
+  });
+
   it('an employee reads the rules without acting on them', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(page([TEN]));

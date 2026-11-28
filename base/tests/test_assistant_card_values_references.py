@@ -587,8 +587,8 @@ TITLED_IN_SPANISH = {
     **{f"payment.method.{action}:id": "Método" for action in ("activate", "deactivate", "update")},
     **{f"payment.payment.{action}:id": "Pago" for action in ("approve", "cancel", "mark_completed", "mark_sent")},
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
-    **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
-    **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
+    **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "delete", "set_default", "update")},
+    **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "delete", "update")},
     "reservation.blocked_date.delete:id": "Fecha bloqueada",
     **{f"reservation.reservation.{action}:id": "Reserva" for action in (
         "cancel", "complete", "confirm", "delete", "no_show", "seat", "update",

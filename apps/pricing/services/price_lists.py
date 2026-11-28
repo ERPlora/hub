@@ -344,14 +344,14 @@ def activate_price_list(ctx: OperationContext, data: PriceListRefIn) -> dict:
     ai={
         "asks": {
             "en": (
-                "delete the summer one with all its prices",
-                "remove the Christmas price list, we no longer use it",
-                "get rid of the Hospitality list for good",
+                "delete the summer one entirely",
+                "remove the Christmas one, we no longer use it",
+                "get rid of the Hospitality one for good",
             ),
             "es": (
-                "borra la de verano con todos sus precios",
-                "elimina la tarifa de Navidad, ya no la usamos",
-                "quita para siempre la lista de Hostelería",
+                "borra entera la de verano",
+                "elimina la de Navidad, ya no la usamos",
+                "quita para siempre la de Hostelería",
             ),
         },
         "description": "Delete a price list (by its id, code or name) for good, with all its prices: its code is free "

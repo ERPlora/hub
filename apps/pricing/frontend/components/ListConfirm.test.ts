@@ -26,6 +26,17 @@ describe('ListConfirm', () => {
     await click(s.inDoc('pricing-list-default-submit'));
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/pricing/price_lists/set_default', query: {}, body: { id: 'l1' } }]);
     expect(s.wrapper.emitted('update:action')?.at(-1)).toEqual([null]);
+    // Only a deletion sends its detail back to the lists.
+    expect(s.wrapper.emitted('deleted')).toBeUndefined();
+  });
+
+  it('a deactivation that goes through closes, and says nothing is gone', async () => {
+    const s = await setup('deactivate');
+    s.answer(200, priceList({ is_active: false }));
+    await click(s.inDoc('pricing-list-deactivate-submit'));
+    expect(s.sent()[0]).toMatchObject({ path: '/api/pricing/price_lists/deactivate', body: { id: 'l1' } });
+    expect(s.wrapper.emitted('update:action')?.at(-1)).toEqual([null]);
+    expect(s.wrapper.emitted('deleted')).toBeUndefined();
   });
 
   it('asks before deactivating, and a refusal stays in the dialog', async () => {

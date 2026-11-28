@@ -71,7 +71,6 @@ const LABELLED_BUTTONS: Readonly<Record<string, string>> = {
   'apps/website/frontend/components/ShareDialog.vue#`${one.testid}-png`': 'the format tells the two downloads apart',
   'apps/website/frontend/components/ShareDialog.vue#`${one.testid}-svg`': 'the format tells the two downloads apart',
   'apps/website/frontend/pages/WebsitePage.vue#website-publish': 'publishing puts the site online: a cloud with an arrow reads as uploading a file',
-  'base/frontend/components/ChangeBusinessButton.vue#change-business-button': 'in a menu, an option carries its icon and its words',
   'base/frontend/components/HomeHealthRow.vue#home-health-system': NAVIGATION,
   'base/frontend/components/settings/BusinessPanel.vue#business-change': `${NAVIGATION} (erplora.com)`,
   'base/frontend/pages/FilesPage.vue#files-new-folder': 'a folder alone names the folders, and no icon of the Hub says «New folder»',

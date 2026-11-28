@@ -12,16 +12,17 @@ cuánto queda.
 
 ## Qué hace hoy
 
-- **Las tarifas** (F01–F05): ver, buscar y filtrar tras el embudo (abre en «Activas»), crear con código único
+- **Las tarifas** (F01–F05, F16): ver, buscar y filtrar tras el embudo (abre en «Activas»), crear con código único
   sin distinguir mayúsculas, divisa ISO 4217 de dos decimales (la del negocio, la de su país, si no se dice),
   base fiscal (según el negocio, con o sin impuesto), grupo de clientes y fechas; editar solo lo enviado;
-  elegir la general (una sola, sin grupo y en la divisa del negocio) y desactivar o reactivar (nunca la general).
+  elegir la general (una sola, sin grupo y en la divisa del negocio), desactivar o reactivar y borrar con todos sus
+  precios (nunca la general).
 - **Los precios** (F06–F08): el detalle de la tarifa con sus precios, el de ficha de Inventario al lado;
   poner el precio de un producto o de un servicio desde una cantidad mínima en la unidad del producto
   (repetirlo da precios por volumen), cambiarlo y quitarlo. En una tarifa desactivada solo se quitan.
-- **Las reglas de descuento** (F09–F12): porcentaje, importe por unidad, «compra X, llévate Y» y por tramos,
+- **Las reglas de descuento** (F09–F12, F17): porcentaje, importe por unidad, «compra X, llévate Y» y por tramos,
   sobre todo, todos los productos, todos los servicios, una categoría, un producto o un servicio, con grupo,
-  cantidad mínima, fechas y prioridad; editar, desactivar y reactivar.
+  cantidad mínima, fechas y prioridad; editar, desactivar, reactivar y borrar.
 - **El precio de una línea** (F13): entre las tarifas vigentes de la base fiscal de la venta que valen para
   ese cliente gana el precio más bajo (sin ninguna, el de ficha) y, encima, un solo descuento automático, el
   mejor para el cliente, con las cantidades contadas en la unidad del precio. Es una consulta: no escribe ni
@@ -39,7 +40,7 @@ cuánto queda.
 | Usa de otras apps | Inventario: `Product`, `ProductCategory`, `UNIT_SPECS`, `fits_unit`, `increment_of`, `find_product`, `find_category` y `held` (retiene lo que una escritura nombra); Clientes: `CustomerGroup`, `find_group` y `find_customer`; Servicios (sin requerirla): `service.service.get` por nombre. La tarjeta del asistente lee `inventory.product.get` (marca `refers` de un producto). Las pantallas llaman a `inventory.product.list`, `inventory.category.list`, `customer.group.list` y `service.service.list` |
 | La usan | Ninguna app la llama por nombre (Ventas aún no: «Contrato con Ventas»). Automatizaciones puede arrancar con sus avisos y usar sus acciones que no son de riesgo alto (FLOW-F11, FLOW-F21), como con cualquier app |
 | Pantallas | `/pricing/lists` (las dos tablas: tarifas y reglas) y `/pricing/lists/:id` (el detalle de la tarifa con sus precios); altas y ediciones en `FormModal` |
-| Operaciones | 8 consultas (`queries/`) y 17 acciones (`services/`), todas con `ai=`; 20 rutas en `/api/pricing/…` (las 3 reacciones `pricing.catalog.forget_*`, `pricing.catalog.recall_product` y `pricing.catalog.refresh_service`, solo de la plataforma, no tienen ruta) |
+| Operaciones | 8 consultas (`queries/`) y 19 acciones (`services/`), todas con `ai=`; 22 rutas en `/api/pricing/…` (las 3 reacciones `pricing.catalog.forget_*`, `pricing.catalog.recall_product` y `pricing.catalog.refresh_service`, solo de la plataforma, no tienen ruta) |
 | En vivo | `pricing.price_list.list`, `.get`, `pricing.price_item.list` y `pricing.rule.list` (`live.py`) |
 | Eventos | 12, `pricing.<entidad>.<hecho>` (`events.py`); `REACTIONS` a `inventory.product.deleted`, `inventory.category.deleted`, `customer.group.deleted` y `service.service.updated`, por el relay del outbox |
 | Tareas programadas | ninguna |
@@ -72,7 +73,7 @@ pnpm e2e tests/e2e/pricing-flows.spec.ts tests/e2e/pricing-lists.spec.ts tests/e
 
 ## Qué queda fuera
 
-- Descuentos por importe del tique, horarios (happy hour), conversión de divisas o de bases fiscales, reglas
-  por categoría de servicio y borrar tarifas o reglas: «Lo que NO hace, a propósito» del WORKBOOK.
+- Descuentos por importe del tique, horarios (happy hour), conversión de divisas o de bases fiscales y reglas
+  por categoría de servicio: «Lo que NO hace, a propósito» del WORKBOOK.
 - Que Ventas pida el precio a Tarifas: es de Ventas («Contrato con Ventas» del WORKBOOK).
 - El panel lateral del `DataTable` de [`UI-REQUESTS.md`](UI-REQUESTS.md).

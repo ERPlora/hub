@@ -158,6 +158,13 @@ describe('PriceListsTable', () => {
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/pricing/price_lists/activate', query: {}, body: { id: 'l2' } }]);
   });
 
+  it('«Delete» is a delicate action: always in the row’s «⋮», never a button of its own', async () => {
+    const s = await setup();
+    await s.show(page([VIP]));
+    const actions = s.prop<Array<{ id: string; menuOnly?: boolean; color?: string; icon?: string }>>('actions');
+    expect(actions.find((a) => a.id === 'delete')).toMatchObject({ menuOnly: true, color: 'danger', icon: 'trash-outline' });
+  });
+
   it('an employee reads the lists and only opens them', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show(page([VIP]));
