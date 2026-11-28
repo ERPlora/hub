@@ -188,7 +188,7 @@ async function control(step: 'setup' | 'make' | 'recover' | 'clean'): Promise<st
       '    print(recovery.run_due())',
       'else:',
       '    for copy in RestoredCopy.objects.filter(hub=hub, db_name__contains="_copy_"):',
-      '        move._drop_copy(copy.db_name, copy.cluster)',
+      '        move.databases._drop_copy(copy.db_name, copy.cluster)',
       '        copy.delete()',
       '    Cluster.objects.filter(pk=temporary.pk).delete()',
       '    print("clean")',
@@ -482,12 +482,12 @@ for (const { label, viewport } of SIZES) {
     await context.close();
 
     // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10). The owner booked
-    // it, and that line names the owner; the platform deleted it and the recovery brought it back, and those lines say
-    // the platform did it, never its internal mark.
+    // it, and that line names the owner without their address (an account without a name: what comes before its «@»);
+    // the platform deleted it and the recovery brought it back, and those lines say the platform did it.
     const agenda = await ownerPage(browser, `/appointment/agenda?date=${aMondayAt('10:00').slice(0, 10)}`, viewport);
     await rowAction(agenda.page, 'appointment-list', appointment, 'history');
     const history = agenda.page.locator('ion-modal[data-testid=appointment-history-modal]');
-    const owner = OWNER.email.replaceAll('.', '\\.');
+    const owner = OWNER.email.split('@')[0];
     await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([
       new RegExp(`^Booked.* · ${owner}$`),
       /^Deleted.* · Done by the platform$/,

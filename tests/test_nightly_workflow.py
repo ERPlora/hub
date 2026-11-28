@@ -7,6 +7,7 @@ may last; a last job reads every job's Playwright report and keeps the one open 
 
 import json
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,8 @@ REPO = Path(__file__).resolve().parents[1]
 WORKFLOWS = REPO / ".github" / "workflows"
 ACTION = REPO / ".github" / "actions" / "e2e-stack" / "action.yml"
 STACK = "./.github/actions/e2e-stack"
+POSTGRES_CLIENT = "./.github/actions/postgres-client"
+FONTS = ACTION.parent / "fonts.conf"
 PINNED = re.compile(r"^[\w.-]+/[\w./-]+@[0-9a-f]{40}$")
 # A hosted runner's job is cut at six hours.
 HOSTED_JOB_MINUTES = 360
@@ -164,7 +167,8 @@ def test_the_stack_has_the_saas_the_images_and_postgres_beside_the_hub(action):
 
 
 def test_the_stack_has_the_tools_of_the_hub_pinned_to_a_commit(action):
-    uses = {step["uses"].split("@")[0]: step for step in action["runs"]["steps"] if "uses" in step}
+    uses = {step["uses"].split("@")[0]: step for step in action["runs"]["steps"]
+            if "uses" in step and not step["uses"].startswith("./")}
     assert set(uses) == {"astral-sh/setup-uv", "pnpm/action-setup", "actions/setup-node"}
     assert all(PINNED.match(step["uses"]) for step in uses.values())
     assert uses["astral-sh/setup-uv"]["with"] == {"enable-cache": True, "cache-dependency-glob": "uv.lock"}
@@ -176,3 +180,26 @@ def test_the_stack_has_the_tools_of_the_hub_pinned_to_a_commit(action):
 def test_every_action_of_the_nightly_is_pinned_to_a_commit(nightly):
     uses = [step["uses"] for job in nightly["jobs"].values() for step in steps(job) if "uses" in step]
     assert [use for use in uses if use != STACK and not PINNED.match(use)] == []
+
+
+def test_the_stack_copies_a_business_with_the_client_of_its_own_postgres(action):
+    # base-recover-from-copy's copy failed in CI on the runner's pg_dump 16 against the stack's Postgres 18.
+    uses = [step.get("uses") for step in action["runs"]["steps"]]
+    assert POSTGRES_CLIENT in uses
+    assert uses.index(POSTGRES_CLIENT) < len(uses) - 1
+
+
+def test_the_stack_draws_system_ui_with_roboto_as_the_tablets_do(action):
+    step = next(step for step in action["runs"]["steps"] if "fonts.conf" in str(step.get("run", "")))
+    lines = step["run"].splitlines()
+    installs = [line.split() for line in lines if "apt-install.sh" in line]
+    assert [words[:2] + words[3:] for words in installs] == [
+        ["bash", ".github/scripts/apt-install.sh", "fonts-roboto-unhinted"]
+    ]
+    assert 'sudo install -m 644 "$GITHUB_ACTION_PATH/fonts.conf" /etc/fonts/local.conf' in lines
+    assert any("fc-match" in line for line in lines)
+    preferred = {
+        alias.findtext("family"): [family.text for family in alias.iterfind("prefer/family")]
+        for alias in ET.parse(FONTS).getroot().iterfind("alias")
+    }
+    assert preferred == {"system-ui": ["Roboto"], "sans-serif": ["Roboto"]}
