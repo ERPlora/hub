@@ -7,7 +7,7 @@
 // What it creates is removed after it by its ids (the task by its unique title).
 import { expect, type Page, test } from '@playwright/test';
 
-import { expectInWords, openRun } from './flow-helpers';
+import { expectInWords, grantAllAndSwitchOn, openRun } from './flow-helpers';
 import { A, api, psql, shot, shown } from './helpers';
 import { rowAction } from './service-helpers';
 import { signedIn, VIEWPORTS } from './task-helpers';
@@ -87,13 +87,9 @@ test('an automation from the gallery and one from scratch, allowed, on, run by h
     await expectInWords(page, context);
 
     // FLOW-F12, F14: allowed, on, saved.
-    await shown(page).locator('[data-testid=flow-editor-tab-permissions]').click();
-    await shown(page).locator('[data-testid=flow-perm-grantall]').click();
+    await grantAllAndSwitchOn(page);
     await expect(shown(page).locator('[data-testid^="flow-perm-granted-task.task.create"]')).toBeVisible();
     await expectInWords(page, context);
-    await shown(page).locator('[data-testid=flow-editor-enabled]').click();
-    await shown(page).locator('[data-testid=flow-editor-save]').click();
-    await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
     await expect(shown(page).locator('[data-testid=flow-editor-state]')).toContainText('Active');
 
     // FLOW-F15, F16: run by hand, asked first; the history says it finished well; the task is in Tasks.

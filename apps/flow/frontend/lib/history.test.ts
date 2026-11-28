@@ -3,18 +3,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { catalogNames, internalCodesIn } from '../__tests__/internal-codes';
+import { TASK_CATALOG } from '../__tests__/mount-flow';
 import { phrasingIn } from '../__tests__/phrasing';
-import type { CatalogOut, LogEntry, Step } from '../operations';
+import type { LogEntry, Step } from '../operations';
 import { describeLog, historyLines, type LogWords } from './history';
 
-const CATALOG = {
-  off_apps: [],
-  events: [],
-  actions: [
-    { name: 'task.task.create', kind: 'command', app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: ['id', 'number'] },
-    { name: 'customer.customer.detail', kind: 'query', app: 'customer', app_name: 'Customers', description: '', fields: [], outputs: ['name'] },
-  ],
-} as CatalogOut;
+const CATALOG = TASK_CATALOG;
 const CALL: Step = { id: 's5', kind: 'http', method: 'POST', url: 'https://api.example.com/v1/x', headers: {}, body: '', timeout: 10 };
 const STEPS: Step[] = [
   { id: 's1', kind: 'query', operation: 'customer.customer.detail', params: {}, result: 'first' },
