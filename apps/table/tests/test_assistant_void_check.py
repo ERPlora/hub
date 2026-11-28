@@ -5,7 +5,7 @@ not void a check with something on it never sees that card: the assistant hears 
 import pytest
 from live.context import OperationContext
 
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from base import assistant
 from base.models import Membership
 from base.permissions import access_for
