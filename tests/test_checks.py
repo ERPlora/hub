@@ -13,6 +13,7 @@ What the change touches is what differs from the commit the command is given, un
 Each test here gives it the HEAD of a tree of its own, so that it checks only what the test writes.
 """
 
+import hashlib
 import importlib.util
 import os
 import subprocess
@@ -237,7 +238,9 @@ def test_a_python_change_whose_tests_read_the_component_library_passes_with_it_b
     """The tree's packages/ui is an empty submodule: the touched Python tests get it lent, as the frontend checks do."""
     assert not (head_tree / "packages/ui/package.json").exists()  # positive control: the tree lacks it, as the hook's
     (head_tree / "apps/demo/tests/test_reads_ui.py").write_text(READS_UI_TEST, encoding="utf-8")
-    done = checks(head_tree, "fast", "HEAD", database=True, CHECKS_DEPENDENCIES_FROM=str(LENDER))
+    # A database of the tree's own: the lender's is the one of the run these tests are in when the hook runs them.
+    own = f"test_checks_{hashlib.sha256(bytes(head_tree)).hexdigest()[:6]}"
+    done = checks(head_tree, "fast", "HEAD", database=True, CHECKS_DEPENDENCIES_FROM=str(LENDER), TEST_DB_NAME=own)
     output = done.stdout + done.stderr
     assert done.returncode == 0, output[-8000:]
     assert "apps/demo/tests/test_reads_ui.py" in output and "checks: pnpm" not in output, output[-4000:]
