@@ -1,5 +1,5 @@
 // What the tests of Pricing's two tables, price lists and discount rules, check alike: they open on the active rows,
-// and a load that fails says so with «Retry». Each table's test passes its own setup.
+// a load that fails says so with «Retry», and «Delete» waits in a row's «⋮». Each table's test passes its own setup.
 import { DataTable } from '@erplora/ui/components';
 import type { OpName } from '@erplora/ui/sdk';
 import { expect, it } from 'vitest';
@@ -69,5 +69,15 @@ export function itRetriesAFailedLoad(setup: () => Promise<PricingTable>, op: OpN
     await s.show(firstPage);
     expect(s.prop('error')).toBeUndefined();
     expect(s.prop('loading')).toBe(false);
+  });
+}
+
+/** «Delete» of a table that shows `firstPage`: a delicate action, so always in the row's «⋮» and in red, with the bin. */
+export function itKeepsDeleteInTheRowMenu(setup: () => Promise<PricingTable>, firstPage: unknown): void {
+  it('«Delete» is a delicate action: always in the row’s «⋮», never a button of its own', async () => {
+    const s = await setup();
+    await s.show(firstPage);
+    const actions = s.prop<Array<{ id: string; menuOnly?: boolean; color?: string; icon?: string }>>('actions');
+    expect(actions.find((a) => a.id === 'delete')).toMatchObject({ menuOnly: true, color: 'danger', icon: 'trash-outline' });
   });
 }

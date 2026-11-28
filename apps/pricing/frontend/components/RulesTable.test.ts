@@ -9,7 +9,7 @@ import type { Component } from 'vue';
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, rule } from '../__tests__/fixtures';
 import { click, EMPLOYEE, flush, mountPricing, type MountOptions, page, settle } from '../__tests__/mount-pricing';
-import { itRetriesAFailedLoad, itStartsOnTheActiveOnes, tableOf } from '../__tests__/table-checks';
+import { itKeepsDeleteInTheRowMenu, itRetriesAFailedLoad, itStartsOnTheActiveOnes, tableOf } from '../__tests__/table-checks';
 import RuleFormModal from './RuleFormModal.vue';
 import RulesTable from './RulesTable.vue';
 
@@ -85,6 +85,7 @@ describe('RulesTable', () => {
   });
 
   itRetriesAFailedLoad(setup, OP, 'The discount rules could not be loaded.', page([TEN]));
+  itKeepsDeleteInTheRowMenu(setup, page([TEN]));
 
   it('no rule at all says «No discount rules.»', async () => {
     const s = await setup();
@@ -135,13 +136,6 @@ describe('RulesTable', () => {
       ['/api/pricing/rules/delete', { id: OFF.id }],
     ]);
     expect(deleteDialog(s).props('open')).toBe(false);
-  });
-
-  it('«Delete» is a delicate action: always in the row’s «⋮», never a button of its own', async () => {
-    const s = await setup();
-    await s.show(page([TEN]));
-    const actions = s.prop<Array<{ id: string; menuOnly?: boolean; color?: string; icon?: string }>>('actions');
-    expect(actions.find((a) => a.id === 'delete')).toMatchObject({ menuOnly: true, color: 'danger', icon: 'trash-outline' });
   });
 
   it('an employee reads the rules without acting on them', async () => {

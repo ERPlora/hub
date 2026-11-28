@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import type { Business } from '../../../../base/frontend/operations/business';
 import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { EMPLOYEE, flush, mountPricing, type MountOptions, page } from '../__tests__/mount-pricing';
-import { itRetriesAFailedLoad, itStartsOnTheActiveOnes, tableOf } from '../__tests__/table-checks';
+import { itKeepsDeleteInTheRowMenu, itRetriesAFailedLoad, itStartsOnTheActiveOnes, tableOf } from '../__tests__/table-checks';
 import ListConfirm from './ListConfirm.vue';
 import PriceListFormModal from './PriceListFormModal.vue';
 import PriceListsTable from './PriceListsTable.vue';
@@ -97,6 +97,7 @@ describe('PriceListsTable', () => {
   });
 
   itRetriesAFailedLoad(setup, OP, 'The price lists could not be loaded.', page([VIP]));
+  itKeepsDeleteInTheRowMenu(setup, page([VIP]));
 
   it('no list at all says «No price lists.»', async () => {
     const s = await setup();
@@ -156,13 +157,6 @@ describe('PriceListsTable', () => {
     s.table().vm.$emit('action', { actionId: 'activate', row: OLD });
     await flush();
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/pricing/price_lists/activate', query: {}, body: { id: 'l2' } }]);
-  });
-
-  it('«Delete» is a delicate action: always in the row’s «⋮», never a button of its own', async () => {
-    const s = await setup();
-    await s.show(page([VIP]));
-    const actions = s.prop<Array<{ id: string; menuOnly?: boolean; color?: string; icon?: string }>>('actions');
-    expect(actions.find((a) => a.id === 'delete')).toMatchObject({ menuOnly: true, color: 'danger', icon: 'trash-outline' });
   });
 
   it('an employee reads the lists and only opens them', async () => {
