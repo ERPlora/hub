@@ -1,5 +1,5 @@
-"""The record a write of Sales names, for the assistant's card: by its id (``sale.record.get``), and the product of a new
-line as the write finds it (``sale.order_line.check``)."""
+"""The record a write of Sales names, for the assistant's card: by its id (``sale.record.get``), the product of a new
+line as the write finds it (``sale.order_line.check``) and the open check a void takes (``sale.order.check_void``)."""
 
 from uuid import UUID
 
@@ -42,3 +42,9 @@ class LineProductOut(Schema):
 
     id: UUID = Field(description="The product's id.")
     name: str = Field(description="The product's name in the catalog.")
+
+
+class CheckFoundOut(Schema):
+    """The open check a void takes, once its person may void it."""
+
+    id: UUID = Field(description="The open check's id.")

@@ -1229,6 +1229,7 @@
       "sale__order__split_line": "Dividir una línea de una cuenta",
       "sale__order__update_line": "Cambiar una línea de una cuenta",
       "sale__order_line__check": "Comprobar el producto de una línea nueva de una cuenta",
+      "sale__order__check_void": "Comprobar que se puede anular una cuenta",
       "sale__order__add_combo_line": "Añadir un menú a una cuenta",
       "sale__order__print_bill": "Imprimir una cuenta",
       "sale__order__note_bill": "Apuntar la cuenta que imprimió el dispositivo",
