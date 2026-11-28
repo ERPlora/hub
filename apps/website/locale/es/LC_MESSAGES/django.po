@@ -493,3 +493,6 @@ msgstr "Ver el estado de la web y compartir su dirección y su QR"
 
 msgid "Change, preview, publish and disconnect the website"
 msgstr "Cambiar, previsualizar, publicar y desconectar la web"
+
+msgid "Design, texts and images"
+msgstr "Diseño, textos e imágenes"

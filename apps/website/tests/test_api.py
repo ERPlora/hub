@@ -14,7 +14,7 @@ from PIL import Image as PILImage
 from apps.website.api import router
 from apps.website.queries.public import PUBLIC_LIMIT
 from apps.website.tests.conftest import HOST, HUB_DB, A, B, full_content
-from apps.website.tests.test_apps import CARD_ONLY
+from apps.website.tests.test_apps import CARD_ONLY, EXPORT_ONLY
 from base.tests.routes import spa_routes
 from config.api import api
 
@@ -75,15 +75,15 @@ def test_the_api_keeps_parity():
 def test_every_operation_has_a_route_and_is_open_to_api_keys():
     from live.operations import registry
 
-    ops = {name for name in registry if name.startswith("website.")} - CARD_ONLY
+    ops = {name for name in registry if name.startswith("website.")} - CARD_ONLY - EXPORT_ONLY
     assert ops == {operation for _m, _p, operation in ROUTES}
     assert all(registry[name].expose_api for name in ops)
 
 
-def test_what_only_the_assistants_card_reads_has_no_route():
+def test_what_only_the_assistants_card_or_an_export_reads_has_no_route():
     from live.operations import registry
 
-    assert {name for name in CARD_ONLY if registry[name].expose_api} == set()
+    assert {name for name in CARD_ONLY | EXPORT_ONLY if registry[name].expose_api} == set()
 
 
 def test_the_spas_route_map_names_every_website_route():

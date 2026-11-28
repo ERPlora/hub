@@ -68,6 +68,7 @@ def test_the_operations_of_the_app():
         "website.public.catalog",
         "website.public.reviews",
         *CARD_ONLY,
+        *EXPORT_ONLY,
     }
     assert {name for name, op in operations.items() if op.kind == "command"} == {
         "website.site.save",
@@ -91,6 +92,7 @@ def test_the_public_operations_need_no_permission_and_the_rest_do():
         assert operations[name].permission == "website.manage", name
     # An image is read by whoever sees the site; a category, as the editor's own list of them, by who changes it.
     assert operations["website.image.get"].permission == "website.view"
+    assert operations["website.image.download"].permission == "website.view"
     assert operations["website.category.get"].permission == "website.manage"
 
 
@@ -100,6 +102,8 @@ def test_the_public_operations_need_no_permission_and_the_rest_do():
 #: What only the assistant's card reads, to name a record a save keeps: an image by the name of its file, a
 #: category of the catalog by its name. No tool, no route, nothing live.
 CARD_ONLY = {"website.image.get", "website.category.get"}
+#: What only an export of the business reads, to carry each image of the page inside the file. No tool, no route.
+EXPORT_ONLY = {"website.image.download"}
 SCREEN_ONLY = {
     "website.site.preview",
     "website.image.upload",
@@ -108,6 +112,7 @@ SCREEN_ONLY = {
     "website.public.catalog",
     "website.public.reviews",
     *CARD_ONLY,
+    *EXPORT_ONLY,
 }
 
 

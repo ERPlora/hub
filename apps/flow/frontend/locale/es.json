@@ -1446,6 +1446,7 @@
       "whatsapp_inbox__template_sample__upload": "Subir el archivo de cabecera de una plantilla de WhatsApp",
       "website__catalog__categories": "Buscar las categorías que puede enseñar la página web",
       "website__category__get": "Leer una categoría que puede enseñar la página web",
+      "website__image__download": "Descargar una imagen de la página web",
       "website__image__get": "Leer una imagen de la página web",
       "website__image__upload": "Subir una imagen a la página web",
       "website__qr__get": "Leer el código QR de la página web",

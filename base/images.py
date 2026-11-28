@@ -17,7 +17,9 @@ pixels decode and with nothing after its end, is kept as it came (an exported bl
 loaded again). Each upload is a file of its own, named by a new UUIDv7 (:func:`keep_photo`), counted against the plan's
 space as Files counts its own (``base.queries.files.refuse_past_the_plans_space``). The photo a row lets go is deleted once
 its change is saved (:func:`let_go`): only its upload writes a ``file:`` reference (:func:`check` refuses one set by
-hand), so no two rows share a photo. No ORM here: the apps' ``services.py`` and ``queries.py`` call these.
+hand), so no two rows share a photo. An image of the business's own pages (its website's) goes into a blueprint as a WebP
+of :data:`CARRIED_SIDE` a side at most (:func:`carried`). No ORM here: the apps' ``services.py`` and ``queries.py`` call
+these.
 """
 
 import base64
@@ -209,6 +211,32 @@ def _kept_as_it_came(image: PILImage.Image, raw: bytes) -> bool:
     )
 
 
+#: The longest side of an image of a business's own pages (its website's) as a blueprint carries it: WordPress's
+#: ceiling for an image of a page, past which it keeps a smaller copy. A page with a dozen photos so fits in a file the
+#: business can load again.
+CARRIED_SIDE = 2560
+
+
+def carried(raw: bytes) -> bytes | None:
+    """An image of a business's own pages (a JPG, PNG or WebP as ``base.public_images`` kept it) as a file carries it: a
+    WebP of :data:`CARRIED_SIDE` pixels a side at most, upright, without the camera's metadata and with its transparency;
+    a WebP already within the side and the weight of a file's photo, as it is. ``None`` for what is no image, or for one
+    heavier than a file's photo even so (:data:`MAX_UPLOAD_BYTES`)."""
+    try:
+        with PILImage.open(io.BytesIO(raw)) as image:
+            if image.format == "WEBP" and max(image.size) <= CARRIED_SIDE and len(raw) <= MAX_UPLOAD_BYTES:
+                return raw
+            image.thumbnail((CARRIED_SIDE, CARRIED_SIDE), PILImage.Resampling.LANCZOS)
+            upright = ImageOps.exif_transpose(image)
+            mode = "RGBA" if "A" in upright.getbands() or "transparency" in upright.info else "RGB"
+            buffer = io.BytesIO()
+            upright.convert(mode).save(buffer, "WEBP", quality=QUALITY)
+    except (UnidentifiedImageError, OSError, SyntaxError, ValueError, PILImage.DecompressionBombError):
+        return None
+    webp = buffer.getvalue()
+    return webp if len(webp) <= MAX_UPLOAD_BYTES else None
+
+
 def keep_photo(ctx: OperationContext, folder: str, webp: bytes) -> str:
     """Keep ``webp`` (what :func:`to_webp` made) under ``ctx``'s hub's prefix in ``folder``, by a new UUIDv7, within the
     plan's space (409 ``base.file_no_space`` otherwise, nothing kept); its ``file:`` reference."""
@@ -254,10 +282,13 @@ def _deleter(key: str) -> Callable[[], None]:
 def read_photo(scope: Scope, reference: str) -> bytes | None:
     """The bytes of the photo ``reference`` names in ``scope``'s hub, or ``None`` when it is not there."""
     name = own_name(reference)
-    if name is None:
-        return None
+    return None if name is None else read_kept(f"{hub_prefix(hub_id(scope))}/{name}")
+
+
+def read_kept(key: str) -> bytes | None:
+    """The bytes the hub file store keeps at ``key`` (under a hub's prefix), or ``None`` when it does not have them."""
     try:
-        with storages["hub_files"].open(f"{hub_prefix(hub_id(scope))}/{name}", "rb") as file:
+        with storages["hub_files"].open(key, "rb") as file:
             return file.read()
     except (OSError, BotoCoreError, ClientError):
         return None

@@ -92,6 +92,9 @@ class Dataset:
     personal: bool = False
     #: For rows that show an image: the operations that set one of the library and upload a photo of their own.
     images: tuple[str, str] | None = None
+    #: For rows that name images their app keeps itself, outside ``base.images`` (the website's): the files of those
+    #: images that the given rows name, by their name in the file.
+    media: Callable[[OperationContext, list[dict]], dict[str, bytes]] | None = None
     #: The app's models whose rows travel in this dataset, by class name (a group and its options and links).
     models: tuple[str, ...] = ()
 

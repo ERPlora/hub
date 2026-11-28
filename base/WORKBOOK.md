@@ -1338,7 +1338,11 @@ activos y las tareas abiertas, con su proyecto, la tarea de la que cuelgan, su p
 y su estado; de Automatizaciones, las automatizaciones, que llegan en pausa y sin ningún permiso dado, para que el dueño
 las revise; de Cocina, los puestos con los productos y las categorías que van a cada uno; de Ventas, las secciones de
 precio libre y las notas rápidas; de Clientes, los grupos, las etiquetas y los campos propios en uso; de
-Caja, los cajones en uso; de Demo, sus elementos con sus líneas; y, solo en una copia de seguridad, los clientes, con lo
+Caja, los cajones en uso; de Demo, sus elementos con sus líneas; de Página web, la página tal como se está editando
+(la plantilla, los colores y lo que dice cada sección), con sus imágenes propias dentro, como WebP de 2560 px de lado
+como mucho, y las categorías de su catálogo por su nombre: llega como borrador sin publicar y lo que Google dice de las
+reseñas se vuelve a leer (una web que el negocio nunca ha guardado no viaja ni cuenta, una web guardada no la pisa un
+archivo, y una imagen o una categoría que no entra lo dice el informe); y, solo en una copia de seguridad, los clientes, con lo
 que cada ficha guarda en sus campos propios (un valor cuyo campo no está en el negocio que carga no entra y el informe lo
 dice). Nunca el historial (ventas, cobros, sesiones
 de caja, reservas y citas, fichajes, comandas, tareas hechas, ejecuciones), las personas y sus accesos, los PIN, los datos

@@ -1,9 +1,11 @@
 """The editor: ``website.site.get`` (the draft and what is published), ``website.site.preview`` (the draft
 rendered as visitors would see it, with a fresh catalog), ``website.qr.get`` (the QR of the hub's address, or of
-that address right at its catalog) and ``website.catalog.categories`` (what its catalog may show); and what the
-assistant's card reads to name the images and the categories a save keeps.
+that address right at its catalog) and ``website.catalog.categories`` (what its catalog may show); what the
+assistant's card reads to name the images and the categories a save keeps; and ``website.image.download``, an image as
+its file, which an export of the business carries.
 """
 
+import base64
 from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
@@ -24,6 +26,7 @@ from apps.website.schemas import (
     CategoryIn,
     CategoryOut,
     Content,
+    ImageFileOut,
     ImageIn,
     ImageNameOut,
     ImageRef,
@@ -35,6 +38,7 @@ from apps.website.schemas import (
     Theme,
 )
 from base.catalog_groups import product_categories
+from base.images import read_kept
 from base.operations import business_currency, business_name
 from base.qr import public_url
 from base.registry import hub_by_slug
@@ -269,6 +273,31 @@ def get_image(ctx: OperationContext, data: ImageIn) -> dict:
     if image is None:
         raise NotFound(str(IMAGE_NOT_FOUND), code="website.image_not_found")
     return {"id": image.id, "name": image_name(image)}
+
+
+# What an export of the business reads to carry each image of the page (``apps.website.blueprint``): no tool, no route.
+@operation(
+    "website.image.download",
+    kind="query",
+    permission="website.view",
+    input=ImageIn,
+    output=ImageFileOut,
+    expose_api=False,
+    ai=INTERNAL,
+)
+def download_image(ctx: OperationContext, data: ImageIn) -> dict:
+    """An image of this business's website as the file it was uploaded as, with its type and its name; one whose file the
+    store no longer has, like one that is not there."""
+    image = Image.objects.filter(id=data.id).first()
+    content = read_kept(image.key) if image is not None else None
+    if content is None:
+        raise NotFound(str(IMAGE_NOT_FOUND), code="website.image_not_found")
+    return {
+        "id": image.id,
+        "name": image_name(image),
+        "content_type": image.content_type,
+        "data_base64": base64.b64encode(content).decode("ascii"),
+    }
 
 
 @operation(

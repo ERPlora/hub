@@ -28,6 +28,11 @@ producto actual no tenía página por negocio.
 - **Publicar y desconectar** (F07, F08): publicar copia el borrador y sube la versión; desconectar devuelve la
   dirección al acceso del equipo sin perder nada.
 - **Compartir** (F09): la dirección, **Copiar enlace** y el QR en PNG y SVG.
+- **La copia del negocio** (BASE-F35, `blueprint.py`): la página que se está editando viaja en Exportar con sus
+  imágenes dentro del archivo, como WebP de 2560 px de lado como mucho (`base.images.carried`, leídas con
+  `website.image.download`), y las categorías del catálogo por su nombre; al cargarla, cada imagen se sube otra vez y la
+  página llega como borrador sin publicar. Una web que el negocio nunca guardó no viaja ni cuenta, y una guardada no la
+  pisa un archivo.
 - **La página pública** (F10): plantilla de Django con Bootstrap 5.3, en el idioma del navegador, sin cookies, con su
   propia CSP sin nonce, caché de una hora en el servidor por versión, idioma, día y moneda y un minuto en el navegador; sus tres
   lecturas públicas (`website.public.*`) admiten 60 por minuto por hub y visitante; las reseñas de Google las pide el
@@ -43,7 +48,7 @@ producto actual no tenía página por negocio.
 | Usa de otras apps | Inventario y Servicios por el nombre de sus consultas (`inventory.product.list_for_sale`, `inventory.category.list`, `inventory.product_category.list`, `service.service.list_for_sale`, `service.category.list`), solo con la app activa en el hub (`base.apps_on.active_apps`). De la plataforma: `base.operations.hub_id`, `base.operations.business_currency` (la moneda de los precios en la vista previa y el catálogo público), `base.business.currency_of` (la misma moneda en la página pública, de la fila del registro que el host ya cargó, sin una transacción por visita) y `base.business.currency_decimals` (sus decimales), `storages["hub_files"]`, `base.media` (`/p/media/…`), `base.throttle` y la zona horaria del hub (`control.Hub.timezone`, el «hoy» del horario; Madrid si está vacía) |
 | La usa | `base.public_home`: la entrada `/` del host del hub carga `apps/website/public_home.py` (`is_published`, `respond`) por `import_module`; ninguna app de negocio la lee |
 | Pantallas | `/website` (editor, vista previa y «Compartir y QR») y la página pública en `/` |
-| Operaciones | 9 consultas (`queries/`) y 4 acciones (`services.py`); 11 con su ruta en `/api/website/…` (las 3 `website.public.*` sin sesión) y `expose_api`, y `website.category.get` y `website.image.get` sin ruta; todas con `ai=`: 5 herramientas del asistente y las demás `INTERNAL` |
+| Operaciones | 10 consultas (`queries/`) y 4 acciones (`services.py`); 11 con su ruta en `/api/website/…` (las 3 `website.public.*` sin sesión) y `expose_api`, y `website.category.get`, `website.image.get` y `website.image.download` sin ruta; todas con `ai=`: 5 herramientas del asistente y las demás `INTERNAL` |
 | Eventos | 4, `website.<entidad>.<hecho>` (`events.py`); no reacciona a ninguno |
 | Tareas programadas | ninguna |
 | Migraciones | `0001_initial`, `0002_theme_palettes`, `0003_theme_overrides` (las dos, solo JSON del tema), `0004_site_reviews_snapshot` y `0005_image_filename`; todas reversibles |
