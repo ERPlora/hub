@@ -398,6 +398,9 @@ msgstr "Escribe la dirección a mano, empezando por https:// y el nombre de su s
 msgid "«%(name)s» is no header this step can send."
 msgstr "«%(name)s» no es una cabecera que este paso pueda enviar."
 
+msgid "A key written in «%(name)s» would be on view to whoever opens the automation: save it in «Secrets», in the step «Call another system», and write {{secret.NAME}} in its place, or use a secret already saved."
+msgstr "Una clave escrita en «%(name)s» quedaría a la vista de quien abra la automatización: guárdala en «Secretos», en el paso «Llamar a otro sistema», y escribe {{secret.NOMBRE}} en su lugar, o usa un secreto ya guardado."
+
 msgid "«%(name)s» is no address this automation can be allowed to call."
 msgstr "«%(name)s» no es una dirección a la que se pueda permitir llamar a esta automatización."
 
