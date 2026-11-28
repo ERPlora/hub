@@ -35,7 +35,7 @@ SCHEDULE = gettext_noop("Schedule")
 
 class DayIn(Schema):
     """One weekday (Monday = 0): a stretch with an optional break inside it. An hour it does not say is the business's
-    default working day (``apps.staff.workday``)."""
+    default working day (Staff settings)."""
 
     weekday: Weekday = Field(description="Day of the week: 0 Monday … 6 Sunday.")
     start_time: dt.time | None = Field(
