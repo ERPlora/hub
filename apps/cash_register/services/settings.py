@@ -11,7 +11,7 @@ from apps.cash_register import events
 from apps.cash_register.models import Settings
 from apps.cash_register.queries.people import actor
 from apps.cash_register.queries.settings import settings_row
-from apps.cash_register.schemas import SettingsOut, SettingsPatchIn
+from apps.cash_register.schemas.settings import SettingsOut, SettingsPatchIn
 
 
 def _locked_settings(ctx: OperationContext) -> tuple[Settings, bool]:

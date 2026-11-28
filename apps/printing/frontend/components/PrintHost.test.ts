@@ -46,6 +46,7 @@ function device(more: Partial<DeviceOut> = {}): DeviceOut {
     registered_by: 'Ana',
     last_seen_at: null,
     this_device: true,
+    signed_out: false,
     ...more,
   };
 }

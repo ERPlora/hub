@@ -45,6 +45,12 @@ def device_of_entry(request: HttpRequest) -> TrustedDevice | None:
     return device_of(request)
 
 
+def ended_by_the_device_limit():
+    """The ids of the hub's devices whose sessions another device's entry ended, because the plan covers no more
+    devices at a time, and that nobody has entered on since: they do nothing until someone enters on them again."""
+    return TrustedDevice.objects.filter(ended_reason=TrustedDevice.EndedReason.DEVICE_LIMIT).values_list("pk", flat=True)
+
+
 @operation(
     "base.device.current",
     kind="query",

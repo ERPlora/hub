@@ -109,6 +109,9 @@
         "registeredBy": "Set up by"
       },
       "thisDevice": "This device",
+      "signedOut": "Session closed",
+      "signedOutHeading": "“{name}” is not printing: it lost its session when someone entered on another device.",
+      "signedOutHint": "Your plan covers no more devices at a time: enter on it again, or add devices to your plan.",
       "inactive": "{name} (inactive)",
       "lastSeen": "{age} ago",
       "never": "Never",
@@ -193,6 +196,8 @@
       "noDeviceHint": "No device set up here prints it: set one up in Devices.",
       "deviceOff": "Device off",
       "deviceOffHint": "The device that prints it is not responding: switch it on and open the ERPlora app on it.",
+      "signedOut": "Session closed",
+      "signedOutHint": "The device that prints it lost its session when someone entered on another one: your plan covers no more devices at a time. Enter on it again, or add devices to your plan.",
       "failing": "With errors",
       "waiting": "Waiting: {n}",
       "oldest": "the oldest has waited {age}",

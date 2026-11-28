@@ -8,22 +8,12 @@ from live.ninja import bind, run_operation
 from ninja import Query, Router
 
 from apps.cash_register import queries, services
-from apps.cash_register.schemas import (
-    ClosingSummaryIn,
-    CountAddIn,
-    CountListIn,
-    MovementAddIn,
-    MovementListIn,
-    RegisterGetIn,
-    RegisterIn,
-    RegisterListIn,
-    RegisterUpdateIn,
-    SessionCloseIn,
-    SessionGetIn,
-    SessionListIn,
-    SessionOpenIn,
-    SettingsPatchIn,
-)
+from apps.cash_register.schemas.closing import ClosingSummaryIn
+from apps.cash_register.schemas.counts import CountAddIn, CountListIn
+from apps.cash_register.schemas.movements import MovementAddIn, MovementListIn
+from apps.cash_register.schemas.registers import RegisterGetIn, RegisterIn, RegisterListIn, RegisterUpdateIn
+from apps.cash_register.schemas.sessions import SessionCloseIn, SessionGetIn, SessionListIn, SessionOpenIn
+from apps.cash_register.schemas.settings import SettingsPatchIn
 
 router = Router(tags=["cash_register"])
 

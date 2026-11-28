@@ -23,7 +23,7 @@ from apps.service.models.catalog import Service
 from apps.staff.models import Member
 
 from .conftest import A, HUB_DB, MONDAY, at, make_appointment, make_series, make_settings, run
-from .test_services import book
+from .write_checks import book
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("anytime")]
 

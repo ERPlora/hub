@@ -27,13 +27,8 @@ from apps.cash_register.queries.people import actor
 from apps.cash_register.queries.registers import find_register
 from apps.cash_register.queries.sessions import require_count, session_row, session_to_close
 from apps.cash_register.queries.settings import current_settings
-from apps.cash_register.schemas import (
-    AutoCloseOut,
-    EmptyIn,
-    SessionCloseIn,
-    SessionOpenIn,
-    SessionRow,
-)
+from apps.cash_register.schemas.fields import EmptyIn
+from apps.cash_register.schemas.sessions import AutoCloseOut, SessionCloseIn, SessionOpenIn, SessionRow
 from base.business import business_zone
 from base.queries.people import signed_in_username
 

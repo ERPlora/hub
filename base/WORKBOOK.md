@@ -1858,9 +1858,11 @@ Pasos:
      vende solo está en la web).
   4. Puede volver a entrar (y cierra la del otro) o ir a ampliar el plan a erplora.com.
 Entra: los dispositivos que cubre el plan, que erplora.com le pasa al negocio.
-Sale: las sesiones de los dispositivos que sobran, cerradas, y el motivo guardado en cada uno para decírselo.
+Sale: las sesiones de los dispositivos que sobran, cerradas, y el motivo guardado en cada uno para decírselo. Si el
+que pierde la sesión es el que imprime, Impresión lo dice en su lista de dispositivos y en la cola en vez de
+«Dispositivo apagado» (PRINTING-F18, PRINTING-F01).
 Si falla: sin tope en el plan no se cierra nada.
-Implicados: BASE-F11, BASE-F40
+Implicados: BASE-F11, BASE-F40, PRINTING-F01, PRINTING-F18
 
 ### BASE-F58 La sesión termina mientras se trabaja
 Estado: hecho

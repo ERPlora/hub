@@ -2710,6 +2710,7 @@
       "report": "Informe",
       "printers": "Impresoras",
       "this_device": "Este dispositivo",
+      "signed_out": "Sesión cerrada por el tope de dispositivos del plan",
       "last_seen_at": "Visto por última vez",
       "registered_at": "Fecha de alta",
       "registered_by": "Dado de alta por",

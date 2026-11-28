@@ -1,11 +1,11 @@
 <script setup lang="ts">
 // Printing → Devices (PRINTING-F18; WORKBOOK «Pantallas · Dispositivos»; the old hub's print hosts):
 // only the devices set up here print the queue, with anybody's session. The list, live, by name — Name (this
-// device marked), Printers, Last seen and Set up by — and what the device the page runs on does. Inside the ERPlora
-// app, whoever sets up the printers sets this device up («Print from this device»); a browser reaches no printer
-// (`PrintHost` drains nothing there), so it is never offered and the note says where to get the app. From either,
-// they edit any device and retire one after asking; everybody else reads. A device's own id is never shown: the
-// server marks this one.
+// device marked, and one the plan's cap of devices signed out, with why it prints nothing), Printers, Last seen and
+// Set up by — and what the device the page runs on does. Inside the ERPlora app, whoever sets up the printers sets
+// this device up («Print from this device»); a browser reaches no printer (`PrintHost` drains nothing there), so it
+// is never offered and the note says where to get the app. From either, they edit any device and retire one after
+// asking; everybody else reads. A device's own id is never shown: the server marks this one.
 import { DataTable, type DataTableAction, type DataTableColumn, EmptyState, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, nativeBridge, toastError, toastSuccess, useSession } from '@erplora/ui/shell';
@@ -13,6 +13,7 @@ import { computed, shallowRef } from 'vue';
 
 import AppDownloadButtons from '../components/AppDownloadButtons.vue';
 import DeviceModal from '../components/DeviceModal.vue';
+import { useListBlock } from '../composables/useListBlock';
 import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import { waited } from '../lib/format';
@@ -40,11 +41,9 @@ const retire = useCommand('printing.device.retire');
 const rows = computed(() => list.data.value?.rows ?? []);
 const activePrinters = computed(() => (printerList.data.value?.rows ?? []).filter((printer) => printer.is_active));
 const thisDevice = computed(() => rows.value.find((row) => row.this_device) ?? null);
-const blocked = computed(() => {
-  const code = list.error.value?.code;
-  return code === 'app_inactive' || code === 'permission_denied' ? code : null;
-});
-const tableError = computed(() => (list.status.value === 'error' && !blocked.value ? t('printing.devices.loadError') : undefined));
+/** Devices the plan's cap of devices left without a session: on, their app open, and printing nothing. */
+const signedOut = computed(() => rows.value.filter((row) => row.signed_out));
+const { blocked, tableError } = useListBlock(list, () => t('printing.devices.loadError'));
 
 function printerNames(device: DeviceOut): string {
   return device.printers
@@ -169,6 +168,16 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
         >
           {{ thisNote }}
         </InlineFeedback>
+        <InlineFeedback
+          v-for="row in signedOut"
+          :key="`signed-out-${row.id}`"
+          tone="warning"
+          icon="warning-outline"
+          :data-testid="`printing-devices-signed-out-${row.id}`"
+          :heading="$t('printing.devices.signedOutHeading', { name: row.name })"
+        >
+          {{ $t('printing.devices.signedOutHint') }}
+        </InlineFeedback>
         <DataTable
           testid="printing-devices"
           fill
@@ -203,6 +212,12 @@ function onAction({ actionId, row }: { actionId: string; row: DeviceOut }): void
                 size="sm"
                 tone="success"
                 :label="t('printing.devices.thisDevice')"
+              />
+              <StatusPill
+                v-if="row.signed_out"
+                size="sm"
+                tone="warning"
+                :label="t('printing.devices.signedOut')"
               />
             </span>
           </template>

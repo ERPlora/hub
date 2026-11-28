@@ -5,7 +5,7 @@ from live.operations import operation
 
 from apps.cash_register.models import Count
 from apps.cash_register.queries.sessions import find_session
-from apps.cash_register.schemas import CountListIn, CountPage
+from apps.cash_register.schemas.counts import CountListIn, CountPage
 from base.ordering import list_order
 
 

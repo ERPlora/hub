@@ -11,7 +11,7 @@ from apps.printing.schemas.jobs import JobSummaryOut
 from .device_reads import this_device_key
 from .job_printer import active_printers, prints_on
 from .settings import DEFAULT_FIELDS, USAGES, current_settings
-from .waiting import PENDING, coverage, stalled
+from .waiting import PENDING, coverage, signed_out_usages, stalled
 
 
 @operation(
@@ -35,8 +35,9 @@ from .waiting import PENDING, coverage, stalled
             ),
         },
         "description": "How printing is going, by function (receipts, kitchen, bar, labels): its active printers, the "
-        "one chosen in the settings, how many jobs wait and since when, how many a device has, how many failed, and "
-        "how many have waited a minute with no device on to print them."
+        "one chosen in the settings, how many jobs wait and since when, how many a device has, how many failed, how "
+        "many have waited a minute with no device on to print them, and whether the device set up for it lost its "
+        "session because someone entered on another device and the plan covers no more devices at a time."
     },
 )
 def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
@@ -51,7 +52,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
     }
     # The receipt goes to the printer of the till that looks, when it has one of its own (PRINTING-F22).
     active, settings, device = active_printers(), current_settings(), this_device_key(ctx)
-    reach, stuck = coverage(USAGES), stalled(USAGES)
+    reach, stuck, signed_out = coverage(USAGES), stalled(USAGES), signed_out_usages(USAGES)
     usages = []
     for usage in USAGES:
         row = counts.get(usage, {})
@@ -70,6 +71,7 @@ def job_summary(ctx: OperationContext, data: EmptyIn) -> dict:
                 "failed": row.get("failed", 0),
                 "unattended": reach[usage][1],
                 "stalled": stuck[usage],
+                "signed_out": usage in signed_out,
             }
         )
     return {

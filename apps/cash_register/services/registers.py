@@ -12,7 +12,7 @@ from apps.cash_register import events
 from apps.cash_register.models import Register
 from apps.cash_register.queries.people import actor
 from apps.cash_register.queries.registers import find_register, register_row
-from apps.cash_register.schemas import RegisterIn, RegisterOut, RegisterUpdateIn
+from apps.cash_register.schemas.registers import RegisterIn, RegisterOut, RegisterUpdateIn
 
 REGISTER_EXISTS = _("There is already a drawer with that name.")
 

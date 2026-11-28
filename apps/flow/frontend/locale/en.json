@@ -2710,6 +2710,7 @@
       "report": "Report",
       "printers": "Printers",
       "this_device": "This device",
+      "signed_out": "Session closed by the plan's device limit",
       "last_seen_at": "Last seen",
       "registered_at": "Set up at",
       "registered_by": "Set up by",

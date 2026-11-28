@@ -22,6 +22,7 @@ const usage = (name: UsageSummary['usage'], more: Partial<UsageSummary> = {}): U
   failed: 0,
   unattended: 0,
   stalled: 0,
+  signed_out: false,
   ...more,
 });
 
@@ -149,6 +150,27 @@ describe('QueueSummary by the clock', () => {
     await s.result(OP, summary(usage('receipt', { printers: 1, prints_on: 'Caja', pending: 1, oldest_pending_at: ago(2), unattended: 1, stalled: 1 })));
     expect(words(s.find('printing-summary-card-receipt').element)).toMatch(/^Recibo Sin dispositivo /);
     expect(s.wrapper.find('[data-testid="printing-summary-device-off-receipt"]').exists()).toBe(false);
+  });
+
+  it('a role whose device lost its session to the plan’s cap of devices says that, not «switch it on»', async () => {
+    // The tablet that prints was signed out when the owner entered on a browser (BASE-F57): it is on, its app open.
+    const s = await setup('es');
+    await s.result(OP, summary(usage('receipt', { printers: 1, pending: 1, oldest_pending_at: ago(2), stalled: 1, signed_out: true })));
+    expect(words(s.find('printing-summary-card-receipt').element)).toMatch(/^Recibo Sesión cerrada /);
+    expect(s.find('printing-summary-signed-out-receipt').text()).toBe(
+      'El dispositivo que lo imprime perdió la sesión al entrar alguien en otro: tu plan no cubre más dispositivos a la vez. Vuelve a entrar en él, o amplía los dispositivos de tu plan.',
+    );
+    expect(s.wrapper.find('[data-testid="printing-summary-device-off-receipt"]').exists()).toBe(false);
+    // Nothing waits for it: the card says nothing about it.
+    await s.result(OP, summary(usage('receipt', { printers: 1, signed_out: true })));
+    expect(words(s.find('printing-summary-card-receipt').element)).toMatch(/^Recibo Listo /);
+    expect(s.wrapper.find('[data-testid="printing-summary-signed-out-receipt"]').exists()).toBe(false);
+    const en = await setup();
+    await en.result(OP, summary(usage('kitchen', { printers: 1, pending: 1, oldest_pending_at: ago(2), stalled: 1, signed_out: true })));
+    expect(words(en.find('printing-summary-card-kitchen').element)).toMatch(/^Kitchen Session closed /);
+    expect(en.find('printing-summary-signed-out-kitchen').text()).toBe(
+      'The device that prints it lost its session when someone entered on another one: your plan covers no more devices at a time. Enter on it again, or add devices to your plan.',
+    );
   });
 
   it('says the device is off in English too', async () => {
