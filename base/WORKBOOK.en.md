@@ -1353,7 +1353,7 @@ If it fails: "The retry failed:" with the reason and the report stays in sight.
 Involved: BASE-F32
 
 ### BASE-F34 Undo an import
-<!-- from WORKBOOK.md sha256:09fbceedeb5f -->
+<!-- from WORKBOOK.md sha256:558c893b18c3 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Reset)
@@ -1369,13 +1369,14 @@ Steps:
 In: the import chosen.
 Out: exactly the rows it brought removed, also what came in later because it waited for an app, and what it still
 waited for no longer comes in; what was created afterwards stays (`base.import.undone`). The own tax categories and
-rates it brought stay, like the rest of the business's settings: they do not count among the rows to remove.
+rates, the Staff roles, the Sales payment methods and the Cash register drawers it brought stay, like the rest of the
+business's settings: they do not count among the rows to remove.
 If it fails: the reason shows in the dialog itself, which does not close; an
 import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:2a92cefa684f -->
+<!-- from WORKBOOK.md sha256:7b25f0a34321 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1398,7 +1399,15 @@ Tables, the zones and the tables; of Modifiers, the groups, each with its option
 categories it applies to; of Menus and combos, the menus, each with its closed price, its courses, the products to
 choose in each course (by their code) with their supplement, and its own photo inside; of Taxes, the business's own
 tax categories, each with its rates and its surcharges, never the factory ones, which every business already has and
-no file touches; and, only in a backup, the customers. Never the sales, people, PINs nor fiscal data. Loaded
+no file touches; of Reservations, the time slots and the blocked days; of Staff, the roles in use; of Tasks, the active
+projects and the open tasks, with their project, the task they hang from, their priority, due date, tags and status;
+of Automations, the automations, which arrive paused and with no permission given, for the owner to review them; of
+Kitchen, the stations with the products and categories that go to each; of Sales, the payment methods, the open price
+departments and the quick notes; of Customers, the groups, tags and own fields in use; of Cash register, the drawers in
+use; and, only in a backup, the customers. Never the history (sales, payments, cash sessions, reservations and
+appointments, clock-ins, kitchen tickets, done tasks, runs), the people and their access, PINs, fiscal data, each
+app's settings nor what is bound to something outside the business (WhatsApp, printers, QR codes already printed,
+secrets). Loaded
 into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
 the business.
 If it fails: "The export failed:" with the reason; without a name, "Write a name for the file." and it cannot be
@@ -1407,14 +1416,16 @@ administrator exports just like the owner: what is the owner's alone are the ful
 Involved: BASE-F112 (inside the app), BASE-F37, INVENTORY-F01, INVENTORY-F26, INVENTORY-F33, INVENTORY-F36, BASE-F36
 
 ### BASE-F36 Choose which apps, data and tables travel in the export
-<!-- from WORKBOOK.md sha256:da5ff03469f9 -->
+<!-- from WORKBOOK.md sha256:a06d4a4f47a0 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
 Steps:
   1. In "Export", under "Apps" ("Choose which apps the file registers and whether their data travels with
      it."), one row per app on with two boxes, "App" and "Data". They all come with the app ticked and no
-     data; an app with nothing of its own says "Nothing of its own to copy".
+     data; an app whose data does not travel in the file (only history, people, fiscal data, settings or what is
+     bound to something outside) says "Its data does not travel in the file", and one without data of its own,
+     "Nothing of its own to copy".
   2. Unticking the app unticks its data. "Select all" ticks every app and its data; "Deselect all" unticks
      them all.
   3. Ticking an app's "Data" shows "Data of Inventory" below, with one box per part and its rows;
@@ -1427,7 +1438,7 @@ be exported.
 Involved: none
 
 ### BASE-F37 Reset the business by sections
-<!-- from WORKBOOK.md sha256:a605cd01b7fc -->
+<!-- from WORKBOOK.md sha256:02540db9c5e0 -->
 Status: done
 Actor: owner
 Screen: Settings · Data and backups (Reset)
@@ -1437,8 +1448,10 @@ Steps:
   2. It says what is never removed: "Only what each section lists here is removed. Sales, invoices, fiscal
      records, people and their access, files and the business's settings always stay.", and "Before emptying, a
      full copy of the business's data is made and kept for 90 days, in «Copies» below.".
-  3. One row per section (an app) that has something, with what it has (each part and its rows) and its total. Taxes
-     is no section: its tax categories and rates are the business's settings.
+  3. One row per section (an app) that has something, with what it has (each part and its rows) and its total. Taxes,
+     Staff and Cash register are no sections: their tax categories and rates, their roles and their drawers are the
+     business's settings, like the Sales payment methods. Of Tasks, the open tasks and the active projects are removed;
+     the done or cancelled tasks stay, like the rest of the history.
   4. Tick the sections and tap "Reset the business": "This cannot be undone", with "120 rows will be removed for
      good:" and the breakdown. Type the business's name ("Type «Casa Ramón» to confirm") and tap "Remove for good" (or
      "Cancel").

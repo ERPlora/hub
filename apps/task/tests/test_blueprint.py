@@ -11,6 +11,7 @@ import datetime as dt
 import pytest
 
 from apps.task.tests.conftest import HUB_DB, in_business_a
+from base import blueprint
 from base.tenancy.tests.business import A
 from base.tests.blueprint_round_trip import app_report, call, data_of, loaded_back, owner_of
 from base.tests.blueprint_round_trip import exported as exported_apps
@@ -88,3 +89,14 @@ def test_done_tasks_comments_and_people_never_travel(ctx):
     assert set(data) == {"task.project", "task.task"}
     assert sorted(row["title"] for row in data["task.task"]) == ["Buy paint", "Fix the fridge", "Paint the bar"]
     assert not {"assignee", "assigned_to_id", "owner", "owner_id"} & {key for row in data["task.task"] for key in row}
+
+
+def test_resetting_tasks_takes_the_open_tasks_and_active_projects_and_keeps_the_done_ones(ctx):
+    a_project(ctx)
+    plan = {app["id"]: app for app in blueprint.removal.reset_plan(ctx)}["task"]
+
+    blueprint.removal.reset(ctx, ["task"])
+
+    assert plan["rows"] == 4
+    assert [(row.title, row.status) for row in call(ctx, "task.task.list", limit=100).rows] == [("Order chairs", "done")]
+    assert call(ctx, "task.project.list", limit=100).total == 0

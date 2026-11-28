@@ -17,7 +17,7 @@ def _catalogue(entity: str, label, fields: tuple[str, ...], model: str) -> Datas
         key=f"customer.{entity}",
         label=label,
         rows=rows_of(listed, fields, **ACTIVE),
-        ids=ids_of(listed),
+        ids=ids_of(listed, **ACTIVE),
         count=count_of(listed, **ACTIVE),
         load=by_name(listed, f"customer.{entity}.create", fields),
         remove=remover(f"customer.{entity}.delete"),

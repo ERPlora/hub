@@ -1298,8 +1298,9 @@ Pasos:
      día.
 Entra: la importación elegida.
 Sale: borradas exactamente las filas que trajo, también lo que entró después porque esperaba a una app, y lo que aún
-esperaba ya no entra; lo creado después se queda (`base.import.undone`). Las categorías fiscales propias y sus tipos
-que trajo se quedan, como el resto de los ajustes del negocio: no cuentan entre las filas que se van a borrar.
+esperaba ya no entra; lo creado después se queda (`base.import.undone`). Las categorías fiscales propias y sus tipos,
+los roles de Personal, los medios de pago de Ventas y los cajones de Caja que trajo se quedan, como el resto de los
+ajustes del negocio: no cuentan entre las filas que se van a borrar.
 Si falla: el motivo sale en la propia ventana, que no se cierra; una
 importación ya deshecha, «Esta importación ya se deshizo.».
 Implicados: BASE-F32
@@ -1327,8 +1328,15 @@ zonas y las mesas; de Suplementos, los grupos, cada uno con sus opciones y con l
 categorías a los que se aplica; de Menús y combos, los menús, cada uno con su precio cerrado, sus platos, los productos
 a elegir en cada plato (por su código) con su suplemento, y su foto propia dentro; de Impuestos, las categorías fiscales
 propias del negocio, cada una con sus tipos y sus recargos, nunca las de fábrica, que ya trae todo negocio y que un
-archivo no toca; y, solo en una copia de seguridad, los clientes. Nunca las ventas, las personas, los PIN
-ni los datos fiscales. Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
+archivo no toca; de Reservas, las franjas y los días bloqueados; de Personal, los roles en uso; de Tareas, los proyectos
+activos y las tareas abiertas, con su proyecto, la tarea de la que cuelgan, su prioridad, su fecha límite, sus etiquetas
+y su estado; de Automatizaciones, las automatizaciones, que llegan en pausa y sin ningún permiso dado, para que el dueño
+las revise; de Cocina, los puestos con los productos y las categorías que van a cada uno; de Ventas, los medios de pago,
+las secciones de precio libre y las notas rápidas; de Clientes, los grupos, las etiquetas y los campos propios en uso; de
+Caja, los cajones en uso; y, solo en una copia de seguridad, los clientes. Nunca el historial (ventas, cobros, sesiones
+de caja, reservas y citas, fichajes, comandas, tareas hechas, ejecuciones), las personas y sus accesos, los PIN, los datos
+fiscales, los ajustes de cada app ni lo ligado a algo de fuera del negocio (WhatsApp, impresoras, códigos QR ya impresos,
+secretos). Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
 negocio no se guarda nada.
 Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un nombre para el archivo.» y no se puede
 exportar. Quien no administra el negocio lee «Solo un administrador puede exportar el negocio.». El administrador
@@ -1343,7 +1351,8 @@ Pantalla: Ajustes · Datos y copias (Exportar)
 Pasos:
   1. En «Exportar», bajo «Apps» («Elige qué apps registra el archivo y si sus datos viajan con él.»), una fila
      por app encendida con dos casillas, «App» y «Datos». Vienen todas con la app marcada y sin datos; una app
-     sin nada propio dice «Nada propio que copiar».
+     cuyos datos no viajan en el archivo (solo historial, personas, datos fiscales, ajustes o lo ligado a algo de
+     fuera) dice «Sus datos no viajan en el archivo», y una sin datos propios, «Nada propio que copiar».
   2. Desmarcar la app desmarca sus datos. «Seleccionar todo» marca todas las apps y sus datos;
      «Deseleccionar todo» las desmarca todas.
   3. Al marcar «Datos» de una app sale debajo «Datos de Inventario», con una casilla por cada parte y sus filas;
@@ -1368,8 +1377,10 @@ Pasos:
      los registros fiscales, las personas y sus accesos, los archivos y los ajustes del negocio se quedan
      siempre.», y «Antes de vaciar se hace una copia completa de los datos del negocio y se guarda 90 días, en
      «Copias», aquí debajo.».
-  3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total. Impuestos
-     no sale como sección: sus categorías fiscales y sus tipos son ajustes del negocio.
+  3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total. Impuestos,
+     Personal y Caja no salen como sección: sus categorías fiscales y sus tipos, sus roles y sus cajones son ajustes del
+     negocio, como los medios de pago de Ventas. De Tareas se borran las tareas abiertas y los proyectos activos; las
+     tareas hechas o canceladas se quedan, como el resto del historial.
   4. Marca las secciones y pulsa «Restablecer el negocio»: «Esto no se puede deshacer», con «Se borrarán
      definitivamente 120 filas:» y el desglose. Escribe el nombre del negocio («Escribe «Casa Ramón» para confirmar») y
      pulsa «Borrar definitivamente» (o «Cancelar»).
@@ -4304,7 +4315,14 @@ Implicados: BASE-F52, BASE-F57, BASE-F97, BASE-F100, HUBS-F38 (erplora.com)
   el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.verticals.template_apps(vertical)`) y las siete
   partes que viajan (`inventory.category`, `inventory.product`, `service.category`, `service.service`, `table.zone`,
   `table.table` y `customer.customer`, personal: solo en una copia), cada una leída y escrita por las operaciones
-  de su app (nunca su ORM; las filas se enlazan por nombre, gh:hub#2626). Lo que ya existe se salta.
+  de su app (nunca su ORM; las filas se enlazan por nombre, gh:hub#2626). Lo que ya existe se salta. Las demás partes
+  las declara cada app en `blueprint_datasets()` de su `apps.py` (su `blueprint.py`), y cada `Dataset` nombra en
+  `models` los modelos cuyas filas lleva. Lo que no viaja lo dice el `blueprint_stays` del mismo `apps.py`, modelo a
+  modelo, con su motivo (`base.blueprint.calls.Stays`: historial, personas, fiscal, ajustes, ligado a algo de fuera,
+  de la propia app, o pendiente de su parte). `base/tests/test_blueprint_coverage.py` recorre todas las apps y falla
+  si un modelo no está ni en una parte ni en `blueprint_stays`: una app nueva, o un modelo nuevo de una que ya viaja,
+  no se queda fuera de la copia sin que se vea. Exportar dice «Sus datos no viajan en el archivo» de una app sin partes
+  con `blueprint_stays` (`keeps_data` de `base.dataset.list`).
 - Operaciones (permiso `base.administer_hub`, ruta en `base/api/data.py` bajo `/api/settings/data/`): consultas
   `base.blueprint.list` (con `empty`, viva), `base.blueprint.export` (GET, el fichero en base64),
   `base.import.list` (con `unfinished`, viva) y `base.dataset.list`; órdenes `base.blueprint.inspect` (no escribe;
