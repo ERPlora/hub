@@ -102,7 +102,7 @@ def _is_figure(value: Any) -> bool:
 def _number(value: Decimal, language: str) -> str:
     """``value`` as the screens write a quantity in ``language`` («5,2», «1.500,25»; «1,500.25» in English): every
     decimal it carries and none it does not need."""
-    return format_decimal(value.normalize(), locale=babel_locale(language), decimal_quantization=False)
+    return format_decimal(value, locale=babel_locale(language), decimal_quantization=False)
 
 
 def _unit(per: dict, data: dict, language: str) -> str | None:
