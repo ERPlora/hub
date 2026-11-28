@@ -2,7 +2,8 @@
 # Tests for apt-install.sh against a fake apt-get, sudo and sleep on the PATH: the packages come from
 # GitHub's cache (the archives folder) without touching Ubuntu's mirror; without them, a passing
 # failure of the mirror is retried, a failure that never passes ends in red with an ::error:: that
-# names the packages, and the archives are left readable for the cache to save.
+# names the packages, the runner's Microsoft sources are dropped before apt refreshes its lists, and
+# the archives are left readable for the cache to save.
 #   bash .github/scripts/apt-install.test.sh
 # Conditions are single-quoted on purpose: check() evaluates them later.
 # shellcheck disable=SC2016
@@ -17,7 +18,8 @@ trap 'rm -rf "$root"' EXIT
 #   sudo <cmd...>: logs "sudo <cmd...>" and runs it as the caller, with FAKE_ROOT=1.
 #   sleep <n>: logs "sleep <n>" and returns at once.
 #   apt-get without sudo (no FAKE_ROOT): fails like apt run by the job's user, on dpkg's lock (exit 100).
-#   apt-get update: logs it and, like apt with an unreachable mirror, only warns (exit 0).
+#   apt-get update: logs it and, like apt with an unreachable mirror, only warns (exit 0); with a source
+#   of packages.microsoft.com left in $APT_SOURCES_DIR it fails as apt does on that source's 403 (exit 100).
 #   apt-get install [--no-download] -o Dir::Cache::Archives=<dir> ... <packages>: like apt, a .deb
 #   already in <dir> is handed to dpkg without downloading it again (apt only checks its size), and dpkg
 #   fails on a broken one; with --no-download and no .deb it fails at once; otherwise it takes the next
@@ -51,6 +53,11 @@ while [ "$#" -gt 0 ]; do
 done
 deb="$archives/libfake_1.0_amd64.deb"
 if [ "$command" = update ]; then
+  if grep -qsF packages.microsoft.com "$APT_SOURCES_DIR"/*; then
+    echo "E: Failed to fetch https://packages.microsoft.com/ubuntu/24.04/prod/dists/noble/InRelease  403  Forbidden"
+    echo "E: The repository 'https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease' is no longer signed."
+    exit 100
+  fi
   echo "W: Failed to fetch mirror+file:/etc/apt/apt-mirrors.txt/dists/noble/InRelease  Temporary failure resolving 'azure.archive.ubuntu.com'"
   exit 0
 fi
@@ -83,17 +90,30 @@ exit 100
 EOF
 chmod +x "$root/bin/sudo" "$root/bin/sleep" "$root/bin/apt-get"
 
-# install <plan> [cached|broken] [VAR=value...]: runs apt-install.sh for libfake and libother with the
-# fake commands, ATTEMPTS=3 and RETRY_DELAY_SECONDS=7 unless a VAR overrides them; "cached" puts the
-# .deb in the archives folder first, as a cache hit does, and "broken" a .deb dpkg refuses. Sets status
-# (its exit code) and work: $work/out.log (its output), $work/calls (the fake commands' calls) and
-# $work/archives.
+# install <plan> [cached|broken|microsoft] [VAR=value...]: runs apt-install.sh for libfake and libother
+# with the fake commands, ATTEMPTS=3 and RETRY_DELAY_SECONDS=7 unless a VAR overrides them, and apt's
+# sources in $work/sources (Ubuntu's and PGDG's); "cached" puts the .deb in the archives folder first,
+# as a cache hit does, "broken" a .deb dpkg refuses, and "microsoft" adds the Microsoft sources of
+# GitHub's runners, in both formats apt reads. Sets status (its exit code) and work: $work/out.log (its
+# output), $work/calls (the fake commands' calls), $work/archives and $work/sources.
 install() {
   local plan="$1"
   shift
   work="$(mktemp -d "$root/case.XXXXXX")"
   printf '%s\n' "$plan" > "$work/plan"
   : > "$work/calls"
+  mkdir -p "$work/sources"
+  printf 'Types: deb\nURIs: http://azure.archive.ubuntu.com/ubuntu/\nSuites: noble\nComponents: main\n' \
+    > "$work/sources/ubuntu.sources"
+  echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main" \
+    > "$work/sources/pgdg.list"
+  if [ "${1:-}" = microsoft ]; then
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/ubuntu/24.04/prod noble main" \
+      > "$work/sources/microsoft-prod.list"
+    printf 'Types: deb\nURIs: https://packages.microsoft.com/repos/edge\nSuites: stable\nComponents: main\n' \
+      > "$work/sources/microsoft-edge.sources"
+    shift
+  fi
   if [ "${1:-}" = cached ] || [ "${1:-}" = broken ]; then
     mkdir -p "$work/archives"
     if [ "$1" = cached ]; then
@@ -104,7 +124,8 @@ install() {
     shift
   fi
   status=0
-  env PATH="$root/bin:$PATH" FAKE_PLAN="$work/plan" FAKE_CALLS="$work/calls" ATTEMPTS=3 RETRY_DELAY_SECONDS=7 "$@" \
+  env PATH="$root/bin:$PATH" FAKE_PLAN="$work/plan" FAKE_CALLS="$work/calls" APT_SOURCES_DIR="$work/sources" \
+    ATTEMPTS=3 RETRY_DELAY_SECONDS=7 "$@" \
     bash "$here/apt-install.sh" "$work/archives" libfake libother > "$work/out.log" 2>&1 || status=$?
 }
 
@@ -167,6 +188,18 @@ check "passing failures are retried until the last attempt" 'installed && [ "$(f
 install "ok" broken
 check "a .deb of the cache that does not install is downloaded again from the mirror" \
   'installed && [ "$(from_mirror)" = 1 ] && [ "$(cat "$work/archives/libfake_1.0_amd64.deb")" = "a package" ]'
+
+# --- the runner's sources the Hub does not use -----------------------------------------------------
+# GitHub's runners come with Microsoft's package source, which the Hub does not use: at times it answers
+# 403 and apt-get update fails on it (exit 100) whatever the other sources answer, every attempt alike.
+install "ok" microsoft
+check "without the cache it drops the runner's Microsoft sources before apt refreshes its lists, and installs" \
+  'installed && [ "$(calls "^apt-get update")" = 1 ] && [ "$(from_mirror)" = 1 ] &&
+     [ ! -e "$work/sources/microsoft-prod.list" ] && [ ! -e "$work/sources/microsoft-edge.sources" ]'
+check "they are root's, so it drops them with sudo" \
+  '[ "$(calls "^sudo rm -f $work/sources/microsoft-prod.list$")" = 1 ] &&
+     [ "$(calls "^sudo rm -f $work/sources/microsoft-edge.sources$")" = 1 ]'
+check "it keeps the sources the Hub installs from" '[ -f "$work/sources/ubuntu.sources" ] && [ -f "$work/sources/pgdg.list" ]'
 
 # --- failures that do not pass --------------------------------------------------------------------
 install "fail"

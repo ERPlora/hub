@@ -118,12 +118,16 @@ jobs:
           key: ${{ steps.apt-archives.outputs.cache-primary-key }}
       # PostgreSQL 18's client, as the Dockerfile's postgresql-client-18: base/tenancy/dumps.py copies a hub's database
       # with pg_dump (and its tests read the copy with pg_restore). The runner's own client is older, and pg_dump refuses
-      # a newer server, so 18's bin goes first in the PATH.
+      # a newer server, so 18's bin goes first in the PATH. It comes from PGDG, signed with the Dockerfile's key, through
+      # apt-install.sh, which retries apt and refreshes its lists without the runner's Microsoft sources (at times they
+      # answer 403). Its .deb files are not cached: apt only knows the package once PGDG's lists are refreshed.
       - name: PostgreSQL 18's client
         run: |
-          sudo apt-get install -y --no-install-recommends postgresql-common
-          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
-          sudo apt-get install -y --no-install-recommends postgresql-client-18
+          sudo install -m 644 docker/pgdg.asc /usr/share/keyrings/pgdg.asc
+          . /etc/os-release
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          bash .github/scripts/apt-install.sh "$RUNNER_TEMP/apt-pgdg" postgresql-client-18
           echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
       # apps/verifactu/tests/test_producer.py checks the producer's constants against the signed declaration
       # the SaaS publishes, and fails in CI without it: its public/declaracion is fetched next to the Hub
