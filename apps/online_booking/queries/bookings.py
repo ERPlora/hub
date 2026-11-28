@@ -16,7 +16,7 @@ from apps.customer.queries.reads import business_country
 from apps.customer.queries.contact import searched, sees_contact
 from apps.customer.search import normalize
 from apps.online_booking.models import Booking
-from apps.online_booking.schemas import BookingListIn, BookingOut, BookingPage, BookingRefIn
+from apps.online_booking.schemas.bookings import BookingListIn, BookingOut, BookingPage, BookingRefIn
 from base.business import business_zone
 from base.ordering import list_order
 from base.text_search import contains_text

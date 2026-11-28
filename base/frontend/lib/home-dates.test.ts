@@ -2,7 +2,7 @@ import * as components from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { EUR, widget } from '../__tests__/home-fixtures';
-import { widgetView } from './home';
+import { widgetView } from './home-panels';
 
 /** The zones a business day is read in, west to east: the day is the same in all of them. */
 const ZONES = ['America/Los_Angeles', 'Europe/Madrid', 'Pacific/Kiritimati'];
@@ -14,13 +14,13 @@ const ZONES = ['America/Los_Angeles', 'Europe/Madrid', 'Pacific/Kiritimati'];
  * Vitest's main process, and on a busy run (the machine at load ~24) the three took 5.3 s inside the test while the
  * file's other tests ran in 4 ms.
  */
-async function copiesOfHome(count: number): Promise<(typeof import('./home'))[]> {
+async function copiesOfHome(count: number): Promise<(typeof import('./home-panels'))[]> {
   vi.doMock('@erplora/ui/components', () => components);
   try {
-    const copies: (typeof import('./home'))[] = [];
+    const copies: (typeof import('./home-panels'))[] = [];
     for (let made = 0; made < count; made += 1) {
       vi.resetModules();
-      copies.push(await import('./home'));
+      copies.push(await import('./home-panels'));
     }
     return copies;
   } finally {

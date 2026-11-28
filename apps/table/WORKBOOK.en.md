@@ -565,7 +565,7 @@ Involved: TABLE-F13, TABLE-F14, TABLE-F15, TABLE-F16, TABLE-F17, TABLE-F18, TABL
 SALE-F19
 
 ### TABLE-F12 Take a check that is already open to a table
-<!-- from WORKBOOK.md sha256:e6f250a28dbb -->
+<!-- from WORKBOOK.md sha256:cdd5e295c423 -->
 Status: done
 Actor: employee, manager, assistant
 Screen: Sales → Sell ("Choose table", SALE-F19); assistant
@@ -581,12 +581,16 @@ Steps:
 3. The check's header shows its table ("Table 4"), followed live. In the same window, "Remove from
    table" parks it (TABLE-F13), and a parked check is seated again by tapping another table
    (TABLE-F24).
-4. With the assistant: "put Ana's check at table 4".
+4. With the assistant: "put Ana's check at table 4". If that check was parked, it is seated again at
+   the table as with "Seat again", with its guests, its server and its opening time.
 In: the check (open) and the table.
-Out: the table check opened and linked to that check (announces: `table.session.opened`).
+Out: the table check opened and linked to that check (announces: `table.session.opened`), or the parked
+one seated again (announces: `table.session.restored`).
 If it fails: those of TABLE-F10, inside the window and with these words; a check already charged or
 voided: "That check is no longer open in Sales."; a check that is already at another table: "That check
-is already at table N.". The Occupied and Blocked tables cannot be tapped. Taking a check to a table
+is already at table N."; a parked check someone tries to link to a table that already has its table
+check: "That check is parked: seat it again at a free table.". The Occupied and Blocked tables cannot be
+tapped. Taking a check to a table
 is done with the party in front: an automation cannot do it.
 Involved: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19, FLOW-F12
 
@@ -792,15 +796,18 @@ deleting it.".
 Involved: TABLE-F22
 
 ### TABLE-F24 Seat a parked check again
-<!-- from WORKBOOK.md sha256:52d5718d7720 -->
+<!-- from WORKBOOK.md sha256:5a3ad4bad149 -->
 Status: done
 Actor: employee, manager, assistant
-Screen: Sessions; also in Sales → Sell, by tapping a table in "Choose table" with the check on screen (SALE-F19)
+Screen: Sessions; also in Sales → Sell, by tapping a table in "Choose table" with the check on screen (SALE-F19); assistant
 Steps:
 1. In **Sessions → All**, "Seat again" on a parked check and pick a free table.
 2. The table check goes back to "Open" at that table, with its guests, its server and its opening time,
    and its Sales check takes the table's title; the table turns Occupied and, if it was Reserved, its
    booking counts as seated.
+3. With the assistant: "seat the parked check at table 9", or by taking its check to a free table ("the
+   ones with the beers want to sit down again, put their tab on table 3"): both seat the same table check
+   again.
 In: the parked check and the table.
 Out: the seated table check (announces: `table.session.restored`).
 If it fails: "That check is not parked: it does not exist in this business, or it is already seated at

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// A declarative panel paints its operation's result by `kind` (lib/home.ts `widgetView`), followed live when the
+// A declarative panel paints its operation's result by `kind` (lib/home-panels.ts `widgetView`), followed live when the
 // operation is a live query and asked once when it is not. A figure is the library's figure card (lib/home-figures.ts),
 // in the colour its app declares, soft unless the board puts it in its row in colour; a failed read offers «Retry».
 // Any other panel that fails says «Unavailable». Neither ever shows the figure it had.
@@ -17,7 +17,7 @@ import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, type Ref, 
 
 import type { WidgetDef } from '../operations/home';
 import { appComponent } from '../lib/app-components';
-import { widgetView } from '../lib/home';
+import { widgetView } from '../lib/home-panels';
 import { figureCard, figureTone, isFigure } from '../lib/home-figures';
 import { useBaseI18n } from '../lib/i18n';
 import { useBusinessMoney } from '../lib/money';

@@ -4,7 +4,7 @@
 import type { StatCardStatus, StatCardStatusTone, StatCardTone } from '@erplora/ui/components';
 
 import type { WidgetDef } from '../operations/home';
-import type { WidgetView } from './home';
+import type { WidgetView } from './home-panels';
 
 const FIGURE_KINDS: ReadonlySet<string> = new Set(['kpi', 'stat', 'sparkline']);
 const STATUS_TONES: ReadonlySet<string> = new Set<StatCardStatusTone>(['success', 'warning', 'danger']);

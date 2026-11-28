@@ -72,7 +72,7 @@ describe('guardrail: base/frontend imports no module', () => {
       "const page = () => import('../../../apps/sale/frontend/pages/SalesPage.vue');",
       "const all = import.meta.glob('../../../apps/*/frontend/pages/*.vue');",
       "import { useLive } from '@erplora/ui/sdk';",
-      "import { formatValue } from '../lib/home';",
+      "import { formatValue } from '../lib/home-panels';",
       "const widgets = import.meta.glob<{ default: Component }>('../../../apps/*/frontend/components/*.vue');",
     ].join('\n');
 

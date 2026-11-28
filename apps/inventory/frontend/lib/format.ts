@@ -7,7 +7,7 @@
 // trailing zeros and grouped from four digits on («12.500»), as the till and the invoice write them (hub#974).
 import { formatQuantity } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { amountFilterErrors, filterCents, formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';

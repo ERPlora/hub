@@ -4,7 +4,7 @@ import pytest
 from live.errors import NotFound, PermissionDenied
 
 from apps.online_booking.queries.page import public_page
-from apps.online_booking.schemas import NoIn
+from apps.online_booking.schemas.fields import NoIn
 
 from .conftest import HUB_DB, TUESDAY, ctx_for, make_page, make_rules, public
 

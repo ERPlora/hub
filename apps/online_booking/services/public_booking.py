@@ -25,7 +25,7 @@ from apps.online_booking.queries.bookings import ONLINE, S
 from apps.online_booking.queries.offer import chosen_member, services_to_book
 from apps.online_booking.queries.settings import page_settings
 from apps.online_booking.queries.visitors import PUBLIC, delegated, hash_token, visitor_key
-from apps.online_booking.schemas import BookedOut, PublicBookIn
+from apps.online_booking.schemas.public import BookedOut, PublicBookIn
 from apps.service.models.catalog import Service
 from apps.staff.models import Member
 from base.business import business_zone

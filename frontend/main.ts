@@ -28,7 +28,7 @@ import { installErrorReport } from '../base/frontend/lib/error-report';
 import { approvalPass } from '../base/frontend/lib/approval';
 import { hubAssistant } from '../base/frontend/lib/assistant-hub';
 import { reloadOrForgetGone } from '../base/frontend/lib/change-business';
-import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
+import { type HubHome, readJsonBlock } from '../base/frontend/lib/embedded';
 import { openReportProblem } from '../base/frontend/lib/report-problem';
 import { shellSidebar, SIDEBAR } from '../base/frontend/lib/sidebar';
 import { beforeSignOut } from '../base/frontend/lib/sign-out';

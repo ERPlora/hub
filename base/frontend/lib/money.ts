@@ -1,11 +1,13 @@
 // The business's currency for the Home's amounts, as this hub's `base.business.get` says it, never a call to
 // erplora.com. One subscription serves the whole tab however many pieces ask (the SDK shares it). Until the business
 // answers an amount is a dash, never euros by default nor guessed decimals.
-import { type DataTableFilters, formatMoney as writeMoney, moneyExamples, parseMoney } from '@erplora/ui/components';
+import { type DataTableFilters, formatMoney as writeMoney, type Money, moneyExamples, parseMoney } from '@erplora/ui/components';
 import { type ApiError, useLive } from '@erplora/ui/sdk';
 import { computed, type ComputedRef, type Ref } from 'vue';
 
-import type { Money } from './home';
+/** A business's currency (ISO 4217) and its decimals, as `base.business.get` says them. */
+/** A currency and its minor unit's decimals: the shared one of `@erplora/ui/components`. */
+export type { Money };
 
 /** Minor units in `money`, in `locale`, its thousands grouped («1.234,50 €», «€22.50», «¥1,500»; «—» while it is
  *  unknown): the platform's way of writing an amount, for the screens whose amount is always a number. */

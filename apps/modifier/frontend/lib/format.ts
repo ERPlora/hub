@@ -5,7 +5,7 @@
 // never the euro by default nor guessed decimals. A supplement may be negative (a discount) and carries its sign; 0 is free.
 import { formatMoney } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';

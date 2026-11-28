@@ -1,6 +1,6 @@
 """The steps every write of the table app shares: who acts, Sales and Customers reached by their operations in the same
-transaction, closing the checks Sales already ended, finding the open check, seating a check at a table and ending its
-stretch there.
+transaction, closing the checks Sales already ended, finding the open check, seating a check at a table (a parked one
+again) and ending its stretch there.
 """
 
 import datetime as dt
@@ -15,9 +15,10 @@ from live.operations import UnknownOperation, get
 from live.outbox import record_event
 
 from apps.sale.models import Order
+from apps.table import events
 from apps.table.models import ACTOR_MAX_LENGTH, Hold, SessionMove, Table, TableSession
 from apps.table.queries.lookups import find_session, find_table
-from apps.table.queries.sessions import check_label, order_is_open
+from apps.table.queries.sessions import check_label, order_is_open, session_out
 from apps.table.queries.tables import seatable
 from apps.table.queries.floor import ended_orders, reserving_holds
 from base.queries.people import actor_name
@@ -39,6 +40,7 @@ SESSION_NOT_ACTIVE = _(
 BILL_MISMATCH = _("This table's bill has changed. Reload the list and try again.")
 ORDER_NOT_OPEN = _("That check is no longer open in Sales.")
 ORDER_ELSEWHERE = _("That check is already at table %(table)s.")
+ORDER_PARKED = _("That check is parked: seat it again at a free table.")
 SALE_UNAVAILABLE = _(
     "Sales is not available in this business: the table's check cannot be opened or changed."
 )
@@ -199,9 +201,36 @@ def _bring_order(ctx: OperationContext, order_id: UUID, table: Table) -> None:
         .select_related("table", "table__zone")
         .first()
     )
+    if holder is not None and holder.status == S.PARKED:
+        raise Conflict(str(ORDER_PARKED), code="table.order_parked")
     if holder is not None:
         where = check_label(holder)
         raise Conflict(
             str(ORDER_ELSEWHERE) % {"table": where}, code="table.order_elsewhere"
         )
     retitle(ctx, order_id, table)
+
+
+def _parked_holding(order_id: UUID) -> TableSession | None:
+    """The parked table check that holds the check of Sales ``order_id``, locked; ``None`` when none does."""
+    return (
+        TableSession.objects.select_for_update()
+        .filter(order_id=order_id, status=S.PARKED, is_deleted=False)
+        .first()
+    )
+
+
+def _reseat(ctx: OperationContext, session: TableSession, data) -> dict:
+    """Seats the parked ``session`` at the free table ``data`` names, with its guests, waiter and opening time; its
+    check of Sales takes the table's title (TABLE-F24)."""
+    if session.order_id is not None and not order_is_open(session.order_id):
+        raise Conflict(str(ORDER_NOT_OPEN), code="table.order_not_open")
+    now = timezone.now()
+    table = _seatable_table(data.table_id, data.table, data.zone, now)
+    session.status, session.table = S.OPEN, table
+    _stamp(session, ctx)
+    session.save()
+    _seat_at(session, table, SessionMove.Reason.RESTORED, now)
+    retitle(ctx, session.order_id, table)
+    _event(ctx, events.SESSION_RESTORED, session)
+    return session_out(session)

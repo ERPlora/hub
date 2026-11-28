@@ -7,7 +7,7 @@ from apps.appointment.models.appointments import Appointment
 from apps.appointment.schemas import changes as diary_changes
 from apps.online_booking.queries.links import find_by_token, public_booking_out
 from apps.online_booking.queries.visitors import PUBLIC, delegated
-from apps.online_booking.schemas import PublicBookingOut, PublicCancelIn
+from apps.online_booking.schemas.public import PublicBookingOut, PublicCancelIn
 
 
 @operation(

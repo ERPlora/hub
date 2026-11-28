@@ -8,7 +8,7 @@
 // screen writes them. Until the business answers an amount is a dash, never the euro by default nor guessed decimals.
 import { formatMoney as writeMoney } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';

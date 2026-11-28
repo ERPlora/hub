@@ -9,7 +9,7 @@ import { openExternalLink, toastSuccess, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { type HubHome, readJsonBlock } from '../lib/home';
+import { type HubHome, readJsonBlock } from '../lib/embedded';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { roleName } from '../lib/people';

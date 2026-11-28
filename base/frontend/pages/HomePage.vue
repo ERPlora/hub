@@ -15,7 +15,8 @@ import HomeHealthRow from '../components/HomeHealthRow.vue';
 import HomeMyApps from '../components/HomeMyApps.vue';
 import SetupChecklist from '../components/SetupChecklist.vue';
 import WidgetBoard from '../components/WidgetBoard.vue';
-import { heading, type HubHome, readJsonBlock } from '../lib/home';
+import { type HubHome, readJsonBlock } from '../lib/embedded';
+import { heading } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import '../home.css';
 

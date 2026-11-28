@@ -7,7 +7,8 @@ import { useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
-import { formatValue, saleStatus } from '../lib/home';
+import { saleStatus } from '../lib/home';
+import { formatValue } from '../lib/home-panels';
 import { useBaseI18n } from '../lib/i18n';
 import { useBusinessMoney } from '../lib/money';
 

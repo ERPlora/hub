@@ -25,7 +25,7 @@ import en from '../locale/en.json';
 import { type AskApproval, approvalPass, questionOf, withApproval } from './approval';
 import { base64ToBlob, BLUEPRINT_FILE, MAX_FILE_BYTES } from './data';
 import { saveFile } from './download';
-import { type HubHome, readJsonBlock } from './home';
+import { type HubHome, readJsonBlock } from './embedded';
 import { OWN_BUSINESS } from './plan-link';
 import { useSaasPass } from './saas-pass';
 

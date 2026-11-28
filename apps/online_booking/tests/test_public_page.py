@@ -11,7 +11,7 @@ from apps.appointment.models.appointments import Appointment
 from apps.customer.models import Customer
 from apps.online_booking import public_page
 from apps.online_booking.models import Booking, Settings
-from apps.online_booking.schemas import PublicBookIn
+from apps.online_booking.schemas.public import PublicBookIn
 from base.tenancy.context import use_hub
 from base.tests.test_public_door import B_HOST, TOKEN, book_here, door
 from config.api import api

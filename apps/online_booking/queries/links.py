@@ -9,7 +9,7 @@ from live.operations import operation
 from apps.appointment.models.appointments import Appointment
 from apps.appointment.queries.business import current_settings as current_rules, now
 from apps.online_booking.models import Booking
-from apps.online_booking.schemas import PublicBookingOut, TokenIn
+from apps.online_booking.schemas.public import PublicBookingOut, TokenIn
 from base.business import business_zone, zone_name
 
 from .bookings import BOOKING_NOT_FOUND, S

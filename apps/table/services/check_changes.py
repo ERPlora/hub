@@ -27,18 +27,15 @@ from apps.table.schemas.sessions import (
 from apps.table.services.writes import (
     BILL_MISMATCH,
     LIVE,
-    ORDER_NOT_OPEN,
     S,
     SYSTEM,
     _bring_order,
     _event,
     _open_session,
     _release,
-    _seat_at,
-    _seatable_table,
+    _reseat,
     _settled,
     _stamp,
-    retitle,
 )
 
 SESSION_NOT_PARKED = _(
@@ -156,17 +153,7 @@ def restore_session(ctx: OperationContext, data: SessionRestoreIn) -> dict:
     session = _settled(find_session(data.id, None, lock=True))
     if session.status != S.PARKED:
         raise Conflict(str(SESSION_NOT_PARKED), code="table.session_not_parked")
-    if session.order_id is not None and not order_is_open(session.order_id):
-        raise Conflict(str(ORDER_NOT_OPEN), code="table.order_not_open")
-    now = timezone.now()
-    table = _seatable_table(data.table_id, data.table, data.zone, now)
-    session.status, session.table = S.OPEN, table
-    _stamp(session, ctx)
-    session.save()
-    _seat_at(session, table, SessionMove.Reason.RESTORED, now)
-    retitle(ctx, session.order_id, table)
-    _event(ctx, events.SESSION_RESTORED, session)
-    return session_out(session)
+    return _reseat(ctx, session, data)
 
 
 @operation(

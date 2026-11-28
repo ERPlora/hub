@@ -6,7 +6,7 @@
 // from the server, never from the browser's Intl (which gives none to the forint). A dish's quantity is written with
 // the platform's `orderTicketQuantity` («2.000» → «2×», «1500.000» → «1.500×», «0.350» kg → «0,35 kg») and what is
 // left of it with `quantityWithUnit`, as the till that sent it writes it.
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 import type { SettingsOut } from '../operations';
 
 export type { Money };

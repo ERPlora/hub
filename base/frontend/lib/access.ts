@@ -5,7 +5,7 @@ import { ApiError, parseErrorEnvelope, readCookie, readSpaConfig, type StreamMan
 
 import type { SessionIdle } from '../operations/access';
 
-import { readJsonBlock } from './home';
+import { readJsonBlock } from './embedded';
 import { sessionDoorFetch } from './sign-out';
 
 // ── Entering ─────────────────────────────────────────────────────────────────────────────────────────────────────
