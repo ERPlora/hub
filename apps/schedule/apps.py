@@ -14,15 +14,7 @@ from apps.schedule.events import WEEK_UPDATED
 class ScheduleConfig(LiveAppConfig):
     name = "apps.schedule"
     label = "schedule"
-    blueprint_stays = {
-        "WeekDay": "pending",
-        "WeekDayInterval": "pending",
-        "SpecialDay": "pending",
-        "SpecialDayInterval": "pending",
-        "Override": "pending",
-        "OverrideInterval": "pending",
-        "ScheduleSettings": "settings",
-    }
+    blueprint_stays = {"ScheduleSettings": "settings"}
     kind = "app"
     verbose_name = _("Schedules")
     icon = "ion:time-outline"
@@ -108,3 +100,10 @@ class ScheduleConfig(LiveAppConfig):
             "SCHEDULE-F13": {"es": ["CPWUbFbBxA8"], "en": ["Orajt5aK6rU"]},
         },
     )
+
+    def blueprint_datasets(self) -> list:
+        """What of Schedules travels in an export of the business (BASE-F35): the usual week, the special days and the
+        temporary changes."""
+        from apps.schedule import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS

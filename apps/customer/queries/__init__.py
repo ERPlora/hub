@@ -12,6 +12,7 @@ from . import (
     groups as groups,
     tags as tags,
     custom_fields as custom_fields,
+    field_values as field_values,
     records as records,
     activity as activity,
     purchases as purchases,

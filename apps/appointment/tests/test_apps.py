@@ -102,9 +102,11 @@ def test_navigation_is_the_agenda_and_its_settings_with_registered_icons():
 
 
 #: The reads that are no assistant tool: what names a blocked period on the assistant's card (hub#635), as the model reads
-#: the blocks by their list; and the agenda's list of the bookings to confirm, as the model counts them and lists them
-#: by their status.
-INTERNAL_READS = {"appointment.blocked_time.get", "appointment.appointment.list_to_confirm"}
+#: the blocks by their list; the agenda's list of the bookings to confirm, as the model counts them and lists them
+#: by their status; and the blocks still to come that an export of the business carries.
+INTERNAL_READS = {
+    "appointment.blocked_time.get", "appointment.appointment.list_to_confirm", "appointment.blocked_time.list_upcoming",
+}
 
 
 def test_every_operation_is_a_tool_of_the_assistant():

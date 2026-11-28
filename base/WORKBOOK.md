@@ -1328,12 +1328,19 @@ zonas y las mesas; de Suplementos, los grupos, cada uno con sus opciones y con l
 categorías a los que se aplica; de Menús y combos, los menús, cada uno con su precio cerrado, sus platos, los productos
 a elegir en cada plato (por su código) con su suplemento, y su foto propia dentro; de Impuestos, las categorías fiscales
 propias del negocio, cada una con sus tipos y sus recargos, nunca las de fábrica, que ya trae todo negocio y que un
-archivo no toca; de Reservas, las franjas y los días bloqueados; de Personal, los roles en uso; de Tareas, los proyectos
+archivo no toca; de Servicios, además, los bonos, cada uno con sus servicios por nombre y sus sesiones; de Horarios, la
+semana habitual que el negocio confirmó, los días especiales y los cambios temporales, cada uno con sus horas (la semana
+con la que nace todo negocio, que nadie ha confirmado, no viaja ni cuenta como dato del negocio, y es la que sustituye
+la del archivo; una semana confirmada nunca la pisa un archivo); de Citas, los bloqueos de la agenda que aún no han
+pasado, los de todo el negocio y los de cada profesional por su nombre (si el negocio que carga no tiene esa
+profesional, el bloqueo no entra y el informe lo dice); de Reservas, las franjas y los días bloqueados; de Personal, los roles en uso; de Tareas, los proyectos
 activos y las tareas abiertas, con su proyecto, la tarea de la que cuelgan, su prioridad, su fecha límite, sus etiquetas
 y su estado; de Automatizaciones, las automatizaciones, que llegan en pausa y sin ningún permiso dado, para que el dueño
 las revise; de Cocina, los puestos con los productos y las categorías que van a cada uno; de Ventas, las secciones de
 precio libre y las notas rápidas; de Clientes, los grupos, las etiquetas y los campos propios en uso; de
-Caja, los cajones en uso; y, solo en una copia de seguridad, los clientes. Nunca el historial (ventas, cobros, sesiones
+Caja, los cajones en uso; de Demo, sus elementos con sus líneas; y, solo en una copia de seguridad, los clientes, con lo
+que cada ficha guarda en sus campos propios (un valor cuyo campo no está en el negocio que carga no entra y el informe lo
+dice). Nunca el historial (ventas, cobros, sesiones
 de caja, reservas y citas, fichajes, comandas, tareas hechas, ejecuciones), las personas y sus accesos, los PIN, los datos
 fiscales, los ajustes de cada app (como los medios de pago de Ventas) ni lo ligado a algo de fuera del negocio (WhatsApp, impresoras, códigos QR ya impresos,
 secretos). Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el

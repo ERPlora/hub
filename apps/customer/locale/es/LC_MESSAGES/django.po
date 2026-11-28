@@ -651,3 +651,12 @@ msgstr "Grupos de clientes"
 
 msgid "Customer tags"
 msgstr "Etiquetas de clientes"
+
+msgid "Custom field values"
+msgstr "Valores de los campos personalizados"
+
+msgid "its card is not there"
+msgstr "su ficha no está"
+
+msgid "the custom field «%(field)s» is not there"
+msgstr "el campo personalizado «%(field)s» no está"
