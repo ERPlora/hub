@@ -280,6 +280,17 @@ def test_a_catalog_dir_the_push_names_wins_over_the_one_beside_the_lender(tmp_pa
     assert given.get("CATALOG_DIR", os.environ["CATALOG_DIR"]) == str(tmp_path / "named")
 
 
+def test_a_check_run_in_the_checkout_itself_leaves_the_image_library_to_its_settings(monkeypatch):
+    """The checkout's .env may name its own CATALOG_DIR or a bucket, and a variable in the environment wins over it."""
+    helper = load_helper()
+    monkeypatch.delenv("CHECKS_DEPENDENCIES_FROM", raising=False)
+    monkeypatch.delenv("CATALOG_DIR", raising=False)
+    given = {}
+    monkeypatch.setattr(helper, "run", lambda _command, **env: given.update(env) or False)
+    helper.tests_failed([Path("apps/demo/tests/test_reads_catalog.py")])
+    assert "CATALOG_DIR" not in given, given
+
+
 @needs_lent_frontend
 def test_a_change_to_a_json_file_alone_fails_on_the_vitest_tests_that_import_it(head_tree):
     """As a new route in frontend/generated/operations.json that operation-routes.test.ts does not expect."""
