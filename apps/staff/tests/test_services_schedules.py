@@ -7,7 +7,7 @@ import pytest
 from live.errors import InvalidPayload, NotFound, PermissionDenied
 
 from apps.staff import events
-from apps.staff.models import Member, Schedule, ScheduleDay
+from apps.staff.models import Member, Schedule, ScheduleDay, StaffSettings
 from apps.staff.schemas.fields import DeletedOut
 from apps.staff.schemas.schedules import ScheduleIn, ScheduleRefIn, ScheduleUpdateIn, SetActiveIn
 from apps.staff.services.schedules import delete_schedule
@@ -184,3 +184,47 @@ def test_an_employee_does_not_manage_schedules():
         )
     with pytest.raises(PermissionDenied):
         delete_schedule(ctx_for("hub_employee"), ScheduleRefIn(id=make_schedule(make_member()).id))
+
+
+# A working day sent without its hours (the assistant, when the person does not say them) takes the business's default
+# working day of Staff › Settings, as the window proposes a new schedule: never hours of its own (hub#2716).
+
+
+def salon_working_day():
+    StaffSettings.objects.create(default_work_start=t("10:00"), default_work_end=t("19:00"), default_break_duration=60)
+
+
+def its_days(schedule) -> list[tuple]:
+    return [(day.weekday, day.start_time, day.end_time, day.break_start, day.break_end) for day in schedule.days]
+
+
+def test_a_week_without_its_hours_is_the_business_default_working_day():
+    salon_working_day()
+    schedule = create_schedule(make_member("Bea"), days=[{"weekday": day} for day in range(1, 6)])
+    assert its_days(schedule) == [(day, t("10:00"), t("19:00"), t("14:00"), t("15:00")) for day in range(1, 6)]
+
+
+def test_without_saved_settings_it_is_the_settings_own_working_day():
+    schedule = create_schedule(make_member("Bea"), days=[{"weekday": 1}])
+    assert its_days(schedule) == [(1, t("09:00"), t("18:00"), t("13:00"), t("14:00"))]
+
+
+def test_an_hour_the_working_day_makes_wrong_is_refused_under_its_day_and_nothing_is_written():
+    salon_working_day()
+    with pytest.raises(InvalidPayload) as refused:
+        create_schedule(make_member("Bea"), days=[{"weekday": 1}, {"weekday": 2, "start_time": "20:00"}])
+    assert refused.value.fields == {"days.1.end_time": "The start time must be before the end time."}
+    assert not Schedule.objects.exists() and outbox() == []
+
+
+def test_an_edited_week_without_its_hours_is_the_business_default_working_day():
+    salon_working_day()
+    schedule = make_schedule(make_member("Bea"))
+    updated = run("staff.schedule.update", ScheduleUpdateIn(id=schedule.id, days=[{"weekday": 5}]))
+    assert its_days(updated) == [(5, t("10:00"), t("19:00"), t("14:00"), t("15:00"))]
+
+
+def test_the_break_a_day_without_its_hours_takes_lasts_what_the_settings_say():
+    StaffSettings.objects.create(default_work_start=t("08:00"), default_work_end=t("16:00"), default_break_duration=30)
+    schedule = create_schedule(make_member("Bea"), days=[{"weekday": 1}])
+    assert its_days(schedule) == [(1, t("08:00"), t("16:00"), t("11:45"), t("12:15"))]

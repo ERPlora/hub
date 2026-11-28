@@ -31,7 +31,12 @@ from apps.staff.schemas.settings import SettingsGetIn, SettingsOut
 )
 def get_settings(ctx: OperationContext, data: SettingsGetIn) -> dict:
     """The saved settings, or the defaults while the business has saved none (STAFF-F22)."""
-    return settings_out(StaffSettings.objects.first() or StaffSettings())
+    return settings_out(saved_settings())
+
+
+def saved_settings() -> StaffSettings:
+    """The business's row, or the defaults (not saved) while it has saved none."""
+    return StaffSettings.objects.first() or StaffSettings()
 
 
 def settings_out(row: StaffSettings) -> dict:

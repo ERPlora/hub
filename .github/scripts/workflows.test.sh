@@ -178,6 +178,16 @@ check("the cache keeps one entry per runner image and per test.yml (where the pa
       image is not None and apt_restore is not None and python_steps.index(image) < python_steps.index(apt_restore)
       and all(name in str(image.get("run", "")) for name in ("$ImageOS", "$ImageVersion"))
       and "hashFiles('.github/workflows/test.yml')" in apt_key)
+# PostgreSQL 18's client goes through apt-install.sh too, for the same retries and so that apt refreshes its lists
+# without the runner's Microsoft sources, which at times answer 403 and fail apt-get update whatever the others answer.
+# No step runs apt by itself, nor apt.postgresql.org.sh, which refreshes every source of the runner without retries.
+pg_client = next((step for step in python_steps if step.get("name") == "PostgreSQL 18's client"), {})
+check("PostgreSQL 18's client is installed with apt-install.sh",
+      any(line.split()[:2] == ["bash", ".github/scripts/apt-install.sh"] and line.split()[3:] == ["postgresql-client-18"]
+          for line in str(pg_client.get("run", "")).splitlines()))
+every_run = "\n".join(runs(job) for job in tjobs.values())
+check("no step of test.yml runs apt-get or apt.postgresql.org.sh by itself: apt goes through apt-install.sh",
+      "apt-get" not in every_run and "apt.postgresql.org.sh" not in every_run)
 # pytest is spread over a matrix of shards (hub#1185): a single job ran the whole suite, which grows every day, and
 # GitHub's runners take from 18 to 29 min on the same commit, so a slow one hit the job's 30 minutes and turned PRs and
 # main's deploy red without a failing test. Each shard runs its share through pytest-shard.sh with the index and total
