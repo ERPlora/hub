@@ -1,5 +1,6 @@
-// BASE-F64, BASE-F02: choosing a language applies it to the whole open shell. «My apps» and the setup checklist
-// take their server-rendered names again in that language, in both directions, without reloading the document.
+// BASE-F64, BASE-F02: choosing a language applies it to the whole open shell, and to the shell open on any other
+// device of the same person. «My apps» and the setup checklist take their server-rendered names again in that
+// language, in both directions, without reloading the document.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, hostPage, shown } from './helpers';
@@ -124,6 +125,46 @@ test('BASE-F64: choosing a language on «My profile» opened by its address reop
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await restoreLanguage(page, initial);
   } finally {
+    await context.close();
+  }
+});
+
+/** The Home of the other device in `language`: the shell's words and the server's. */
+async function homeIn(page: Page, language: 'en' | 'es'): Promise<void> {
+  await expect(page.locator('html')).toHaveAttribute('lang', language);
+  await expect(shown(page).getByTestId('home-my-apps').locator('h2')).toHaveText(language === 'es' ? 'Mis apps' : 'My apps');
+}
+
+/** The other device's cookie says `language`, as if it had been chosen there the last time. */
+async function lastChosenThere(context: BrowserContext, language: 'en' | 'es'): Promise<void> {
+  await context.addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
+}
+
+// The same person on two devices, the second already open: what is chosen on one is spoken on the other at once and
+// after reloading, though the other's language cookie still says the one it had.
+test('BASE-F64: a language chosen on one device is the one another open device speaks, at once and after reloading', async ({
+  browser,
+}) => {
+  const { context, page, initial } = await profileInEnglish(browser);
+  const tablet = await hostPage(browser, A, { viewport: { width: 820, height: 1180 }, next: '/' });
+  try {
+    await lastChosenThere(tablet.context, 'en');
+    await tablet.page.reload();
+    await homeIn(tablet.page, 'en');
+
+    await chooseLanguage(page, 'Español');
+    await homeIn(tablet.page, 'es');
+    await tablet.page.reload();
+    await homeIn(tablet.page, 'es');
+
+    await lastChosenThere(tablet.context, 'es');
+    await chooseLanguage(page, 'English');
+    await homeIn(tablet.page, 'en');
+    await tablet.page.reload();
+    await homeIn(tablet.page, 'en');
+    await restoreLanguage(page, initial);
+  } finally {
+    await tablet.context.close();
     await context.close();
   }
 });
