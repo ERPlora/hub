@@ -26,7 +26,7 @@ from live.operations import get
 
 from apps.combo.models import ChoiceOption
 from apps.inventory.models import Product, StockMovement
-from apps.kitchen.models import Ticket
+from apps.kitchen.models.tickets import Ticket
 from apps.kitchen.tests.conftest import add_printers
 from base.models.relay import EventDelivery
 from base.tenancy.context import use_hub

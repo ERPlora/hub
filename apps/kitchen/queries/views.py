@@ -8,7 +8,7 @@ from dataclasses import dataclass, field, fields
 from decimal import Decimal
 from uuid import UUID
 
-from apps.kitchen.models import ItemStatus, Ticket, TicketItem
+from apps.kitchen.models.tickets import ItemStatus, Ticket, TicketItem
 from apps.kitchen.queries.reads import IN_FLIGHT, STRUCK, TO_DO
 from apps.sale.models.orders import OrderLine
 from base.queries.people import without_address

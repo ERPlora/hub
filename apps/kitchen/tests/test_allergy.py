@@ -13,7 +13,8 @@ from django.utils import timezone
 from live.context import system_context
 from pydantic import ValidationError
 
-from apps.kitchen.models import KitchenSettings, Ticket, TicketItem
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.tickets import Ticket, TicketItem
 from apps.kitchen.queries.rounds import unsaved_views
 from apps.kitchen.queries.views import saved_views
 from apps.sale.models.orders import OrderLine

@@ -7,7 +7,8 @@ from uuid import UUID
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.kitchen.models import Station, TicketStatus
+from apps.kitchen.models.stations import Station
+from apps.kitchen.models.tickets import TicketStatus
 from apps.kitchen.queries.outputs import ticket_out
 from apps.kitchen.queries.reads import COOKING, IN_FLIGHT, current_settings
 from apps.kitchen.queries.scope import ALL, find_scope, scoped, station_map

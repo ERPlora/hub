@@ -12,16 +12,12 @@ ticket a cook is working on never waits for the cook in a circle.
 from django.contrib import admin
 from live.operations import atomic
 
-from apps.kitchen.models import (
-    CategoryRoute,
-    DayCounter,
-    KitchenSettings,
-    LogEntry,
-    ProductRoute,
-    Station,
-    Ticket,
-    TicketItem,
-)
+from apps.kitchen.models.history import LogEntry
+from apps.kitchen.models.numbering import DayCounter
+from apps.kitchen.models.routing import CategoryRoute, ProductRoute
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.stations import Station
+from apps.kitchen.models.tickets import Ticket, TicketItem
 from apps.kitchen.services.writes import locked_settings
 
 AUTOMATIC = ("id", "created_at", "updated_at")

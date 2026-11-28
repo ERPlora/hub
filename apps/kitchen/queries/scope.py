@@ -6,7 +6,7 @@ from uuid import UUID
 from django.utils.translation import gettext_lazy as _
 from live.errors import Conflict, NotFound
 
-from apps.kitchen.models import Station
+from apps.kitchen.models.stations import Station
 from apps.kitchen.queries.reads import MAX_CANDIDATES
 from apps.kitchen.queries.views import ItemView, TicketView
 from base.text_search import contains_text

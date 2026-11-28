@@ -3,7 +3,7 @@ its modules it happens in."""
 
 import logging
 
-from apps.kitchen.models import KitchenSettings
+from apps.kitchen.models.settings import KitchenSettings
 
 from .conftest import HUB_DB, ctx_for, run, void_the_last_dish_to_cook
 

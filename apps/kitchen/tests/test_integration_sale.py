@@ -12,7 +12,7 @@ that stays).
 import pytest
 from live.context import system_context
 
-from apps.kitchen.models import Ticket
+from apps.kitchen.models.tickets import Ticket
 
 from .conftest import (
     HUB_DB,

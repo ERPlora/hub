@@ -9,7 +9,8 @@ from live.outbox import record_event
 from apps.inventory.models import Category, Product
 from apps.inventory.queries.reads import held
 from apps.kitchen import events
-from apps.kitchen.models import CategoryRoute, ProductRoute, Station
+from apps.kitchen.models.routing import CategoryRoute, ProductRoute
+from apps.kitchen.models.stations import Station
 from apps.kitchen.queries.scope import find_station
 from apps.kitchen.schemas.routing import RouteOut, RoutingClearIn, RoutingSetIn
 from apps.kitchen.services.catalog import CATEGORY_NOT_FOUND, PRODUCT_NOT_FOUND, find_category, find_product

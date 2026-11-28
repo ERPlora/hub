@@ -11,7 +11,9 @@ from live.errors import AppInactive, OperationError
 from live.operations import UnknownOperation, get
 
 from apps.kitchen import allergy
-from apps.kitchen.models import Destination, KitchenSettings, OrderType, Ticket
+from apps.kitchen.models.fields import Destination, OrderType
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.tickets import Ticket
 from apps.kitchen.queries.reads import STRUCK
 from apps.inventory.models import Unit
 from apps.kitchen.services.writes import logger

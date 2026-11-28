@@ -8,24 +8,13 @@ from django.utils import translation
 from django.utils.functional import Promise
 
 from apps.kitchen import queries, schemas, services
-from apps.kitchen.models import (
-    CategoryRoute,
-    DayCounter,
-    Destination,
-    ItemStatus,
-    KitchenSettings,
-    LogAction,
-    LogEntry,
-    OrderType,
-    PrinterUsage,
-    Priority,
-    ProductRoute,
-    SoundTone,
-    Station,
-    Ticket,
-    TicketItem,
-    TicketStatus,
-)
+from apps.kitchen.models.fields import Destination, OrderType, PrinterUsage
+from apps.kitchen.models.history import LogAction, LogEntry
+from apps.kitchen.models.numbering import DayCounter
+from apps.kitchen.models.routing import CategoryRoute, ProductRoute
+from apps.kitchen.models.settings import KitchenSettings, SoundTone
+from apps.kitchen.models.stations import Station
+from apps.kitchen.models.tickets import ItemStatus, Priority, Ticket, TicketItem, TicketStatus
 from base.tests.po import (
     catalogue_key,
     compiled_differences,

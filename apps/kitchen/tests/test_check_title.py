@@ -6,7 +6,7 @@ served or cancelled keeps the title it went out with.
 
 from live.context import system_context
 
-from apps.kitchen.models import Ticket
+from apps.kitchen.models.tickets import Ticket
 from apps.table.tests.conftest import make_table, make_zone
 from base.tenancy.context import use_hub
 

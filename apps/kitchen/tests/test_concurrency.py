@@ -25,14 +25,10 @@ from live.models import OutboxEvent
 from live.operations import atomic
 
 from apps.inventory.models import Category, Product
-from apps.kitchen.models import (
-    CategoryRoute,
-    LogEntry,
-    ProductRoute,
-    Station,
-    Ticket,
-    TicketItem,
-)
+from apps.kitchen.models.history import LogEntry
+from apps.kitchen.models.routing import CategoryRoute, ProductRoute
+from apps.kitchen.models.stations import Station
+from apps.kitchen.models.tickets import Ticket, TicketItem
 from apps.kitchen.queries.scope import STATION_NOT_FOUND
 from apps.kitchen.queries.tickets import TICKET_NOT_FOUND
 from base.tenancy.context import current_alias

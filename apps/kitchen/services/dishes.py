@@ -8,7 +8,8 @@ from live.operations import operation
 from live.outbox import record_event
 
 from apps.kitchen import events
-from apps.kitchen.models import ItemStatus, LogAction, Ticket, TicketItem, TicketStatus
+from apps.kitchen.models.history import LogAction
+from apps.kitchen.models.tickets import ItemStatus, Ticket, TicketItem, TicketStatus
 from apps.kitchen.queries.reads import IN_FLIGHT, STRUCK, TO_DO
 from apps.kitchen.queries.scope import find_scope, in_scope
 from apps.kitchen.schemas.tickets import ItemBumpIn, ItemRecallIn, TicketOut

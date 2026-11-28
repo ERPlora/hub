@@ -10,7 +10,9 @@ from uuid import UUID
 from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
-from apps.kitchen.models import Destination, ItemStatus, KitchenSettings, Ticket, TicketItem, TicketStatus
+from apps.kitchen.models.fields import Destination
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.tickets import ItemStatus, Ticket, TicketItem, TicketStatus
 from apps.kitchen.queries.reads import EPOCH, IN_FLIGHT, STRUCK
 from apps.kitchen.queries.rounds import unsaved_views
 from apps.kitchen.queries.views import Change, TicketView, saved_views

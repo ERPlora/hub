@@ -13,7 +13,11 @@ from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from apps.kitchen.allergy import frozen
-from apps.kitchen.models import DayCounter, Destination, ItemStatus, KitchenSettings, Station, TicketItem, TicketStatus
+from apps.kitchen.models.fields import Destination
+from apps.kitchen.models.numbering import DayCounter
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.stations import Station
+from apps.kitchen.models.tickets import ItemStatus, TicketItem, TicketStatus
 from apps.kitchen.queries.reads import business_day, number_of
 from apps.kitchen.queries.routing import Routing, routing
 from apps.kitchen.queries.views import ItemView, LineFacts, TicketView

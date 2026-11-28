@@ -5,7 +5,7 @@ Stations and routes are built straight on the models (the operations are under t
 Sales, their lines and their rounds, and the products and categories of Inventory, are made by their
 own apps' operations, never by hand: the integration with ``sale`` and ``inventory`` is tested as it
 runs (no mocks). The builders import the models lazily, so the tests of apps.py still collect while
-models.py does not exist.
+the models do not exist.
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
@@ -14,10 +14,11 @@ Every test with the database runs as production does: inside business A's own da
 import datetime as dt
 
 import pytest
+from django.db import IntegrityError
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.meta import all_live_app_configs, permissions_for_role
-from live.operations import get
+from live.operations import atomic, get
 
 from apps.flow.tests.test_relay import worker_loop
 from apps.invoice.tests.conftest import catalog_of, in_hubs
@@ -101,7 +102,7 @@ def receives_everything(request, in_business_a):
     else:
         yield
         return
-    from apps.kitchen.models import KitchenSettings
+    from apps.kitchen.models.settings import KitchenSettings
 
     KitchenSettings.objects.update(
         receiving_since=dt.datetime(2000, 1, 1, tzinfo=dt.UTC)
@@ -158,21 +159,39 @@ def printers(in_business_a):
 
 
 def make_station(name: str = "Grill", **fields):
-    from apps.kitchen.models import Station
+    from apps.kitchen.models.stations import Station
 
     return Station.objects.create(name=name, **fields)
 
 
 def route_product(product_id, station):
-    from apps.kitchen.models import ProductRoute
+    from apps.kitchen.models.routing import ProductRoute
 
     return ProductRoute.objects.create(product_id=product_id, station=station)
 
 
 def route_category(category_id, station):
-    from apps.kitchen.models import CategoryRoute
+    from apps.kitchen.models.routing import CategoryRoute
 
     return CategoryRoute.objects.create(category_id=category_id, station=station)
+
+
+def refused(build) -> bool:
+    try:
+        with atomic():
+            build()
+    except IntegrityError:
+        return True
+    return False
+
+
+def make_ticket(number: str = "20261014-0001", **fields):
+    from apps.kitchen.models.tickets import Ticket
+
+    fields.setdefault("day", dt.date(2026, 10, 14))
+    fields.setdefault("sequence", int(number[-4:]))
+    fields.setdefault("received_at", timezone.now())
+    return Ticket.objects.create(number=number, **fields)
 
 
 # ── Sales and Inventory, by their own operations ─────────────────────────────────────────────────

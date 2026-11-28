@@ -14,7 +14,8 @@ from django.apps import apps as global_apps
 from django.db import connections
 from django.utils import timezone
 
-from apps.kitchen.models import KitchenSettings, Ticket, TicketItem
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.tickets import Ticket, TicketItem
 from base.tenancy.context import current_alias
 
 from .conftest import HUB_DB
