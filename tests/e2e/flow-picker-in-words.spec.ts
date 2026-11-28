@@ -54,7 +54,7 @@ for (const language of LANGUAGES) {
         await listsInWords(page, context, 'flow-step-action-s1', 'task.task.list', language.query, language.app);
         expect(await horizontalOverflow(page), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
         await capture(page, `FLOW-F11-what-to-look-up-${language.code}-${size.label}`);
-        await page.keyboard.press('Escape');
+        await page.locator('[data-testid="flow-step-action-s1-option-task.task.list"]').click();
 
         await editor.locator('[data-testid=flow-editor-add-command]').click();
         await listsInWords(page, context, 'flow-step-action-s2', 'task.task.create', language.command, language.app);
@@ -74,6 +74,8 @@ for (const language of LANGUAGES) {
 
         await editor.locator('[data-testid=flow-step-param-s2-title-insert]').click();
         await expect(page.locator('[data-testid=flow-picker]')).toBeVisible();
+        // What the step before leaves: an empty «Which data?» would have nothing to read.
+        await expect(page.locator('[data-testid^="flow-picker-steps.s1."]').first()).toBeVisible();
         await expectInWords(page, context);
         await page.locator('[data-testid=flow-picker-close]').click();
       } finally {

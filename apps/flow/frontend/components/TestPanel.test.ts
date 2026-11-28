@@ -67,6 +67,19 @@ describe('TestPanel', () => {
     expect(internalCodesIn(m.find('flow-test-step-s9').text(), catalogNames(catalog))).toEqual([]);
   });
 
+  it('waits for the catalog before it says what it would send: a value of a closed list is never said as the action keeps it', async () => {
+    const priority = { name: 'priority', type: 'choice', required: false, description: '', choices: ['low', 'medium', 'high', 'urgent'] };
+    const catalog = { ...CATALOG, actions: [{ ...CATALOG.actions[0], fields: [priority] }] } as unknown as CatalogOut;
+    const would = { ...ANSWER.steps[2], outcome: 'would_run' as const, params: { title: 'Hi', priority: 'high' }, empty: [], errors: {} };
+    const m = await mountFlow(TestPanel, { props: { document: DOC, flowId: 'f1', catalog: null }, answers: { '/api/flow/flows/test': [200, { ...ANSWER, steps: [would] }] }, locale: 'es' });
+    await settle();
+    expect(m.wrapper.find('[data-testid="flow-test-loading"]').exists()).toBe(true);
+    expect(m.wrapper.text()).not.toContain('high');
+    await m.wrapper.setProps({ catalog });
+    expect(m.wrapper.find('[data-testid="flow-test-loading"]').exists()).toBe(false);
+    expect(m.find('flow-test-step-s3').text()).toContain('PrioridadAlta');
+  });
+
   it('asks the server with the editor’s document and the saved automation’s permissions', async () => {
     const m = await setup();
     const [call] = m.sent();

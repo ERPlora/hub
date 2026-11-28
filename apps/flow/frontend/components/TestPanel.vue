@@ -42,6 +42,9 @@ async function run(): Promise<void> {
 
 onMounted(run);
 
+/** Until the catalog is in, what it would do is not said: a value of a closed list would show as the action keeps it. */
+const waiting = computed(() => (loading.value && !result.value) || (!!result.value && !props.catalog));
+
 const sampleLine = computed(() => {
   const answer = result.value;
   if (!answer) return '';
@@ -131,7 +134,7 @@ function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
       {{ $t('flow.test.banner') }}
     </InlineFeedback>
     <div
-      v-if="loading && !result"
+      v-if="waiting"
       class="flow-test__loading"
       data-testid="flow-test-loading"
     >
@@ -144,7 +147,7 @@ function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
     >
       {{ wording(error, $t('flow.errors.read')) }}
     </InlineFeedback>
-    <template v-if="result">
+    <template v-if="result && catalog">
       <p
         class="flow-test__sample"
         data-testid="flow-test-sample"
