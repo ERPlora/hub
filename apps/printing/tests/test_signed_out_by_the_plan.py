@@ -131,3 +131,13 @@ def test_a_device_with_no_hub_device_behind_it_or_whose_hub_device_was_removed_i
     [row] = run("printing.device.list", {}).rows
     assert row.signed_out is False
     assert run("printing.job.summary").usages[0].signed_out is False
+
+
+def test_a_retired_tablet_signed_out_by_the_plan_says_nothing_about_the_receipts_it_printed():
+    device, token = hub_device()
+    row = set_up_tablet(printer("Till"), token=token)
+    signed_out_by_the_plan(device)
+    assert run("printing.job.summary").usages[0].signed_out is True
+    # Retired, it keeps its printers by name, but it is no longer the one the receipts wait for.
+    run("printing.device.retire", {"device_id": str(row.id)})
+    assert run("printing.job.summary").usages[0].signed_out is False
