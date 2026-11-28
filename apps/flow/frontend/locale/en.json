@@ -1448,6 +1448,7 @@
       "whatsapp_inbox__template_sample__upload": "Upload the header file of a WhatsApp template",
       "website__catalog__categories": "Look for the categories the website can show",
       "website__category__get": "Read a category the website can show",
+      "website__image__download": "Download an image of the website",
       "website__image__get": "Read an image of the website",
       "website__image__upload": "Upload an image to the website",
       "website__qr__get": "Read the website's QR code",

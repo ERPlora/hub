@@ -440,6 +440,13 @@ class ImageNameOut(Schema):
     )
 
 
+class ImageFileOut(Schema):
+    id: UUID
+    name: str = Field(description="The name of the file it was uploaded with.")
+    content_type: ImageType
+    data_base64: str = Field(description="The file as it was uploaded, in base64.")
+
+
 class CategoriesOut(Schema):
     categories: list[CategoryOut] = Field(description="The source's categories, in their order.")
 
