@@ -217,6 +217,10 @@ class UsageSummary(Schema):
         description="Its jobs that have waited a minute or more with no device on to print them, as the bell counts "
         "them: those no device set up here prints, and those whose device gave no news in the last 90 s (off)."
     )
+    signed_out: bool = Field(
+        description="A device set up for it lost its session because someone entered on another device and the plan "
+        "covers no more devices at a time: it prints nothing until someone enters on it again (not a device off)."
+    )
 
 
 class JobSummaryOut(Schema):

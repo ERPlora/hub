@@ -92,19 +92,23 @@ are your printers, with their connection, their paper and their state. With "Add
 or with "Search printers" you find it on the network; on each row, "Test" prints a test page.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:2a3e2e51bb6f -->
+<!-- from WORKBOOK.md sha256:1cbd060c985d -->
 Menu **Printing → Printers**. Title "Printing" and the sentence "Add the business's printers, say what each one
 prints and check that paper comes out.". Two areas, in this order:
 
 - **Print queue**: one card for each role that has a printer or jobs
   waiting (a new business sees none), with its name ("Receipt", "Kitchen", "Bar",
-  "Label"), its state ("Ready", "Waiting, no printer", "No device", "Device off", "With errors"), "Waiting: N · the
+  "Label"), its state ("Ready", "Waiting, no printer", "No device", "Device off", "Session closed", "With errors"),
+  "Waiting: N · the
   oldest has waited 3 min" or "Nothing waiting", the failed ones ("Failed: N") and which printer it comes out of now:
   "Prints on: Till." (the one chosen in the settings or, if none, the first active one with that role). If
   it has jobs waiting that no device set up can take out, "No device" shows with
   "No device set up here prints it: set one up in Devices.". If the device is set up
   but has given no sign for 90 s and some job has already waited a minute, "Device off" shows with "The device
-  that prints it is not responding: switch it on and open the ERPlora app on it.". A
+  that prints it is not responding: switch it on and open the ERPlora app on it."; if it is not off but lost its
+  session because someone entered on another device and the plan covers no more at a time, "Session closed" shows
+  with "The device that prints it lost its session when someone entered on another one: your plan covers no more
+  devices at a time. Enter on it again, or add devices to your plan.". A
   role with jobs waiting more than a minute and no active printer raises the orange warning
   "3 print jobs for Kitchen have been waiting 3 min. No active printer has this
   role: add one below or give this role to one of them." ("1 print job … has been waiting …" if there is one). With
@@ -139,7 +143,7 @@ the devices on this list print, with anybody's session. From that device, "Print
 the printers it reaches; the list says when each one was last seen, and on each row you can change it or retire it.
 
 #### Detail
-<!-- from WORKBOOK.md sha256:4d7505a7b23e -->
+<!-- from WORKBOOK.md sha256:d92e0288bde0 -->
 Menu **Printing → Devices**. Title "Devices that print" and the sentence "Only the devices set up here
 print the queue, with anybody’s session: set up the one next to the printers from that
 device.". Underneath, a note about the device it is being looked at on: "This device prints for: Till,
@@ -150,8 +154,12 @@ browser cannot print: the paper comes out of the ERPlora app. Install it on the 
 that device up from the app, in Printing → Devices.", with one button per system to download it underneath, as in
 PRINTING-F21.
 
-The table (or cards on the phone), by name: Name (with "This device" on its own), Printers (an
-inactive one, "Kitchen (inactive)"), Last seen ("3 min ago" or "Never") and Set up by. Whoever manages
+The table (or cards on the phone), by name: Name (with "This device" on its own, and "Session closed" on the one
+that lost its session because someone entered on another device and the plan covers no more at a time), Printers (an
+inactive one, "Kitchen (inactive)"), Last seen ("3 min ago" or "Never") and Set up by. For each one with its session
+closed, above the table and in amber: "“Bar tablet” is not printing: it lost its session when someone entered on
+another device." with "Your plan covers no more devices at a time: enter on it again, or add devices to your plan.";
+it goes away as soon as someone enters on it again. Whoever manages
 the printers sees "Print from this device" at the top (only inside the app and if this one is not set up) and on each row
 "Edit" and "Retire". Empty: "No device prints yet. Set up the one next to the printers
 from that device.". Error when loading: "Could not load the devices." with "Retry".
@@ -249,7 +257,7 @@ the window without saving. With the window as it opened, Back closes it without 
 | PRINTING-F22 | Print the receipt and open the drawer at the till that charges | common | done |
 
 ### PRINTING-F01 See how printing is going
-<!-- from WORKBOOK.md sha256:f5e6f2dc8c77 -->
+<!-- from WORKBOOK.md sha256:131b1a0761b8 -->
 Status: done
 Actor: administrator, manager; the employee, only on the Home
 Screen: Home, Printers, Queue
@@ -268,7 +276,10 @@ Steps:
    with the ERPlora app open can print them.". "See the printers" opens **Printing → Printers**, where the card of that
    role says why: "No device" and "No device set up here prints it: set one up in
    Devices.", "Device off" and "The device that prints it is not responding: switch it on and open the
-   ERPlora app on it." or "Waiting, no printer" if it has no active printer.
+   ERPlora app on it.", "Session closed" and "The device that prints it lost its session when someone entered on
+   another one: your plan covers no more devices at a time. Enter on it again, or add devices to your plan." when it
+   is not off but its session was closed because someone entered on another device and the plan covers no more at
+   a time (the Free one covers one), or "Waiting, no printer" if it has no active printer.
 3. Open **Printing → Printers**: the role cards say whether each one has a printer and which one
    prints it, how many are waiting and since when.
 4. Open **Printing → Queue** to see each job with its status, its attempts and its last
@@ -277,7 +288,7 @@ Steps:
    role to a printer in **Printing → Printers** or get the job unstuck in **Printing → Queue**.
 In: the business's queue, printers and devices.
 Out: nothing saved. What depends on the clock (how long it has been waiting, the orange warning, "Waiting",
-"Device off" on the role's card and a sent job that did not answer in time) is recalculated on its own every
+"Device off" or "Session closed" on the role's card and a sent job that did not answer in time) is recalculated on its own every
 30 s, without waiting for another change or reloading; "All
 clear" requires nothing waiting, sent without confirmation or failed. The screens refresh on their own when a job is queued, sent, printed, fails,
 is retried or is cancelled. The Home step and the bell rows change on their own, without
@@ -290,7 +301,7 @@ If it fails: "Could not read the print queue." with "Retry"; "All clear" is not 
 the read fails. A device that is set up but switched off does make the bell ring, once the minute has passed: the Home
 step stays "Done" (being set up is enough), but nobody is printing. A job that has waited less than a
 minute does not make it ring (a device that restarts is not an alarm).
-Involved: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01
+Involved: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01, BASE-F57
 
 ### PRINTING-F02 Find a network printer without typing its address
 <!-- from WORKBOOK.md sha256:5c8ee76752e6 -->
@@ -620,7 +631,7 @@ If it fails: as in F07.
 Involved: CASH_REGISTER-F16, PRINTING-F22
 
 ### PRINTING-F18 Take the paper out: the device picks up and confirms the jobs
-<!-- from WORKBOOK.md sha256:42aeb864026b -->
+<!-- from WORKBOOK.md sha256:2a4c2341fa49 -->
 Status: done
 Actor: the owner, the administrator or the manager (they set up the device) and the device's app
 (it picks up)
@@ -651,10 +662,13 @@ Steps:
    devices are told. If the connection drops, the app connects again on its own, waiting a little longer each time (up to
    30 s), and the first thing it does is confirm what it printed and did not get to confirm, so that it does not come out twice.
    If the session ends, the business is cancelled or suspended, Printing is switched off or the device stops
-   printing for any printer, it stops trying.
+   printing for any printer, it stops trying. If the session was closed because someone entered on another device
+   and the plan covers no more at a time, the list marks it "Session closed" and says why it does not print, and
+   the queue says so instead of "Device off", until someone enters on it again.
 6. While the ERPlora app on the device is connected to print, it says it is there when it connects and in
    each heartbeat (every 30 s), with the session of whoever uses it, an employee's too; setting it up from it and
-   asking for a job also count. The list shows it in "Last seen". If 90 s pass without signs, it
+   asking for a job also count. With each one, Printing notes on which of the business's devices (the browser or the
+   app someone entered on) that session is, to know whether the plan's cap closed it. The list shows it in "Last seen". If 90 s pass without signs, it
    counts as switched off: its jobs make the bell ring once the minute has passed.
 7. From any device, whoever manages the printers changes in the list the name or the printers of
    a device ("Edit") or retires it ("Retire", after confirming it): the app on that device notices it
@@ -681,7 +695,7 @@ that field changes (the name is typed, a printer is ticked), without tapping "Sa
 its own changes. It is only set up from the device itself, and not in a browser: "Print from this device" is not
 there, so the queue keeps saying that no device set up here prints it and the Home keeps "Set up your printer". The queue and the list name each device by its name, never by its identifier: with it
 anybody could pretend to be the till.
-Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F21, PRINTING-F22
+Involved: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F21, PRINTING-F22, BASE-F57
 
 ### PRINTING-F19 See the state of a printer
 <!-- from WORKBOOK.md sha256:4c410470a0af -->

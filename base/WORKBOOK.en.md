@@ -1935,7 +1935,7 @@ or ask an administrator."; it counts as a failed attempt. The PIN pad stays avai
 Involved: BASE-F55
 
 ### BASE-F57 Lose the session because it was opened on another device
-<!-- from WORKBOOK.md sha256:28a72686e4b4 -->
+<!-- from WORKBOOK.md sha256:974d30048641 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Access
@@ -1949,9 +1949,11 @@ Steps:
      sells is only on the web).
   4. They can enter again (and it closes the other one's) or go to erplora.com to extend the plan.
 In: the devices the plan covers, which erplora.com passes to the business.
-Out: the sessions of the devices left over, ended, and the reason kept on each one to tell it.
+Out: the sessions of the devices left over, ended, and the reason kept on each one to tell it. If the one that loses
+its session is the one that prints, Printing says so in its list of devices and in the queue instead of "Device off"
+(PRINTING-F18, PRINTING-F01).
 If it fails: with no limit in the plan nothing ends.
-Involved: BASE-F11, BASE-F40
+Involved: BASE-F11, BASE-F40, PRINTING-F01, PRINTING-F18
 
 ### BASE-F58 The session ends while working
 <!-- from WORKBOOK.md sha256:9b2c63c0a89a -->

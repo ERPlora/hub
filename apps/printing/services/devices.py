@@ -12,7 +12,7 @@ from live.outbox import record_event
 
 from apps.printing import events
 from apps.printing.models import PrintDevice, Printer
-from apps.printing.queries.device_reads import active_devices, device_row, find_device, this_device_key
+from apps.printing.queries.device_reads import active_devices, device_row, find_device, hub_device_of, this_device_key
 from apps.printing.queries.jobs import actor
 from apps.printing.schemas.devices import (
     DeviceOut,
@@ -78,7 +78,8 @@ def register_device(ctx: OperationContext, data: DeviceRegisterIn) -> dict:
             device = PrintDevice.objects.select_for_update().get(key=key)
     # Set up from the device in hand: it is there (a re-registration counts as news).
     device.name, device.retired_at, device.retired_by, device.last_seen_at = data.name, None, "", timezone.now()
-    device.save(update_fields=["name", "retired_at", "retired_by", "last_seen_at"])
+    device.hub_device = hub_device_of(ctx)
+    device.save(update_fields=["name", "retired_at", "retired_by", "last_seen_at", "hub_device"])
     device.printers.set(printers)
     record_event(ctx, events.DEVICE_REGISTERED, {"id": str(device.id)})
     return device_row(device, key)
@@ -96,10 +97,13 @@ def register_device(ctx: OperationContext, data: DeviceRegisterIn) -> dict:
 def see_device(ctx: OperationContext, data: DeviceSeenIn) -> dict:
     """The device's presence: base's /ws/print runs it at the hello and at the beats of a device that prints
     (``print_presence`` of this app), as the device's user, so ``printing.print`` is all it asks — whoever is signed in
-    at the till prints. The device set up with that id (not retired) is there now; anything else is not, and nothing is
-    set up by being there. No event: every device beats every 30 s, and the bell reads the clock instead
-    (``bell_refresh_every``). No route, no API key and no assistant: the id never travels in a URL."""
-    seen = active_devices().filter(key=PrintDevice.key_of(data.device)).update(last_seen_at=timezone.now())
+    at the till prints. The device set up with that id (not retired) is there now, on the hub's device of this session;
+    anything else is not, and nothing is set up by being there. No event: every device beats every 30 s, and the bell
+    reads the clock instead (``bell_refresh_every``). No route, no API key and no assistant: the id never travels in a
+    URL."""
+    seen = active_devices().filter(key=PrintDevice.key_of(data.device)).update(
+        last_seen_at=timezone.now(), hub_device=hub_device_of(ctx)
+    )
     return {"seen": seen > 0}
 
 

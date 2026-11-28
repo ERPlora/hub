@@ -21,6 +21,7 @@ const COUNTER: DeviceOut = {
   registered_by: 'Ana',
   last_seen_at: null,
   this_device: true,
+  signed_out: false,
 };
 
 async function setup(device: DeviceOut | null = null, printers: PrinterOut[] = [TILL, KITCHEN], locale: 'en' | 'es' = 'en') {

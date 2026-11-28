@@ -84,3 +84,22 @@ async def test_a_till_seen_by_the_socket_quiets_the_bell(sockets, session):
     assert await db(count) == 1, "the till is off: nobody is printing the receipt"
     await ready_socket(sockets, cookie, [till], host=TILL_HOST)
     assert await db(count) == 0, "the till is back"
+
+
+async def test_the_socket_notes_the_hub_device_the_till_prints_with(sockets, session):
+    # The hub's device is the one its ``hub_device`` cookie names: what base marks when the plan's cap ends its session.
+    from base import access
+    from base.models.access import TrustedDevice
+
+    def a_hub_device():
+        token = access.new_device_token()
+        device = TrustedDevice.objects.create(token_digest=access.token_digest(token), last_entry_at=timezone.now())
+        return device.pk, token
+
+    cookie = await db(session, "eva", host=A.key, role=Membership.Role.EMPLOYEE)
+    till = await db(printer, scope=A)
+    await db(set_up, DEVICE, till, scope=A)
+    hub_device, token = await db(a_hub_device)
+    # The browser sends both cookies in one header.
+    await ready_socket(sockets, f"{cookie}; {access.DEVICE_COOKIE}={token}", [till], host=TILL_HOST)
+    assert await db(lambda: PrintDevice.objects.get(key=PrintDevice.key_of(DEVICE)).hub_device) == hub_device

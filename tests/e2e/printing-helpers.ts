@@ -1,8 +1,8 @@
 // Helpers of the printing specs (apps/printing/WORKBOOK.md): the screenshots of a flow in the three sizes the
 // migration asks for (`APP-PRINTING-<KEY>-390`, `-834`, `-1440` in `.artifacts/`), the device's side of the
-// queue by the API (claim, then confirm or fail: what `/ws/print` will do for the app of the device), the hub's pages
-// as the installed app (only there does Devices set a device up) and letting go of the devices a spec printed from
-// (PRINTING-F18: the owner's claim sets the device up).
+// queue by the API (claim, then confirm or fail: what `/ws/print` will do for the app of the device), the device's print
+// host saying it is there (its hello on `/ws/print`), the hub's pages as the installed app (only there does Devices set
+// a device up) and letting go of the devices a spec printed from (PRINTING-F18: the owner's claim sets the device up).
 import { type BrowserContext, expect, type Page } from '@playwright/test';
 
 import { A, api, capture, painted, psql, settled } from './helpers';
@@ -87,6 +87,30 @@ export function forgetDevices(like: string, { ids = [], names = [] }: { ids?: re
   psql(`update printing_printjob set print_device_id = null where print_device_id in (select id from printing_printdevice where ${where})`);
   psql(`delete from printing_printdevice_printers where printdevice_id in (select id from printing_printdevice where ${where})`);
   psql(`delete from printing_printdevice where ${where}`);
+}
+
+/** The print host of `device` connects from `page` the way the app does (/ws/print, `hello` with `printer`): it is
+ *  there, with the session and the device of the business of that page. The socket stays open as `printSocket`. */
+export async function printHostHello(page: Page, device: string, printer: string): Promise<void> {
+  const ready = await page.evaluate(
+    ([deviceId, printerId]) =>
+      new Promise<string>((resolve, reject) => {
+        const socket = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/print`);
+        (window as unknown as { printSocket: WebSocket }).printSocket = socket;
+        socket.onopen = () => socket.send(JSON.stringify({ type: 'hello', session: '', deviceId, printers: [printerId] }));
+        socket.onmessage = (event) => resolve((JSON.parse(event.data as string) as { type: string }).type);
+        socket.onerror = () => reject(new Error('the print socket failed'));
+      }),
+    [device, printer],
+  );
+  expect(ready).toBe('ready');
+}
+
+/** Lets go of what a spec made under `tag`: the jobs of its printers, the devices named after it and its printers. */
+export function forgetTagged(tag: string): void {
+  psql(`delete from printing_printjob where printer_id in (select id from printing_printer where name like '${tag} %')`);
+  forgetDevices(`${tag} %`, { names: [`${tag} %`] });
+  psql(`delete from printing_printer where name like '${tag} %'`);
 }
 
 /** Switches off every printer of the business that is on, for a run where nothing may be queued (the device prints);

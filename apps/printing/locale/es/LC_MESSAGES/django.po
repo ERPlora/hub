@@ -422,6 +422,9 @@ msgstr "clave"
 msgid "last seen at"
 msgstr "visto por última vez el"
 
+msgid "signed in on"
+msgstr "con sesión en"
+
 msgid "printing device"
 msgstr "dispositivo de impresión"
 

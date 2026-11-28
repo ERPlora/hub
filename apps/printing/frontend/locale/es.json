@@ -109,6 +109,9 @@
         "registeredBy": "Dado de alta por"
       },
       "thisDevice": "Este dispositivo",
+      "signedOut": "Sesión cerrada",
+      "signedOutHeading": "«{name}» no imprime: perdió la sesión al entrar alguien en otro dispositivo.",
+      "signedOutHint": "Tu plan no cubre más dispositivos a la vez: vuelve a entrar en él, o amplía los dispositivos de tu plan.",
       "inactive": "{name} (inactiva)",
       "lastSeen": "hace {age}",
       "never": "Nunca",
@@ -193,6 +196,8 @@
       "noDeviceHint": "Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.",
       "deviceOff": "Dispositivo apagado",
       "deviceOffHint": "El dispositivo que lo imprime no responde: enciéndelo y abre en él la app de ERPlora.",
+      "signedOut": "Sesión cerrada",
+      "signedOutHint": "El dispositivo que lo imprime perdió la sesión al entrar alguien en otro: tu plan no cubre más dispositivos a la vez. Vuelve a entrar en él, o amplía los dispositivos de tu plan.",
       "failing": "Con errores",
       "waiting": "En cola: {n}",
       "oldest": "el más antiguo lleva {age}",

@@ -28,6 +28,7 @@ from base import access
 from base.models import Hub, Membership
 from base.models.sessions import SessionOwner
 from base.models.access import TrustedDevice
+from base.queries.devices import ended_by_the_device_limit
 from base.tenancy.context import use_hub
 from base.tests.test_access_account import enter
 from base.tests.test_auth_views import A, B, HOST, ON_HUB_A
@@ -250,10 +251,19 @@ class TestThePlanCoversOneDevice:
         first, second = Client(), Client()
         enter(first)
         enter(second)
-        enter(first)
-        token = first.cookies[access.DEVICE_COOKIE].value
+
+        def device_of(client) -> TrustedDevice:
+            return TrustedDevice.objects.get(token_digest=access.token_digest(client.cookies[access.DEVICE_COOKIE].value))
+
         with use_hub(hub_a):
-            assert TrustedDevice.objects.get(token_digest=access.token_digest(token)).ended_reason == ""
+            evicted = device_of(first)
+            # What the apps ask (Printing, for the device that prints): the devices the cap left without a session.
+            assert list(ended_by_the_device_limit()) == [evicted.pk]
+        enter(first)
+        with use_hub(hub_a):
+            assert TrustedDevice.objects.get(pk=evicted.pk).ended_reason == ""
+            # One device at a time: entering on the first one again leaves the second one without its session.
+            assert list(ended_by_the_device_limit()) == [device_of(second).pk]
 
     def test_the_session_s_note_names_the_device_it_was_on(self, fake_saas, one_device, hub_a):
         fake_saas()

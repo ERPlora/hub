@@ -154,6 +154,10 @@ class PrintDevice(UUIDModel):
     registered_at = models.DateTimeField(_("set up at"), auto_now_add=True)
     registered_by = models.CharField(_("set up by"), max_length=ACTOR_MAX_LENGTH, blank=True)
     last_seen_at = models.DateTimeField(_("last seen at"), null=True, blank=True)
+    #: The hub's device (base's ``TrustedDevice``, named by its ``hub_device`` cookie) whose session it last printed
+    #: with: when the plan's cap of devices ends that session, the screens say so. No foreign key: base's row is
+    #: removed with its device, and this one stays; none when it prints without one (an API key).
+    hub_device = models.UUIDField(_("signed in on"), null=True, blank=True)
     retired_at = models.DateTimeField(_("retired at"), null=True, blank=True)
     retired_by = models.CharField(_("retired by"), max_length=ACTOR_MAX_LENGTH, blank=True)
 

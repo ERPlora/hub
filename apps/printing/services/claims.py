@@ -13,7 +13,7 @@ from live.outbox import record_event
 
 from apps.printing import events
 from apps.printing.models import PrintDevice, Printer, PrintJob
-from apps.printing.queries.device_reads import active_devices
+from apps.printing.queries.device_reads import active_devices, hub_device_of
 from apps.printing.queries.jobs import LEASE, MAX_ATTEMPTS, actor, find_job, job_row
 from apps.printing.schemas.claims import JobAckOut, JobClaimIn, JobClaimOut, JobCompleteIn, JobFailIn
 from apps.printing.services.writes import MANAGE_SETTINGS, _queued
@@ -71,8 +71,8 @@ def _claiming_device(ctx: OperationContext, device_id: str, printers: list[Print
         device.printers.add(*missing)
         if not new:
             record_event(ctx, events.DEVICE_UPDATED, {"id": str(device.id)})
-    device.last_seen_at = now
-    device.save(update_fields=["last_seen_at"])
+    device.last_seen_at, device.hub_device = now, hub_device_of(ctx)
+    device.save(update_fields=["last_seen_at", "hub_device"])
     return device
 
 
