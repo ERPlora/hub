@@ -200,3 +200,9 @@ msgstr "Cambiar los ajustes"
 msgctxt "schedule card"
 msgid "When"
 msgstr "Cuándo"
+
+msgid "Usual week"
+msgstr "Semana habitual"
+
+msgid "Temporary changes"
+msgstr "Cambios temporales"

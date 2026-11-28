@@ -230,7 +230,12 @@ def remover(name: str) -> Callable[[OperationContext, str], None]:
 
 
 def as_text(value: Any) -> Any:
-    """A date or a time as a file writes it (``2026-12-25``, ``20:00``); anything else as it is."""
+    """A date or a time as a file writes it (``2026-12-25``, ``20:00``), also inside a list or a row a row holds (a
+    day's opening hours); anything else as it is."""
+    if isinstance(value, list):
+        return [as_text(item) for item in value]
+    if isinstance(value, pydantic.BaseModel):
+        return {name: as_text(item) for name, item in value}
     if isinstance(value, dt.time):
         return value.isoformat(timespec="minutes")
     return value.isoformat() if isinstance(value, dt.date) else value

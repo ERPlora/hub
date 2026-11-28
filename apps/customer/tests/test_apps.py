@@ -34,6 +34,7 @@ OPERATIONS = {
     "customer.group.list": "customer.view",
     "customer.tag.list": "customer.view",
     "customer.field.list": "customer.view",
+    "customer.field_value.list": "customer.export",
     "customer.activity.list": "customer.view",
     "customer.purchase.list": "customer.view",
     "customer.purchase.divergences": "customer.view",
@@ -117,6 +118,8 @@ CARD_ONLY = {
     "customer.field.detail",
     "customer.order.get",
 }
+#: What only an export of the business reads: every value the cards keep in their custom fields.
+FILE_ONLY = {"customer.field_value.list"}
 #: The writes whose card says their data by a summary of their own (the rows of a file by their names, the custom
 #: fields by their values, the words a consent stores): a dict, since ``AI`` holds no summary.
 CARD_SUMMARY = {"customer.customer.import", "customer.customer.update", "customer.consent.grant"}
@@ -238,7 +241,7 @@ def test_every_operation_tells_the_assistant_what_it_does():
     Spanish (test_assistant_asks.py); the screen's health data, the sale's reactions and what names a record on the card
     are no tool (``INTERNAL``)."""
     for name, op in customer_operations().items():
-        if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY:
+        if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY | FILE_ONLY:
             assert op.ai is INTERNAL, name
             continue
         if name in CARD_SUMMARY:
@@ -253,7 +256,7 @@ def test_every_operation_tells_the_assistant_what_it_does():
 
 def test_commands_declare_their_risk_and_queries_do_not():
     for name, op in customer_operations().items():
-        if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY:
+        if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY | FILE_ONLY:
             continue
         if op.kind == "command":
             expected = "high" if name in HIGH_RISK else "normal"

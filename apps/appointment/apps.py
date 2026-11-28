@@ -25,7 +25,6 @@ class AppointmentConfig(LiveAppConfig):
         "Appointment": "history",
         "AppointmentService": "history",
         "History": "history",
-        "BlockedTime": "pending",
     }
     kind = "app"
     verbose_name = _("Appointments")
@@ -218,3 +217,9 @@ class AppointmentConfig(LiveAppConfig):
                 restore="appointment.recurring.restore",
             ),
         ]
+
+    def blueprint_datasets(self) -> list:
+        """What of Appointments travels in an export of the business (BASE-F35): the agenda's blocks still to come."""
+        from apps.appointment import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS

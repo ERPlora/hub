@@ -279,14 +279,15 @@ settings…"; error: "Could not load settings." with "Retry"; without permission
 by its address, "No access" (BASE-F118).
 
 ## States of each screen
-<!-- from WORKBOOK.md sha256:2fa9a3c5cc56 -->
+<!-- from WORKBOOK.md sha256:e1561dc202b1 -->
 
 | State | What the person sees |
 |---|---|
 | Loading | "Loading…" (or its screen's text) while the first result arrives. |
 | Empty | Its screen's text, with **+** if they can create. |
 | Error | The notice with "Retry"; an action's refusal shows inside its sheet or window, next to its field. |
-| Reconnecting | What is painted stays; a band warns "Reconnecting…" until the connection is back. |
+| Reconnecting | What is painted stays; a band warns "Reconnecting…" until the connection is back. It shows as soon as the device loses its network or the live connection drops; in **Sell**, above the grid of articles. |
+| No connection (Sell) | What is tapped and does not reach the server (an article, "Charge" with the order still to send, a change to the check) does nothing and says so: "Could not connect to the server. Check your connection and try again in a few seconds.". Once the connection is back, the check is as it was. |
 | App inactive (`app_inactive`) | "This app is not active in this business". |
 | Speaking (Sell) | The microphone key, red, changes to the stop icon and is called "Stop"; "Listening…" shows underneath; on stopping, "Transcribing…". A notice says what fails: no voice, "Nothing was heard. Try again closer to the microphone."; with the microphone denied, "Microphone access is blocked. Allow it in your browser to speak." (in the installed app, which has no browser, "Microphone access is blocked. Allow it in your device settings to speak."); too long, "The recording is too long: say something shorter."; if it cannot be transcribed, "The audio could not be transcribed. Try again."; offline, "No connection: talking to the assistant needs the internet.". |
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". What a manager can approve with their PIN (voiding and refunding a sale, voiding a sent line, deleting a check with something ordered, the open price and discounts above the maximum) does show and, when pressed, asks "An approval is needed". |
@@ -620,7 +621,7 @@ the step of the product (…)." and the line stays as it was. There is no scale 
 Involved: INVENTORY-F26
 
 ### SALE-F11 Choose an article's modifiers
-<!-- from WORKBOOK.md sha256:059162f5c4fa -->
+<!-- from WORKBOOK.md sha256:be88711da2b4 -->
 Status: done
 Vertical: common
 Actor: employee, manager
@@ -650,7 +651,8 @@ lowers the stock.
 If it fails: Modifiers' reasons show inside the sheet ("Choose at least 1 in «Doneness».", "This option is
 not offered with this product."…), and a required group left unchosen does not go in when ordered through
 the assistant either. If the groups cannot be read, "The options of this product could not be read. Try
-again." and nothing goes in.
+again." and nothing goes in; with no connection, "Could not connect to the server. Check your connection and try
+again in a few seconds.", and nothing goes in either.
 Involved: MODIFIER-F06, MODIFIER-F07, MODIFIER-F08
 
 ### SALE-F12 Put together a menu
@@ -892,7 +894,7 @@ its tables and seat, there is no button and Tables is not asked anything.
 Involved: TABLE-F10, TABLE-F12, TABLE-F13, TABLE-F24, TABLE-F33
 
 ### SALE-F20 Send the order to the kitchen and void a sent line
-<!-- from WORKBOOK.md sha256:1a2608507bd3 -->
+<!-- from WORKBOOK.md sha256:7606363eeda3 -->
 Status: done
 Vertical: restaurant
 Actor: employee (send), manager (void; the cashier, with a manager's approval)
@@ -934,7 +936,8 @@ Out: the lines with their round and the kitchen order open in Kitchen, a rush if
 (announces: order sent, with the lines, their notes, their modifiers, the dishes of each menu and who
 serves); on voiding a sent line, it announces the voided line with its reason.
 If it fails: with nothing pending, "There is nothing new to send to the kitchen."; if Kitchen does not
-answer, "The order could not be sent to the kitchen. Try again." shows at the top of the screen and nothing
+answer, "The order could not be sent to the kitchen. Try again." shows at the top of the screen (with no
+connection, "Could not connect to the server. Check your connection and try again in a few seconds.") and nothing
 is charged: you can press "Charge" or "Send order" again without waiting for it to go. If the order is sent
 but its slip does not print, the POS warns, at the top too, "Order N sent to the kitchen, but it did not
 print. Check the kitchen printer in Printing.". A line already sent cannot be removed: "That line can no

@@ -305,18 +305,18 @@ def _customer_rows(ctx: OperationContext) -> list[dict]:
     ]
 
 
-def _customer_identity(name: str, phone: str, email: str) -> str:
+def customer_identity(name: str, phone: str, email: str) -> str:
     return f"{natural_key(name)}\x00{phone.strip()}\x00{natural_key(email)}"
 
 
 def _customer_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
-    existing = {_customer_identity(row.name, row.phone, row.email) for row in pages(ctx, "customer.customer.list")}
+    existing = {customer_identity(row.name, row.phone, row.email) for row in pages(ctx, "customer.customer.list")}
     fresh = []
     for row in rows:
         values = {name: text_of(row, name) for name in CUSTOMER_FIELDS}
         if not values["name"]:
             loaded.refuse("", str(NO_NAME))
-        elif _customer_identity(values["name"], values["phone"], values["email"]) in existing:
+        elif customer_identity(values["name"], values["phone"], values["email"]) in existing:
             loaded.already += 1
         else:
             fresh.append(values)

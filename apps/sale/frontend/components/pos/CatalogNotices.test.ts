@@ -1,9 +1,9 @@
 // The notices above the till's grid (SALE-F07): how many articles cannot be sold for lack of VAT,
 // with «Review the catalogue» (to Inventory's list of unconfigured products) only for whoever can fix
-// it, and the reason of the last tap on a blocked tile.
+// it, the reason of the last tap on a blocked tile, and «Reconnecting…» while the live connection recovers.
 import { describe, expect, it } from 'vitest';
 
-import { click, errorFrame, MANAGER, mountSale, taxSettings } from '../../__tests__/mount-sale';
+import { BYE, click, errorFrame, flush, MANAGER, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { page, product } from './__tests__/fixtures';
 import CatalogNotices from './CatalogNotices.vue';
 
@@ -69,5 +69,14 @@ describe('CatalogNotices', () => {
     const notice = m.find('pos-tap-notice');
     expect(notice.text()).toBe('Cannot be sold: no tax category. VAT needs to be set up.');
     expect(notice.attributes('role')).toBe('status');
+  });
+
+  it('«Reconnecting…» above the grid while the live connection recovers, and nothing about it while it is live', async () => {
+    const m = await setup({ locale: 'es' });
+    await m.result(OP, page([], 0, 1));
+    expect(m.find('pos-reconnecting').exists()).toBe(false);
+    m.net.lastStream().push(BYE);
+    await flush();
+    expect(m.find('pos-reconnecting').text()).toBe('Reconectando…');
   });
 });

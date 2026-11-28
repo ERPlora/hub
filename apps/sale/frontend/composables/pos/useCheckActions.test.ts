@@ -15,7 +15,7 @@ describe('useTill: the check', () => {
     await s.till().addProduct(product({ id: 'p1' }), null);
     await s.till().rename('Table 4');
     expect(s.calls().at(-1)).toEqual(['/set_label', { order_id: 'o1', label: 'Table 4' }]);
-    s.net.onApi(() => Promise.reject(new TypeError('Failed to fetch')));
+    s.net.onApi(() => new Response('Bad gateway', { status: 502 }));
     await s.till().rename('Table 5');
     expect(toastError).toHaveBeenCalledWith('The check title could not be saved');
   });
@@ -35,7 +35,7 @@ describe('useTill: the check', () => {
     const s = await setup();
     s.reply(CHECK);
     await s.till().addProduct(product({ id: 'p1' }), null);
-    s.net.onApi(() => Promise.reject(new TypeError('Failed to fetch')));
+    s.net.onApi(() => new Response('Bad gateway', { status: 502 }));
     expect(await s.till().park('Ana')).toEqual({ ok: false, message: 'The check could not be parked. It is still on screen.' });
     expect(s.till().orderId.value).toBe('o1');
   });

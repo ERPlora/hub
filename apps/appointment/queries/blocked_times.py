@@ -1,6 +1,7 @@
 """The blocked periods of the agenda and how a person names one."""
 
 from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import NotFound
@@ -13,6 +14,7 @@ from apps.appointment.schemas.blocked_times import (
     BlockedTimePage,
     BlockedTimeRefIn,
 )
+from apps.appointment.schemas.fields import PageIn
 from base.business import business_zone
 
 from .business import day_bounds
@@ -64,6 +66,21 @@ def list_blocked_times(ctx: OperationContext, params: BlockedTimeListIn) -> dict
     )
     if params.staff_id:
         rows = rows.filter(Q(staff__isnull=True) | Q(staff_id=params.staff_id))
+    return _page(rows.order_by("start", "id"), params.limit, params.offset, blocked_out)
+
+
+@operation(
+    "appointment.blocked_time.list_upcoming",
+    kind="query",
+    permission="appointment.view_schedule",
+    input=PageIn,
+    output=BlockedTimePage,
+    ai=INTERNAL,
+)
+def list_upcoming_blocked_times(ctx: OperationContext, params: PageIn) -> dict:
+    """The blocks that have not ended yet, however far ahead, page by page: what an export of the business carries of
+    the agenda (``apps.appointment.blueprint``). The agenda's own list reads a few weeks at a time."""
+    rows = BlockedTime.objects.select_related("staff").filter(end__gt=timezone.now())
     return _page(rows.order_by("start", "id"), params.limit, params.offset, blocked_out)
 
 

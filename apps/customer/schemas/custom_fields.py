@@ -6,6 +6,7 @@ from uuid import UUID
 from ninja import Field, Schema
 from pydantic import StringConstraints, ValidationInfo, field_validator
 
+from apps.customer.schemas.contact import EMAIL, PHONE
 from apps.customer.schemas.fields import INT4_MAX, OPTIONS_MISSING, FieldRefIn, FieldType, Page, PageIn, _text
 from base.schemas.assistant import IN_OWN_WORDS
 
@@ -98,3 +99,16 @@ class FieldRow(Schema):
 
 
 FieldPage = Page[FieldRow]
+
+
+class FieldValueRow(Schema):
+    """What a card keeps in one of its custom fields, with the card and the field by name."""
+
+    customer: str = Field(description="The card's name.")
+    phone: str | None = PHONE
+    email: str | None = EMAIL
+    field: str = Field(description="The custom field's name.")
+    value: str = Field(description="What the card keeps in it.")
+
+
+FieldValuePage = Page[FieldValueRow]

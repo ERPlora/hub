@@ -744,3 +744,6 @@ msgstr "Devolver sesiones al anular o devolver una venta"
 
 msgid "Change the settings"
 msgstr "Cambiar los ajustes"
+
+msgid "Vouchers"
+msgstr "Bonos"
