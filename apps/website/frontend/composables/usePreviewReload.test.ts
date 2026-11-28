@@ -42,4 +42,16 @@ describe('usePreviewReload', () => {
     await nextTick();
     expect(key.value).toBe(1);
   });
+
+  it('stays when a new photo comes back named by its file: the server writes that name on every read', async () => {
+    const photo = { id: '0192f0b2-0000-7000-8000-000000000001', url: '/p/media/a/website/img/b.png' };
+    const sent = toDraft(SITE);
+    sent.content.gallery.images = [photo];
+    const saved = ref<SaveIn | null>(sent);
+    const key = usePreviewReload(saved);
+    const gallery = { ...SITE.content.gallery, images: [{ ...photo, name: 'terraza.png' }] };
+    saved.value = toDraft({ ...SITE, content: { ...SITE.content, gallery } });
+    await nextTick();
+    expect(key.value).toBe(1);
+  });
 });

@@ -16,7 +16,8 @@ import { useLiveList } from '../composables/useLiveList';
 import { usePhrasing } from '../composables/usePhrasing';
 import { advice } from '../lib/advice';
 import { wording } from '../lib/refusal';
-import { describeLog, runStatusPill, waitsForAssistant } from '../lib/phrasing';
+import { historyLines } from '../lib/history';
+import { runStatusPill, waitsForAssistant } from '../lib/phrasing';
 import type { CatalogOut, RunOut, RunPageOut, RunStatus, Step } from '../operations';
 import LoadingNote from './LoadingNote.vue';
 
@@ -225,10 +226,10 @@ const attentionText = computed(() => phrasing.value.t('flow.history.stopped', { 
         :data-testid="`flow-run-steps-${run.id}`"
       >
         <li
-          v-for="(entry, index) in run.log"
+          v-for="(line, index) in historyLines(run.log, { steps, catalog, p: phrasing })"
           :key="index"
         >
-          {{ describeLog(entry, steps, catalog, phrasing) }}
+          {{ line }}
         </li>
       </ul>
     </div>

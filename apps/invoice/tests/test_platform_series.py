@@ -22,7 +22,7 @@ from apps.invoice.tests.conftest import B, HUB_DB, HUB_DB_COMMITTED, ISSUER, A, 
 from apps.invoice.tests.manual import LINE, RECIPIENT, manual
 from apps.invoice.tests.test_platform import BODY, CREDIT_NOTE, line
 from apps.invoice.tests.test_platform_invoices import code_of, committed_platform_hub, issue, platform_hub
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.verifactu.models import Record
 from base.tenancy.context import use_hub
 from base.tenancy.tests.concurrency import at_once, meanwhile

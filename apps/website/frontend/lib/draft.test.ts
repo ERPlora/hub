@@ -22,6 +22,22 @@ describe('draft', () => {
     expect(draft.content.topbar.name).toBe('Pepe');
   });
 
+  it('leaves out the name each image is read with: the server writes it on every read and keeps none', () => {
+    const photo = { id: '0192f0b2-0000-7000-8000-000000000001', url: '/p/media/a/website/img/b.png' };
+    const named = { ...photo, name: 'terraza.png' };
+    const content = {
+      ...SITE.content,
+      topbar: { ...SITE.content.topbar, logo: named },
+      hero: { ...SITE.content.hero, cover: named },
+      about: { ...SITE.content.about, image: named },
+      gallery: { ...SITE.content.gallery, images: [named] },
+    };
+    const draft = toDraft({ ...SITE, content });
+    expect([draft.content.topbar.logo, draft.content.hero.cover, draft.content.about.image]).toEqual([photo, photo, photo]);
+    expect(draft.content.gallery.images).toEqual([photo]);
+    expect(draft.content.topbar.name).toBe('Pepe');
+  });
+
   it('pads the address to its four lines so each has its field', () => {
     expect(toDraft(SITE).content.location.address_lines).toEqual(['', '', '', '']);
     const one = { ...SITE, content: { ...SITE.content, location: { ...SITE.content.location, address_lines: ['Gran Vía 1'] } } };

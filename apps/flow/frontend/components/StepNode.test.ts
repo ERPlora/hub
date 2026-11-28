@@ -5,6 +5,7 @@ import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import type { CatalogOut, Step } from '../operations';
+import { catalogNames, internalCodesIn } from '../__tests__/internal-codes';
 import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
 import AskStepPanel from './AskStepPanel.vue';
@@ -90,10 +91,17 @@ describe('StepNode', () => {
     expect(s.emitted().at(-1)).toEqual({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Call {{input.name}}' } });
   });
 
-  it('an optional field shows its choices and can be taken out', async () => {
+  it('an optional field with a closed list offers its values in words, never as the action keeps them, and can be taken out (hub#2729)', async () => {
     const s = await setup({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Hi', priority: 'high' } });
     const priority = s.wrapper.findAllComponents(ValueBox)[1];
-    expect(priority.props('helper')).toBe('low, medium, high, urgent');
+    expect(priority.props('options')).toEqual([
+      { value: 'low', label: 'Low' },
+      { value: 'medium', label: 'Medium' },
+      { value: 'high', label: 'High' },
+      { value: 'urgent', label: 'Urgent' },
+    ]);
+    expect(priority.props('helper')).toBe('Priority.');
+    expect(internalCodesIn(s.wrapper.text(), catalogNames(CATALOG))).toEqual([]);
     await click(s.find('flow-step-unparam-s1-priority').element);
     expect(s.emitted().at(-1)).toEqual({ id: 's1', kind: 'command', operation: 'task.task.create', params: { title: 'Hi' } });
   });

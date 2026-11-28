@@ -20,11 +20,10 @@ from apps.inventory.models import Product
 from apps.inventory.schemas.imports import ProductImportIn
 from apps.inventory.schemas.products import ProductFiltersIn, ProductIn, ProductPatchIn
 from apps.inventory.schemas.stock import ReceiveIn
-from apps.inventory.tests.test_queries import read_csv
 from apps.tax.models import TaxCategory
 from base.sensitive import VIEW_COSTS
 
-from .conftest import A, HUB_DB, ctx_for, ctx_with
+from .conftest import A, HUB_DB, ctx_for, ctx_with, read_csv
 
 pytestmark = HUB_DB
 

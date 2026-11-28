@@ -4,6 +4,7 @@ that address right at its catalog) and ``website.catalog.categories`` (what its 
 assistant's card reads to name the images and the categories a save keeps.
 """
 
+from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
 
@@ -25,6 +26,7 @@ from apps.website.schemas import (
     Content,
     ImageIn,
     ImageNameOut,
+    ImageRef,
     NoIn,
     PreviewOut,
     QrIn,
@@ -40,6 +42,30 @@ from base.registry import hub_by_slug
 IMAGE_NOT_FOUND = _("This image was not uploaded to this business's website: upload it again.")
 CATEGORY_NOT_FOUND = _("This category is not in Inventory or Services.")
 
+#: The parts of the content that hold one image (the gallery holds a list of them).
+IMAGE_FIELDS = (("topbar", "logo"), ("hero", "cover"), ("about", "image"))
+#: What the site keeps of its content leaves out each image's name: every read writes it anew from the upload, so what
+#: was kept and published before the names were read compares as it always did.
+NOT_KEPT = {
+    **{section: {field: {"name"}} for section, field in IMAGE_FIELDS},
+    "gallery": {"images": {"__all__": {"name"}}},
+}
+
+
+def image_refs(content: Content) -> Iterator[tuple[str, ImageRef]]:
+    """Each image the content names, with the path of its field (the 422's key)."""
+    for section, field in IMAGE_FIELDS:
+        ref = getattr(getattr(content, section), field)
+        if ref is not None:
+            yield f"content.{section}.{field}", ref
+    for index, ref in enumerate(content.gallery.images):
+        yield f"content.gallery.images.{index}", ref
+
+
+def kept(content: Content) -> dict[str, Any]:
+    """``content`` as the site keeps it."""
+    return content.model_dump(mode="json", exclude=NOT_KEPT)
+
 
 def current_site() -> Site:
     """The business's saved site, or the factory one (unsaved: classic, empty, never published) while nobody saved it."""
@@ -51,8 +77,25 @@ def draft(site: Site) -> dict[str, Any]:
     return {
         "template": site.template,
         "theme": Theme.model_validate(site.theme or {}).model_dump(),
-        "content": Content.model_validate(site.content or {}).model_dump(mode="json"),
+        "content": kept(Content.model_validate(site.content or {})),
     }
+
+
+def image_name(image: Image) -> str:
+    """The name of the file ``image`` was uploaded with; one uploaded before it was kept, by its format and size («PNG
+    1200 × 800»)."""
+    kind = image.content_type.rpartition("/")[2].upper()
+    return image.filename or f"{kind} {image.width} × {image.height}"
+
+
+def with_image_names(content: dict[str, Any]) -> dict[str, Any]:
+    """``content`` with each image named as the person calls it; one that is no upload of the business, by none."""
+    valid = Content.model_validate(content)
+    refs = [ref for _path, ref in image_refs(valid)]
+    images = Image.objects.in_bulk({ref.id for ref in refs})
+    for ref in refs:
+        ref.name = image_name(images[ref.id]) if ref.id in images else ""
+    return valid.model_dump(mode="json")
 
 
 def _has_changes(site: Site, now: dict[str, Any]) -> bool:
@@ -68,6 +111,7 @@ def site_out(ctx: OperationContext, site: Site) -> dict[str, Any]:
     now = draft(site)
     return {
         **now,
+        "content": with_image_names(now["content"]),
         "published_version": site.published_version,
         "published_at": site.published_at,
         "is_live": site.is_live,
@@ -224,8 +268,7 @@ def get_image(ctx: OperationContext, data: ImageIn) -> dict:
     image = Image.objects.filter(id=data.id).first()
     if image is None:
         raise NotFound(str(IMAGE_NOT_FOUND), code="website.image_not_found")
-    kind = image.content_type.rpartition("/")[2].upper()
-    return {"id": image.id, "name": image.filename or f"{kind} {image.width} × {image.height}"}
+    return {"id": image.id, "name": image_name(image)}
 
 
 @operation(

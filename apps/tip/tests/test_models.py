@@ -4,7 +4,7 @@ import pytest
 from django.db import IntegrityError
 from live.operations import atomic
 
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 from apps.tip.models import Settings, Tip
 
 from .conftest import HUB_DB

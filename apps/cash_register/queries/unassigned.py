@@ -11,7 +11,9 @@ from apps.cash_register.models import Movement, Session, Settings
 from apps.cash_register.queries.auto_close import auto_close_due_at
 from apps.cash_register.queries.lines import CASH, Line, _between, sale_lines
 from apps.cash_register.queries.ownership import SESSIONS
-from apps.sale.models import RefundPayment, Sale, SalePayment
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.refunds import RefundPayment
+from apps.sale.models.sales import Sale
 
 Window = tuple[dt.datetime, dt.datetime | None]
 

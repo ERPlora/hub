@@ -360,16 +360,6 @@
     ]
   },
   {
-    "path": "apps/website/services.py",
-    "file_name": "services.py",
-    "functions": [
-      {
-        "name": "_save_summary",
-        "complexity": 17
-      }
-    ]
-  },
-  {
     "path": "apps/whatsapp_inbox/services/deliveries.py",
     "file_name": "deliveries.py",
     "functions": [

@@ -9,7 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from apps.sale.queries.business import actor, missing_tax
 from apps.sale.queries.departments import _department_refused, find_department, find_tax_category
 from apps.sale.queries.line_parts import GRID_FALLBACK, WHOLE, check_grid, provisional_total

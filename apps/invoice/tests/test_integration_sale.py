@@ -16,7 +16,7 @@ from live.models import OutboxEvent
 from apps.invoice.models import Invoice, InvoiceSeries
 from apps.invoice.tests.conftest import A, HUB_DB, ISSUER, ctx_for, deliver, run
 from apps.sale import events as sale_events
-from apps.sale.models import Sale, SaleLine
+from apps.sale.models.sales import Sale, SaleLine
 from apps.verifactu.models import Record
 
 pytestmark = HUB_DB

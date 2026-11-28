@@ -14,7 +14,8 @@ from live.models import OutboxEvent
 from live.operations import registry
 from pydantic import ValidationError
 
-from apps.sale.models import Sale, SaleLine, VoucherSession
+from apps.sale.models.sales import Sale, SaleLine
+from apps.sale.models.voucher_sessions import VoucherSession
 from apps.sale.tests.conftest import by_staff, charged_open, ctx_for, professional, redeem, run
 from apps.service.models.grants import Grant, Redemption
 from base.tenancy.context import use_hub

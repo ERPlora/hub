@@ -12,7 +12,7 @@ from live.operations import AI, atomic, operation
 from live.outbox import record_event
 
 from apps.sale import events
-from apps.sale.models import Order, OrderLine
+from apps.sale.models.orders import Order, OrderLine
 from apps.sale.queries.business import actor
 from apps.sale.queries.order_voids import VOID_PERMISSION, refuse_unpermitted_void
 from apps.sale.queries.orders import ORDER_CHANGED, ORDER_NOT_FOUND, dish_allergens, find_order, order_detail

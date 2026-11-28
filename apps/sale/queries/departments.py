@@ -9,7 +9,8 @@ from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import AI, operation
 
-from apps.sale.models import Department, OrderLine, QuickNote
+from apps.sale.models.departments import Department, QuickNote
+from apps.sale.models.orders import OrderLine
 from apps.sale.queries.rows import held
 from apps.sale.schemas.lines import OpenLineFields
 from apps.sale.schemas.settings import DepartmentListIn, DepartmentPage, QuickNoteListIn, QuickNotePage

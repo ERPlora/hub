@@ -12,7 +12,7 @@ from live.operations import NAME_RE, registry
 
 from apps.invoice import events
 from apps.invoice.tests.conftest import A, HUB_DB, deliver, run
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 
 PAST_FACT = re.compile(r"^invoice\.[a-z_]+\.([a-z_]+ed|paid|sent)$")
 

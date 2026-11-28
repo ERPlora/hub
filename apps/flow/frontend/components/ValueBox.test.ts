@@ -1,9 +1,10 @@
 // One value composed of text the owner types and data they pick (WORKBOOK FLOW-F11): a picked datum is
 // a pill with its words (never a path on screen), each piece of text its own box; «Insert data» asks
 // the editor's one picker and adds what it answers.
+import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
-import { click, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__/mount-flow';
+import { click, ionValue, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__/mount-flow';
 import ValueBox from './ValueBox.vue';
 
 async function setup(modelValue: unknown, pick: () => Promise<string | null> = async () => 'input.customer_name') {
@@ -58,5 +59,59 @@ describe('ValueBox', () => {
   it('shows the server’s refusal of this value', async () => {
     const m = await mountFlow(ValueBox, { props: { modelValue: '', label: 'Title', testid: 'vb', steps: [], catalog: null, pick: async () => null, errorText: 'Required.' } });
     expect(m.find('vb-error').text()).toBe('Required.');
+  });
+
+  describe('a closed list (a task’s priority, hub#2729)', () => {
+    const OPTIONS = [
+      { value: 'low', label: 'Low' },
+      { value: 'high', label: 'High' },
+    ];
+    async function choice(modelValue: unknown, pick: () => Promise<string | null> = async () => 'input.priority') {
+      const m = await mountFlow(ValueBox, { props: { modelValue, label: 'Priority', testid: 'vb', steps: TASK_STEPS, catalog: TASK_CATALOG, pick, options: OPTIONS } });
+      const emitted = () => (m.wrapper.emitted('update:modelValue') ?? []).map(([value]) => value);
+      return { ...m, emitted };
+    }
+
+    it('is chosen by the words of its values, never typed as the action keeps them', async () => {
+      const s = await choice('high');
+      const select = s.find('vb-choice');
+      expect((select.element as unknown as { value: string }).value).toBe('high');
+      expect(select.findAll('ion-select-option').map((option) => [(option.element as unknown as { value: string }).value, option.text()])).toEqual([
+        ['low', 'Low'],
+        ['high', 'High'],
+      ]);
+      expect(s.wrapper.find('[data-testid="vb-text-0"]').exists()).toBe(false);
+      await ionValue(select.element, 'low');
+      expect(s.emitted()).toEqual(['low']);
+    });
+
+    it('takes a datum instead with «Insert data», shown as its pill until it is taken out', async () => {
+      const empty = await choice('');
+      await click(empty.find('vb-insert').element);
+      await settle();
+      expect(empty.emitted()).toEqual(['input.priority']);
+      const picked = await choice('input.priority');
+      expect(picked.wrapper.find('[data-testid="vb-choice"]').exists()).toBe(false);
+      expect(picked.find('vb-pill-1').text()).toBe('Priority');
+    });
+
+    it('a long one (the countries) is searched by its names, in the order of the language', async () => {
+      const countries = ['ES', 'DE', 'FR', 'IT', 'PT', 'GB', 'IE', 'NL', 'BE', 'AT', 'CH', 'SE', 'AD'].map((value) => ({ value, label: `Country ${value}` }));
+      countries[0] = { value: 'ES', label: 'Spain' };
+      countries[12] = { value: 'AD', label: 'Andorra' };
+      const m = await mountFlow(ValueBox, { props: { modelValue: 'ES', label: 'Country', testid: 'vb', steps: [], catalog: null, pick: async () => null, options: countries } });
+      const combo = m.wrapper.findComponent(Combo);
+      expect(combo.props('modelValue')).toEqual({ id: 'ES', label: 'Spain' });
+      expect((combo.props('options') as { label: string }[]).map((option) => option.label).slice(0, 2)).toEqual(['Andorra', 'Country AT']);
+      expect(m.wrapper.find('[data-testid="vb-choice"]').exists()).toBe(false);
+      combo.vm.$emit('update:modelValue', { id: 'AD', label: 'Andorra' });
+      expect((m.wrapper.emitted('update:modelValue') ?? []).map(([value]) => value)).toEqual(['AD']);
+    });
+
+    it('a value that is not one of the list is shown as it is, to be corrected', async () => {
+      const s = await choice('High');
+      expect(s.wrapper.find('[data-testid="vb-choice"]').exists()).toBe(false);
+      expect((s.find('vb-text-0').element as HTMLInputElement).value).toBe('High');
+    });
   });
 });

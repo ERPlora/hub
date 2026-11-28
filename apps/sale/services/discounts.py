@@ -8,7 +8,7 @@ from live.errors import Conflict
 from live.operations import AI, operation
 
 from apps.sale import pricing
-from apps.sale.models import Settings
+from apps.sale.models.settings import Settings
 from apps.sale.queries.business import authoriser
 from apps.sale.queries.line_parts import provisional_total
 from apps.sale.queries.settings import current_settings

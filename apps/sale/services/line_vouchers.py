@@ -8,7 +8,7 @@ from live.errors import Conflict
 from live.operations import AI, operation
 
 from apps.sale import pricing
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from apps.sale.queries.line_parts import provisional_total
 from apps.sale.queries.other_apps import call_services
 from apps.sale.schemas.orders import OrderApplyVoucherIn, OrderLineRefIn, OrderOut

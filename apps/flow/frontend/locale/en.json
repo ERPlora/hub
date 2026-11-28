@@ -388,6 +388,7 @@
       },
       "wait": "Wait {amount} {unit}",
       "insert": "Insert data",
+      "chooseValue": "Choose one…",
       "removeData": "Remove this data",
       "describe": {
         "noCondition": "nothing yet",
@@ -418,6 +419,8 @@
       "step": "What step {n} left",
       "none": "There is no data to insert here yet: choose what happens first, or add an action before.",
       "example": "e.g. {value}",
+      "yes": "Yes",
+      "no": "No",
       "noExample": "no example yet",
       "close": "Close",
       "secret": "Secret “{name}”",
@@ -2848,7 +2851,612 @@
       "other": "Other ways",
       "shift_id": "Working day",
       "week": "This week",
-      "week_from": "Week from"
+      "week_from": "Week from",
+      "assigned_to": "Assigned to",
+      "starts_at": "Date and time"
+    },
+    "choices": {
+      "action": {
+        "cancelled": "Cancelled",
+        "created": "Created",
+        "deleted": "Deleted",
+        "item_ready": "Dish ready",
+        "item_recalled": "Dish recalled",
+        "item_voided": "Dish voided",
+        "ready": "Ready",
+        "recalled": "Recalled",
+        "received": "Received",
+        "reprinted": "Reprinted",
+        "rushed": "Rushed",
+        "served": "Served",
+        "started": "Fired",
+        "unrushed": "Rush removed"
+      },
+      "applies_to": {
+        "all": "Everything",
+        "category": "A category",
+        "product": "A product",
+        "products": "All products",
+        "service": "A service",
+        "services": "All services"
+      },
+      "block_type": {
+        "break": "Break",
+        "holiday": "Holiday",
+        "maintenance": "Maintenance",
+        "other": "Other",
+        "vacation": "Vacation"
+      },
+      "by": {
+        "person": "By person",
+        "shift": "By shift"
+      },
+      "category": {
+        "AUTHENTICATION": "Authentication",
+        "MARKETING": "Marketing",
+        "UTILITY": "Utility"
+      },
+      "channel": {
+        "delivery": "Delivery",
+        "dine_in": "Dine in",
+        "email": "Email",
+        "phone": "Phone",
+        "postal": "Post",
+        "sms": "SMS",
+        "takeaway": "Takeaway",
+        "whatsapp": "WhatsApp"
+      },
+      "color": {
+        "danger": "Red",
+        "medium": "Grey",
+        "primary": "Blue",
+        "secondary": "Cyan",
+        "success": "Green",
+        "tertiary": "Purple",
+        "warning": "Amber"
+      },
+      "content_type": {
+        "image_jpeg": "JPEG image",
+        "image_png": "PNG image",
+        "image_webp": "WebP image"
+      },
+      "correction_status": {
+        "corrected": "Corrected",
+        "pending": "Pending correction"
+      },
+      "customer_id_type": {
+        "02": "EU VAT number",
+        "03": "Passport",
+        "04": "Tax ID of their country",
+        "05": "Residence certificate",
+        "06": "Other document",
+        "07": "Not registered"
+      },
+      "default_document_type": {
+        "invoice": "Invoice",
+        "ticket": "Ticket"
+      },
+      "default_order_type": {
+        "delivery": "Delivery",
+        "dine_in": "Dine in",
+        "takeaway": "Takeaway"
+      },
+      "destination": {
+        "both": "Screen and paper",
+        "display": "Screen only",
+        "printer": "Paper only"
+      },
+      "dir": {
+        "asc": "Ascending",
+        "desc": "Descending"
+      },
+      "discount_type": {
+        "fixed": "Fixed amount",
+        "percentage": "Percentage"
+      },
+      "document_type": {
+        "barcode_label": "Barcode label",
+        "cash_session_report": "Cash session report",
+        "delivery_note": "Delivery note",
+        "generic": "Document",
+        "invoice": "Invoice",
+        "kitchen_order": "Kitchen order",
+        "prebill": "Pre-bill",
+        "receipt": "Receipt",
+        "ticket": "Ticket"
+      },
+      "environment": {
+        "production": "Production",
+        "testing": "Testing (AEAT test)"
+      },
+      "field_type": {
+        "boolean": "Yes/No",
+        "date": "Date",
+        "number": "Number",
+        "select": "Select",
+        "text": "Text",
+        "textarea": "Long text"
+      },
+      "format": {
+        "a4": "A4",
+        "png": "PNG image",
+        "receipt": "Receipt",
+        "svg": "SVG image"
+      },
+      "frequency": {
+        "biweekly": "Every two weeks",
+        "daily": "Every day",
+        "monthly": "Every month",
+        "weekly": "Every week"
+      },
+      "header_format": {
+        "DOCUMENT": "Document",
+        "IMAGE": "Photo",
+        "TEXT": "Text",
+        "VIDEO": "Video"
+      },
+      "invoice_type": {
+        "F1": "Invoice (F1)",
+        "F2": "Ticket (F2)",
+        "F3": "Invoice replacing a ticket (F3)",
+        "R1": "Rectifying (R1)",
+        "R2": "Rectifying (R2)",
+        "R3": "Rectifying (R3)",
+        "R4": "Rectifying (R4)",
+        "R5": "Rectifying (R5)"
+      },
+      "kind": {
+        "accepted": "Submission accepted",
+        "accepted_with_errors": "Accepted with errors",
+        "aeat_queried": "AEAT query",
+        "bluetooth": "Bluetooth",
+        "chain_broken": "Chain broken",
+        "chain_recovered": "Chain recovered",
+        "chain_valid": "Chain verified",
+        "config_changed": "Configuration changed",
+        "connection_test": "Connection test",
+        "deferred": "Submission postponed",
+        "failed": "Submission failed",
+        "network": "Network",
+        "product": "Product",
+        "queue_processed": "Queue processed",
+        "queue_retried": "Record rescheduled",
+        "record_created": "Record created",
+        "service": "Service",
+        "system": "System printer (A4)",
+        "usb": "USB"
+      },
+      "leave_type": {
+        "other": "Other",
+        "personal": "Personal",
+        "sick": "Sick leave",
+        "training": "Training",
+        "vacation": "Vacation"
+      },
+      "lifecycle_stage": {
+        "active": "Active",
+        "at_risk": "At risk",
+        "churned": "Churned",
+        "dormant": "Dormant",
+        "first_purchase": "First purchase",
+        "lead": "Lead",
+        "prospect": "Prospect",
+        "vip": "VIP"
+      },
+      "method_type": {
+        "card": "Card",
+        "cash": "Cash",
+        "check": "Cheque",
+        "other": "Other",
+        "sepa": "SEPA direct debit",
+        "transfer": "Bank transfer"
+      },
+      "movement_type": {
+        "count": "Count",
+        "initial": "Initial stock",
+        "reception": "Reception",
+        "refund": "Refund",
+        "sale": "Sale",
+        "void": "Void",
+        "write_off": "Write-off"
+      },
+      "operation_class": {
+        "exempt": "Exempt",
+        "not_subject": "Not subject",
+        "not_subject_location": "Not subject (place of supply)",
+        "subject": "Subject",
+        "subject_reverse": "Reverse charge"
+      },
+      "order_type": {
+        "delivery": "Delivery",
+        "dine_in": "Dine in",
+        "takeaway": "Takeaway"
+      },
+      "period": {
+        "this_month": "This month",
+        "this_week": "This week",
+        "today": "Today",
+        "yesterday": "Yesterday"
+      },
+      "preferred_channel": {
+        "email": "Email",
+        "none": "None",
+        "phone": "Phone",
+        "sms": "SMS",
+        "whatsapp": "WhatsApp"
+      },
+      "pricing_type": {
+        "fixed": "Fixed price",
+        "free": "Free",
+        "from": "From a price",
+        "hourly": "Hourly",
+        "variable": "Variable"
+      },
+      "pricing_unit": {
+        "g": "Gram",
+        "h": "Hour",
+        "kg": "Kilogram",
+        "l": "Litre",
+        "min": "Minute",
+        "ml": "Millilitre",
+        "t": "Tonne",
+        "ud": "Unit"
+      },
+      "printer_usage": {
+        "bar": "Bar",
+        "kitchen": "Kitchen"
+      },
+      "priority": {
+        "high": "High",
+        "low": "Low",
+        "medium": "Medium",
+        "normal": "Normal",
+        "rush": "Rush",
+        "urgent": "Urgent",
+        "vip": "VIP"
+      },
+      "product_type": {
+        "physical": "Physical product",
+        "service": "Service"
+      },
+      "record_type": {
+        "alta": "Registration",
+        "anulacion": "Cancellation"
+      },
+      "rectification_type": {
+        "R1": "R1 · Error founded in law, refunds (art. 80 One, Two and Six)",
+        "R2": "R2 · Insolvency (art. 80 Three)",
+        "R3": "R3 · Bad debts (art. 80 Four)",
+        "R4": "R4 · Other causes"
+      },
+      "rule_type": {
+        "buy_x_get_y": "Buy X, get Y",
+        "fixed": "Amount per unit",
+        "percent": "Percentage",
+        "tiered": "Tiered"
+      },
+      "sensitivity_test_result": {
+        "negative": "Negative",
+        "positive": "Positive"
+      },
+      "severity": {
+        "critical": "Critical",
+        "debug": "Debug",
+        "error": "Error",
+        "info": "Information",
+        "warning": "Warning"
+      },
+      "shape": {
+        "rectangle": "Rectangular",
+        "round": "Round",
+        "square": "Square"
+      },
+      "signer_document_type": {
+        "dni": "DNI",
+        "nie": "NIE"
+      },
+      "sound_tone": {
+        "bell": "Bell",
+        "buzzer": "Buzzer",
+        "chime": "Chime"
+      },
+      "source": {
+        "counter": "At the counter",
+        "email": "By email",
+        "import": "Import",
+        "in_person": "In person",
+        "inventory": "Products",
+        "learned": "Learned",
+        "manual": "By hand",
+        "online": "Online",
+        "other": "Other",
+        "phone": "Phone",
+        "receipt": "On the receipt",
+        "referral": "Referral",
+        "reservation": "Reservation",
+        "service": "Services",
+        "shipped": "Built in",
+        "social": "Social media",
+        "walk_in": "Walk-in",
+        "web_form": "Web form",
+        "website": "Website",
+        "whatsapp": "WhatsApp"
+      },
+      "source_type": {
+        "manual": "Manual entry",
+        "rectification": "Rectification",
+        "refund": "Sale refund",
+        "sale": "POS sale",
+        "substitution": "Replaces a simplified invoice",
+        "void": "Sale void"
+      },
+      "state": {
+        "AceptadoConErrores": "Accepted with errors",
+        "Anulado": "Cancelled",
+        "Correcto": "Registered"
+      },
+      "supply_kind": {
+        "goods": "Take away",
+        "service": "Eat in"
+      },
+      "target": {
+        "catalog": "Catalog",
+        "page": "Web page"
+      },
+      "tax_basis": {
+        "business": "Business default",
+        "excluded": "Tax excluded",
+        "included": "Tax included"
+      },
+      "tax_type": {
+        "excise": "Excise",
+        "igic": "IGIC (Canary Islands)",
+        "import_duty": "Import duty",
+        "ipsi": "IPSI (Ceuta/Melilla)",
+        "sales_tax": "Sales tax",
+        "surcharge": "Surcharge",
+        "vat": "VAT",
+        "withholding": "Withholding"
+      },
+      "template": {
+        "bold": "Bold",
+        "classic": "Classic",
+        "minimal": "Minimal",
+        "modern": "Modern"
+      },
+      "trigger_kind": {
+        "at": "Once, at a date and time",
+        "event": "Something happens",
+        "manual": "Only by hand",
+        "schedule": "On a schedule"
+      },
+      "type": {
+        "card": "Card",
+        "cash": "Cash",
+        "closing": "Closing",
+        "in": "Cash in",
+        "opening": "Opening",
+        "other": "Other",
+        "out": "Cash out",
+        "refund": "Refund",
+        "sale": "Sale",
+        "transfer": "Bank transfer",
+        "void": "Void"
+      },
+      "unit": {
+        "g": "Gram",
+        "h": "Hour",
+        "kg": "Kilogram",
+        "l": "Litre",
+        "min": "Minute",
+        "ml": "Millilitre",
+        "t": "Tonne",
+        "ud": "Unit"
+      },
+      "usage": {
+        "bar": "Bar",
+        "kitchen": "Kitchen",
+        "label": "Label",
+        "receipt": "Receipt"
+      }
+    },
+    "statuses": {
+      "appointment__appointment": {
+        "cancelled": "Cancelled",
+        "completed": "Completed",
+        "confirmed": "Confirmed",
+        "in_progress": "In progress",
+        "no_show": "No-show",
+        "pending": "Pending"
+      },
+      "attendance__record": {
+        "closed": "Closed",
+        "needs_review": "Needs review",
+        "open": "Open"
+      },
+      "cart_checkout__cart": {
+        "abandoned": "Abandoned",
+        "active": "Active",
+        "converted": "Converted",
+        "expired": "Expired"
+      },
+      "cart_checkout__order": {
+        "completed": "Completed",
+        "failed": "Failed",
+        "initiated": "Initiated",
+        "paid": "Paid"
+      },
+      "cash_register__session": {
+        "closed": "Closed",
+        "open": "Open"
+      },
+      "customer__purchase": {
+        "confirmed": "Paid",
+        "refunded": "Refund",
+        "voided": "Voided"
+      },
+      "demo__item": {
+        "done": "Done",
+        "open": "Open"
+      },
+      "flow__run": {
+        "asking": "Waiting for an answer",
+        "calling": "Calling another system",
+        "cancelled": "Cancelled",
+        "failed": "Stopped by an error",
+        "running": "Running",
+        "stopped": "Finished: a condition did not hold",
+        "succeeded": "Finished well",
+        "waiting": "Waiting"
+      },
+      "inventory__product": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "needs_tax_setup": "Missing tax category",
+        "sold_out": "Sold out"
+      },
+      "invoice__invoice": {
+        "cancelled": "Cancelled",
+        "issued": "Issued",
+        "overdue": "Overdue",
+        "paid": "Paid"
+      },
+      "kitchen__ticket": {
+        "cancelled": "Cancelled",
+        "pending": "To prepare",
+        "preparing": "Preparing",
+        "ready": "Ready",
+        "served": "Served"
+      },
+      "online_booking__booking": {
+        "cancelled": "Cancelled",
+        "completed": "Completed",
+        "confirmed": "Confirmed",
+        "in_progress": "In progress",
+        "no_show": "No-show",
+        "pending": "Pending"
+      },
+      "payment__payment": {
+        "approved": "Approved",
+        "cancelled": "Cancelled",
+        "completed": "Completed",
+        "draft": "Draft",
+        "sent": "Sent"
+      },
+      "pricing__price_list": {
+        "active": "Active",
+        "all": "Everything",
+        "inactive": "Inactive"
+      },
+      "pricing__rule": {
+        "active": "Active",
+        "all": "Everything",
+        "inactive": "Inactive"
+      },
+      "printing__job": {
+        "cancelled": "Cancelled",
+        "done": "Printed",
+        "failed": "Failed",
+        "pending": "Pending",
+        "sent": "Sent"
+      },
+      "reservation__reservation": {
+        "cancelled": "Cancelled",
+        "completed": "Completed",
+        "confirmed": "Confirmed",
+        "no_show": "No-show",
+        "pending": "Pending",
+        "seated": "Seated"
+      },
+      "sale__order": {
+        "completed": "Completed",
+        "open": "Open",
+        "voided": "Voided"
+      },
+      "sale__sale": {
+        "completed": "Completed",
+        "refunded": "Refunded",
+        "voided": "Voided"
+      },
+      "service__grant": {
+        "active": "Active",
+        "voided": "Voided"
+      },
+      "service__package": {
+        "active": "Active",
+        "archived": "Archived",
+        "deleted": "Deleted"
+      },
+      "service__service": {
+        "active": "Active",
+        "archived": "Archived",
+        "unconfigured": "Not configured"
+      },
+      "staff__member": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "on_leave": "On leave"
+      },
+      "staff__time_off": {
+        "approved": "Approved",
+        "cancelled": "Cancelled",
+        "pending": "Pending",
+        "rejected": "Rejected"
+      },
+      "table__session": {
+        "closed": "Closed",
+        "merged": "Merged",
+        "open": "Open",
+        "parked": "Parked",
+        "transferred": "Transferred"
+      },
+      "table__table": {
+        "available": "Available",
+        "blocked": "Blocked",
+        "occupied": "Occupied",
+        "reserved": "Reserved"
+      },
+      "task__task": {
+        "blocked": "Blocked",
+        "cancelled": "Cancelled",
+        "done": "Done",
+        "in_progress": "In Progress",
+        "todo": "To Do"
+      },
+      "tax__rule": {
+        "active": "Active",
+        "all": "All",
+        "inactive": "Deactivated"
+      },
+      "tip__tip": {
+        "active": "Active",
+        "voided": "Voided"
+      },
+      "verifactu__record": {
+        "accepted": "Accepted",
+        "accepted_with_errors": "Accepted with errors",
+        "pending": "Pending",
+        "rejected": "Rejected",
+        "sent": "Sent, no answer"
+      },
+      "whatsapp_inbox__conversation": {
+        "closed": "Closed",
+        "open": "Open",
+        "pending": "Pending"
+      },
+      "whatsapp_inbox__template": {
+        "APPROVED": "Approved",
+        "DELETED": "Deleted in WhatsApp Manager",
+        "DISABLED": "Disabled by Meta",
+        "DRAFT": "Not sent to Meta",
+        "PAUSED": "Paused by Meta",
+        "PENDING": "In review",
+        "REJECTED": "Rejected"
+      }
+    },
+    "choiceOrder": {
+      "asc": "{field}, ascending",
+      "desc": "{field}, descending"
     },
     "catalogError": "What automations can use here could not be read.",
     "errors": {

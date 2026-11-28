@@ -12,7 +12,7 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 from apps.sale.schemas.fields import EmptyIn
 from apps.staff.models import Member
 from apps.tip.models import Settings, Tip

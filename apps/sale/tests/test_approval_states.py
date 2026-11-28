@@ -5,7 +5,8 @@ nobody's PIN in between. Over HTTP, as the till asks."""
 import pytest
 from django.core.cache import cache
 
-from apps.sale.models import Order, Sale
+from apps.sale.models.orders import Order
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB
 from apps.sale.tests.test_approvals import (
     approve,

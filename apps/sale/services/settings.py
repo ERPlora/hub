@@ -10,7 +10,9 @@ from live.operations import AI, atomic, operation
 from live.outbox import record_event
 
 from apps.sale import events
-from apps.sale.models import Department, PaymentMethod, QuickNote, Settings
+from apps.sale.models.departments import Department, QuickNote
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.settings import Settings
 from apps.sale.queries.business import actor
 from apps.sale.queries.departments import (
     department_rates,

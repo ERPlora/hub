@@ -9,7 +9,8 @@ from live.context import system_context
 from live.models import OutboxEvent
 
 from apps.sale import paper
-from apps.sale.models import OrderLine, SaleLine
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.sales import SaleLine
 from apps.sale.schemas.checkout import PreviewLineOut
 from apps.sale.schemas.orders import OrderAddComboLineIn, OrderAddLineIn, OrderAddOpenLineIn, OrderAddServiceLineIn
 from apps.sale.tests.conftest import HUB_DB, A, B, ctx_for, run

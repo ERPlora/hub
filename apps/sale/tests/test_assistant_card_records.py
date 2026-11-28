@@ -19,7 +19,9 @@ from live.operations import get
 from pydantic import ValidationError
 
 from apps.customer.tax_ids import ID_TYPES
-from apps.sale.models import ForeignIdType, OrderLine, QuickNote
+from apps.sale.models.departments import QuickNote
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.sales import ForeignIdType
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 from apps.tax.models import TaxCategory
 from base import assistant

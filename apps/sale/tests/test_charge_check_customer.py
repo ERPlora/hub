@@ -9,7 +9,7 @@ from live.models import OutboxEvent
 
 from apps.customer import events as customer_events
 from apps.customer.models import Customer
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, A, charged_by_the_assistant, run
 
 pytestmark = HUB_DB

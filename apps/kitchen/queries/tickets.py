@@ -32,7 +32,7 @@ from apps.kitchen.schemas.tickets import (
     TicketPage,
     TicketsOut,
 )
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from base.ordering import list_order
 from base.text_search import contains_text
 

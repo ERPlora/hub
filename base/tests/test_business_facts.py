@@ -20,7 +20,7 @@ from live.operations import get
 from apps.cash_register.models import Settings as DrawerSettings
 from apps.demo.models import Item
 from apps.reservation.models import Settings as BookSettings
-from apps.sale.models import Settings as TillSettings
+from apps.sale.models.settings import Settings as TillSettings
 from base import assistant
 from base.models import Membership
 from base.models.activation import AppActivation

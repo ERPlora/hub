@@ -10,7 +10,7 @@ import dataclasses
 
 from live.context import system_context
 
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 
 from apps.cash_register.tests.conftest import (
     HUB_DB,

@@ -8,7 +8,7 @@ import json
 import pytest
 from live.operations import get
 
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.table.models import TableSession
 from base import assistant
 

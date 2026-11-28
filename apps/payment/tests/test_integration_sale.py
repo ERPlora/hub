@@ -14,8 +14,8 @@ from live.errors import InvalidPayload
 from live.models import OutboxEvent
 from live.operations import get
 
-from apps.sale.models import PaymentMethod as Tender
-from apps.sale.models import SalePayment
+from apps.sale.models.payment_methods import PaymentMethod as Tender
+from apps.sale.models.payments import SalePayment
 
 from base.tenancy.tests.business import plant_factory_data
 

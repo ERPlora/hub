@@ -18,7 +18,7 @@ from live.errors import Conflict, PermissionDenied
 from live.operations import registry
 
 from apps.appointment.tests.conftest import TESTER
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
 pytestmark = HUB_DB

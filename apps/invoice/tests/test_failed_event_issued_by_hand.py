@@ -14,7 +14,8 @@ from live.models import OutboxEvent
 
 from apps.invoice.models import Invoice
 from apps.invoice.tests.conftest import B, HUB_DB, ISSUER, run
-from apps.sale.models import Refund, Sale
+from apps.sale.models.refunds import Refund
+from apps.sale.models.sales import Sale
 from apps.verifactu.models import Record
 from base import events, relay
 from base.models.relay import EventDelivery

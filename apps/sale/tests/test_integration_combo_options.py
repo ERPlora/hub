@@ -12,7 +12,8 @@ from live.context import system_context
 from live.errors import Conflict
 from live.models import OutboxEvent
 
-from apps.sale.models import Order, SaleLine
+from apps.sale.models.orders import Order
+from apps.sale.models.sales import SaleLine
 from apps.sale.tests.conftest import HUB_DB, A, run
 
 pytestmark = HUB_DB

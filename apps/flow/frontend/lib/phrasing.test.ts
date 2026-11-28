@@ -1,6 +1,6 @@
 // Words for what an automation does (WORKBOOK «Cómo son las páginas»): the events and actions of the
-// active apps, its trigger, its steps, a condition, a wait and each line of a run's history, never a
-// technical name where a phrase exists. Hand-written phrases for the known ones, composed for the rest.
+// active apps, its trigger, its steps, a condition and a wait, never a technical name where a phrase
+// exists (a run's history is `history.test.ts`). Hand-written phrases for the known ones, composed for the rest.
 import { describe, expect, it } from 'vitest';
 
 import { phrasingIn } from '../__tests__/phrasing';
@@ -12,7 +12,6 @@ import {
   actionLabel,
   describeClause,
   describeDelay,
-  describeLog,
   describeStep,
   describeTrigger,
   formatDate,
@@ -220,37 +219,6 @@ describe('a moment, on the clock of the business (hub#687)', () => {
   });
 });
 
-describe('a line of the history', () => {
-  const steps: Step[] = [
-    { id: 's1', kind: 'query', operation: 'customer.customer.detail', params: {}, result: 'first' },
-    { id: 's2', kind: 'condition', when: { 'input.total': { gte: 10000 } } },
-    { id: 's3', kind: 'command', operation: 'task.task.create', params: {} },
-    { id: 's4', kind: 'delay', seconds: 3600 },
-  ];
-  const entry = (more: Partial<LogEntry>): LogEntry => ({ step: 's3', kind: 'command', outcome: 'done', at: '2026-10-15T10:00:00+02:00', ...more });
-
-  it('in words, step by step', () => {
-    const p = phrasing();
-    expect(describeLog(entry({ operation: 'task.task.create' }), steps, CATALOG, p)).toBe('Did: Create a task');
-    expect(describeLog(entry({ step: 's1', kind: 'query', outcome: 'found', count: 3 }), steps, CATALOG, p)).toBe('Found 3');
-    expect(describeLog(entry({ step: 's1', kind: 'query', outcome: 'not_found' }), steps, CATALOG, p)).toBe('Found nothing, and carried on');
-    expect(describeLog(entry({ step: 's2', kind: 'condition', outcome: 'passed' }), steps, CATALOG, p)).toBe('The condition held');
-    expect(
-      describeLog(entry({ step: 's2', kind: 'condition', outcome: 'stopped', failed: [{ path: 'input.total', op: 'gte', value: 10000 }] }), steps, CATALOG, p),
-    ).toBe('It stopped here because this was not met: Total greater than or equal to 10000. That is the automation working.');
-    expect(describeLog(entry({ step: 's4', kind: 'delay', outcome: 'waited', seconds: 3600 }), steps, CATALOG, p)).toBe('Waited 1 hour');
-    expect(
-      describeLog(entry({ operation: 'task.task.create', outcome: 'failed', error: { code: 'invalid_field', message: 'No such project.' } }), steps, CATALOG, p),
-    ).toBe('Create a task: No such project.');
-    expect(
-      describeLog(entry({ operation: 'task.task.create', outcome: 'skipped', failed: [{ path: 'input.total', op: 'gte', value: 10000 }] }), steps, CATALOG, p),
-    ).toBe('Skipped: its “Only if…” did not hold (Total greater than or equal to 10000)');
-    expect(
-      describeLog(entry({ operation: 'task.task.create', outcome: 'failed', continued: true, error: { code: 'flow.not_allowed', message: 'Not allowed.' } }), steps, CATALOG, p),
-    ).toBe('Create a task: Not allowed. It carried on with the next steps.');
-  });
-});
-
 // FLOW-F27: what a call is called on the screen.
 describe('a call in words', () => {
   const call: Step = { id: 's1', kind: 'http', method: 'GET', url: 'https://api.example.com/v1/x', headers: {}, body: '', timeout: 10 };
@@ -270,12 +238,6 @@ describe('a call in words', () => {
     expect(pathLabel('steps.s1.status', [call], CATALOG, p)).toBe('1. Call api.example.com › Status');
   });
 
-  it('says in the history what the call did', () => {
-    const p = phrasing();
-    const at = '2026-10-15T10:00:00+02:00';
-    expect(describeLog({ step: 's1', kind: 'http', outcome: 'calling', host: 'api.example.com', at }, [call], CATALOG, p)).toBe('Calling api.example.com…');
-    expect(describeLog({ step: 's1', kind: 'http', outcome: 'called', host: 'api.example.com', status: 201, at }, [call], CATALOG, p)).toBe('Called api.example.com: it answered 201');
-  });
 });
 
 // FLOW-F28 to F30: what a question is called, and what its run says.
@@ -291,18 +253,6 @@ describe('a question in words', () => {
     expect(pathLabel('steps.s1.approved', [question], CATALOG, p)).toBe('1. Ask: Refund “Amount”? › Approved');
   });
 
-  it('says in the history who was asked, who answered and what', () => {
-    const p = phrasing();
-    const at = '2026-10-15T10:00:00+02:00';
-    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'asking', role: 'manager', until: '2026-10-16T10:00:00+02:00', at }, [question], CATALOG, p)).toBe(
-      'Asked the managers; waiting for an answer until Oct 16, 2026, 10:00 AM',
-    );
-    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'asking', role: '', until: at, at }, [question], CATALOG, p)).toContain('Asked whoever runs the business');
-    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'answered', approved: true, by: 'Marta', note: 'ok', at }, [question], CATALOG, p)).toBe('Marta answered yes: “ok”');
-    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'answered', approved: true, by: 'Marta', note: 'ok', at }, [question], CATALOG, phrasing('es'))).toMatch(/: «ok»$/);
-    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'answered', approved: false, by: 'Marta', note: '', at }, [question], CATALOG, p)).toBe('Marta answered no');
-    expect(describeLog({ step: 's1', kind: 'ask', outcome: 'expired', at }, [question], CATALOG, p)).toBe('Nobody answered in time');
-  });
 });
 
 
@@ -323,24 +273,5 @@ describe('«Ask the assistant» in words (FLOW-F37, F38)', () => {
     expect(runStatusPill('calling', en, [entry({ kind: 'http', outcome: 'calling' })]).label).toBe('Calling another system');
   });
 
-  it('tells in the history what the assistant did', () => {
-    expect(describeLog(entry({}), [step], null, en)).toBe('Asked the assistant; it answers in a moment.');
-    expect(describeLog(entry({ outcome: 'assistant_used', operation: 'task.task.create', ok: true }), [step], null, en)).toBe('The assistant used “Create a task”.');
-    expect(describeLog(entry({ outcome: 'assistant_used', operation: 'task.task.create', ok: false }), [step], null, en)).toBe('The assistant tried “Create a task”, which did not take it.');
-    expect(describeLog(entry({ outcome: 'assistant_answered', text: 'Done' }), [step], null, en)).toBe('The assistant answered: “Done”');
-    expect(describeLog(entry({ outcome: 'assistant_proposed', operation: 'task.task.create', until: '2026-10-31T10:00:00Z' }), [step], null, en)).toMatch(
-      /^The assistant wants to “Create a task”: it waits for a yes until /,
-    );
-  });
 
-  it('says a tool was not used because a datum the step fixes was empty, naming the datum', () => {
-    // Nothing half done, and visible.
-    const empty = entry({ outcome: 'assistant_pinned_empty', operation: 'reservation.reservation.cancel', fields: ['on_behalf_of'] });
-    expect(describeLog(empty, [step], null, en)).toBe(
-      'The assistant tried “Cancel a reservation”, but “On behalf of the customer”, fixed by this step, was empty: it was not done.',
-    );
-    expect(describeLog(empty, [step], null, phrasing('es'))).toBe(
-      'El asistente ha intentado «Anular una reserva», pero «En nombre del cliente», que fija este paso, estaba vacío: no se ha hecho.',
-    );
-  });
 });

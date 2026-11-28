@@ -9,7 +9,8 @@ from live.context import system_context
 from live.errors import Conflict
 from live.meta import CheckoutStep
 
-from apps.sale.models import Sale, SalePayment
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, B, ctx_for, run
 from base import activation
 from base.tenancy.context import use_hub

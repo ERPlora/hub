@@ -9,7 +9,8 @@ from live.operations import INTERNAL, operation
 from live.outbox import record_event
 
 from apps.sale import events
-from apps.sale.models import SaleLine, VoucherSession
+from apps.sale.models.sales import SaleLine
+from apps.sale.models.voucher_sessions import VoucherSession
 from apps.sale.queries.business import money_text
 from apps.sale.queries.figures import COUNTED
 from apps.sale.queries.sales import find_sale

@@ -136,10 +136,17 @@ class Strict(Schema):
 
 
 class ImageRef(Strict):
-    """An uploaded image (``website.image.upload``): its id; the server writes its URL on every save."""
+    """An uploaded image (``website.image.upload``): its id; the server writes its URL on every save and the name of its
+    file on every read."""
 
     id: UUID = Field(description="The image's id, as website.image.upload answered it.", json_schema_extra=AN_IMAGE)
     url: str = Field("", max_length=300, description="Where the Hub serves it; written by the server.")
+    name: str = Field(
+        "",
+        max_length=200,
+        description="The name of the file it was uploaded with, which is how the person calls it; written by the "
+        "server on every read, never kept.",
+    )
 
 
 class CustomColours(Strict):

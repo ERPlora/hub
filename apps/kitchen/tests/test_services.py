@@ -195,7 +195,7 @@ def test_sending_with_nothing_pending_is_refused_by_sales(clock, product):
 
 
 def test_sending_only_services_is_refused_and_sends_nothing(clock, product):
-    from apps.sale.models import OrderLine
+    from apps.sale.models.orders import OrderLine
 
     order = open_check("Table 4")
     add_line(

@@ -15,7 +15,9 @@ from apps.customer.queries.reads import find_customer
 from apps.customer.queries.orders import linked_customer_id
 from apps.customer.tax_ids import IdTypeRequired, InvalidCountry, InvalidTaxId, normalize_country, normalize_tax_id
 from apps.sale import pricing
-from apps.sale.models import OrderLine, PaymentMethod, Settings
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.settings import Settings
 from apps.sale.queries.business import CASH_LIMIT, LIMITS_CURRENCY, business_country, money_text
 from apps.sale.queries.checkout_steps import declared_steps, steps_at_the_charge
 from apps.sale.queries.line_parts import ratio_of

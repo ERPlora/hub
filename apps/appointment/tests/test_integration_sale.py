@@ -16,7 +16,7 @@ from django.utils import timezone
 
 from apps.appointment import events
 from apps.appointment.models.appointments import Appointment
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.tax.models import TaxCategory
 
 from .conftest import A, HUB_DB, MONDAY, ctx_for, make_customer, make_member, make_service, run, wall
@@ -102,7 +102,7 @@ def test_the_check_opened_from_the_agenda_is_the_customers_and_so_is_its_sale(bo
     from apps.customer import events as customer_events
     from apps.customer.models import Customer
     from apps.customer.queries.orders import linked_customer_id
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     opened = run("appointment.appointment.charge", {"id": str(booked.id)})
     assert linked_customer_id(opened.order_id) == booked.customer_id

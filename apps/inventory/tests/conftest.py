@@ -1,8 +1,12 @@
-"""Fixtures of the inventory tests: contexts per role and scope, users with a role on a host, a raw DSN.
+"""Fixtures of the inventory tests: contexts per role and scope, users with a role on a host, a raw DSN, and what the
+tests of the reads share (running a read, a product, a movement, reading an export).
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``). Business B (``hub_b``) has its own database beside it; a test of B asks for ``hub_b`` and enters it.
 """
+
+import csv
+import io
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -10,10 +14,13 @@ from django.db import connections
 from django.utils import translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
+from live.operations import get
 from psycopg.conninfo import make_conninfo
 
 from apps.flow.tests.test_relay import worker_loop
+from apps.inventory.models import Product, ProductCategory, StockMovement
 from apps.invoice.tests.conftest import catalog_of
+from apps.tax.models import TaxCategory
 from base.models import Membership
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, factory_data_b, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
@@ -66,3 +73,41 @@ def db_dsn(django_db_setup):
         host=params["HOST"],
         port=params["PORT"],
     )
+
+
+def run(name, data, role="hub_admin"):
+    return get(name)(ctx_for(role), data)
+
+
+@pytest.fixture
+def general(db):
+    return TaxCategory.objects.create(key="product.general", name="Product — general")
+
+
+def product(name, sku=None, *, tax=None, **fields):
+    return Product.objects.create(
+        name=name, sku=sku or name.upper(), tax_category=tax, **{"price": 100, **fields}
+    )
+
+
+def link(product, category):
+    ProductCategory.objects.create(product=product, category=category)
+
+
+def names(page):
+    return [row.name for row in page.rows]
+
+
+def movement(prod, movement_type, qty, stock_after, **fields):
+    return StockMovement.objects.create(
+        product=prod,
+        movement_type=movement_type,
+        qty=qty,
+        stock_after=stock_after,
+        **fields,
+    )
+
+
+def read_csv(export, delimiter):
+    assert export.content.startswith("\ufeff")  # Excel reads it as UTF-8
+    return list(csv.reader(io.StringIO(export.content[1:]), delimiter=delimiter))

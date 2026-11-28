@@ -5,7 +5,7 @@ import pytest
 from live.errors import PermissionDenied
 from live.models import OutboxEvent
 
-from apps.sale.models import PaymentMethod
+from apps.sale.models.payment_methods import PaymentMethod
 
 from .conftest import HUB_DB, ctx_for, run
 

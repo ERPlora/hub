@@ -21,7 +21,7 @@ from live.executor import Stream, Subscription, executor
 from live.operations import get as operation
 
 from apps.flow.tests.test_api import get, post
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HOST, HUB_DB, A, ctx_for, run
 from base.operations import HubContextBuilder
 from base.sensitive import VIEW_CUSTOMER_CONTACT

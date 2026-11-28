@@ -19,7 +19,8 @@ from live.context import OperationContext
 from live.errors import Conflict
 from live.meta import all_live_app_configs, permissions_for_role
 
-from apps.sale.models import OrderLine, SaleLine
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.sales import SaleLine
 
 from .conftest import FOOD, GENERIC, HUB_DB, A, make_category, make_product, run
 

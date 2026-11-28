@@ -1,7 +1,7 @@
 // The editor's draft: what `website.site.save` takes (template, theme, content), cut from what `website.site.get`
 // answers. The form edits a deep copy, with the address padded to its four lines (one field each); what is sent
 // drops the empty ones. The server's 422 (`fields`, keyed by the path of the field) is read back onto the fields.
-import type { SaveIn, SiteOut } from '../operations';
+import type { ImageRef, SaveIn, SiteOut } from '../operations';
 
 /** The address takes four lines at most (the server's bound too). */
 export const ADDRESS_LINES = 4;
@@ -11,8 +11,18 @@ export function copyOf<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/** An image as the draft holds it: without the name of its file, which the server writes on every read. */
+function unnamed(image: ImageRef): ImageRef {
+  return { id: image.id, url: image.url };
+}
+
 export function toDraft(site: SiteOut): SaveIn {
   const copy = copyOf({ template: site.template, theme: site.theme, content: site.content });
+  const { topbar, hero, about, gallery } = copy.content;
+  topbar.logo = topbar.logo && unnamed(topbar.logo);
+  hero.cover = hero.cover && unnamed(hero.cover);
+  about.image = about.image && unnamed(about.image);
+  gallery.images = gallery.images.map(unnamed);
   const lines = copy.content.location.address_lines;
   copy.content.location.address_lines = [...lines, ...Array<string>(Math.max(0, ADDRESS_LINES - lines.length)).fill('')];
   return copy;

@@ -14,8 +14,8 @@ from django.conf import settings
 from django.utils.crypto import salted_hmac
 from live.context import OperationContext
 
-from apps.sale.models import FiscalStatus, Sale
-from apps.sale.models import Settings as SaleSettings
+from apps.sale.models.sales import FiscalStatus, Sale
+from apps.sale.models.settings import Settings as SaleSettings
 
 #: Four years from the charge: the limitation period (art. 66 LGT), the one art. 15.3 RD 1619/2012 gives a rectifying
 #: invoice; no rule sets another for the full invoice a customer may demand (art. 7.2 and 7.3).

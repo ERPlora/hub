@@ -15,7 +15,7 @@ from live.models import OutboxEvent
 
 from apps.invoice.models import Invoice
 from apps.invoice.tests.conftest import HUB_DB_COMMITTED, ISSUER, run
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.verifactu.models import Record
 from base import catalog, relay, worker
 from base.catalog.register_apps import RegisterResult

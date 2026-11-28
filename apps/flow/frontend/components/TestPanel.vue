@@ -13,6 +13,7 @@ import { computed, onMounted, ref, shallowRef } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
+import { choiceLabel } from '../lib/choices';
 import { cleanTrigger, type FlowDocument } from '../lib/document';
 import { actionLabel, describeClause, describeDuration, describeStep, eventLabel, fieldLabel, quoted } from '../lib/phrasing';
 import type { CatalogOut, PinnedOut, TestOut, TestStepOut } from '../operations';
@@ -40,6 +41,9 @@ async function run(): Promise<void> {
 }
 
 onMounted(run);
+
+/** Until the catalog is in, what it would do is not said: a value of a closed list would show as the action keeps it. */
+const waiting = computed(() => (loading.value && !result.value) || (!!result.value && !props.catalog));
 
 const sampleLine = computed(() => {
   const answer = result.value;
@@ -87,6 +91,18 @@ function shown(value: unknown): string {
   return typeof value === 'object' && value !== null ? JSON.stringify(value) : String(value);
 }
 
+/** A value it would send in words: one of a closed list by its name («High», never «high»), the rest as it is. */
+function said(step: TestStepOut, field: string, value: unknown): string {
+  const choices = props.catalog?.actions.find((action) => action.name === step.operation)?.fields.find((candidate) => candidate.name === field)?.choices ?? [];
+  return choices.includes(String(value)) ? choiceLabel({ action: step.operation, field }, String(value), phrasing.value) : shown(value);
+}
+
+/** What a step does («Create a task»), or its kind if the automation no longer has it: never its id. */
+function stepTitle(step: TestStepOut): string {
+  const own = stepOf(step.id);
+  return own ? describeStep(own, props.document.steps, props.catalog, phrasing.value) : phrasing.value.t(`flow.steps.add.${step.kind}`);
+}
+
 const names = (fields: readonly string[]): string => fields.map((field) => fieldLabel(field, phrasing.value)).join(', ');
 
 /** «Cancel a reservation › On behalf of the customer»: a datum an «Ask the assistant» step fixes. */
@@ -118,7 +134,7 @@ function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
       {{ $t('flow.test.banner') }}
     </InlineFeedback>
     <div
-      v-if="loading && !result"
+      v-if="waiting"
       class="flow-test__loading"
       data-testid="flow-test-loading"
     >
@@ -131,7 +147,7 @@ function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
     >
       {{ wording(error, $t('flow.errors.read')) }}
     </InlineFeedback>
-    <template v-if="result">
+    <template v-if="result && catalog">
       <p
         class="flow-test__sample"
         data-testid="flow-test-sample"
@@ -153,7 +169,7 @@ function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
         :data-outcome="step.outcome"
         :data-testid="`flow-test-step-${step.id}`"
       >
-        <strong>{{ stepOf(step.id) ? describeStep(stepOf(step.id)!, document.steps, catalog, phrasing) : step.id }}</strong>
+        <strong>{{ stepTitle(step) }}</strong>
         <span class="flow-test__verdict">{{ outcome(step) }}</span>
         <div
           v-for="(value, field) in shownParams(step)"
@@ -161,7 +177,7 @@ function unusedTools(step: TestStepOut): { tool: string; text: string }[] {
           class="flow-test__value"
         >
           <span class="flow-test__key">{{ fieldLabel(String(field), phrasing) }}</span>
-          <span>{{ shown(value) }}</span>
+          <span>{{ said(step, String(field), value) }}</span>
         </div>
         <div
           v-for="row in pinnedSaid(step)"

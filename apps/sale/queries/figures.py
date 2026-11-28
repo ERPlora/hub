@@ -15,7 +15,8 @@ from live.context import OperationContext
 from live.operations import AI, operation
 
 from apps.sale import pricing
-from apps.sale.models import Refund, RefundLine, Sale, SaleLine
+from apps.sale.models.refunds import Refund, RefundLine
+from apps.sale.models.sales import Sale, SaleLine
 from apps.sale.queries.ownership import SALES, VOUCHER_SESSIONS
 from apps.sale.schemas.fields import EmptyIn
 from apps.sale.schemas.figures import ByStaffOut, LastDaysOut, PeriodIn, StatsOut, TodayOut
