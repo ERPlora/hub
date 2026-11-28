@@ -26,6 +26,8 @@ import {
   dialog,
   fill,
   filterStatus,
+  newList,
+  newRule,
   pick,
   post,
   ready,
@@ -46,26 +48,6 @@ test.afterAll(cleanPricing);
 const LISTS = 'pricing-lists';
 const RULES = 'pricing-rules';
 const ITEMS = 'pricing-items';
-
-interface Named {
-  id: string;
-  code: string;
-  name: string;
-}
-
-async function newList(page: Page, s: string, suffix: string, fields: Record<string, unknown> = {}): Promise<Named> {
-  const code = `${CODE}${s}${suffix}`;
-  const name = `${TAG} ${suffix} ${s}`;
-  const made = await post<{ id: string }>(page.context(), '/pricing/price_lists', { code, name, ...fields });
-  return { id: made.id, code, name };
-}
-
-async function newRule(page: Page, s: string, suffix: string, fields: Record<string, unknown>): Promise<Named> {
-  const code = `${CODE}${s}${suffix}`;
-  const name = `${TAG} ${suffix} ${s}`;
-  const made = await post<{ id: string }>(page.context(), '/pricing/rules', { code, name, ...fields });
-  return { id: made.id, code, name };
-}
 
 async function openLists(page: Page, filter: string): Promise<void> {
   await login(page, A, '/pricing/lists');

@@ -143,8 +143,8 @@ nombre delante («Código QA-TERRAZA», «Divisa EUR», «Precios 1»).
   **Hasta**, y **Tarifa general** (un interruptor; no se puede con grupo).
 - Acciones de fila: **Abrir** (también pulsando la fila), **Editar**, **Hacer general** (en el menú «⋮»;
   solo en una activa, sin grupo, en la divisa del negocio y que no lo sea; pide confirmación),
-  **Desactivar** (en el menú «⋮»; pide confirmación; no en la general) o **Activar** (en las inactivas). El empleado solo ve
-  **Abrir**.
+  **Desactivar** (en el menú «⋮»; pide confirmación; no en la general), **Activar** (en las inactivas) y **Borrar** (en
+  el menú «⋮»; pide confirmación; no en la general). El empleado solo ve **Abrir**.
 
 #### Reglas de descuento
 
@@ -158,13 +158,14 @@ Código, Nombre, Tipo, Se aplica a y Estado (como en las tarifas: **Activas** al
 
 - **+** abre **Nueva regla de descuento** (PRICING-F10).
 - Acciones de fila: **Editar** (también pulsando la fila), **Desactivar** (pide confirmación) o
-  **Activar** (en las inactivas). El empleado no tiene acciones.
+  **Activar** (en las inactivas), y **Borrar** (en el menú «⋮»; pide confirmación). El empleado no tiene acciones.
 
 #### Tarifa (detalle)
 Se abre desde la fila y tiene **Volver**; su título es el nombre de la tarifa. Arriba, la tarifa:
 **Código** con la etiqueta **General**, **Grupo de clientes** («Todos» en la general), **Divisa**,
-**Impuesto**, **Vigencia** y **Estado**, y en la barra **Editar**, **Hacer general** y **Desactivar /
-Activar** (lo que corresponda; con las mismas confirmaciones que en la tabla).
+**Impuesto**, **Vigencia** y **Estado**, y en la barra **Editar**, **Hacer general**, **Desactivar /
+Activar** y **Borrar**, la papelera (lo que corresponda; con las mismas confirmaciones que en la tabla). Al borrarla se
+vuelve a **Tarifas**.
 
 Debajo, **Precios**: buscador «Buscar producto o servicio…», columnas **Artículo** (nombre),
 **Tipo** (Producto o Servicio), **SKU**, **Desde** (la cantidad mínima, con su unidad), **Precio** y
@@ -215,8 +216,8 @@ cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra
 | PRICING-F13 | Consultar el precio de una línea | hecho |
 | PRICING-F14 | Cuando se borra o vuelve un producto, se borra una categoría o un grupo, o cambia un servicio | hecho |
 | PRICING-F15 | Recuperar los precios de tarifa desde una copia aparte | hecho |
-| PRICING-F16 | Borrar una tarifa | no hecho |
-| PRICING-F17 | Borrar una regla de descuento | no hecho |
+| PRICING-F16 | Borrar una tarifa | hecho |
+| PRICING-F17 | Borrar una regla de descuento | hecho |
 
 ### PRICING-F01 Ver las tarifas
 Estado: hecho (servidor y pantalla)
@@ -523,11 +524,11 @@ recuperó una recuperación anterior a esta regla no lo guarda, y sus precios ta
 Implicados: BASE-F114, INVENTORY-F01, INVENTORY-F34, PRICING-F07, PRICING-F14, SERVICE-F01
 
 ### PRICING-F16 Borrar una tarifa
-Estado: no hecho — faltan la acción de borrar, su ruta, su frase del asistente y **Borrar** en la pantalla
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas, Tarifa (detalle)
 Pasos:
-1. **Borrar** en el menú «⋮» de la fila de la tarifa o en la barra de su detalle, en una activa o en una
+1. **Borrar** en el menú «⋮» de la fila de la tarifa o en la barra de su detalle (la papelera), en una activa o en una
    desactivada. En la tarifa general no se ofrece.
 2. Confirma «Socios VIP desaparece con todos sus precios. Las ventas ya hechas no cambian.».
 3. Desde el detalle, al borrarla se vuelve a **Tarifas**.
@@ -541,11 +542,11 @@ sale dentro de la confirmación.
 Implicados: ninguno
 
 ### PRICING-F17 Borrar una regla de descuento
-Estado: no hecho — faltan la acción de borrar, su ruta, su frase del asistente y **Borrar** en la pantalla
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, asistente
 Pantalla: Tarifas
 Pasos:
-1. **Borrar** en la fila de la regla, activa o desactivada.
+1. **Borrar** en el menú «⋮» de la fila de la regla, activa o desactivada.
 2. Confirma «Happy hour desaparece y deja de aplicarse a las ventas nuevas. Las ventas ya hechas no cambian.».
 Entra: la regla, por su id, su código o su nombre.
 Sale: la regla borrada y `pricing.rule.deleted` (con `id` y `code`). Su código queda libre para una regla nueva. Las
@@ -585,6 +586,7 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Elige o quita la tarifa general | gestionar | F04 | `pricing.price_list.set_default` |
 | Desactiva una tarifa | gestionar | F05 | `pricing.price_list.deactivate` |
 | Reactiva una tarifa | gestionar | F05 | `pricing.price_list.activate` |
+| Borra una tarifa con todos sus precios (no la general) | gestionar | F16 | `pricing.price_list.delete` |
 | Pone el precio de un producto o un servicio en una tarifa | gestionar | F07, F15 | `pricing.price_item.add` |
 | Cambia un precio | gestionar | F08 | `pricing.price_item.update` |
 | Quita un precio | gestionar | F08 | `pricing.price_item.remove` |
@@ -592,6 +594,7 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 | Cambia una regla | gestionar | F11 | `pricing.rule.update` |
 | Desactiva una regla | gestionar | F12 | `pricing.rule.deactivate` |
 | Reactiva una regla | gestionar | F12 | `pricing.rule.activate` |
+| Borra una regla | gestionar | F17 | `pricing.rule.delete` |
 | Olvida un producto borrado | solo la plataforma | F14 | `pricing.catalog.forget_product` |
 | Vuelve a activar las reglas de un producto recuperado | solo la plataforma | F14 | `pricing.catalog.recall_product` |
 | Olvida una categoría borrada | solo la plataforma | F14 | `pricing.catalog.forget_category` |
@@ -600,7 +603,7 @@ por su id, su nombre, su teléfono o su correo. Si un nombre vale para varios, s
 
 Las API keys del Hub (`erpk_live`) llegan a las consultas, a crear y cambiar tarifas y a
 poner, cambiar y quitar precios (para sincronizar precios desde otro sistema); elegir la general,
-desactivar y las reglas, solo desde el Hub o el asistente.
+desactivar, borrar y las reglas, solo desde el Hub o el asistente.
 
 ### Lo que avisa
 
@@ -610,12 +613,14 @@ desactivar y las reglas, solo desde el Hub o el asistente.
 | Tarifa cambiada | Editar con algún cambio, o su grupo borrado | `id` | `pricing.price_list.updated` |
 | Tarifa general cambiada | Elegirla o quitarla | `id`, `is_default`, `previous_id` | `pricing.price_list.default_changed` |
 | Tarifa desactivada / reactivada | Desactivar / activar | `id` | `pricing.price_list.deactivated`, `…activated` |
+| Tarifa borrada | Borrar, con todos sus precios | `id`, `code` | `pricing.price_list.deleted` |
 | Precio puesto | Añadir, o recuperarlo desde una copia aparte | `id`, `price_list_id`, `product_id` o `service_id`, `min_quantity`, `price`, `currency` (la de su tarifa) | `pricing.price_item.added` |
 | Precio cambiado | Editar, o el nombre nuevo de un servicio | `id` (o `service_id`) | `pricing.price_item.updated` |
 | Precio quitado | Quitar, o el producto borrado | `id`, `price_list_id` | `pricing.price_item.removed` |
 | Regla nueva | Crear | `id`, `code` | `pricing.rule.created` |
 | Regla cambiada | Editar, o el nombre nuevo de un servicio | `id` | `pricing.rule.updated` |
 | Regla desactivada / reactivada | Desactivar / activar, o su producto, categoría o grupo borrados (reactivada: su producto recuperado) | `id` | `pricing.rule.deactivated`, `…activated` |
+| Regla borrada | Borrar | `id`, `code` | `pricing.rule.deleted` |
 
 Ninguna app los escucha salvo **Automatizaciones**, que puede arrancar una automatización con cualquiera
 de ellos (FLOW-F21). Sus pasos también pueden consultar tarifas, precios, reglas y el precio de una
@@ -664,7 +669,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
 | Ver tarifas, precios y reglas, y consultar el precio de una línea | sí | sí | sí | sí | `pricing.view` |
-| Crear, cambiar, elegir la general, desactivar y reactivar | sí | sí | sí | no | `pricing.manage` |
+| Crear, cambiar, elegir la general, desactivar, reactivar y borrar | sí | sí | sí | no | `pricing.manage` |
 
 ## Para quien lo mantiene
 
@@ -800,8 +805,8 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
 
 - `frontend/routes.ts`: `/pricing/lists` (las dos tablas, `ListsPage` con `PriceListsTable` y
   `RulesTable`) y `/pricing/lists/:id` (el detalle, `ListDetailPage`, con el id como prop).
-- Las confirmaciones de la tarifa (hacer general, desactivar) viven en `ListConfirm`, que comparten la
-  tabla y el detalle.
+- Las confirmaciones de la tarifa (hacer general, desactivar, borrar) viven en `ListConfirm`, que comparten la
+  tabla y el detalle; al borrar, el detalle vuelve a la lista. Las de la regla (desactivar, borrar), en `RulesTable`.
 - Las tres tablas llevan sus filtros detrás del embudo (`filterable`), y
   las de tarifas y reglas abren con «Activas» elegido: su opción vacía («Todos») pide todas.
 - Listas en vivo con `useLiveList` (ventanas de 100 filas, cada una su suscripción) y `useServerTable`;

@@ -43,6 +43,29 @@ export function createProduct(context: BrowserContext, name: string, sku: string
   return post(context, '/inventory/products', { name, sku, price, tax_category_key: 'product.generic' });
 }
 
+/** A price list or a discount rule a spec made: its id, its code and its name. */
+export interface Named {
+  id: string;
+  code: string;
+  name: string;
+}
+
+/** A price list of this run (code `E2EPF<s><suffix>`, named «E2E Pricing <suffix> <s>»), through Price Lists' API. */
+export async function newList(page: Page, s: string, suffix: string, fields: Record<string, unknown> = {}): Promise<Named> {
+  const code = `${CODE}${s}${suffix}`;
+  const name = `${TAG} ${suffix} ${s}`;
+  const made = await post<{ id: string }>(page.context(), '/pricing/price_lists', { code, name, ...fields });
+  return { id: made.id, code, name };
+}
+
+/** A discount rule of this run, named as `newList` names a list. */
+export async function newRule(page: Page, s: string, suffix: string, fields: Record<string, unknown>): Promise<Named> {
+  const code = `${CODE}${s}${suffix}`;
+  const name = `${TAG} ${suffix} ${s}`;
+  const made = await post<{ id: string }>(page.context(), '/pricing/rules', { code, name, ...fields });
+  return { id: made.id, code, name };
+}
+
 /** Screenshots of the page shown at the three viewports (`APP-PRICING-<key>-<390|834|1440>`), then back. */
 export async function shootFlow(page: Page, key: string, restore = DESKTOP): Promise<string[]> {
   const files: string[] = [];

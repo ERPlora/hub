@@ -20,11 +20,12 @@ import {
   StatusPill,
 } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
+import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import BarIconButton from '../components/BarIconButton.vue';
 import ListConfirm, { type ListAction } from '../components/ListConfirm.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import PriceItemFormModal from '../components/PriceItemFormModal.vue';
@@ -198,19 +199,14 @@ function onAction({ actionId, row }: { actionId: string; row: PriceItemOut }): v
       >
         {{ $t('pricing.lists.actions.activate') }}
       </ion-button>
-      <ion-button
+      <BarIconButton
         v-if="!list.is_default"
-        data-testid="pricing-detail-delete"
+        testid="pricing-detail-delete"
+        icon="ion:trash-outline"
         color="danger"
-        :aria-label="$t('pricing.lists.actions.delete')"
-        :title="$t('pricing.lists.actions.delete')"
-        @click="confirmAction = 'delete'"
-      >
-        <HubIcon
-          slot="icon-only"
-          name="ion:trash-outline"
-        />
-      </ion-button>
+        :label="$t('pricing.lists.actions.delete')"
+        @press="confirmAction = 'delete'"
+      />
     </template>
 
     <div class="pricing-detail">
