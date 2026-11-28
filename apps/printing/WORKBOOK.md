@@ -101,13 +101,17 @@ di qué sale por cada una y comprueba que el papel sale.». Dos zonas, en este o
 
 - **Cola de impresión**: una tarjeta por cada función que tenga alguna impresora o trabajos
   esperando (un negocio nuevo no ve ninguna), con su nombre («Recibo», «Cocina», «Barra»,
-  «Etiqueta»), su estado («Listo», «En cola, sin impresora», «Sin dispositivo», «Dispositivo apagado», «Con errores»), «En cola: N · el más
+  «Etiqueta»), su estado («Listo», «En cola, sin impresora», «Sin dispositivo», «Dispositivo apagado», «Sesión
+  cerrada», «Con errores»), «En cola: N · el más
   antiguo lleva 3 min» o «Nada en cola», los fallidos («Fallidos: N») y por qué impresora sale ahora:
   «Imprime en: Caja.» (la elegida en los ajustes o, si no, la primera activa con esa función). Si
   tiene trabajos en cola que ningún dispositivo dado de alta puede sacar, sale «Sin dispositivo» con
   «Ningún dispositivo dado de alta lo imprime: dalo de alta en Dispositivos.». Si el dispositivo está dado de alta
   pero lleva 90 s sin dar señales y algún trabajo espera ya un minuto, sale «Dispositivo apagado» con «El dispositivo
-  que lo imprime no responde: enciéndelo y abre en él la app de ERPlora.». Una
+  que lo imprime no responde: enciéndelo y abre en él la app de ERPlora.»; si no está apagado sino que perdió la
+  sesión porque alguien entró en otro dispositivo y el plan no cubre más a la vez, sale «Sesión cerrada» con «El
+  dispositivo que lo imprime perdió la sesión al entrar alguien en otro: tu plan no cubre más dispositivos a la vez.
+  Vuelve a entrar en él, o amplía los dispositivos de tu plan.». Una
   función con trabajos esperando más de un minuto y sin ninguna impresora activa saca el aviso naranja
   «3 trabajos de impresión de Cocina llevan 3 min esperando. Ninguna impresora activa tiene esta
   función: añade una abajo o dale esta función a una de ellas.» («1 trabajo … lleva …» si es uno). Con
@@ -153,8 +157,12 @@ navegador no imprime: el papel lo saca la app de ERPlora. Instálala en el dispo
 y dalo de alta desde la app, en Impresión → Dispositivos.», con un botón por sistema para descargarla debajo, como en
 PRINTING-F21.
 
-La tabla (o tarjetas en el móvil), por nombre: Nombre (con «Este dispositivo» en el suyo), Impresoras (una
-inactiva, «Cocina (inactiva)»), Visto por última vez («hace 3 min» o «Nunca») y Dado de alta por. Quien gestiona
+La tabla (o tarjetas en el móvil), por nombre: Nombre (con «Este dispositivo» en el suyo, y «Sesión cerrada» en el
+que perdió la sesión porque alguien entró en otro dispositivo y el plan no cubre más a la vez), Impresoras (una
+inactiva, «Cocina (inactiva)»), Visto por última vez («hace 3 min» o «Nunca») y Dado de alta por. Por cada uno con la
+sesión cerrada, encima de la tabla y en ámbar: ««Tableta barra» no imprime: perdió la sesión al entrar alguien en otro
+dispositivo.» con «Tu plan no cubre más dispositivos a la vez: vuelve a entrar en él, o amplía los dispositivos de tu
+plan.»; deja de salir en cuanto alguien vuelve a entrar en él. Quien gestiona
 las impresoras ve arriba «Imprimir desde este dispositivo» (solo dentro de la app y si este no está dado de alta) y en
 cada fila «Editar» y «Retirar». Vacía: «Todavía no imprime ningún dispositivo. Da de alta el que está junto a las
 impresoras desde ese dispositivo.». Error al cargar: «No se pudieron cargar los dispositivos.» con «Reintentar».
@@ -265,7 +273,10 @@ Pasos:
    tarjeta de esa
    función dice por qué: «Sin dispositivo» y «Ningún dispositivo dado de alta lo imprime: dalo de alta en
    Dispositivos.», «Dispositivo apagado» y «El dispositivo que lo imprime no responde: enciéndelo y abre en él
-   la app de ERPlora.» o «En cola, sin impresora» si no tiene ninguna impresora activa.
+   la app de ERPlora.», «Sesión cerrada» y «El dispositivo que lo imprime perdió la sesión al entrar alguien en otro:
+   tu plan no cubre más dispositivos a la vez. Vuelve a entrar en él, o amplía los dispositivos de tu plan.» cuando
+   no está apagado sino que su sesión se cerró porque alguien entró en otro dispositivo y el plan no cubre más a la
+   vez (el Gratis cubre uno), o «En cola, sin impresora» si no tiene ninguna impresora activa.
 3. Abre **Impresión → Impresoras**: las tarjetas de función dicen si cada una tiene impresora y cuál
    la imprime, cuánto espera y desde cuándo.
 4. Abre **Impresión → Cola** para ver cada trabajo con su estado, sus intentos y su último error.
@@ -273,7 +284,7 @@ Pasos:
    función a una impresora en **Impresión → Impresoras** o saca el trabajo del atasco en **Impresión → Cola**.
 Entra: la cola, las impresoras y los dispositivos del negocio.
 Sale: nada guardado. Lo que depende del reloj (cuánto lleva esperando, el aviso naranja, «Esperando»,
-«Dispositivo apagado» en la tarjeta de la función y un enviado que no contestó a tiempo) se recalcula solo cada
+«Dispositivo apagado» o «Sesión cerrada» en la tarjeta de la función y un enviado que no contestó a tiempo) se recalcula solo cada
 30 s, sin esperar a otro cambio ni recargar; «Todo al
 día» exige que no haya nada en cola, enviado sin confirmar ni fallido. Las pantallas se refrescan solas al encolarse, enviarse, imprimirse, fallar,
 reintentarse o cancelarse un trabajo. El paso del Inicio y las filas de la campana cambian solos, sin
@@ -286,7 +297,7 @@ Si falla: «No se pudo leer la cola de impresión.» con «Reintentar»; no se p
 la lectura falla. Un dispositivo dado de alta pero apagado sí hace sonar la campana, pasado el minuto: el paso
 del Inicio sigue «Hecho» (dado de alta basta), pero nadie está imprimiendo. Un trabajo que lleva menos de un
 minuto no la hace sonar (un dispositivo que se reinicia no es una alarma).
-Implicados: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01
+Implicados: PRINTING-F14, PRINTING-F18, CASH_REGISTER-F08, BASE-F01, BASE-F57
 
 ### PRINTING-F02 Encontrar una impresora de la red sin escribir su dirección
 Estado: parcial — la búsqueda está en Impresoras y la hace la app de ERPlora del dispositivo para el
@@ -629,10 +640,13 @@ Pasos:
    dispositivos. Si se corta la conexión, la app vuelve a conectarse sola, esperando cada vez un poco más (hasta
    30 s), y lo primero que hace es confirmar lo que imprimió y no llegó a confirmar, para que no salga dos veces.
    Si la sesión se acaba, el negocio se da de baja o se suspende, Impresión se apaga o el dispositivo deja de
-   imprimir para ninguna impresora, deja de intentarlo.
+   imprimir para ninguna impresora, deja de intentarlo. Si la sesión se cerró porque alguien entró en otro
+   dispositivo y el plan no cubre más a la vez, la lista lo marca «Sesión cerrada» y dice por qué no imprime, y la
+   cola lo dice en vez de «Dispositivo apagado», hasta que alguien vuelve a entrar en él.
 6. Mientras la app de ERPlora del dispositivo está conectada para imprimir, dice que está ahí al conectarse y en
    cada latido (cada 30 s), con la sesión de quien la usa, también la de un empleado; darlo de alta desde él y
-   pedir un trabajo también cuentan. La lista lo enseña en «Visto por última vez». Si pasa 90 s sin dar señales,
+   pedir un trabajo también cuentan. Con cada una, Impresión apunta en qué dispositivo del negocio (el navegador o la
+   app en la que se entró) está esa sesión, para saber si el tope del plan se la cerró. La lista lo enseña en «Visto por última vez». Si pasa 90 s sin dar señales,
    cuenta como apagado: sus trabajos hacen sonar la campana pasado el minuto.
 7. Desde cualquier dispositivo, quien gestiona las impresoras cambia en la lista el nombre o las impresoras de
    un dispositivo («Editar») o lo retira («Retirar», tras confirmarlo): la app de ese dispositivo lo nota al
@@ -660,7 +674,7 @@ que se cambia el suyo. Solo se da de alta desde el propio dispositivo, y en un n
 este dispositivo», así que la cola sigue diciendo que ningún dispositivo dado de alta lo imprime y el Inicio sigue
 con «Configura la impresora». La cola y la lista nombran cada dispositivo por su nombre, nunca por su identificador: con él
 cualquiera se haría pasar por la caja.
-Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F21, PRINTING-F22
+Implicados: PRINTING-F05, PRINTING-F07, PRINTING-F14, PRINTING-F21, PRINTING-F22, BASE-F57
 
 ### PRINTING-F19 Ver el estado de una impresora
 Estado: hecho
@@ -956,6 +970,13 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `printing.manage_settings` la presencia de la caja de un empleado nunca se grabaría: el canal solo deja un aviso
    en el log). Escribe `last_seen_at` del alta no retirada con ese `deviceId` (`{"seen": true}`; si no, `false`, sin
    dar de alta nada) y no registra evento. `printing.device.register` y `printing.job.claim` también la escriben.
+   Las tres apuntan además `hub_device`: el `TrustedDevice` de base que nombra la cookie `hub_device` de la petición
+   (`base.queries.devices.device_of`), o nada sin ella (una llave de API). El tope de dispositivos del plan marca ese
+   dispositivo con `ended_reason = device_limit` al cerrar su sesión (BASE-F57) y lo limpia en la siguiente entrada:
+   `ended_by_the_device_limit()` de base da esos dispositivos, y `signed_out` de `printing.device.list` (y de cada
+   fila) y de cada función de `printing.job.summary` sale de ahí. Sin clave ajena: la fila de base se borra con su
+   dispositivo y la de Impresión se queda. Tests: `tests/test_signed_out_by_the_plan.py` y el del socket en
+   `tests/test_presence.py`.
    La campana (`printing.device.coverage`, `count`) cuenta los trabajos en cola desde hace `STALLED_AFTER` (60 s,
    `UNDRAINED_ALERT_SECONDS`) o más que ningún dispositivo con `last_seen_at` en los últimos `SEEN_WITHIN` (90 s,
    `HOST_TTL_SECONDS`) puede sacar; `configured` (el paso del Inicio) y `unattended` del resumen siguen mirando solo
@@ -1023,8 +1044,8 @@ Tests: `tests/test_queries_health.py` y `tests/test_integration_home_health.py`.
 - **`requires = []`**: Impresión no lee modelos de nadie. Quien imprime compone el documento.
 - **Modelos**: `Settings` (una fila; sin ella valen los de fábrica), `Printer` (nunca se borra: la
   cola la nombra; nombre único sin distinguir mayúsculas), `PrintDevice` (el dispositivo que imprime: nombre,
-  `key` = SHA-256 de su identificador, sus impresoras, quién y cuándo lo dio de alta, su última petición y,
-  retirado, quién y cuándo; nunca se borra) y `PrintJob` (la cola: clave única
+  `key` = SHA-256 de su identificador, sus impresoras, quién y cuándo lo dio de alta, su última petición, el
+  dispositivo del negocio de su sesión (`hub_device`) y, retirado, quién y cuándo; nunca se borra) y `PrintJob` (la cola: clave única
   `job_key`, tipo, documento, HTML, formato, función, impresora, copias, cajón, estado, intentos,
   plazo, dispositivo —su alta y su nombre—, último error y los sellos de quién reintentó o canceló). Nadie borra un trabajo a
   mano: la tarea programada `prune` (`printing.job.prune`, cada hora, como sistema y sin ruta) borra los
