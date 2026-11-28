@@ -144,8 +144,6 @@ def frontend_data(path: str) -> bool:
 
 
 def frontend_failed(code: list[str], data: list[str]) -> bool:
-    if lender := os.environ.get(LENDER):
-        borrow(Path(lender))
     missing = [f"{name}: run {fix}" for name, (shown_by, fix) in NEEDED.items() if not shown_by.exists()]
     if missing:
         print(f"checks: ESLint, the typecheck and Vitest need {'; '.join(missing)}", flush=True)
@@ -171,6 +169,9 @@ def main(argv: list[str] | None = None) -> int:
     frontend = [path for path in files if path.endswith(FRONTEND)]
     data = [path for path in files if frontend_data(path)]
     tests = sorted({test for path in files for test in tests_of(Path(path))})
+    # Before every check: a Python test may read packages/ui as much as a frontend one (the assistant card's texts).
+    if lender := os.environ.get(LENDER):
+        borrow(Path(lender))
     failed = run([sys.executable, "-m", "pytest", "-q", "--tb=short", *GUARDRAILS])
     if frontend or data:
         failed = frontend_failed(frontend, data) or failed
