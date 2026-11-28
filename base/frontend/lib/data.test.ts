@@ -41,9 +41,16 @@ const APPS: AppDatasets[] = [
       { key: 'inventory.category', label: 'Categories', rows: 2, personal: false },
       { key: 'inventory.product', label: 'Products', rows: 12, personal: false },
     ],
+    keeps_data: true,
   },
-  { id: 'customer', label: 'Customers', icon: 'ion:people-outline', datasets: [{ key: 'customer.customer', label: 'Customers', rows: 3, personal: true }] },
-  { id: 'kitchen', label: 'Kitchen', icon: 'ion:flame-outline', datasets: [] },
+  {
+    id: 'customer',
+    label: 'Customers',
+    icon: 'ion:people-outline',
+    datasets: [{ key: 'customer.customer', label: 'Customers', rows: 3, personal: true }],
+    keeps_data: true,
+  },
+  { id: 'kitchen', label: 'Kitchen', icon: 'ion:flame-outline', datasets: [], keeps_data: false },
 ];
 
 function template(key: string, fields: Partial<Template> = {}): Template {
