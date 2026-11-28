@@ -1,15 +1,15 @@
 // The check on screen and a write to it. The screen shows only what the operations answer — the check comes back
 // whole from every write and from the live `sale.order.get` (`follow`), the newer version wins — so nothing about
-// money is decided here. A refusal shows the server's own sentence; when nobody answered, the product's sentence for
-// that action.
+// money is decided here. A refusal shows the server's own sentence; without a connection, that it is missing; any other
+// failure nobody worded, the product's sentence for that action.
 import { toastError } from '@erplora/ui/shell';
 import { shallowRef } from 'vue';
 
-import { refusal } from '../../lib/refusal';
 import type { OrderOut } from '../../operations';
 import { useT } from '../useT';
 import { useCurrentCheck } from './useCurrentCheck';
 import type { WriteResult } from './useTill';
+import { useWordsOf } from './useWordsOf';
 import { useWriteQueue } from './useWriteQueue';
 
 export type CheckWrites = ReturnType<typeof useCheckWrites>;
@@ -24,11 +24,7 @@ export function useCheckWrites() {
   const check = useCurrentCheck();
   const { inFlight, busy, serial, afterWrites } = useWriteQueue();
 
-  /** The words of a refusal; the screen's own sentence (`fallbackKey`) when nobody worded it. */
-  const wordsOf = (error: unknown, fallbackKey: string): string => {
-    const fallback = t(fallbackKey);
-    return refusal(error, fallback)?.message ?? fallback;
-  };
+  const wordsOf = useWordsOf();
 
   const order = shallowRef<OrderOut | null>(null);
   const pendingLabel = shallowRef('');

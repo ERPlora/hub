@@ -54,7 +54,7 @@ describe('useTill: the lines', () => {
     const s = await withCheck();
     await s.till().setLineStaff(line({ id: 'l1' }), 's3');
     expect(s.calls().at(-1)).toEqual(['/set_line_staff', { order_id: 'o1', line_id: 'l1', staff_id: 's3' }]);
-    s.net.onApi(() => Promise.reject(new TypeError('Failed to fetch')));
+    s.net.onApi(() => new Response('Bad gateway', { status: 502 }));
     await s.till().setLineStaff(line({ id: 'l1' }), null);
     expect(toastError).toHaveBeenCalledWith('The line could not be moved to another professional. It stays with the one it had.');
   });

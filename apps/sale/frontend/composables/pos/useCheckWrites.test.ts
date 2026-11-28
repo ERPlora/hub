@@ -15,9 +15,9 @@ describe('useTill: adding products', () => {
     expect(s.till().order.value).toBeNull();
   });
 
-  it('nobody answering says «tap again»', async () => {
+  it('a failure nobody worded (a proxy’s error page) says «tap again»', async () => {
     const s = await setup();
-    s.net.onApi(() => Promise.reject(new TypeError('Failed to fetch')));
+    s.net.onApi(() => new Response('Bad gateway', { status: 502 }));
     await s.till().addProduct(product({ id: 'p1' }), null);
     expect(toastError).toHaveBeenCalledExactlyOnceWith("Couldn't save that item — tap again");
   });

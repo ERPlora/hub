@@ -49,13 +49,13 @@ import { useLinkedCheck } from '../composables/pos/useLinkedCheck';
 import { useStaffNames } from '../composables/pos/useStaffNames';
 import { useSystemBack } from '../composables/pos/useSystemBack';
 import { type OpenLine, useTill, type WriteResult } from '../composables/pos/useTill';
+import { useWordsOf } from '../composables/pos/useWordsOf';
 import { useLocale, useT } from '../composables/useT';
 import type { SaleComboOut } from '../../../combo/frontend/operations';
 import type { ProductOut } from '../../../inventory/frontend/operations';
 import type { TargetGroupOut } from '../../../modifier/frontend/operations';
 import type { ServiceSaleOut } from '../../../service/frontend/operations';
 import type { ComboChoiceIn, OrderLineOut, OrderOut, OrderRow, PreviewOut, SaleOut } from '../operations';
-import { refusal } from '../lib/refusal';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('sale');
@@ -152,11 +152,7 @@ const link = useCommand('customer.order.link');
 const linkOf = useCommand('customer.order.customer');
 const cardOf = useCommand('customer.customer.detail');
 
-/** The words of a refusal; the screen's own sentence (`fallbackKey`) when nobody worded it. */
-function wordsOf(error: unknown, fallbackKey: string): string {
-  const fallback = t(fallbackKey);
-  return refusal(error, fallback)?.message ?? fallback;
-}
+const wordsOf = useWordsOf();
 
 async function linkCustomer(orderId: string, snapshot: CustomerSnapshot | null): Promise<void> {
   try {

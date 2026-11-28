@@ -3,7 +3,8 @@
 // articles cannot be sold for lack of VAT — the business territory's tax — (counted on the server: one row asked, its total read), with
 // «Review the catalogue» — to Inventory's unconfigured products — only for whoever can fix it. And
 // the reason of the last tap on a blocked tile, boxed, where the cashier is looking. When Inventory is
-// off the count cannot be read and the grid itself says why.
+// off the count cannot be read and the grid itself says why. While the live connection recovers, «Reconnecting…»
+// first: the till keeps what it shows, and a tap that cannot reach the server says so.
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
@@ -12,6 +13,7 @@ import { useRouter } from 'vue-router';
 
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useT } from '../../composables/useT';
+import ReconnectingNotice from '../ReconnectingNotice.vue';
 
 defineProps<{ tapNotice: string | null }>();
 
@@ -21,7 +23,7 @@ const router = useRouter();
 const session = useSession();
 const canFix = computed(() => session.can('inventory.change_product'));
 
-const { data, error } = useLive('inventory.product.list', { needs_tax_setup: true, is_active: true, limit: 1, offset: 0 });
+const { data, error, status } = useLive('inventory.product.list', { needs_tax_setup: true, is_active: true, limit: 1, offset: 0 });
 
 const blocked = computed(() => (error.value ? 0 : (data.value?.total ?? 0)));
 const sentence = computed(() => t('sale.pos.catalogBlocked', { count: blocked.value, tax: taxName.value }));
@@ -32,6 +34,10 @@ function review(): void {
 </script>
 
 <template>
+  <ReconnectingNotice
+    :status="status"
+    testid="pos"
+  />
   <p
     v-if="tapNotice"
     class="pos-notice pos-notice--box"

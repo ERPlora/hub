@@ -21,6 +21,7 @@ import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useT } from '../../composables/useT';
 import type { SettingsOut, SettingsPatchIn } from '../../operations';
 import { refusal } from '../../lib/refusal';
+import ReconnectingNotice from '../ReconnectingNotice.vue';
 import SettingsField from './SettingsField.vue';
 import { SETTINGS_FIELDS, type SettingsField as Field, type SettingsKey } from './settingsFields';
 
@@ -113,13 +114,10 @@ const failed = computed(() => !server.value && status.value === 'error' && !forb
 
 <template>
   <div class="sale-settings">
-    <InlineFeedback
-      v-if="status === 'reconnecting'"
-      tone="warning"
-      data-testid="sale-settings-reconnecting"
-    >
-      {{ $t('sale.live.reconnecting') }}
-    </InlineFeedback>
+    <ReconnectingNotice
+      :status="status"
+      testid="sale-settings"
+    />
 
     <p
       v-if="loading"
