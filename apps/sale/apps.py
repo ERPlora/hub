@@ -13,10 +13,7 @@ class SaleConfig(LiveAppConfig):
     name = "apps.sale"
     label = "sale"
     blueprint_stays = {
-        "PaymentMethod": "pending",
         "Settings": "settings",
-        "Department": "pending",
-        "QuickNote": "pending",
         "Order": "history",
         "OrderLine": "history",
         "Sale": "history",
@@ -236,3 +233,10 @@ class SaleConfig(LiveAppConfig):
         from apps.sale import queries  # the models are not loaded yet when this module is
 
         return queries.sales.keeps_fiscal_documents()
+
+    def blueprint_datasets(self) -> list:
+        """What of Sales travels in an export of the business (BASE-F35): the till's payment methods, departments and
+        quick notes, never a sale."""
+        from apps.sale import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS
