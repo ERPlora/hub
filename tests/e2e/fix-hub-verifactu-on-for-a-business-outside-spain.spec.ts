@@ -4,7 +4,7 @@
 // detail shows no «VeriFactu receipt»; a ticket sealed while the business was in Spain stays unsent, its invoice shows
 // no receipt either, and its record says why it does not leave (never «it goes out by itself», nothing to send);
 // VeriFactu › Settings and › Configuration say «VeriFactu is only for businesses in Spain.» as the one reason and offer
-// nothing that leads to the AEAT (the route switch, «Go live» and the live test disabled; neither the authorisation
+// nothing that leads to the AEAT («Go live» and the live test disabled; neither the authorisation
 // nor a certificate on offer, the certificate only saying its state). In 390, 834 and 1440, with the captures `<KEY>-<width>` (the invoice),
 // `<KEY>-record-<width>`, `<KEY>-settings-<width>` and `<KEY>-config-<width>`. Back in Spain an invoice is sealed and
 // shows its receipt (`<KEY>-es-1440`) and Settings and Configuration offer all of it again (`<KEY>-es-settings-1440`).
@@ -32,8 +32,8 @@ const CUSTOMER = `e2e Kowalski ${RUN}`;
 const NOT_IN_SPAIN = 'this business is not in Spain: VeriFactu is only for businesses in Spain, so nothing is sent to the AEAT';
 /** The one reason Settings and Configuration give outside Spain. */
 const ONLY_IN_SPAIN = 'VeriFactu is only for businesses in Spain.';
-/** What in VeriFactu › Settings would lead to the AEAT: the route switch, «Go live» and the live test. */
-const TO_THE_AEAT = ['own', 'go-live', 'test', 'test-invoice'];
+/** What in VeriFactu › Settings would lead to the AEAT: «Go live» and the live test. */
+const TO_THE_AEAT = ['go-live', 'test', 'test-invoice'];
 
 interface Registration {
   id: string;
@@ -198,7 +198,7 @@ test(`VERIFACTU-F13: back in Spain an invoice is sealed and shows its VeriFactu 
   await expect(settings.locator('[data-testid=verifactu-settings-environment]')).toBeVisible();
   await expect(settings.locator('[data-testid=verifactu-settings-outside-spain]')).toHaveCount(0);
   await expect(settings.locator('[data-testid=verifactu-settings-live-blockers]')).not.toContainText(NOT_IN_SPAIN);
-  for (const hook of ['own', 'test', 'test-invoice']) {
+  for (const hook of ['test', 'test-invoice']) {
     await expect(settings.locator(`[data-testid=verifactu-settings-${hook}]`), hook).toHaveJSProperty('disabled', false);
   }
   await untilStill(page);

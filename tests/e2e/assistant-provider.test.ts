@@ -63,24 +63,33 @@ const requested = (name: string) => ({ role: 'assistant', content: '', tool_call
 const NOT_CONFIRMED = { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed", "message": "Not confirmed."}}' };
 const SUMMARY = {
   number: 'S-1',
-  closing_balance: '250.00 EUR',
-  expected_balance: '230.00 EUR',
-  difference: '20.00 EUR',
+  closing_balance: '€250.00',
+  expected_balance: '€230.00',
+  difference: '€20.00',
   expected_hidden: false,
   pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
 };
 const PREVIEW = {
-  original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: '121.00 EUR', remaining: '121.00 EUR' },
+  original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: '€121.00', remaining: '€121.00' },
   invoice_type: 'R1',
   reason: 'el precio estaba mal',
   series_code: 'RECT',
   next_number: 'RECT-2026-000001',
   issue_date: '2026-10-27',
   whole: true,
-  base_amount: '-100.00 EUR',
-  tax_amount: '-21.00 EUR',
-  total_amount: '-121.00 EUR',
-  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: '-121.00 EUR' }],
+  base_amount: '-€100.00',
+  tax_amount: '-€21.00',
+  total_amount: '-€121.00',
+  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: '-€121.00' }],
+};
+/** The same preview told to a Spanish reader: money_text writes «-121,00 €», its space a no-break one. */
+const PREVIEW_ES = {
+  ...PREVIEW,
+  original: { ...PREVIEW.original, total_amount: '121,00\u00a0€', remaining: '121,00\u00a0€' },
+  base_amount: '-100,00\u00a0€',
+  tax_amount: '-21,00\u00a0€',
+  total_amount: '-121,00\u00a0€',
+  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: '-121,00\u00a0€' }],
 };
 
 describe('answerTo', () => {
@@ -194,9 +203,9 @@ describe('answerTo', () => {
     });
     const summary = {
       number: 'S-261024-0001',
-      closing_balance: '250.00 EUR',
-      expected_balance: '230.00 EUR',
-      difference: '20.00 EUR',
+      closing_balance: '€250.00',
+      expected_balance: '€230.00',
+      difference: '€20.00',
       expected_hidden: false,
       pending: { open_checks: 2, open_check_labels: ['Mesa 4', 'Mesa 7'], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
     };
@@ -223,13 +232,14 @@ describe('answerTo', () => {
   });
 
   it('the close summary as the model says it in Spanish: the expected and the difference only when they came, and what is pending', () => {
-    const base = { number: 'S-1', closing_balance: '250.00 EUR', pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
-    expect(closeCashSummary({ ...base, expected_balance: '230.00 EUR', difference: '20.00 EUR', expected_hidden: false }, 'es')).toBe(
-      'Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Esperado: 230.00 €\n- Diferencia: +20.00 €',
+    const base = { number: 'S-1', closing_balance: '250,00\u00a0€', pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false } };
+    expect(closeCashSummary({ ...base, expected_balance: '230,00\u00a0€', difference: '20,00\u00a0€', expected_hidden: false }, 'es')).toBe(
+      'Vas a cerrar la sesión **S-1**:\n\n- Contado: 250,00\u00a0€\n- Esperado: 230,00\u00a0€\n- Diferencia: +20,00\u00a0€',
     );
-    expect(closeCashSummary({ ...base, expected_balance: '230.00 EUR', difference: '-5.00 EUR', expected_hidden: false }, 'es')).toContain('- Diferencia: -5.00 €');
+    expect(closeCashSummary({ ...base, expected_balance: '230,00\u00a0€', difference: '-5,00\u00a0€', expected_hidden: false }, 'es')).toContain('- Diferencia: -5,00\u00a0€');
+    expect(closeCashSummary({ ...base, expected_balance: '250,00\u00a0€', difference: '0,00\u00a0€', expected_hidden: false }, 'es')).toContain('- Diferencia: 0,00\u00a0€');
     const blind = closeCashSummary({ ...base, expected_balance: null, difference: null, expected_hidden: true }, 'es');
-    expect(blind).toBe('Vas a cerrar la sesión **S-1**:\n\n- Contado: 250.00 €\n- Arqueo ciego: el cierre lo comparará al confirmar.');
+    expect(blind).toBe('Vas a cerrar la sesión **S-1**:\n\n- Contado: 250,00\u00a0€\n- Arqueo ciego: el cierre lo comparará al confirmar.');
     const pending = closeCashSummary(
       {
         ...base,
@@ -280,7 +290,7 @@ describe('answerTo', () => {
   });
 
   it('the rectification preview as the model says it in Spanish: the original, the type, the reason, the next number, the amounts and what was left', () => {
-    const whole = PREVIEW;
+    const whole = PREVIEW_ES;
     expect(rectifyPreview(whole, 'es')).toBe(
       [
         'Vas a rectificar la factura **F-1** del 26/10/2026 (Talleres Pérez SL) con esta rectificativa:',
@@ -289,16 +299,16 @@ describe('answerTo', () => {
         '- Motivo: el precio estaba mal',
         '- Número: RECT-2026-000001 (el siguiente de la serie RECT; se asigna al emitirla)',
         '- Fecha: 27/10/2026',
-        '- Corte × -1: -121.00 €',
-        '- Base: -100.00 €',
-        '- Impuestos: -21.00 €',
-        '- Total: -121.00 €',
+        '- Corte × -1: -121,00\u00a0€',
+        '- Base: -100,00\u00a0€',
+        '- Impuestos: -21,00\u00a0€',
+        '- Total: -121,00\u00a0€',
       ].join('\n'),
     );
-    const left = rectifyPreview({ ...whole, invoice_type: 'R5', whole: false, original: { ...whole.original, customer_name: '', remaining: '111.00 EUR' }, total_amount: '-111.00 EUR' }, 'es');
+    const left = rectifyPreview({ ...whole, invoice_type: 'R5', whole: false, original: { ...whole.original, customer_name: '', remaining: '111,00\u00a0€' }, total_amount: '-111,00\u00a0€' }, 'es');
     expect(left).toContain('Vas a rectificar la factura **F-1** del 26/10/2026 con esta rectificativa:');
     expect(left).toContain('- Tipo: R5');
-    expect(left).toContain('- Rectifica lo que queda: 111.00 € de 121.00 €');
+    expect(left).toContain('- Rectifica lo que queda: 111,00\u00a0€ de 121,00\u00a0€');
   });
 
   it('reads the question from a message with attachments', () => {
@@ -363,9 +373,10 @@ describe('answerTo — in the language of the request (hub#1025)', () => {
   }
 
   it('the close summary and the rectification preview in English: the same data, in its own words', () => {
-    expect(closeCashSummary(SUMMARY, 'en')).toBe('You are about to close session **S-1**:\n\n- Counted: 250.00 €\n- Expected: 230.00 €\n- Difference: +20.00 €');
+    expect(closeCashSummary(SUMMARY, 'en')).toBe('You are about to close session **S-1**:\n\n- Counted: €250.00\n- Expected: €230.00\n- Difference: +€20.00');
+    expect(closeCashSummary({ ...SUMMARY, difference: '-€5.00' }, 'en')).toContain('- Difference: -€5.00');
     const blind = closeCashSummary({ ...SUMMARY, expected_balance: null, difference: null, expected_hidden: true }, 'en');
-    expect(blind).toBe('You are about to close session **S-1**:\n\n- Counted: 250.00 €\n- Blind count: the close compares it when you confirm.');
+    expect(blind).toBe('You are about to close session **S-1**:\n\n- Counted: €250.00\n- Blind count: the close compares it when you confirm.');
     const pending = closeCashSummary(
       { ...SUMMARY, pending: { open_checks: 1, open_check_labels: ['Table 4'], unserved: 1, unserved_labels: ['Terrace 2'], prints: 3, print_usages: ['receipt'], incomplete: true } },
       'en',
@@ -382,15 +393,15 @@ describe('answerTo — in the language of the request (hub#1025)', () => {
         '- Reason: el precio estaba mal',
         '- Number: RECT-2026-000001 (the next one of series RECT; it is assigned when issued)',
         '- Date: 27/10/2026',
-        '- Corte × -1: -121.00 €',
-        '- Base: -100.00 €',
-        '- Taxes: -21.00 €',
-        '- Total: -121.00 €',
+        '- Corte × -1: -€121.00',
+        '- Base: -€100.00',
+        '- Taxes: -€21.00',
+        '- Total: -€121.00',
       ].join('\n'),
     );
-    const left = rectifyPreview({ ...PREVIEW, whole: false, original: { ...PREVIEW.original, customer_name: '', remaining: '111.00 EUR' } }, 'en');
+    const left = rectifyPreview({ ...PREVIEW, whole: false, original: { ...PREVIEW.original, customer_name: '', remaining: '€111.00' } }, 'en');
     expect(left).toContain('You are about to rectify invoice **F-1** of 26/10/2026 with this rectifying invoice:');
-    expect(left).toContain('- Rectifies what is left: 111.00 € of 121.00 €');
+    expect(left).toContain('- Rectifies what is left: €111.00 of €121.00');
   });
 });
 

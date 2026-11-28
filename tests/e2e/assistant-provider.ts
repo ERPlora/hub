@@ -109,7 +109,8 @@ export interface Seen {
   body: Record<string, unknown> | null;
 }
 
-/** The close's summary as the model reads `cash_register.session.closing_summary` (its amounts: «250.00 EUR»). */
+/** The close's summary as the model reads `cash_register.session.closing_summary` (its amounts as the screens write
+ *  them, in the language of whoever asks: «€250.00», «250,00 €»). */
 export interface CloseCashSummary {
   number: string;
   closing_balance: string | null;
@@ -153,7 +154,9 @@ const CLOSE_WORDS = {
   },
 } as const;
 
-const euros = (told: string, signed = false) => `${signed && Number(told.split(' ')[0]) > 0 ? '+' : ''}${told.split(' ')[0]} €`;
+/** An amount as the tool wrote it, said as it came; a signed one over zero with its «+», as «Cash register» writes a
+ *  difference. */
+const money = (told: string, signed = false) => `${signed && !told.startsWith('-') && /[1-9]/.test(told) ? '+' : ''}${told}`;
 const named = (count: number, labels: string[]) => (labels.length ? `${count} (${labels.join(' · ')})` : String(count));
 
 /** What the model says of the close's summary before its card, in `language`: only what the summary carries (never an
@@ -161,12 +164,12 @@ const named = (count: number, labels: string[]) => (labels.length ? `${count} ($
 export function closeCashSummary(summary: CloseCashSummary, language: Language): string {
   const words = CLOSE_WORDS[language];
   const lines = [words.title(summary.number), ''];
-  if (summary.closing_balance !== null) lines.push(`- ${words.counted}: ${euros(summary.closing_balance)}`);
+  if (summary.closing_balance !== null) lines.push(`- ${words.counted}: ${money(summary.closing_balance)}`);
   if (summary.expected_hidden || summary.expected_balance === null) {
     lines.push(`- ${words.blind}`);
   } else {
-    lines.push(`- ${words.expected}: ${euros(summary.expected_balance)}`);
-    if (summary.difference !== null) lines.push(`- ${words.difference}: ${euros(summary.difference, true)}`);
+    lines.push(`- ${words.expected}: ${money(summary.expected_balance)}`);
+    if (summary.difference !== null) lines.push(`- ${words.difference}: ${money(summary.difference, true)}`);
   }
   const review = summary.pending;
   if (review.open_checks) lines.push(`- ${words.openChecks}: ${named(review.open_checks, review.open_check_labels)}`);
@@ -176,7 +179,7 @@ export function closeCashSummary(summary: CloseCashSummary, language: Language):
   return lines.join('\n');
 }
 
-/** The rectification's preview as the model reads `invoice.invoice.rectification_preview` (amounts: «-121.00 EUR»). */
+/** The rectification's preview as the model reads `invoice.invoice.rectification_preview` (amounts: «-€121.00»). */
 export interface RectificationPreview {
   original: { number: string; issue_date: string; customer_name: string; total_amount: string; remaining: string };
   invoice_type: string;
@@ -232,9 +235,9 @@ export function rectifyPreview(preview: RectificationPreview, language: Language
   lines.push(`- ${words.type}: ${preview.invoice_type}`, `- ${words.reason}: ${preview.reason}`);
   lines.push(`- ${words.numberLabel}: ${words.number(preview.next_number, preview.series_code)}`);
   lines.push(`- ${words.date}: ${day(preview.issue_date)}`);
-  if (!preview.whole) lines.push(`- ${words.left(euros(original.remaining), euros(original.total_amount))}`);
-  for (const line of preview.lines) lines.push(`- ${line.description} × ${Number(line.quantity)}: ${euros(line.total_amount)}`);
-  lines.push(`- ${words.base}: ${euros(preview.base_amount)}`, `- ${words.tax}: ${euros(preview.tax_amount)}`, `- ${words.total}: ${euros(preview.total_amount)}`);
+  if (!preview.whole) lines.push(`- ${words.left(money(original.remaining), money(original.total_amount))}`);
+  for (const line of preview.lines) lines.push(`- ${line.description} × ${Number(line.quantity)}: ${money(line.total_amount)}`);
+  lines.push(`- ${words.base}: ${money(preview.base_amount)}`, `- ${words.tax}: ${money(preview.tax_amount)}`, `- ${words.total}: ${money(preview.total_amount)}`);
   return lines.join('\n');
 }
 

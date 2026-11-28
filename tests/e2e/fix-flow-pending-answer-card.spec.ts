@@ -70,11 +70,12 @@ for (const viewport of VIEWPORTS) {
       // Before: «Services: [{}]» in its details, as the model sent it; then «Services: 2 items» (hub#860).
       const text = await card.innerText();
       for (const raw of RAW) expect(text, `${raw} on the card`).not.toMatch(raw);
+      // In the chat card's order: whom, when it starts and the services first (APPOINTMENT's booking card).
       const data = card.locator('[data-testid^=flow-question-data-] li');
       await expect(data).toHaveText([
         'Customer: Ana López',
-        'Services: Tinte and 1 more',
         /^Starts at: Nov 2, 2026, \d{1,2}:00\s(AM|PM)$/,
+        'Services: Tinte and 1 more',
         'Booked through: Front desk',
       ]);
 

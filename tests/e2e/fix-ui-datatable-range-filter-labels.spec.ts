@@ -1,6 +1,7 @@
 // flow: UI DataTable range labels — the two ends of a range filter say which column they filter (hub#110): «From» /
-// «To» («Desde» / «Hasta») alone would not tell two ranges of one list apart (Payments: Date and Amount), and a date
-// range's ends are native date fields that paint «dd/mm/yyyy», never a placeholder. As in the market (Shopify, Odoo),
+// «To» («Desde» / «Hasta») alone would not tell two ranges of one list apart (Payments: Date and Amount). A date
+// range's ends are the app's day fields, picked in its calendar: read-only boxes that say «From» / «To» as their
+// label, not as an example text. As in the market (Shopify, Odoo),
 // a range filter carries the name of its field, in English and in Spanish. Behind the funnel (a `filterable` list
 // such as Invoices, and every list on a phone) each range has its column as a title, said once, «From» / «To» below
 // it. The ends keep their widths and nothing runs past the row, the panel or the sheet.
@@ -18,8 +19,8 @@ interface Range {
   /** The column's name, as the list says it in each language. */
   column: Record<Language, string>;
   ends: [string, string];
-  /** The native field of each end: a day, an amount as typed (decimal keyboard) or a number. */
-  field: 'date' | 'text' | 'number';
+  /** The field of each end: a day picked in the app's calendar, an amount as typed (decimal keyboard) or a number. */
+  field: 'day' | 'text' | 'number';
 }
 interface List {
   path: string;
@@ -36,7 +37,7 @@ const PAYMENTS: List = {
   path: '/payment/payments',
   table: 'payment-payments',
   ranges: [
-    { column: { en: 'Date', es: 'Fecha' }, ends: ['payment_date_from', 'payment_date_to'], field: 'date' },
+    { column: { en: 'Date', es: 'Fecha' }, ends: ['payment_date_from', 'payment_date_to'], field: 'day' },
     { column: { en: 'Amount', es: 'Importe' }, ends: ['amount_from', 'amount_to'], field: 'number' },
   ],
 };
@@ -45,7 +46,7 @@ const INVOICES: List = {
   table: 'invoice-list',
   ranges: [
     { column: { en: 'Total', es: 'Total' }, ends: ['total_amount_from', 'total_amount_to'], field: 'text' },
-    { column: { en: 'Date', es: 'Fecha' }, ends: ['issue_date_from', 'issue_date_to'], field: 'date' },
+    { column: { en: 'Date', es: 'Fecha' }, ends: ['issue_date_from', 'issue_date_to'], field: 'day' },
   ],
 };
 const HINTS: Record<Language, [string, string]> = { en: ['From', 'To'], es: ['Desde', 'Hasta'] };
@@ -66,8 +67,8 @@ interface Painted {
   cut: boolean;
   /** The heading comes before the ends: to their left on the same line, or on a line above. */
   before: boolean;
-  /** Each end: its example text («From»/«To», not painted by a date field), its type and its box. */
-  ends: Array<{ placeholder: string; type: string; x: number; width: number }>;
+  /** Each end: its example text, the label it paints, its type, whether it is typed in and its box. */
+  ends: Array<{ placeholder: string; label: string; type: string; typed: boolean; x: number; width: number }>;
 }
 
 async function signedIn(browser: Browser, size: (typeof SIZES)[number], language: Language): Promise<{ context: BrowserContext; page: Page }> {
@@ -108,7 +109,8 @@ async function painted(end: Locator): Promise<Painted> {
     const ends = [...group.querySelectorAll<HTMLElement>('ion-input')].map((input) => {
       const field = input.querySelector('input') as HTMLInputElement;
       const own = input.getBoundingClientRect();
-      return { placeholder: field.placeholder, type: field.type, x: own.x, width: own.width };
+      const label = input.querySelector<HTMLElement>('.label-text')?.innerText.trim() ?? '';
+      return { placeholder: field.placeholder, label, type: field.type, typed: !field.readOnly, x: own.x, width: own.width };
     });
     const first = group.querySelector('ion-input')!.getBoundingClientRect();
     return {
@@ -119,6 +121,18 @@ async function painted(end: Locator): Promise<Painted> {
       ends,
     };
   });
+}
+
+/** The ends still say «From» / «To»: a day as the label of the field the calendar fills in, a figure as the example
+ *  text of the box it is typed in. */
+function expectEndsSaid(own: Painted, range: Range, language: Language, what: string): void {
+  if (range.field === 'day') {
+    expect(own.ends.map((end) => end.label), `${what}: the ends' labels`).toEqual(HINTS[language]);
+    expect(own.ends.map((end) => [end.type, end.typed]), `${what}: the ends' fields`).toEqual([['text', false], ['text', false]]);
+    return;
+  }
+  expect(own.ends.map((end) => end.placeholder), `${what}: the ends' example texts`).toEqual(HINTS[language]);
+  expect(own.ends.map((end) => [end.type, end.typed]), `${what}: the ends' fields`).toEqual([[range.field, true], [range.field, true]]);
 }
 
 for (const size of SIZES) {
@@ -145,9 +159,7 @@ for (const size of SIZES) {
             expect(own.box!.width, `${what}: the column is painted`).toBeGreaterThan(0);
             expect(own.cut, `${what}: the column is whole or ends in «…»`).toBe(false);
             expect(own.before, `${what}: the column comes before its ends`).toBe(true);
-            // Its ends still say «From» / «To» (a date field paints its own «dd/mm/yyyy»).
-            expect(own.ends.map((end) => end.placeholder), `${what}: the ends' example texts`).toEqual(HINTS[language]);
-            expect(own.ends.map((end) => end.type), `${what}: the ends' fields`).toEqual([range.field, range.field]);
+            expectEndsSaid(own, range, language, what);
             // Nothing runs past the panel or the sheet.
             for (const box of [own.box!, ...own.ends]) {
               expect(box.x, `${what}: starts inside the panel`).toBeGreaterThanOrEqual(area.x - 0.5);

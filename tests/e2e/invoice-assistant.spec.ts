@@ -94,7 +94,8 @@ function toldPreview(): Record<string, unknown> {
   return JSON.parse(String(messages.filter((message) => message.role === 'tool').at(-1)?.content ?? '{}')) as Record<string, unknown>;
 }
 
-const euros = (cents: number) => `${(cents / 100).toFixed(2)} €`;
+/** Euros as the Hub writes them to an English reader, on its screens and to the model: «-€121.00». */
+const euros = (cents: number) => new Intl.NumberFormat('en', { style: 'currency', currency: 'EUR' }).format(cents / 100);
 const asked = (number: string) => `E2E-RECTIFY ${number} rectifica la factura ${number} porque ${REASON}`;
 /** The card says a rectification's kind by the name the models give it, never by its code (hub#708). */
 const KIND_R1 = {
@@ -125,10 +126,10 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   await expect(preview).toContainText(`Total: ${euros(-12100)}`);
   // The preview was the Hub's own reading, sent to the model as it is: never a figure the model made up.
   expect(toldPreview()).toMatchObject({
-    original: { number: invoice.number, total_amount: '121.00 EUR', remaining: '121.00 EUR' },
+    original: { number: invoice.number, total_amount: euros(12100), remaining: euros(12100) },
     invoice_type: 'R1',
     next_number: expected.next_number,
-    total_amount: '-121.00 EUR',
+    total_amount: euros(-12100),
   });
   // Reading it issued nothing; the card is the dangerous one, naming the invoice and the reason.
   expect((await invoiceOf(context, invoice.id)).status).toBe('issued');

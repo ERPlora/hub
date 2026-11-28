@@ -1,8 +1,9 @@
 // The icon of a dialog's confirm button keeps its distance from the label: in Staff → Staff, «Deactivate» on a member
-// must not ask with «⊘Deactivate», the icon against the word, while the list's «+ Add» keeps its gap. Tailwind's
+// must not ask with «⊘Deactivate», the icon against the word (the list's «+» is only an icon, its name in its
+// `aria-label`, so there is no gap of its own to compare). Tailwind's
 // preflight (`* { margin: 0 }`) is a document rule, and a document rule beats the `::slotted(ion-icon[slot=start])`
-// margin Ionic gives an icon inside `ion-button`, so every `ion-button` with a `HubIcon slot="start"` would lose it
-// (the DataTable puts its own back). Measured in the page at 390×844, 834×1112 and
+// margin Ionic gives an icon inside `ion-button`, so every `ion-button` with a `HubIcon slot="start"` would lose it.
+// Measured in the page at 390×844, 834×1112 and
 // 1440×900 (the shell pins Ionic's ios mode; md has the same rule): from the icon's right edge to the
 // label's first letter, Ionic's 0.3em of the icon, and the same gap from the spinner while the confirmation runs.
 // Only the gap comes back: the outer side (`margin-inline-start`) stays `0px`, or every SaaS button that sets only
@@ -81,7 +82,7 @@ async function openDeactivate(page: Page, id: string): Promise<Locator> {
   return dialog;
 }
 
-test('ui:ConfirmDialog — the confirm button keeps its icon apart from «Deactivate», like the list’s «+ Add»', async ({ browser }) => {
+test('ui:ConfirmDialog — the confirm button keeps its icon apart from «Deactivate»', async ({ browser }) => {
   const stamp = Date.now().toString(36);
   const name = `${TAG} Ana Icon${stamp}`;
   const { context, page } = await ownerPage(browser);
@@ -94,9 +95,6 @@ test('ui:ConfirmDialog — the confirm button keeps its icon apart from «Deacti
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await page.goto(`${A}/staff/members`);
       await expect(shown(page).locator('[data-testid=staff-members-row]', { hasText: name })).toBeVisible();
-      const add = await startGap(shown(page).locator('[data-testid=staff-members-add]'));
-      expect(add.gap, `«+ Add» ${vp.label}: ${JSON.stringify(add)}`).toBeGreaterThanOrEqual(4);
-
       const dialog = await openDeactivate(page, id);
       await expect(dialog).toContainText(`Take ${name} off the floor?`);
       const submit = dialog.locator('[data-testid=staff-member-deactivate-submit]');
