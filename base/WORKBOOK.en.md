@@ -1399,12 +1399,18 @@ Tables, the zones and the tables; of Modifiers, the groups, each with its option
 categories it applies to; of Menus and combos, the menus, each with its closed price, its courses, the products to
 choose in each course (by their code) with their supplement, and its own photo inside; of Taxes, the business's own
 tax categories, each with its rates and its surcharges, never the factory ones, which every business already has and
-no file touches; of Reservations, the time slots and the blocked days; of Staff, the roles in use; of Tasks, the active
+no file touches; of Services, also the vouchers, each with its services by name and its sessions; of Schedules, the
+usual week the business confirmed, the special days and the temporary changes, each with its hours (the week every
+business is born with, which nobody has confirmed, neither travels nor counts as the business's data, and it is the one
+the file's week replaces; a confirmed week is never overwritten by a file); of Appointments, the agenda blocks that have
+not passed yet, the whole business's and each professional's by their name (if the business loading it does not have
+that professional, the block does not go in and the report says so); of Reservations, the time slots and the blocked days; of Staff, the roles in use; of Tasks, the active
 projects and the open tasks, with their project, the task they hang from, their priority, due date, tags and status;
 of Automations, the automations, which arrive paused and with no permission given, for the owner to review them; of
 Kitchen, the stations with the products and categories that go to each; of Sales, the open price departments and the
 quick notes; of Customers, the groups, tags and own fields in use; of Cash register, the drawers in
-use; and, only in a backup, the customers. Never the history (sales, payments, cash sessions, reservations and
+use; of Demo, its items with their lines; and, only in a backup, the customers, with what each card keeps in its own
+fields (a value whose field is not in the business loading it does not go in and the report says so). Never the history (sales, payments, cash sessions, reservations and
 appointments, clock-ins, kitchen tickets, done tasks, runs), the people and their access, PINs, fiscal data, each
 app's settings (like the Sales payment methods) nor what is bound to something outside the business (WhatsApp, printers, QR codes already printed,
 secrets). Loaded
