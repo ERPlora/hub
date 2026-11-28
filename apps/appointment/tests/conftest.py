@@ -29,6 +29,9 @@ from base.services.sessions import ensure_hub_user
 from base.tenancy.tests.business import HOST, HUB_DB, HUB_DB_COMMITTED, A, B, factory_data, in_business_a
 from base.tenancy.tests.concurrency import hub_staff, plan_with_room
 
+# pytest explains a failed assert only in test files unless told: the write tests' shared checks live in their own module.
+pytest.register_assert_rewrite("apps.appointment.tests.write_checks")
+
 #: The marks, scopes and fixtures of the businesses' own databases (the factory data a committed test plants again, the
 #: platform staff with business A chosen in the Hub admin, business A on a plan with room for several sessions, the
 #: worker's real loop over them, a business's database cloned from the template for a migration's round trip) that
