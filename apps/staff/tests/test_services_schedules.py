@@ -222,3 +222,9 @@ def test_an_edited_week_without_its_hours_is_the_business_default_working_day():
     schedule = make_schedule(make_member("Bea"))
     updated = run("staff.schedule.update", ScheduleUpdateIn(id=schedule.id, days=[{"weekday": 5}]))
     assert its_days(updated) == [(5, t("10:00"), t("19:00"), t("14:00"), t("15:00"))]
+
+
+def test_the_break_a_day_without_its_hours_takes_lasts_what_the_settings_say():
+    StaffSettings.objects.create(default_work_start=t("08:00"), default_work_end=t("16:00"), default_break_duration=30)
+    schedule = create_schedule(make_member("Bea"), days=[{"weekday": 1}])
+    assert its_days(schedule) == [(1, t("08:00"), t("16:00"), t("11:45"), t("12:15"))]
