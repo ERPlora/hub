@@ -25,6 +25,8 @@ import { InlineFeedback } from '@erplora/ui/components';
 import type { LiveStatus } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
+import ReconnectingNotice from '../ReconnectingNotice.vue';
+
 const props = withDefaults(
   defineProps<{
     status: LiveStatus;
@@ -41,13 +43,10 @@ const blocked = computed(() => blockingError(props.error));
 </script>
 
 <template>
-  <InlineFeedback
-    v-if="status === 'reconnecting'"
-    tone="warning"
-    :data-testid="`${testid}-reconnecting`"
-  >
-    {{ $t('sale.live.reconnecting') }}
-  </InlineFeedback>
+  <ReconnectingNotice
+    :status="status"
+    :testid="testid"
+  />
   <InlineFeedback
     v-if="blocked"
     tone="warning"
