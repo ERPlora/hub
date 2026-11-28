@@ -17,7 +17,6 @@ from apps.inventory.models import Product
 from apps.inventory.schemas.fields import ProductRefIn
 from apps.inventory.schemas.products import ForSaleListIn, ProductFiltersIn, ProductIn, ProductListIn, ProductPatchIn
 from apps.inventory.tests.test_assistant_card_records import fields_of
-from apps.inventory.tests.test_queries import read_csv
 from apps.inventory.tests.test_services import (
     TAX,
     create,
@@ -31,7 +30,7 @@ from apps.inventory.tests.test_services_imports import import_products, row
 from apps.tax.models import TaxCategory
 from base.tenancy.context import current_alias, use_hub
 
-from .conftest import HOST, A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for
+from .conftest import HOST, A, B, HUB_DB, HUB_DB_COMMITTED, ctx_for, read_csv
 
 pytestmark = HUB_DB
 #: The fixture taken from the service tests: the sessions that hear each business.

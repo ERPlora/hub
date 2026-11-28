@@ -9,7 +9,8 @@ import pytest
 from live.context import system_context
 from live.operations import get
 
-from apps.sale.models import OrderLine, Sale, SaleLine
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.sales import Sale, SaleLine
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
 pytestmark = HUB_DB

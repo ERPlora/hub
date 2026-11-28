@@ -12,7 +12,9 @@ from live.context import system_context
 from live.errors import Conflict
 from live.models import OutboxEvent
 
-from apps.sale.models import Sale, SaleCounter, SalePayment
+from apps.sale.models.numbering import SaleCounter
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, B, ctx_for, run
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs

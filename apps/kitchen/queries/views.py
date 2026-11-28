@@ -10,7 +10,7 @@ from uuid import UUID
 
 from apps.kitchen.models import ItemStatus, Ticket, TicketItem
 from apps.kitchen.queries.reads import IN_FLIGHT, STRUCK, TO_DO
-from apps.sale.models import OrderLine
+from apps.sale.models.orders import OrderLine
 from base.queries.people import without_address
 
 

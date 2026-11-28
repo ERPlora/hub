@@ -8,7 +8,8 @@ from django.utils import translation
 from live.context import OperationContext
 from live.operations import AI, operation
 
-from apps.sale.models import Refund, Sale
+from apps.sale.models.refunds import Refund
+from apps.sale.models.sales import Sale
 from apps.sale.queries.payment_methods import method_display_name
 from apps.sale.queries.sales import returned_by_line, visible_sale
 from apps.sale.schemas.refunds import RefundByKeyIn, RefundByKeyOut, RefundListOut, RefundOptionsOut

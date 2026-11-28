@@ -12,7 +12,7 @@ from live.operations import AI, atomic, operation
 from live.outbox import record_event
 
 from apps.sale import events
-from apps.sale.models import Order, OrderLine
+from apps.sale.models.orders import Order, OrderLine
 from apps.sale.queries.business import actor
 from apps.sale.queries.checkout import loose_lines
 from apps.sale.queries.orders import ORDER_CHANGED, find_order, order_detail

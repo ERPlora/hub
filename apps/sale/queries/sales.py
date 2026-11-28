@@ -11,7 +11,9 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import AI, operation
 
-from apps.sale.models import FiscalStatus, Refund, RefundLine, Sale, SaleLine, SalePayment
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.refunds import Refund, RefundLine
+from apps.sale.models.sales import FiscalStatus, Sale, SaleLine
 from apps.sale.queries.ownership import SALES
 from apps.sale.queries.payment_methods import method_display_name
 from apps.sale.queries.receipt_codes import paper_code

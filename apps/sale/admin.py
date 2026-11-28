@@ -12,22 +12,15 @@ payment method (``lock_rows``), which a write naming it holds.
 from django.contrib import admin
 from live.operations import atomic
 
-from apps.sale.models import (
-    Department,
-    Order,
-    OrderLine,
-    PaymentMethod,
-    QuickNote,
-    Refund,
-    RefundLine,
-    RefundPayment,
-    Sale,
-    SaleCounter,
-    SaleLine,
-    SalePayment,
-    Settings,
-    VoucherSession,
-)
+from apps.sale.models.departments import Department, QuickNote
+from apps.sale.models.numbering import SaleCounter
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.refunds import Refund, RefundLine, RefundPayment
+from apps.sale.models.sales import Sale, SaleLine
+from apps.sale.models.settings import Settings
+from apps.sale.models.voucher_sessions import VoucherSession
 from apps.sale.services.orders import lock_orders, lock_rows
 
 AUDIT = ("id", "created_at", "updated_at")

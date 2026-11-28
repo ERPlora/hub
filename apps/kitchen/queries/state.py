@@ -14,7 +14,7 @@ from apps.kitchen.models import Destination, ItemStatus, KitchenSettings, Ticket
 from apps.kitchen.queries.reads import EPOCH, IN_FLIGHT, STRUCK
 from apps.kitchen.queries.rounds import unsaved_views
 from apps.kitchen.queries.views import Change, TicketView, saved_views
-from apps.sale.models import Order, OrderLine
+from apps.sale.models.orders import Order, OrderLine
 
 
 def _latest(moments: Iterable[dt.datetime | None]) -> dt.datetime:

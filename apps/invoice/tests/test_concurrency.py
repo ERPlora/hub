@@ -18,7 +18,7 @@ from apps.customer.tests.conftest import card_protected, reads, writes
 from apps.invoice.models import Invoice, InvoiceSeries, Issuer
 from apps.invoice.tests.conftest import HUB_DB_COMMITTED, ISSUER, deliver, run
 from apps.invoice.tests.manual import manual
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from base.tenancy.tests import hubs
 from base.tenancy.tests.concurrency import HOW, admin_delete, at_once, meanwhile
 

@@ -8,7 +8,10 @@ from live.context import OperationContext
 from live.errors import NotFound
 from live.operations import INTERNAL, operation
 
-from apps.sale.models import OrderLine, Refund, SaleLine, SalePayment
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.refunds import Refund
+from apps.sale.models.sales import SaleLine
 from apps.sale.queries.business import business_currency, money_text
 from apps.sale.queries.departments import find_department, find_quick_note
 from apps.sale.queries.orders import find_order

@@ -9,7 +9,8 @@ from live.errors import Conflict
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.sale.models import PaymentMethod, Sale
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.sales import Sale
 from apps.sale.queries.business import actor
 from apps.sale.queries.payment_methods import find_method
 from apps.staff.models import Member

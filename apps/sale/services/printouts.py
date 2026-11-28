@@ -16,7 +16,8 @@ from live.operations import AI, INTERNAL, UnknownOperation, atomic, get, operati
 from live.outbox import record_event
 
 from apps.sale import events, paper
-from apps.sale.models import FiscalStatus, Order
+from apps.sale.models.orders import Order
+from apps.sale.models.sales import FiscalStatus
 from apps.sale.queries.business import business_currency
 from apps.sale.queries.checkout import preview
 from apps.sale.queries.letterhead import business_letterhead

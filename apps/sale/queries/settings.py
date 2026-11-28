@@ -3,7 +3,7 @@
 from live.context import OperationContext
 from live.operations import AI, operation
 
-from apps.sale.models import Settings
+from apps.sale.models.settings import Settings
 from apps.sale.schemas.fields import EmptyIn
 from apps.sale.schemas.settings import SettingsOut
 

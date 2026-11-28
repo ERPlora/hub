@@ -143,7 +143,7 @@ DAY = dt.date(2026, 10, 14)
 
 
 def one_sale():
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     Sale.objects.create(number="20261014-0001", business_day=DAY, sequence=1, idempotency_key="key-1", total=100)
 

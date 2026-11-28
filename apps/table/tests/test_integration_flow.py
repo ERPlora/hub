@@ -11,7 +11,7 @@ runs (``flow.high_risk``), seating nobody and touching no check (TABLE-F10, TABL
 import pytest
 from live.errors import InvalidPayload
 
-from apps.sale.models import Order
+from apps.sale.models.orders import Order
 from apps.table.models import TableSession
 
 from .conftest import HUB_DB, A, add_line, make_session, make_table, open_check, run

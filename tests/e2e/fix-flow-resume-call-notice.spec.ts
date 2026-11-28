@@ -1,13 +1,15 @@
 // flow: FLOW-F24 FLOW-F27
 // Resuming a run whose call to another system failed says what the run is doing, never «finished well»: the call is
 // made again by the worker, so «Resume» answers «it is calling another system», and when that call fails again the
-// run says «It was resumed and stopped by an error again: …» with why. The owner of hub `a` runs a manual automation
+// run says «It was resumed and stopped by an error again: …» with why. Its steps say the call once, by what it calls
+// and why it stopped, never by the id of the step nor with the «Calling…» of while it went on, and nothing on the
+// screen is an internal code (hub#2586, hub#2629). The owner of hub `a` runs a manual automation
 // that calls an address that does not exist (`.invalid`, never resolved, so nothing leaves the machine), in English
 // and then in Spanish, at 390, 834 and 1440 px; each size leaves its captures. Its automations are deleted however
 // the test ends.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { confirmDialog, deleteFlowsNamed, manualFlow, ownerOnAutomations, workerCalls } from './flow-helpers';
+import { confirmDialog, deleteFlowsNamed, expectInWords, manualFlow, openRun, ownerOnAutomations, workerCalls } from './flow-helpers';
 import { A, api, capture, saveSessionForTheSweep, shown } from './helpers';
 import { noHorizontalScroll, VIEWPORTS } from './schedule-helpers';
 import { toastSaying } from './toast-helpers';
@@ -16,9 +18,11 @@ const KEY = 'FIX-HUB-FLOW-RESUME-CALL-NOTICE';
 const TAG = 'E2E FlowResumeCall';
 const ORIGIN = 'https://qa-resume.invalid';
 const CALLING = 'Resumed: it is calling another system. See how it goes here.';
-const AGAIN = 'It was resumed and stopped by an error again: It could not reach «qa-resume.invalid», so it stopped.';
+const WHY = 'It could not reach «qa-resume.invalid», so it stopped.';
+const AGAIN = `It was resumed and stopped by an error again: ${WHY}`;
+const WHY_ES = 'No ha podido llegar a «qa-resume.invalid», así que se ha parado.';
 const CALLING_ES = 'Reanudada: está llamando a otro sistema. Mira aquí cómo sigue.';
-const AGAIN_ES = 'Se reanudó y volvió a pararse por un error: No ha podido llegar a «qa-resume.invalid», así que se ha parado.';
+const AGAIN_ES = `Se reanudó y volvió a pararse por un error: ${WHY_ES}`;
 
 /** Resumes the run stopped by an error on `page` and checks the notice says it is calling, not that it finished. */
 async function resume(page: Page, stopped: string, retryTitle: string, calling: string): Promise<Locator> {
@@ -43,6 +47,10 @@ for (const viewport of VIEWPORTS) {
       workerCalls(flowId);
 
       await page.goto(`${A}/flow/automations/${flowId}?tab=history`);
+      const failed = await openRun(page, 'Stopped by an error');
+      await expect(failed.locator('[data-testid^=flow-run-steps-] li')).toHaveText([`Call qa-resume.invalid: ${WHY}`]);
+      await expectInWords(page, context);
+      await capture(page, `${KEY}-steps-${viewport.label}`);
       const card = await resume(page, 'Stopped by an error', 'Resume it from the step that failed?', CALLING);
       await expect(toastSaying(page, 'Resumed: it finished well.')).toHaveCount(0);
       await noHorizontalScroll(page, viewport.label);
@@ -57,6 +65,10 @@ for (const viewport of VIEWPORTS) {
       const inSpanish = await resume(page, 'Se paró por un error', '¿Reanudarla desde el paso que falló?', CALLING_ES);
       workerCalls(flowId);
       await expect(inSpanish.locator('[data-testid^=flow-run-retry-problem-]')).toHaveText(AGAIN_ES);
+      await inSpanish.locator('[data-testid^=flow-run-toggle-]').click();
+      await expect(inSpanish.locator('[data-testid^=flow-run-steps-] li').first()).toHaveText(/^Llamar a qa-resume\.invalid: /);
+      await expect(inSpanish.locator('[data-testid^=flow-run-steps-]')).not.toContainText('Llamando a');
+      await expectInWords(page, context);
       await noHorizontalScroll(page, viewport.label);
       await capture(page, `${KEY}-stopped-again-es-${viewport.label}`);
       await saveSessionForTheSweep(context);

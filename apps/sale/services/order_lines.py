@@ -10,7 +10,7 @@ from live.operations import AI, operation
 from live.outbox import record_event
 
 from apps.sale import events
-from apps.sale.models import Order, OrderLine
+from apps.sale.models.orders import Order, OrderLine
 from apps.sale.queries.business import authoriser
 from apps.sale.queries.departments import hold_departments
 from apps.sale.queries.line_parts import check_grid, provisional_total

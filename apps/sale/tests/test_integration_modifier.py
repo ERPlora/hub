@@ -16,7 +16,8 @@ from live.models import OutboxEvent
 
 from apps.inventory import events as inventory_events
 from apps.modifier.tests.burger import dress
-from apps.sale.models import OrderLine, SaleLine
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.sales import SaleLine
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
 pytestmark = HUB_DB

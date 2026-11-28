@@ -12,7 +12,8 @@ from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.sale.models import Order, OrderLine, Settings
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.settings import Settings
 from apps.sale.tests.conftest import HUB_DB, A, ctx_for, run
 
 pytestmark = HUB_DB

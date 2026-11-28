@@ -11,7 +11,7 @@ import { computed } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
 import type { DataChoice } from '../lib/document';
-import { pathLabel } from '../lib/phrasing';
+import { formatDate, pathLabel } from '../lib/phrasing';
 import type { CatalogOut, Step } from '../operations';
 import CatalogError from './CatalogError.vue';
 import LoadingNote from './LoadingNote.vue';
@@ -46,9 +46,19 @@ function heading(group: string): string {
   return phrasing.value.t('flow.picker.step', { n: props.steps.findIndex((step) => step.id === group) + 1 });
 }
 
+/** A moment as a datum keeps it (`2026-11-27T23:38:51+00:00`): said at the business's clock. */
+const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+/** The example of a datum as the screen says it: a yes or a no in words, a moment at the business's clock; an empty
+ *  one has none. */
 function example(value: unknown): string {
-  if (value === undefined) return '';
-  return phrasing.value.t('flow.picker.example', { value: typeof value === 'object' ? JSON.stringify(value) : String(value) });
+  if (value === undefined || value === null || value === '') return '';
+  const p = phrasing.value;
+  let said: string;
+  if (typeof value === 'boolean') said = p.t(value ? 'flow.picker.yes' : 'flow.picker.no');
+  else if (typeof value === 'string' && MOMENT.test(value)) said = formatDate(value, p.locale, p.timeZone);
+  else said = typeof value === 'object' ? JSON.stringify(value) : String(value);
+  return p.t('flow.picker.example', { value: said });
 }
 
 function choose(path: string): void {
@@ -120,7 +130,7 @@ function choose(path: string): void {
           >
             <span class="flow-picker__label">{{ pathLabel(choice.path, steps, catalog, phrasing) }}</span>
             <IonNote
-              v-if="choice.example !== undefined"
+              v-if="example(choice.example)"
               slot="end"
             >
               {{ example(choice.example) }}

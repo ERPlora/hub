@@ -41,7 +41,7 @@ business = leaving.business
 
 
 def sale(number: int):
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     return Sale.objects.create(
         number=f"20261014-{number:04d}", business_day=DAY, sequence=number, idempotency_key=f"key-{number}", total=100
@@ -238,7 +238,7 @@ def test_each_document_is_locked_by_the_bucket_and_written_once_with_its_checksu
 def test_a_large_table_goes_in_parts_read_a_page_at_a_time_and_none_is_lost(
     business, dumps_bucket, fiscal_archive_bucket, moto_s3, monkeypatch
 ):
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     from base.services import fiscal_archive as reads
 

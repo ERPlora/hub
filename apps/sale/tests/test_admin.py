@@ -17,22 +17,15 @@ from django.contrib.auth import get_user_model
 from django.test import RequestFactory
 
 from apps.sale import admin as sale_admin
-from apps.sale.models import (
-    Department,
-    Order,
-    OrderLine,
-    PaymentMethod,
-    QuickNote,
-    Refund,
-    RefundLine,
-    RefundPayment,
-    Sale,
-    SaleCounter,
-    SaleLine,
-    SalePayment,
-    Settings,
-    VoucherSession,
-)
+from apps.sale.models.departments import Department, QuickNote
+from apps.sale.models.numbering import SaleCounter
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.payment_methods import PaymentMethod
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.refunds import Refund, RefundLine, RefundPayment
+from apps.sale.models.sales import Sale, SaleLine
+from apps.sale.models.settings import Settings
+from apps.sale.models.voucher_sessions import VoucherSession
 from apps.sale.tests.conftest import HUB_DB, A, run
 
 pytestmark = HUB_DB

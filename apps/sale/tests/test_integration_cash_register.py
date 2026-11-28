@@ -9,7 +9,8 @@ from django.utils import translation
 from live.errors import Conflict
 from live.operations import registry
 
-from apps.sale.models import Sale, SaleCounter
+from apps.sale.models.numbering import SaleCounter
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 
 pytestmark = HUB_DB

@@ -15,6 +15,7 @@ import { computed } from 'vue';
 
 import { usePhrasing } from '../composables/usePhrasing';
 import { catalogOptions } from '../lib/catalogOptions';
+import { choiceOptions } from '../lib/choices';
 import { type DataChoice, delayParts, type DelayUnit, NOTIFY_OPERATION, secondsOf } from '../lib/document';
 import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
 import type { CatalogOut, Condition, FieldOut, FixedByAppOut, Step } from '../operations';
@@ -134,10 +135,16 @@ function setResult(result: 'first' | 'count'): void {
   if (props.step.kind === 'query') emit('update:step', { ...props.step, result });
 }
 
-/** What helps to fill a field: its choices, or (in English, the language they are written in) its words. */
-function helper(field: FieldOut): string | undefined {
-  if (field.choices.length) return field.choices.join(', ');
-  return phrasing.value.locale === 'en' && field.description ? field.description : undefined;
+/** How a field is painted: its words, whether it is required, its closed list by the words of its values (hub#2729)
+ *  and, in English (the language they are written in), its description. */
+function fieldProps(field: FieldOut) {
+  const operation = props.step.kind === 'command' || props.step.kind === 'query' ? props.step.operation : '';
+  return {
+    label: fieldLabel(field.name, phrasing.value),
+    required: field.required,
+    helper: phrasing.value.locale === 'en' && field.description ? field.description : undefined,
+    options: field.choices.length ? choiceOptions(operation, field, phrasing.value) : undefined,
+  };
 }
 
 const title = computed(() => describeStep(props.step, props.steps, props.catalog, phrasing.value));
@@ -582,9 +589,7 @@ const summary = computed(() => {
             <ValueBox
               :testid="`flow-step-param-${id}-${field.name}`"
               :model-value="params[field.name]"
-              :label="fieldLabel(field.name, phrasing)"
-              :required="field.required"
-              :helper="helper(field)"
+              v-bind="fieldProps(field)"
               :error-text="error(`params.${field.name}`)"
               :steps="steps"
               :catalog="catalog"

@@ -1,7 +1,9 @@
 """What a charge writes: the fiscal copy of each part it charged, its tenders and what ``sale.sale.completed``
 carries."""
 
-from apps.sale.models import OrderLine, Sale, SaleLine, SalePayment
+from apps.sale.models.orders import OrderLine
+from apps.sale.models.payments import SalePayment
+from apps.sale.models.sales import Sale, SaleLine
 from apps.sale.queries.line_parts import combo_name, dishes_of, folded_names, is_child
 
 

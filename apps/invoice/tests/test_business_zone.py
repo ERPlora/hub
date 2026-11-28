@@ -9,7 +9,8 @@ import pytest
 from apps.invoice.services import writes
 from apps.invoice.models import Invoice
 from apps.invoice.tests.conftest import HUB_DB, ISSUER, deliver, run
-from apps.sale.models import Refund, Sale
+from apps.sale.models.refunds import Refund
+from apps.sale.models.sales import Sale
 
 pytestmark = [HUB_DB, pytest.mark.usefixtures("nothing_leaves")]
 

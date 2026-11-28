@@ -17,7 +17,7 @@ from apps.kitchen.models import DayCounter, Destination, ItemStatus, KitchenSett
 from apps.kitchen.queries.reads import business_day, number_of
 from apps.kitchen.queries.routing import Routing, routing
 from apps.kitchen.queries.views import ItemView, LineFacts, TicketView
-from apps.sale.models import Order, OrderLine
+from apps.sale.models.orders import Order, OrderLine
 from apps.sale.queries.people import person_names
 
 #: How long after its check closed a round the kitchen never saved is still read from Sales.

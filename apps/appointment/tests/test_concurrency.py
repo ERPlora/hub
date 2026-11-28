@@ -115,7 +115,7 @@ def test_two_runs_of_the_same_series_never_book_a_date_twice(salon):
 
 
 def test_two_charges_of_the_same_appointment_at_once_open_one_check(salon):
-    from apps.sale.models import Order
+    from apps.sale.models.orders import Order
 
     booked = booking(salon, "10:00")()
     charge = lambda: run("appointment.appointment.charge", {"id": str(booked.id)})  # noqa: E731

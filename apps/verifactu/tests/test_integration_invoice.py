@@ -161,7 +161,7 @@ def test_voiding_a_charged_sale_registers_its_r5_as_an_alta_not_an_anulacion(she
 def test_a_partial_refund_registers_its_rectification_by_differences(shelf):
     sale = charge("verifactu-0003", [{"product": "SHA"}, {"product": "MNU"}])
     record_of(Invoice.objects.get(source_sale_id=sale.id, source_type="sale").id)
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     payment = Sale.objects.get(pk=sale.id).payments.get()
     run(

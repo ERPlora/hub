@@ -10,7 +10,8 @@ from live.context import OperationContext
 from live.errors import Conflict
 from live.operations import AI, operation
 
-from apps.sale.models import FACTORY_METHOD_NAMES, PaymentMethod, Settings
+from apps.sale.models.payment_methods import FACTORY_METHOD_NAMES, PaymentMethod
+from apps.sale.models.settings import Settings
 from apps.sale.queries.rows import held
 from apps.sale.queries.settings import current_settings
 from apps.sale.schemas.settings import PaymentMethodListIn, PaymentMethodPage

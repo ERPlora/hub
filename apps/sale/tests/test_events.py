@@ -11,7 +11,7 @@ from live.models import OutboxEvent
 from live.operations import NAME_RE
 
 from apps.sale import events
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.tests.conftest import HUB_DB, A, run
 
 PAST_FACT = re.compile(r"^sale\.[a-z_]+\.[a-z_]+(ed|_from_appointment)$")
@@ -183,7 +183,7 @@ def test_the_rectifying_invoice_of_a_refund_issued_later_goes_back_to_its_refund
     # refund's rectifying invoice waits and Invoicing's reaction issues it: the refund has its number at
     # once (INVOICE-F06), the sale's own documents do not change, and Sales' reaction to the notice
     # changes nothing.
-    from apps.sale.models import Refund
+    from apps.sale.models.refunds import Refund
     from apps.sale.tests.conftest import ctx_for
 
     product("Coffee", "COF", 150, "restaurant.drink")

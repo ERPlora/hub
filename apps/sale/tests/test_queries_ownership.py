@@ -15,7 +15,7 @@ from live.context import system_context
 from live.errors import NotFound
 from live.meta import all_live_app_configs, permissions_for_role
 
-from apps.sale.models import Sale
+from apps.sale.models.sales import Sale
 from apps.sale.queries.ownership import SALES
 from apps.sale.tests.conftest import HOST, HUB_DB, A, ctx_for, run
 

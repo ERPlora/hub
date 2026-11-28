@@ -23,7 +23,8 @@ from live.models import OutboxEvent
 from live.operations import get as operation
 
 from apps.invoice.models import Invoice
-from apps.sale.models import Order, OrderLine, Sale, SaleLine
+from apps.sale.models.orders import Order, OrderLine
+from apps.sale.models.sales import Sale, SaleLine
 from apps.sale.tests.conftest import HOST, HUB_DB, charged_with_voucher, ctx_for, run
 from apps.sale.tests.test_integration_invoice import ISSUER
 from apps.service.models.grants import Redemption

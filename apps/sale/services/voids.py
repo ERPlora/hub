@@ -9,7 +9,8 @@ from live.operations import AI, operation
 from live.outbox import record_event
 
 from apps.sale import events
-from apps.sale.models import Sale, Settings
+from apps.sale.models.sales import Sale
+from apps.sale.models.settings import Settings
 from apps.sale.queries.business import actor
 from apps.sale.queries.other_apps import call_services
 from apps.sale.queries.sales import sale_detail, visible_sale

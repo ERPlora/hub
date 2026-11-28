@@ -8,7 +8,7 @@ from live.errors import NotFound
 from live.operations import operation
 
 from apps.invoice.schemas.refunds import RefundGetIn, RefundOut
-from apps.sale.models import Refund
+from apps.sale.models.refunds import Refund
 from base.business import money_text
 
 REFUND_NOT_FOUND = _("That refund does not exist.")

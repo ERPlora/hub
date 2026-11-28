@@ -47,7 +47,7 @@ def document(
 
 def a_sale(number="20261014-0001"):
     """A bare charged sale (the foreign keys need a real row; the operations are tested elsewhere)."""
-    from apps.sale.models import Sale
+    from apps.sale.models.sales import Sale
 
     return Sale.objects.create(
         number=number,
@@ -184,7 +184,7 @@ def test_one_invoice_per_sale_and_one_rectification_per_void():
 
 
 def test_one_rectification_per_refund():
-    from apps.sale.models import Refund
+    from apps.sale.models.refunds import Refund
 
     refund_id = Refund.objects.create(sale=a_sale(), total=121, reason="broken").id
     original = document(series(), 1)
