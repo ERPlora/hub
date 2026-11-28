@@ -14,7 +14,8 @@ from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
 
-from apps.kitchen.models import KitchenSettings, Ticket, TicketItem
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.tickets import Ticket, TicketItem
 from apps.kitchen.queries.outputs import item_out, row_out, ticket_out
 from apps.kitchen.queries.reads import IN_FLIGHT, MAX_CANDIDATES, STRUCK, business_day, current_settings
 from apps.kitchen.queries.rounds import unsaved_views

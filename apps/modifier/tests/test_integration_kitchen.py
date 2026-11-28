@@ -15,7 +15,7 @@ import pytest
 from live.context import OperationContext
 from live.meta import all_live_app_configs
 
-from apps.kitchen.models import TicketItem
+from apps.kitchen.models.tickets import TicketItem
 from apps.kitchen.tests.conftest import add_printers
 from apps.printing.models import PrintJob
 from base.tenancy.context import use_hub

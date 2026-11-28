@@ -8,7 +8,8 @@ from live.errors import Conflict
 from live.operations import get, operation
 
 from apps.kitchen import events
-from apps.kitchen.models import ACTOR_MAX_LENGTH, Ticket, TicketItem
+from apps.kitchen.models.fields import ACTOR_MAX_LENGTH
+from apps.kitchen.models.tickets import Ticket, TicketItem
 from apps.kitchen.queries.reads import COOKING
 from apps.kitchen.schemas.rounds import ReceivedOut, SyncOut, TicketReceiveIn, TicketSendIn, TicketSyncIn
 from apps.kitchen.schemas.tickets import TicketOut

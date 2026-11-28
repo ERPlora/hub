@@ -9,7 +9,9 @@ from django.db.models import Count, Q
 from live.context import OperationContext
 from live.operations import INTERNAL, operation
 
-from apps.kitchen.models import CategoryRoute, KitchenSettings, ProductRoute, Station
+from apps.kitchen.models.routing import CategoryRoute, ProductRoute
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.stations import Station
 from apps.kitchen.queries.reads import COOKING, current_settings
 from apps.kitchen.queries.routing import category_routes, product_routes
 from apps.kitchen.queries.scope import ALL, find_scope, find_station

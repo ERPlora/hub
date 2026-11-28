@@ -9,7 +9,7 @@ from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.kitchen import events
-from apps.kitchen.models import Station
+from apps.kitchen.models.stations import Station
 from apps.kitchen.queries.reads import current_settings
 from apps.kitchen.queries.routing import category_routes, product_routes
 from apps.kitchen.queries.scope import STATION_NOT_FOUND, find_station

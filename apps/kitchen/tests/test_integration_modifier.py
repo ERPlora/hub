@@ -14,7 +14,7 @@ line reaches card and paper.
 import pytest
 from live.context import system_context
 
-from apps.kitchen.models import TicketItem
+from apps.kitchen.models.tickets import TicketItem
 
 from apps.modifier.tests.burger import dress
 

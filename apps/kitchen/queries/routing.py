@@ -3,7 +3,8 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from apps.kitchen.models import CategoryRoute, ProductRoute, Station
+from apps.kitchen.models.routing import CategoryRoute, ProductRoute
+from apps.kitchen.models.stations import Station
 
 
 @dataclass

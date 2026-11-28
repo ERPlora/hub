@@ -12,7 +12,7 @@ from django.utils import timezone
 from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
 
-from apps.kitchen.models import Ticket
+from apps.kitchen.models.tickets import Ticket
 from base.tests.actors import who_did_it
 from base.tests.ordering import assert_reads_backwards, listed_with
 
@@ -123,7 +123,7 @@ def test_services_never_reach_the_kitchen(clock, product):
 
 
 def test_what_was_fired_before_the_kitchen_existed_never_shows(clock, product):
-    from apps.kitchen.models import KitchenSettings
+    from apps.kitchen.models.settings import KitchenSettings
 
     fired_round(product, "Burger")
     KitchenSettings.objects.update(receiving_since=clock.advance(minutes=1))
@@ -135,7 +135,7 @@ def test_a_round_never_saved_of_a_check_closed_over_a_day_ago_is_no_longer_read(
 ):
     # The rounds not saved yet are read from Sales on every read: only the ones of checks still open or closed within
     # the last day, so a kitchen that never writes does not read a growing past.
-    from apps.kitchen.models import KitchenSettings
+    from apps.kitchen.models.settings import KitchenSettings
 
     KitchenSettings.objects.update(works_from_screen=False, screen_changed_at=clock.now)
     clock.advance(minutes=1)
@@ -235,7 +235,7 @@ def test_a_deleted_station_is_no_longer_found_nor_offered(clock, product):
     lines = fire(order.id).order.lines
     run("kitchen.item.bump", {"ticket_id": str(lines[0].id), "station": "grill"})
     run("kitchen.routing.clear", {"product_id": str(burger.id)})
-    from apps.kitchen.models import Station
+    from apps.kitchen.models.stations import Station
 
     Station.objects.filter(pk=grill.id).update(is_deleted=True)
     assert [chip.name for chip in board().stations] == [""]
@@ -270,7 +270,7 @@ def test_rush_first_then_vip_then_the_oldest(clock, product):
         clock.advance(minutes=1)
     save_everything()
     run("kitchen.ticket.set_rush", {"ticket": "New"})
-    from apps.kitchen.models import Ticket
+    from apps.kitchen.models.tickets import Ticket
 
     Ticket.objects.filter(label="Middle").update(priority="vip")
     assert [t.label for t in board().cooking] == ["New", "Middle", "Old"]
@@ -657,7 +657,7 @@ def test_the_settings_are_the_factory_ones_with_the_business_zone():
 
 
 def test_the_settings_are_the_factory_ones_without_a_row():
-    from apps.kitchen.models import KitchenSettings
+    from apps.kitchen.models.settings import KitchenSettings
 
     KitchenSettings.objects.all().delete()
     assert run("kitchen.settings.get", {}).works_from_screen is True

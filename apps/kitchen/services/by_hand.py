@@ -7,7 +7,9 @@ from live.context import OperationContext
 from live.operations import operation
 
 from apps.kitchen import events
-from apps.kitchen.models import ACTOR_MAX_LENGTH, Destination, LogAction, Ticket, TicketItem
+from apps.kitchen.models.fields import ACTOR_MAX_LENGTH, Destination
+from apps.kitchen.models.history import LogAction
+from apps.kitchen.models.tickets import Ticket, TicketItem
 from apps.kitchen.queries.reads import business_day
 from apps.kitchen.queries.routing import routing
 from apps.kitchen.schemas.tickets import TicketCreateIn, TicketOut

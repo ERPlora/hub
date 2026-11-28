@@ -9,7 +9,11 @@ from django.utils import timezone
 from live.context import OperationContext
 from live.outbox import record_event
 
-from apps.kitchen.models import ACTOR_MAX_LENGTH, DayCounter, KitchenSettings, Station, Ticket
+from apps.kitchen.models.fields import ACTOR_MAX_LENGTH
+from apps.kitchen.models.numbering import DayCounter
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.stations import Station
+from apps.kitchen.models.tickets import Ticket
 from apps.kitchen.queries.reads import EPOCH
 
 # One logger for every module of the kitchen's writes, named after the package rather than each module.
@@ -57,7 +61,7 @@ def write_log(  # noqa: PLR0913
     item_id=None,
     station_id=None,
 ):
-    from apps.kitchen.models import LogEntry
+    from apps.kitchen.models.history import LogEntry
 
     return LogEntry.objects.create(
         ticket_id=ticket_id,

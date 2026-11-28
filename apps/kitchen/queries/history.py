@@ -5,7 +5,7 @@ import datetime as dt
 from live.context import OperationContext
 from live.operations import operation
 
-from apps.kitchen.models import LogEntry
+from apps.kitchen.models.history import LogEntry
 from apps.kitchen.queries.reads import start_of
 from apps.kitchen.schemas.history import LogListIn, LogPage
 from apps.sale.queries.people import person_names

@@ -8,7 +8,8 @@ through an operation of this app; delivering it twice changes nothing.
 """
 
 from apps.kitchen import events
-from apps.kitchen.models import LogEntry, Ticket, TicketItem
+from apps.kitchen.models.history import LogEntry
+from apps.kitchen.models.tickets import Ticket, TicketItem
 
 from .conftest import (
     A,

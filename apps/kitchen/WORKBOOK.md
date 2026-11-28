@@ -1001,8 +1001,8 @@ que no tiene ningún papel: solo el sistema (`*`).
 
 ### Notas técnicas
 
-- Anatomía completa: `apps.py`, `models.py`, `migrations/` (`0001_initial`; `0002_settings_row` crea la
-  fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
+- Anatomía completa: `apps.py`, `models/` (un módulo por tema), `migrations/` (`0001_initial`;
+  `0002_settings_row` crea la fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
   `0004_item_options_and_menu`, los suplementos y el menú de cada plato; `0005_item_allergy`, la alergia y los
   alérgenos que coinciden de cada plato), `allergy.py` (la alergia de un plato y sus renglones en el papel),
   `schemas/`, `queries/` (un módulo por tema),

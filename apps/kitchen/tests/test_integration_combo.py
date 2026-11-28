@@ -19,7 +19,7 @@ import pytest
 from live.context import system_context
 from live.errors import Conflict
 
-from apps.kitchen.models import Ticket, TicketItem
+from apps.kitchen.models.tickets import Ticket, TicketItem
 
 from .conftest import (
     A,

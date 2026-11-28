@@ -18,7 +18,7 @@ from live.executor import Stream, Subscription, executor
 from live.operations import get as operation
 
 from apps.flow.tests.test_api import get, post
-from apps.kitchen.models import Ticket
+from apps.kitchen.models.tickets import Ticket
 from base.models import Membership
 from base.operations import HubContextBuilder
 from base.schemas.home import NoticeListIn

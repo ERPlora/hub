@@ -31,7 +31,7 @@ from apps.customer.models import Customer
 from apps.flow.tests.test_relay import heard, listen, worker_loop
 from apps.inventory.models import Product, StockMovement
 from apps.invoice.models import Invoice
-from apps.kitchen.models import Ticket
+from apps.kitchen.models.tickets import Ticket
 from apps.kitchen.tests.conftest import add_printers
 from apps.printing.models import PrintJob
 from apps.sale.tests.conftest import db_dsn

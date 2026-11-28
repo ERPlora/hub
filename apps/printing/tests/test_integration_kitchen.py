@@ -11,7 +11,7 @@ from django.db.models import F
 from live.context import system_context
 from live.errors import Conflict
 
-from apps.kitchen.models import Destination
+from apps.kitchen.models.fields import Destination
 from apps.kitchen.tests.conftest import add_line, make_station, open_check, route_product
 from apps.printing.models import PrintJob
 from apps.printing.queries.waiting import STALLED_AFTER

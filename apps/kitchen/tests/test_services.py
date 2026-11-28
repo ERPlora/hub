@@ -13,7 +13,10 @@ from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
 
-from apps.kitchen.models import KitchenSettings, LogEntry, Station, Ticket, TicketItem
+from apps.kitchen.models.history import LogEntry
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.stations import Station
+from apps.kitchen.models.tickets import Ticket, TicketItem
 from base.tenancy.context import use_hub
 
 from .conftest import HUB_DB, HUB_DB_COMMITTED, A, B, add_line, add_printers, charge, ctx_for, fire, fired_round, make_station

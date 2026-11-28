@@ -9,7 +9,8 @@ from live.errors import Conflict
 from live.operations import operation
 
 from apps.kitchen import events
-from apps.kitchen.models import ItemStatus, LogAction, Ticket, TicketStatus
+from apps.kitchen.models.history import LogAction
+from apps.kitchen.models.tickets import ItemStatus, Ticket, TicketStatus
 from apps.kitchen.queries.reads import COOKING, STRUCK, TO_DO
 from apps.kitchen.schemas.fields import DeletedOut, TicketRefIn
 from apps.kitchen.schemas.tickets import TicketCancelIn, TicketOut, TicketRushIn

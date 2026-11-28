@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from apps.kitchen.models import Station
+from apps.kitchen.models.stations import Station
 from apps.kitchen.queries.scope import station_map
 from apps.kitchen.queries.views import ItemView, TicketView
 

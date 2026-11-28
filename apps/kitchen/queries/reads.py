@@ -6,7 +6,8 @@ import datetime as dt
 
 from django.utils import timezone
 
-from apps.kitchen.models import ItemStatus, KitchenSettings, TicketStatus
+from apps.kitchen.models.settings import KitchenSettings
+from apps.kitchen.models.tickets import ItemStatus, TicketStatus
 from base.business import business_zone, zone_name
 
 IN_FLIGHT = (TicketStatus.PENDING, TicketStatus.PREPARING, TicketStatus.READY)
