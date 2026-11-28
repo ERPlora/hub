@@ -1,8 +1,9 @@
 """What the card of a write says of a datum beyond its value, as the datum's screen says it: each datum as the write
-takes it (``as_taken``), never one of our ids, a value that means there is no limit (``NO_LIMIT``) and a price with the
-unit it is for (``PER_UNIT``). The marks are declared on the datum's schema, as its other marks are
-(``base.schemas.assistant.no_limit`` and ``per_unit``)."""
+takes it (``as_taken``), never one of our ids, a value that means there is no limit (``NO_LIMIT``), a figure with
+decimals as the person's language writes it and a price with the unit it is for (``PER_UNIT``). The marks are declared
+on the datum's schema, as its other marks are (``base.schemas.assistant.no_limit`` and ``per_unit``)."""
 
+import re
 from decimal import Decimal, InvalidOperation
 from functools import cache
 from typing import Annotated, Any
@@ -72,11 +73,36 @@ def marked(op: Operation, fields: list[dict], data: dict, language: str) -> list
 def _said(field: dict, prop: dict, data: dict, language: str) -> dict:
     if NO_LIMIT in prop and type(field["value"]) is int and field["value"] == prop[NO_LIMIT]:
         return {**field, "kind": "text", "value": pgettext("base", "No limit"), CHOICE: True}
+    if field["kind"] == "text" and _takes_a_fraction(prop) and _is_figure(field["value"]):
+        # A figure says nothing of which datum it is: marked as a value of a closed list is, the screen names it.
+        return {**field, "value": _number(Decimal(str(field["value"])), language), CHOICE: True}
     per = prop.get(PER_UNIT)
     unit = _unit(per, data, language) if field["kind"] == "money" and isinstance(per, dict) else None
     if unit is None:
         return field
     return {**field, "label": pgettext("base", "%(datum)s per %(unit)s") % {"datum": field["label"], "unit": unit}, "titled": True}
+
+
+#: A figure as JSON and the text of a decimal write one («5.2», «-1.250»), as the write takes it.
+_FIGURE = re.compile(r"-?\d+(?:\.\d+)?")
+
+
+def _takes_a_fraction(prop: dict) -> bool:
+    """Whether a datum takes a number that may carry decimals (a quantity, a percentage, a coordinate): a ``number``,
+    or the number branch of a decimal; never a whole number, nor a text that looks like one (a phone, a postal code)."""
+    return any(branch.get("type") == "number" for branch in prop.get("anyOf", []) or [prop])
+
+
+def _is_figure(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, int | float) or (isinstance(value, str) and _FIGURE.fullmatch(value) is not None)
+
+
+def _number(value: Decimal, language: str) -> str:
+    """``value`` as the screens write a quantity in ``language`` («5,2», «1.500,25»; «1,500.25» in English): every
+    decimal it carries and none it does not need."""
+    return format_decimal(value.normalize(), locale=babel_locale(language), decimal_quantization=False)
 
 
 def _unit(per: dict, data: dict, language: str) -> str | None:
@@ -85,7 +111,7 @@ def _unit(per: dict, data: dict, language: str) -> str | None:
     quantity = _quantity(data.get(per.get("quantity", "")))
     if unit is None or (unit == per.get("each") and quantity == 1):
         return None
-    return unit if quantity == 1 else f"{format_decimal(quantity, locale=babel_locale(language))} {unit}"
+    return unit if quantity == 1 else f"{_number(quantity, language)} {unit}"
 
 
 def _quantity(value: Any) -> Decimal:

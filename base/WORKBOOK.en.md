@@ -3032,7 +3032,7 @@ that screen tells them.
 Involved: BASE-F92, BASE-F99
 
 ### BASE-F97 Confirm an action before it runs
-<!-- from WORKBOOK.md sha256:c292b3532729 -->
+<!-- from WORKBOOK.md sha256:7a1653992649 -->
 Status: done
 Actor: owner, administrator, manager, employee
 Screen: Assistant confirmation card
@@ -3072,7 +3072,10 @@ Steps:
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
      no sign when it balances); a yes or a no, as "Yes" or "No", with the name of its datum in front, also on a normal action's line,
      because alone it says nothing of what changes ("Require an opening float: Yes · Require a count to close: Yes",
-     never "Yes · Yes"); a list that its app (the server) names, by its items
+     never "Yes · Yes"); a figure with decimals (a percentage, a quantity, a weight, a coordinate) as its screen writes
+     it in the person's language, without the zeros it does not need and with the name of its datum in front ("Rate
+     (%): 5.2", "Quantity: 0.5", "Counted stock: 1,500.25"; in Spanish, "5,2"), never "2.000" for two; a list that its
+     app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
      2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
@@ -3089,7 +3092,9 @@ Steps:
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of what the person wrote,
-     such as the options of a select field, by each one as written ("Options: Terrace, Inside"); a list of lines that
+     such as the options of a select field, the tags or groups of a customer, the tags of a task, the notes of an
+     automation's draft or the examples of a WhatsApp template, by each one as written ("Options: Terrace, Inside";
+     "Tags: VIP, Regular"); a list of lines that
      carry in words their record, the name the person said, what they wrote or a time or a date and, beside it, only
      figures — a goods receipt (product and quantity), the services of a voucher (service and sessions), the dishes of
      a ticket made by hand, the intervals of a day's hours or the lines of an invoice made by hand —, by its words
@@ -3097,7 +3102,11 @@ Steps:
      rate typed by hand as a percentage ("Products: Red wine · 6, Beer · 2.5"; "Services included: Haircut · 5,
      Colour · 3"; "Dishes: Espresso · 2, Latte · 1"; "Opening intervals: 9:00 AM · 2:00 PM"; "Lines: Private birthday
      menus · 10% · 1 · €681.82"; when a line cannot be named, the list says how many it carries: it would read as a
-     bare figure); the custom fields of a customer's card, each by its name and its value as the card shows it: a yes
+     bare figure), and the same with what the line says in words beside its record: the dishes of a menu added to a
+     check, by the dish and the course it goes in ("Dishes: Mixed salad · Starters, Grilled sea bass · Mains"), a line of a sale with its
+     note, its section or its name, a tender by its name and its reference, and the buttons of a WhatsApp template by
+     their kind, as its sheet calls it, and what they say ("Buttons: Quick reply · Yes, Call · Call us ·
+     +34910000000"); the custom fields of a customer's card, each by its name and its value as the card shows it: a yes
      or no in the person's language, a date as it is written in it and a field that is cleared, with a dash ("Custom
      fields: Table preference · Terrace, VIP · Yes"; "VIP · —"); the special days loaded at once, by their date and
      their name and, when that day opens, its hours ("Jan 1, 2027 · New Year's Day; Jan 6, 2027 · Epiphany; Mar 26,

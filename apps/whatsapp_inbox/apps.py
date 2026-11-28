@@ -58,6 +58,15 @@ class WhatsappInboxConfig(LiveAppConfig):
         "whatsapp_inbox.configure": _("Connect the number and manage the templates and settings"),
         "whatsapp_inbox.erase": _("Erase a number's data"),
     }
+    # The kinds of a button a template made here takes, by the names its sheet gives them: the assistant's card says each
+    # button so. Meta's own kinds, made in WhatsApp Manager, are no closed list.
+    choices = {
+        "button_type": (
+            ("QUICK_REPLY", pgettext_lazy("whatsapp button", "Quick reply")),
+            ("URL", pgettext_lazy("whatsapp button", "Link")),
+            ("PHONE_NUMBER", pgettext_lazy("whatsapp button", "Call")),
+        )
+    }
     # The files of the templates' headers (samples.py), which the template's sheet shows to the hub's people only
     # (base.media serves them at /p/media/ to a session of this hub; a visitor gets a 404).
     members_media = ["whatsapp_inbox/samples/"]

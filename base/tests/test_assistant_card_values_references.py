@@ -367,7 +367,7 @@ def test_a_list_with_a_value_nobody_can_name_says_the_rest_and_counts_it():
 
 def text_lists() -> dict[str, list[str]]:
     """Each list of texts of the assistant's writes no schema says anything of (no record, moment, closed list or the
-    person's own words): the write and its datum."""
+    person's own words), which the card would say by how many it carries: the write and its datum."""
     found: dict[str, list[str]] = {}
     for op in writes():
         schema = op.input.model_json_schema()
@@ -383,19 +383,11 @@ def text_lists() -> dict[str, list[str]]:
 
 
 @HUB_DB
-def test_no_list_of_texts_sent_as_they_are_is_named():
-    """Every one of them, codes or texts no schema marks as the person's own words: as sent, so never said item by item
-    as if the server had named it. A list the server says in words is (positive controls: a series of visits, said as
-    moments; the options of a select field, the person's own words, hub#2288)."""
-    found = text_lists()
-    assert "flow.draft.propose" in found
-    named = [
-        f"{write}:{name}"
-        for write, names in found.items()
-        for name in names
-        if NAMED in list_field(assistant.cards.card(get(write), {name: ["sale.sale.create", "vip"]}, "es"), name)
-    ]
-    assert named == []
+def test_every_list_of_texts_says_what_its_texts_are():
+    """The tags of a customer or a task, the notes of an automation's draft and the examples of a template went by how
+    many they carry: every list of texts says what its texts are, so the card says them item by item (positive
+    controls: a series of visits, said as moments; the options of a select field, the person's own words, hub#2288)."""
+    assert text_lists() == {}
     starts = ["2026-11-02T10:00:00+01:00", "2026-11-09T10:00:00+01:00"]
     visits = list_field(assistant.cards.card(get("appointment.appointment.bulk_create"), {"starts": starts}, "es"), "starts")
     assert (visits["value"], visits.get(NAMED)) == (["2 nov 2026, 10:00", "9 nov 2026, 10:00"], True)
@@ -415,12 +407,7 @@ UNNAMED_REFERENCES = {
 
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models give no label — of their app,
 #: or those their ``choices_of`` mark names —, by app: their card says that value as sent. Only ever lower, as above.
-UNLABELLED_LISTS = {
-    # The type of a template's button (template.create and .update): it lives in the JSON of its buttons, and no field
-    # of the models names its values to point a mark at. The card says the buttons by how many go, never by their codes
-    # (a line of two data: test_the_buttons_of_a_template_go_by_how_many_never_by_their_codes, hub#571).
-    "whatsapp_inbox": 2,
-}
+UNLABELLED_LISTS: dict[str, int] = {}
 
 
 def unnamed(op: Operation) -> tuple[list[str], list[str]]:
