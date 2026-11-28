@@ -279,17 +279,24 @@ def another(item):
     return "Otro texto" if item == "Texto" else item
 
 
-def counted(op: Operation) -> list[str]:
-    """The lists of ``op`` its card says as «N items» when the model names their records by their names."""
+def lists_by_name(op: Operation):
+    """Each list of ``op`` a model may send naming things by their names: its datum, two items of it and whether the
+    write takes them."""
     props, defs = schema_of(op)
-    found = []
     for name, prop in props.items():
         if shared.resolved(prop, defs).get("type") != "array":
             continue
         item = item_by_name(shared.resolved(prop, defs).get("items") or {}, defs)
-        if item is None or refuses(op, name, items := [item, another(item)]):
-            continue
-        card = assistant.cards.card(op, {name: items}, "es", card_values.ctx())
+        if item is not None:
+            items = [item, another(item)]
+            yield name, items, not refuses(op, name, items)
+
+
+def counted(op: Operation) -> list[str]:
+    """The lists of ``op`` its card says as «N items» when the model names their records by their names."""
+    found = []
+    for name, items, taken in lists_by_name(op):
+        card = assistant.cards.card(op, {name: items}, "es", card_values.ctx()) if taken else {"fields": []}
         if any(field["kind"] == "list" and not field.get("named") for field in card["fields"]):
             found.append(f"{op.name}:{name}")
     return found
@@ -302,3 +309,23 @@ def test_every_list_a_write_sends_is_said_item_by_item():
     name, a record by its name, its figures beside them); the ones that need their app to say them are listed."""
     found = [found for op in writes() for found in counted(op)]
     assert sorted(found) == sorted(COUNTED_UNTIL_THEIR_APP_SAYS_THEM)
+
+
+#: The lists the check above draws no card of: the write refuses the two items it makes up, because the data of a line
+#: go together (a day with its hours, a step with its settings). A new one falls here, never out of the check unseen.
+NOT_DRAWN = {
+    "customer.customer.update:field_values",
+    "flow.flow.create:steps",
+    "flow.flow.update:steps",
+    "sale.sale.refund:allocations",
+    "sale.sale.refund:lines",
+    "schedule.week.set_day:intervals",
+    "staff.schedule.create:days",
+    "staff.schedule.update:days",
+    "tax.rule.bulk_create:rules",
+}
+
+
+def test_the_lists_the_check_draws_no_card_of_are_listed():
+    found = [f"{op.name}:{name}" for op in writes() for name, _, taken in lists_by_name(op) if not taken]
+    assert sorted(found) == sorted(NOT_DRAWN)

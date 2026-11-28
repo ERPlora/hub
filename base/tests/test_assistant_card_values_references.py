@@ -396,6 +396,31 @@ def test_every_list_of_texts_says_what_its_texts_are():
     assert (options["value"], options.get(NAMED)) == (["Terraza", "Dentro"], True)
 
 
+class CodeLineIn(Schema):
+    code: str
+    count: int = 1
+
+
+class CodesIn(Schema):
+    codes: list[str] = []
+    lines: list[CodeLineIn] = []
+
+
+CODES = dataclasses.replace(VISITS, name="appointment.appointment.codes", input=CodesIn, output=CodesIn)
+
+
+@HUB_DB
+def test_a_list_of_texts_nobody_marks_is_never_said_item_by_item():
+    """A text no schema says anything of may be a code nobody names: a list of them, or of lines that carry one, says
+    how many it carries, never each one as sent."""
+    sent = {"codes": ["sale.sale.create", "vip"], "lines": [{"code": "QUICK_REPLY", "count": 2}]}
+    card = assistant.cards.card(CODES, sent, "es")
+    assert [(field["name"], field["kind"], NAMED in field) for field in card["fields"]] == [
+        ("codes", "list", False),
+        ("lines", "list", False),
+    ]
+
+
 # ── The ratchet: references nobody marks and lists nobody labels, by app ──────────────────────────────────────────────
 
 #: The references (``format: uuid``) of the assistant's writes no ``refers`` mark names, by app: their card leaves
