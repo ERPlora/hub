@@ -7,7 +7,7 @@
 // the platform's `orderTicketQuantity` («2.000» → «2×», «1500.000» → «1.500×», «0.350» kg → «0,35 kg») and what is
 // left of it with `quantityWithUnit`, as the till that sent it writes it.
 import type { Money } from '../../../../base/frontend/lib/money';
-import type { SettingsOut } from '../operations';
+import type { SettingsOut } from '../operations/settings';
 
 export type { Money };
 export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';

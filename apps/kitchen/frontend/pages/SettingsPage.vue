@@ -14,7 +14,8 @@ import { computed } from 'vue';
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import { Chime, CHIME_TONES } from '../lib/chime';
-import type { OrderType, SettingsOut, SoundTone } from '../operations';
+import type { OrderType, SoundTone } from '../operations/fields';
+import type { SettingsOut } from '../operations/settings';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('kitchen');

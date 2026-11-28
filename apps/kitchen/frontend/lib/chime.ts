@@ -2,7 +2,7 @@
 // nothing from the network) — with the tone and the volume of the settings. One AudioContext per screen
 // (browsers cap how many a page opens). Every path is non-fatal: a display that stops showing tickets
 // because the browser would not give it a speaker is far worse than a silent one.
-import type { SoundTone } from '../operations';
+import type { SoundTone } from '../operations/fields';
 
 interface AudioParamLike {
   value: number;

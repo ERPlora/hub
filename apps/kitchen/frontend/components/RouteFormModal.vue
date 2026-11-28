@@ -12,7 +12,8 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 
 import { useT } from '../composables/useT';
 import { searchCategories, searchProducts } from '../lib/pickers';
-import type { RouteOut, StationOut } from '../operations';
+import type { RouteOut } from '../operations/routing';
+import type { StationOut } from '../operations/stations';
 
 const props = withDefaults(
   defineProps<{

@@ -8,7 +8,7 @@ import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed } from 'vue';
 
-import type { StationChipOut } from '../operations';
+import type { StationChipOut } from '../operations/board';
 
 const VIEWS: readonly DisplayView[] = ['tickets', 'ready', 'allday'];
 const ALL = '__all';

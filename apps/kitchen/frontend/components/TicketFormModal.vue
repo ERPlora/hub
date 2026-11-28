@@ -14,7 +14,8 @@ import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-chan
 
 import { useT } from '../composables/useT';
 import { searchProducts } from '../lib/pickers';
-import type { ManualItemIn, OrderType, TicketOut } from '../operations';
+import type { OrderType } from '../operations/fields';
+import type { ManualItemIn, TicketOut } from '../operations/tickets';
 
 const props = withDefaults(defineProps<{ defaultType?: OrderType }>(), { defaultType: 'dine_in' });
 

@@ -1,6 +1,6 @@
 import type { AllergenCode } from '@erplora/ui/components';
 
-declare module '../operations' {
+declare module './tickets' {
   interface ItemOut {
     allergy: AllergenCode[];
     allergy_in_dish: AllergenCode[];

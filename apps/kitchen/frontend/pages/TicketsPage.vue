@@ -28,7 +28,8 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatDateTime, formatMoney, useBusinessMoney } from '../lib/format';
-import type { OrderType, Priority, TicketListIn, TicketRowOut, TicketStatus } from '../operations';
+import type { OrderType, Priority, TicketStatus } from '../operations/fields';
+import type { TicketListIn, TicketRowOut } from '../operations/tickets';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('kitchen');

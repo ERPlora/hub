@@ -2,7 +2,7 @@
 // alone), the tones of its status and priority pills, and the icons of the type of order and of each dish's state.
 import type { StatusPillTone } from '@erplora/ui/components';
 
-import type { ItemStatus, OrderType, Priority, TicketStatus } from '../operations';
+import type { ItemStatus, OrderType, Priority, TicketStatus } from '../operations/fields';
 import type { Semaphore } from './format';
 
 export interface Wait {

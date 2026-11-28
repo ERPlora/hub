@@ -1,6 +1,11 @@
 // Fixtures of the kitchen app's frontend tests: what the server answers, as schemas/ shapes it.
 import type { Business } from '../../../../base/frontend/operations/business';
-import type { BoardOut, ItemOut, LogOut, RouteOut, SettingsOut, StationOut, TicketOut, TicketRowOut } from '../operations';
+import type { BoardOut } from '../operations/board';
+import type { LogOut } from '../operations/history';
+import type { RouteOut } from '../operations/routing';
+import type { SettingsOut } from '../operations/settings';
+import type { StationOut } from '../operations/stations';
+import type { ItemOut, TicketOut, TicketRowOut } from '../operations/tickets';
 
 export const SETTINGS: SettingsOut = {
   show_timer: true,

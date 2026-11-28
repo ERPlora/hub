@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
-import type { TicketRowOut } from '../operations';
+import type { TicketRowOut } from '../operations/tickets';
 import { flush, mountKitchen, page } from '../__tests__/mount-kitchen';
 import type { ListWindow } from './useServerTable';
 import { useLiveList } from './useLiveList';

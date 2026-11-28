@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { station } from '../__tests__/kitchen';
 import { click, ionChecked, ionValue, mountKitchen, settle } from '../__tests__/mount-kitchen';
-import type { StationOut } from '../operations';
+import type { StationOut } from '../operations/stations';
 import StationFormModal from './StationFormModal.vue';
 
 type Control = HTMLElement & { label?: string; value?: unknown; checked?: boolean; disabled?: boolean; placeholder?: string };

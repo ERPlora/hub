@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { click, ionValue, mountKitchen, said } from '../__tests__/mount-kitchen';
-import type { StationChipOut } from '../operations';
+import type { StationChipOut } from '../operations/board';
 import KdsDisplayToolbar from './KdsDisplayToolbar.vue';
 
 const GRILL: StationChipOut = { id: 'st-grill', name: 'Grill', color: '#E03131' };

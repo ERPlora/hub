@@ -8,7 +8,8 @@ import { computed } from 'vue';
 import { useT } from '../composables/useT';
 import { ORDER_TYPE_ICONS, PRIORITY_TONES, STATUS_TONES, waitOf } from '../lib/card';
 import { formatElapsed, type Semaphore } from '../lib/format';
-import type { SettingsOut, TicketOut } from '../operations';
+import type { SettingsOut } from '../operations/settings';
+import type { TicketOut } from '../operations/tickets';
 
 const props = defineProps<{
   ticket: TicketOut;

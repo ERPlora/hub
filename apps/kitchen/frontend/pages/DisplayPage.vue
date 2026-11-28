@@ -20,7 +20,10 @@ import { useNow } from '../composables/useNow';
 import { useT } from '../composables/useT';
 import { arrivals, rememberedStation, rememberStation } from '../lib/board';
 import { Chime } from '../lib/chime';
-import type { AllDayOut, Priority, SettingsOut, TicketOut } from '../operations';
+import type { AllDayOut } from '../operations/board';
+import type { Priority } from '../operations/fields';
+import type { SettingsOut } from '../operations/settings';
+import type { TicketOut } from '../operations/tickets';
 import { useAppTabs } from '../../../../base/frontend/lib/app-tabs';
 
 const tabs = useAppTabs('kitchen');
