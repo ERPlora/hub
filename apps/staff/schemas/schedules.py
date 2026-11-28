@@ -34,17 +34,24 @@ SCHEDULE = gettext_noop("Schedule")
 
 
 class DayIn(Schema):
-    """One weekday (Monday = 0): a stretch with an optional break inside it."""
+    """One weekday (Monday = 0): a stretch with an optional break inside it. An hour it does not say is the business's
+    default working day (``apps.staff.workday``)."""
 
     weekday: Weekday = Field(description="Day of the week: 0 Monday … 6 Sunday.")
-    start_time: dt.time = Field(
-        dt.time(9), description="Start of the working day (HH:MM)."
+    start_time: dt.time | None = Field(
+        None,
+        description="Start of the working day (HH:MM), only when the person says it; empty: the business's default "
+        "working day (Staff settings).",
     )
-    end_time: dt.time = Field(
-        dt.time(18), description="End of the working day (HH:MM), after the start."
+    end_time: dt.time | None = Field(
+        None,
+        description="End of the working day (HH:MM), after the start, only when the person says it; empty: the "
+        "business's default working day.",
     )
     break_start: dt.time | None = Field(
-        None, description="Start of the break (HH:MM), inside the working day."
+        None,
+        description="Start of the break (HH:MM), inside the working day; a day without any of its hours takes the "
+        "default working day's break.",
     )
     break_end: dt.time | None = Field(
         None,
@@ -58,9 +65,9 @@ class DayIn(Schema):
 
     @field_validator("end_time")
     @classmethod
-    def _ends_after_it_starts(cls, value: dt.time, info: ValidationInfo) -> dt.time:
+    def _ends_after_it_starts(cls, value: dt.time | None, info: ValidationInfo) -> dt.time | None:
         start = info.data.get("start_time")
-        if start is not None and value <= start:
+        if start is not None and value is not None and value <= start:
             raise ValueError(str(TIME_ORDER))
         return value
 
