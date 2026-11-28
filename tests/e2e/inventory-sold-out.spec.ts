@@ -26,7 +26,7 @@ import {
   shootFlow,
   stamp,
 } from './inventory-helpers';
-import { drawerOff, expectTakes, linesOf, restoreDrawer } from './sale-helpers';
+import { drawerOff, expectTakes, linesOf, restoreDrawer, soldOutNotice } from './sale-helpers';
 import { rowAction } from './service-helpers';
 
 const RUN = stamp();
@@ -211,7 +211,7 @@ test('INVENTORY-F29 / INVENTORY-F27: «Mark sold out» greys the article out in 
   // Picking it closes the search and adds nothing: the till says why.
   await row.click({ force: true });
   await expect(search).toBeHidden();
-  await expect(shown(till).locator('[data-testid=pos-tap-notice]')).toHaveText(new RegExp(`^«${croquettes.name}» (is sold out|está agotado)\\.$`));
+  await expect(shown(till).locator('[data-testid=pos-tap-notice]')).toHaveText(soldOutNotice(croquettes.name));
   await expect(linesOf(till, croquettes)).toHaveCount(0);
   await till.screenshot({ path: shot('inventory-sold-out-till-1440') });
 

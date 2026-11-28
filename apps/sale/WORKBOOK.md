@@ -273,7 +273,8 @@ por su dirección, «Sin acceso» (BASE-F118).
 | Cargando | «Cargando…» (o el texto de su pantalla) mientras llega el primer resultado. |
 | Vacío | El texto de su pantalla, con **+** si puede crear. |
 | Error | El aviso con «Reintentar»; un rechazo de una acción sale dentro de su hoja o ventana, junto a su campo. |
-| Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. |
+| Reconectando | Lo pintado se queda; una franja avisa «Reconectando…» hasta que vuelve la conexión. Sale en cuanto el dispositivo se queda sin red o se corta la conexión en vivo; en **Vender**, encima de la rejilla de artículos. |
+| Sin conexión (Vender) | Lo que se toca y no llega al servidor (un artículo, «Cobrar» con la comanda por enviar, un cambio de la cuenta) no hace nada y lo dice: «No se pudo conectar con el servidor. Revisa tu conexión y vuelve a intentarlo en unos segundos.». Al volver la conexión, la cuenta sigue como estaba. |
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
 | Hablando (Vender) | La tecla del micrófono, roja, pasa al icono de parar y se llama «Parar»; debajo sale «Escuchando…»; al parar, «Transcribiendo…». Un aviso dice lo que falla: sin voz, «No se ha oído nada. Inténtalo de nuevo más cerca del micrófono.»; con el micrófono denegado, «El acceso al micrófono está denegado. Permítelo en tu navegador para hablar.» (en la app instalada, que no tiene navegador, «El acceso al micrófono está denegado. Permítelo en los ajustes del dispositivo para hablar.»); demasiado larga, «La grabación es demasiado larga: di algo más corto.»; si no se puede transcribir, «No se ha podido transcribir el audio. Inténtalo de nuevo.»; sin conexión, «Sin conexión: para hablar con el asistente hace falta internet.». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». Lo que un responsable puede aprobar con su PIN (anular y devolver una venta, anular una línea enviada, eliminar una cuenta con algo pedido, el precio libre y los descuentos por encima del máximo) sí aparece y, al pulsarlo, pide «Hace falta una aprobación». |
@@ -620,7 +621,8 @@ suplemento de otro IVA es una línea propia con su base y su cuota; el stock lo 
 Si falla: los motivos de Suplementos salen dentro de la hoja («Elige al menos 1 en «Punto».», «Esta opción
 no se ofrece con este producto.»…), y un grupo obligatorio sin elegir tampoco entra pedido por el
 asistente. Si no se pueden leer los grupos, «No se han podido leer los suplementos de este producto.
-Inténtalo de nuevo.» y no entra nada.
+Inténtalo de nuevo.» y no entra nada; sin conexión, «No se pudo conectar con el servidor. Revisa tu conexión y
+vuelve a intentarlo en unos segundos.», y tampoco entra nada.
 Implicados: MODIFIER-F06, MODIFIER-F07, MODIFIER-F08
 
 ### SALE-F12 Componer un menú
@@ -891,7 +893,8 @@ Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se arm
 enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
 línea enviada, avisa de la línea anulada con su motivo.
 Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, sale arriba de la
-pantalla «No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra: puedes volver a pulsar
+pantalla «No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.» (sin conexión, «No se pudo conectar con el
+servidor. Revisa tu conexión y vuelve a intentarlo en unos segundos.») y no se cobra: puedes volver a pulsar
 «Cobrar» o «Enviar comanda» sin esperar a que se vaya. Si la comanda se envía pero su hoja no se imprime, el TPV
 avisa, también arriba, «Comanda N enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en
 Impresión.». Una línea ya enviada no se puede quitar: «Esa línea ya no se puede quitar: ya se envió a cocina

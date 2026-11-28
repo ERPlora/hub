@@ -147,9 +147,9 @@ describe('PosPage: the options of Modifiers (SALE-F11)', () => {
     expect(s.inDoc('pos-options-title')).toBeNull();
   });
 
-  it('when the groups cannot be read nothing is added and the till says so', async () => {
+  it('when the groups cannot be read (a proxy’s error page) nothing is added and the till says so', async () => {
     const s = await setup({ session: WITH_MODIFIERS, locale: 'es' });
-    s.net.onApi((call) => (call.url.startsWith('/api/modifier/groups/for_target') ? Promise.reject(new TypeError('Failed to fetch')) : Response.json(CHECK)));
+    s.net.onApi((call) => (call.url.startsWith('/api/modifier/groups/for_target') ? new Response('Bad gateway', { status: 502 }) : Response.json(CHECK)));
     s.wrapper.findComponent(PosCatalog).vm.$emit('add', product({ id: 'p1' }));
     await settle();
     expect(s.writes()).toEqual([]);
