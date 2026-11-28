@@ -7,6 +7,7 @@ import pytest
 from live.errors import NotFound, PermissionDenied
 from live.operations import INTERNAL, get
 
+from apps.sale.models import Order
 from apps.sale.tests.conftest import HUB_DB, ctx_for, run
 from base import assistant
 
@@ -53,6 +54,14 @@ def test_whoever_lacks_the_void_permission_is_refused_a_check_with_something_on_
     with pytest.raises(PermissionDenied) as refused:
         checked("hub_employee", order_id)
     assert refused.value.code == "permission_denied"
+
+
+@pytest.mark.parametrize("status", ["completed", "voided"])
+def test_a_check_no_longer_open_is_the_voids_to_answer_whoever_asks(coffee, status):
+    # The void answers that a check is no longer open before it looks at who asks: no manager is called for it.
+    order_id = a_check(coffee)
+    Order.objects.filter(pk=order_id).update(status=status)
+    assert str(checked("hub_employee", order_id).id) == order_id
 
 
 def test_a_check_that_does_not_exist_is_not_found():
