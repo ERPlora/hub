@@ -340,6 +340,7 @@ def _customer_load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> N
 PLATFORM_DATASETS: tuple[Dataset, ...] = (
     Dataset(
         key="inventory.category",
+        models=("Category",),
         label=pgettext_lazy("blueprint dataset", "Product categories"),
         rows=_inventory_category_rows,
         ids=ids_of("inventory.category.list"),
@@ -349,6 +350,7 @@ PLATFORM_DATASETS: tuple[Dataset, ...] = (
     ),
     Dataset(
         key="inventory.product",
+        models=("Product", "ProductCategory"),
         label=pgettext_lazy("blueprint dataset", "Products"),
         rows=_inventory_product_rows,
         ids=ids_of("inventory.product.list"),
@@ -359,6 +361,7 @@ PLATFORM_DATASETS: tuple[Dataset, ...] = (
     ),
     Dataset(
         key="service.category",
+        models=("Category",),
         label=pgettext_lazy("blueprint dataset", "Service categories"),
         rows=_service_category_rows,
         ids=ids_of("service.category.list"),
@@ -368,6 +371,7 @@ PLATFORM_DATASETS: tuple[Dataset, ...] = (
     ),
     Dataset(
         key="service.service",
+        models=("Service",),
         label=pgettext_lazy("blueprint dataset", "Services"),
         rows=_service_rows,
         ids=ids_of("service.service.list"),
@@ -378,6 +382,7 @@ PLATFORM_DATASETS: tuple[Dataset, ...] = (
     ),
     Dataset(
         key="table.zone",
+        models=("Zone",),
         label=pgettext_lazy("blueprint dataset", "Zones"),
         rows=_zone_rows,
         ids=ids_of("table.zone.list"),
@@ -387,6 +392,7 @@ PLATFORM_DATASETS: tuple[Dataset, ...] = (
     ),
     Dataset(
         key="table.table",
+        models=("Table",),
         label=pgettext_lazy("blueprint dataset", "Tables"),
         rows=_table_rows,
         ids=ids_of("table.table.list"),
@@ -396,6 +402,7 @@ PLATFORM_DATASETS: tuple[Dataset, ...] = (
     ),
     Dataset(
         key="customer.customer",
+        models=("Customer",),
         label=pgettext_lazy("blueprint dataset", "Customers"),
         rows=_customer_rows,
         ids=ids_of("customer.customer.list"),

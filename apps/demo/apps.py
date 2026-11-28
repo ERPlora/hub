@@ -10,6 +10,10 @@ from apps.demo.events import ITEM_CREATED, ITEM_DELETED, ITEM_UPDATED
 class DemoConfig(LiveAppConfig):
     name = "apps.demo"
     label = "demo"
+    blueprint_stays = {
+        "Item": "pending",
+        "ItemLine": "pending",
+    }
     kind = "app"
     verbose_name = _("Demo")
     icon = "ion:flask-outline"

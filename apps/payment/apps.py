@@ -9,6 +9,11 @@ from live.meta import Category, Help, LiveAppConfig, Nav
 class PaymentConfig(LiveAppConfig):
     name = "apps.payment"
     label = "payment"
+    blueprint_stays = {
+        "PaymentMethod": "fiscal",
+        "Payment": "history",
+        "PaymentCounter": "internal",
+    }
     kind = "app"
     verbose_name = _("Payments")
     icon = "lucide:send"

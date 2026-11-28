@@ -480,3 +480,9 @@ msgstr "Ver los ajustes"
 
 msgid "Change the settings"
 msgstr "Cambiar los ajustes"
+
+msgid "Booking time slots"
+msgstr "Franjas de reserva"
+
+msgid "Blocked days"
+msgstr "Días bloqueados"

@@ -236,3 +236,6 @@ msgstr "Borrar tareas"
 
 msgid "Create, change and delete projects"
 msgstr "Crear, cambiar y borrar proyectos"
+
+msgid "Open tasks"
+msgstr "Tareas abiertas"

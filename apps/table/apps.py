@@ -10,6 +10,12 @@ from apps.table.events import TABLE_EVENTS
 class TableConfig(LiveAppConfig):
     name = "apps.table"
     label = "table"
+    blueprint_stays = {
+        "TableSettings": "settings",
+        "TableSession": "history",
+        "SessionMove": "history",
+        "Hold": "history",
+    }
     kind = "app"
     verbose_name = _("Tables")
     # Registered in the shell (ION_ICONS); `map-outline` waits in UI-REQUESTS.md.

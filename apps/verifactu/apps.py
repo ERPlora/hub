@@ -24,6 +24,15 @@ def sending_route_description() -> str:
 class VerifactuConfig(LiveAppConfig):
     name = "apps.verifactu"
     label = "verifactu"
+    blueprint_stays = {
+        "Config": "fiscal",
+        "OwnCertificate": "fiscal",
+        "Chain": "fiscal",
+        "SendControl": "fiscal",
+        "Record": "fiscal",
+        "Event": "fiscal",
+        "AeatRecord": "fiscal",
+    }
     kind = "app"
     verbose_name = _("VeriFactu")
     icon = "ion:shield-checkmark-outline"

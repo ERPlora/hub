@@ -28,6 +28,12 @@ STALLED_BODY = ngettext_lazy(
 class PrintingConfig(LiveAppConfig):
     name = "apps.printing"
     label = "printing"
+    blueprint_stays = {
+        "Printer": "outside",
+        "Settings": "settings",
+        "PrintDevice": "outside",
+        "PrintJob": "history",
+    }
     kind = "app"
     verbose_name = _("Printing")
     # `ion:print-outline` waits in UI-REQUESTS.md; lucide's receipt is registered and unlike invoice's.

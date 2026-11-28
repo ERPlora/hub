@@ -284,7 +284,7 @@ const checked = (event: CustomEvent) => Boolean((event.detail as { checked?: boo
               v-if="!app.datasets.length"
               class="data-row-detail"
             >
-              {{ t('base.data.export.nothingToCopy') }}
+              {{ t(app.keeps_data ? 'base.data.export.dataStays' : 'base.data.export.nothingToCopy') }}
             </p>
           </div>
           <ion-checkbox

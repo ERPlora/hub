@@ -322,10 +322,24 @@ def test_every_app_on_is_listed_with_what_of_it_travels_and_how_many_rows(owner)
         ("inventory.category", "Categorías de productos", 6, False),
         ("inventory.product", "Productos", 16, False),
     ]
-    assert [(part.key, part.personal) for part in apps["customer"].datasets] == [("customer.customer", True)]
-    assert apps["sale"].datasets == []  # on, registered by an export, with nothing of its own that travels
+    assert [(part.key, part.personal) for part in apps["customer"].datasets] == [
+        ("customer.customer", True),
+        ("customer.group", False),
+        ("customer.tag", False),
+        ("customer.field", False),
+    ]
+    assert apps["printing"].datasets == []  # on, registered by an export, with nothing of its own that travels
     assert "base" not in apps
     assert list(apps) == sorted(apps, key=lambda app: apps[app].label)
+
+
+def test_an_app_says_whether_it_keeps_data_of_its_own_that_does_not_travel(owner):
+    call(owner, "base.blueprint.import", template="restaurant.es")
+
+    apps = {app.id: app for app in call(owner, "base.dataset.list").apps}
+
+    assert (apps["inventory"].keeps_data, apps["printing"].keeps_data) == (True, True)
+    assert apps["modifier"].keeps_data is False
 
 
 def test_the_apps_data_is_for_who_runs_the_hub(manager):

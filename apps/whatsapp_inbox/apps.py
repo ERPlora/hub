@@ -14,6 +14,14 @@ from apps.whatsapp_inbox.events import AWAITING_REPLY_EVENTS, NOTICE_EVENTS
 class WhatsappInboxConfig(LiveAppConfig):
     name = "apps.whatsapp_inbox"
     label = "whatsapp_inbox"
+    blueprint_stays = {
+        "Channel": "outside",
+        "Conversation": "history",
+        "Message": "history",
+        "Note": "history",
+        "TemplateSample": "outside",
+        "Template": "outside",
+    }
     kind = "app"
     verbose_name = _("WhatsApp inbox")
     icon = "ion:chatbubbles-outline"

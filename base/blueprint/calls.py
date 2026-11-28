@@ -4,9 +4,11 @@ An app says what of it travels in a blueprint by the hook ``blueprint_datasets``
 :class:`Dataset`, built with these helpers.
 """
 
+import datetime as dt
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
+from enum import StrEnum
 from typing import Any
 
 import pydantic
@@ -23,6 +25,31 @@ PAGE = 100
 
 NO_NAME = _("A row has no name.")
 ROW_REFUSED = _("«%(row)s»: %(reason)s")
+
+
+#: The attribute of a ``LiveAppConfig`` that says, for each of its models no dataset carries, why it stays out of the
+#: file: ``{"Reservation": "history"}``. Every model of an app travels in one of its datasets or is named here.
+STAYS_HOOK = "blueprint_stays"
+
+
+class Stays(StrEnum):
+    """Why a kind of row of an app does not travel in an export of the business."""
+
+    #: What already happened: sales, payments, bookings and visits, clock-ins, runs, logs, messages.
+    HISTORY = "history"
+    #: The people of the business and what is theirs: the team, their accounts, schedules and time off.
+    PEOPLE = "people"
+    #: Fiscal data: invoice series and issuers, records for the tax agency, certificates.
+    FISCAL = "fiscal"
+    #: The app's settings, which no reset erases and every business sets for itself.
+    SETTINGS = "settings"
+    #: Bound to something outside the business's data: a WhatsApp account, a printer on the local network, a code
+    #: already printed, a secret.
+    OUTSIDE = "outside"
+    #: Kept by the app itself: a counter, an audit trail, a row another one rebuilds.
+    INTERNAL = "internal"
+    #: Catalogue or configuration that should travel and has no dataset yet.
+    PENDING = "pending"
 
 
 @dataclass
@@ -65,6 +92,8 @@ class Dataset:
     personal: bool = False
     #: For rows that show an image: the operations that set one of the library and upload a photo of their own.
     images: tuple[str, str] | None = None
+    #: The app's models whose rows travel in this dataset, by class name (a group and its options and links).
+    models: tuple[str, ...] = ()
 
     @property
     def app(self) -> str:
@@ -198,3 +227,27 @@ def count_of(name: str, **params: Any) -> Callable[[OperationContext], int]:
 def remover(name: str) -> Callable[[OperationContext, str], None]:
     """A dataset's ``remove``: the operation ``name`` on the row's id."""
     return lambda ctx, pk: call(ctx, name, id=pk)
+
+
+def as_text(value: Any) -> Any:
+    """A date or a time as a file writes it (``2026-12-25``, ``20:00``); anything else as it is."""
+    if isinstance(value, dt.time):
+        return value.isoformat(timespec="minutes")
+    return value.isoformat() if isinstance(value, dt.date) else value
+
+
+def rows_of(name: str, fields: tuple[str, ...], **params: Any) -> Callable[[OperationContext], list[dict]]:
+    """A dataset's ``rows``: the ``fields`` of every row of the list ``name``."""
+    return lambda ctx: [{field: as_text(getattr(row, field)) for field in fields} for row in pages(ctx, name, **params)]
+
+
+def by_name(name: str, create: str, fields: tuple[str, ...], *, named: str = "name"):
+    """A dataset's ``load``: each row the business does not have, by its ``named`` field in the list ``name``, made
+    with ``create`` from its ``fields``."""
+
+    def load(ctx: OperationContext, rows: list[dict], loaded: Loaded) -> None:
+        existing = {natural_key(str(getattr(row, named))) for row in pages(ctx, name)}
+        create_each(ctx, rows, loaded, name=create, key=lambda row: natural_key(text_of(row, named)),
+                    existing=existing, build=lambda row: given(row, fields), label=lambda row: text_of(row, named))
+
+    return load
