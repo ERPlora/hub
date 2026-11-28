@@ -1,5 +1,6 @@
 """Fixtures of the service tests: contexts per role and scope, users with a role on a host, a raw DSN,
-and builders of the data a test starts from (straight to the models: the operations are under test).
+builders of the data a test starts from (straight to the models: the operations are under test) and the
+helpers the tests of the writes share.
 
 Every test with the database runs as production does: inside business A's own database (``hub_a``, entered by
 ``in_business_a``), nothing falling back on control's. Business B (``hub_b``) has its own database beside it; a test
@@ -17,7 +18,8 @@ from django.db import IntegrityError, connections
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
 from live.meta import all_live_app_configs, permissions_for_role
-from live.operations import atomic
+from live.models import OutboxEvent
+from live.operations import atomic, get
 from psycopg.conninfo import make_conninfo
 
 from apps.flow.tests.test_relay import worker_loop
@@ -160,3 +162,27 @@ def refused(**create) -> bool:
     except IntegrityError:
         return True
     return False
+
+
+# Helpers of the writes' tests
+
+
+def run(name, data, role="hub_admin", **ctx):
+    op = get(name)
+    return op(
+        ctx_for(role, **ctx),
+        op.input.model_validate(data) if isinstance(data, dict) else data,
+    )
+
+
+def events() -> list[str]:
+    return list(OutboxEvent.objects.order_by("id").values_list("name", flat=True))
+
+
+def payload(name: str) -> dict:
+    return OutboxEvent.objects.filter(name=name).latest("id").payload
+
+
+@pytest.fixture
+def tax():
+    return make_tax("test.service", "Service — test")
