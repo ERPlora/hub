@@ -90,6 +90,14 @@ class UpdateIn(FlowRefIn):
     steps: Steps | None = Field(None, description=D_STEPS)
 
 
+class CheckIn(In):
+    steps: Steps | None = Field(None, description=D_STEPS)
+
+
+class CheckOut(Schema):
+    calls: int = Field(description="How many calls to another system it checked.")
+
+
 class EnabledIn(FlowRefIn):
     enabled: bool = Field(description="true: turn it on; false: pause it.")
 

@@ -114,7 +114,10 @@ class HttpStep(In):
     headers: dict[HeaderName, Annotated[str, StringConstraints(max_length=4000)]] = Field(
         default_factory=dict,
         max_length=20,
-        description="Headers to send; a value may read `{{secret.NAME}}` and `{{run.idempotency_key}}`.",
+        description="Headers to send; a value may read `{{secret.NAME}}` and `{{run.idempotency_key}}`. A key, token "
+        "or password never goes in as it is, where whoever opens the automation would read it, and you never keep "
+        "one: the person saves it in «Secrets», on the screen of this step, and the value names it "
+        "(`Bearer {{secret.SHOP_KEY}}`); `flow.secret.list` says which are saved, so ask which one to use.",
     )
     body: Annotated[str, StringConstraints(max_length=65536)] = Field(
         "", description="What to send, as text (a datum inserted in a JSON body is JSON-escaped)."

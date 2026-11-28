@@ -814,7 +814,12 @@ se puede anular: «Esa cuenta ya no está abierta.». Quien monta cuentas ve la 
 obliga a llamar a un responsable; con algo pedido o cobrado hace falta el permiso de anular o la
 aprobación de un responsable. Si en «Hace falta una aprobación» se pulsa «Cancelar», la cuenta sigue en
 la lista y encima se lee «Esto necesita la aprobación de un encargado.».
-Implicados: TABLE-F20, TABLE-F21, BASE-F84
+Por el asistente: «elimina la cuenta de la mesa 3» (o «bórrala», «anúlala») saca la tarjeta «Anular en Ventas / TPV»
+con la cuenta por su mesa («3 (Comedor)»); al confirmar, la cuenta queda anulada como desde Cuentas abiertas y la mesa
+queda libre (TABLE-F20). Si la cuenta tiene algo pedido o cobrado y quien lo pide no tiene el permiso de anular, esa
+tarjeta no sale: el asistente oye antes que hace falta ese permiso y ofrece la de anularla con la aprobación de un
+responsable, que la aprueba con su PIN como en la pantalla (BASE-F100); si su rol no le deja anular, se lo dice.
+Implicados: TABLE-F20, TABLE-F21, BASE-F84, BASE-F100
 
 ### SALE-F19 Abrir la cuenta de una mesa y dejarla en la mesa
 Estado: hecho (sin preguntar los comensales en el TPV: ver «Lo que queda fuera»)

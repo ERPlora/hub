@@ -146,7 +146,7 @@ def update_option(ctx: OperationContext, data: OptionPatchIn) -> dict:
             ),
             "es": (
                 "quita la salsa barbacoa del grupo Salsas",
-                "borra la opción Sin gluten de Extras, lo ya enviado se queda como está",
+                "borra la opción Sin gluten de Extras, las comandas ya enviadas se quedan como están",
             ),
         },
     },
