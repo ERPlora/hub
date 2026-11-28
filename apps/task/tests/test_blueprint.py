@@ -8,23 +8,14 @@ Every test runs against the real apps, in business A's own database, as producti
 
 import datetime as dt
 
-import pytest
-
 from apps.task.tests.conftest import HUB_DB, in_business_a
 from base import blueprint
-from base.tenancy.tests.business import A
-from base.tests.blueprint_round_trip import app_report, call, data_of, loaded_back, owner_of
-from base.tests.blueprint_round_trip import exported as exported_apps
+from base.tests.blueprint_round_trip import app_report, call, ctx, data_of, exported, loaded_back
 
-__all__ = ["in_business_a"]
+__all__ = ["ctx", "in_business_a"]
 pytestmark = HUB_DB
 
 DUE = dt.date(2030, 3, 2)
-
-
-@pytest.fixture
-def ctx():
-    return owner_of(A, "olga")
 
 
 def a_project(ctx):
@@ -61,7 +52,7 @@ def test_a_backup_brings_the_projects_and_the_open_tasks_back(ctx):
     a_project(ctx)
     projects = the_projects(ctx)
     open_tasks = [task for task in the_tasks(ctx) if task[2] != "done"]
-    file = exported_apps(ctx, ["task"])
+    file = exported(ctx, ["task"])
     emptied(ctx)
 
     report = loaded_back(ctx, file)
@@ -76,7 +67,7 @@ def test_a_backup_brings_the_projects_and_the_open_tasks_back(ctx):
 def test_loading_the_file_again_duplicates_nothing(ctx):
     a_project(ctx)
 
-    report = loaded_back(ctx, exported_apps(ctx, ["task"]))
+    report = loaded_back(ctx, exported(ctx, ["task"]))
 
     assert [(part["created"], part["already"]) for part in app_report(report, "task")["datasets"]] == [(0, 1), (0, 3)]
 

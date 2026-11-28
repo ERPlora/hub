@@ -2,30 +2,12 @@ import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { insideTheAppSaving, outOfTheApp } from '../../__tests__/app-download';
+import { EXPORT_APPS } from '../../__tests__/data-fixtures';
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
 import type { AppDatasets } from '../../operations/blueprints';
 import ExportPanel from './ExportPanel.vue';
 
-const APPS: AppDatasets[] = [
-  {
-    id: 'inventory',
-    label: 'Inventory',
-    icon: 'ion:cube-outline',
-    datasets: [
-      { key: 'inventory.category', label: 'Categories', rows: 2, personal: false },
-      { key: 'inventory.product', label: 'Products', rows: 12, personal: false },
-    ],
-    keeps_data: true,
-  },
-  {
-    id: 'customer',
-    label: 'Customers',
-    icon: 'ion:people-outline',
-    datasets: [{ key: 'customer.customer', label: 'Customers', rows: 3, personal: true }],
-    keeps_data: true,
-  },
-  { id: 'kitchen', label: 'Kitchen', icon: 'ion:flame-outline', datasets: [], keeps_data: false },
-];
+const APPS = EXPORT_APPS;
 const ATTENDANCE: AppDatasets = { id: 'attendance', label: 'Time clock', icon: 'ion:time-outline', datasets: [], keeps_data: true };
 
 const FILE = { filename: 'bar-pepe_en.blueprint.zip', content_type: 'application/zip', content_base64: 'UEsDBA==' };

@@ -6,23 +6,14 @@ assistant's drafts and the secrets its steps send never travel.
 Every test runs against the real apps, in business A's own database, as production does.
 """
 
-import pytest
-
 from apps.flow.tests.conftest import HUB_DB, TASK_STEP, in_business_a
-from base.tenancy.tests.business import A
-from base.tests.blueprint_round_trip import app_report, call, data_of, loaded_back, owner_of
-from base.tests.blueprint_round_trip import exported as exported_apps
+from base.tests.blueprint_round_trip import app_report, call, ctx, data_of, exported, loaded_back
 
-__all__ = ["in_business_a"]
+__all__ = ["ctx", "in_business_a"]
 pytestmark = HUB_DB
 
 WELCOME = {"name": "Welcome", "trigger": {"kind": "event", "event": "customer.customer.created"}, "steps": [TASK_STEP]}
 MONDAYS = {"name": "Mondays", "trigger": {"kind": "manual"}, "steps": []}
-
-
-@pytest.fixture
-def ctx():
-    return owner_of(A, "olga")
 
 
 def the_automations(ctx) -> list[tuple]:
@@ -38,7 +29,7 @@ def test_a_backup_brings_the_automations_back_paused_and_without_permissions(ctx
     call(ctx, "flow.flow.set_enabled", id=welcome.id, enabled=True)
     call(ctx, "flow.flow.create", **MONDAYS)
     before = [(name, trigger, steps) for name, trigger, steps, _, _ in the_automations(ctx)]
-    file = exported_apps(ctx, ["flow"])
+    file = exported(ctx, ["flow"])
     for row in call(ctx, "flow.flow.list", limit=100).rows:
         call(ctx, "flow.flow.delete", id=row.id)
 
@@ -51,7 +42,7 @@ def test_a_backup_brings_the_automations_back_paused_and_without_permissions(ctx
 def test_loading_the_file_again_duplicates_nothing(ctx):
     call(ctx, "flow.flow.create", **WELCOME)
 
-    report = loaded_back(ctx, exported_apps(ctx, ["flow"]))
+    report = loaded_back(ctx, exported(ctx, ["flow"]))
 
     assert [(part["created"], part["already"]) for part in app_report(report, "flow")["datasets"]] == [(0, 1)]
 

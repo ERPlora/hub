@@ -6,24 +6,15 @@ travel.
 Every test runs against the real apps (Sales, Taxes, Customers), in business A's own database, as production does.
 """
 
-import pytest
-
 from apps.sale.tests.conftest import HUB_DB, in_business_a
-from base.tenancy.tests.business import A
-from base.tests.blueprint_round_trip import app_report, call, data_of, loaded_back, owner_of
-from base.tests.blueprint_round_trip import exported as exported_apps
+from base.tests.blueprint_round_trip import app_report, call, ctx, data_of, exported, loaded_back
 
-__all__ = ["in_business_a"]
+__all__ = ["ctx", "in_business_a"]
 pytestmark = HUB_DB
 
 FRUIT = {"name": "Fruit", "tax_category_key": "restaurant.food", "sort_order": 1}
 NO_SALT = {"text": "No salt", "sort_order": 1}
 BIZUM = {"name": "Bizum", "type": "transfer", "sort_order": 40}
-
-
-@pytest.fixture
-def ctx():
-    return owner_of(A, "olga")
 
 
 def a_till(ctx):
@@ -47,7 +38,7 @@ def created(report: dict) -> dict:
 def test_a_backup_brings_the_departments_and_quick_notes_back(ctx):
     a_till(ctx)
     before = the_till(ctx)
-    file = exported_apps(ctx, ["sale"])
+    file = exported(ctx, ["sale"])
     for row in call(ctx, "sale.department.list", limit=100).rows:
         call(ctx, "sale.department.delete", id=row.id)
     for row in call(ctx, "sale.quick_note.list", limit=100).rows:
@@ -62,7 +53,7 @@ def test_a_backup_brings_the_departments_and_quick_notes_back(ctx):
 def test_loading_the_file_again_duplicates_nothing_and_the_payment_methods_never_travel(ctx):
     a_till(ctx)
 
-    report = loaded_back(ctx, exported_apps(ctx, ["sale"]))
+    report = loaded_back(ctx, exported(ctx, ["sale"]))
 
     assert created(report) == {"sale.department": (0, 1), "sale.quick_note": (0, 1)}
     assert set(data_of(ctx, ["sale"])) == {"sale.department", "sale.quick_note"}

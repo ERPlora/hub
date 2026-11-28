@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { EXPORT_APPS } from '../__tests__/data-fixtures';
 import en from '../locale/en.json';
-import type { AppDatasets, ImportRow, LoadReport, Template } from '../operations/blueprints';
+import type { ImportRow, LoadReport, Template } from '../operations/blueprints';
 import {
   downloadFrom,
   base64ToBlob,
@@ -32,26 +33,7 @@ function lookup(key: string): unknown {
   return key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], en);
 }
 
-const APPS: AppDatasets[] = [
-  {
-    id: 'inventory',
-    label: 'Inventory',
-    icon: 'ion:cube-outline',
-    datasets: [
-      { key: 'inventory.category', label: 'Categories', rows: 2, personal: false },
-      { key: 'inventory.product', label: 'Products', rows: 12, personal: false },
-    ],
-    keeps_data: true,
-  },
-  {
-    id: 'customer',
-    label: 'Customers',
-    icon: 'ion:people-outline',
-    datasets: [{ key: 'customer.customer', label: 'Customers', rows: 3, personal: true }],
-    keeps_data: true,
-  },
-  { id: 'kitchen', label: 'Kitchen', icon: 'ion:flame-outline', datasets: [], keeps_data: false },
-];
+const APPS = EXPORT_APPS;
 
 function template(key: string, fields: Partial<Template> = {}): Template {
   return {

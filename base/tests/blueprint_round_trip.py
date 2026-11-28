@@ -1,6 +1,7 @@
 """What the tests of an app's part of a business's export share: its owner, the operations called as them, the file
 Settings › Data › Export gives and loading it back, as a person does it on that screen."""
 
+import pytest
 from django.contrib.auth import get_user_model
 from live.context import OperationContext, Scope
 from live.operations import get
@@ -8,6 +9,7 @@ from live.operations import get
 from base import blueprint
 from base.models import Membership
 from base.permissions import access_for
+from base.tenancy.tests.business import A
 
 
 def owner_of(scope: Scope, username: str) -> OperationContext:
@@ -15,6 +17,12 @@ def owner_of(scope: Scope, username: str) -> OperationContext:
     user = get_user_model().objects.create_user(username=username, password="pw")
     Membership.objects.create(user=user, host=scope.key, role=Membership.Role.OWNER)
     return OperationContext(scope=scope, actor=user, permissions=access_for(user, scope), language="en")
+
+
+@pytest.fixture
+def ctx() -> OperationContext:
+    """The owner of business A, as whom a test writes the app's rows, exports them and loads the file back."""
+    return owner_of(A, "olga")
 
 
 def call(ctx: OperationContext, operation: str, /, **data):

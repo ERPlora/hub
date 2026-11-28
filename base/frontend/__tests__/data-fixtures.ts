@@ -1,5 +1,5 @@
 // Rows of Settings › Data for its tests, shaped as base/schemas/ answers them.
-import type { BlueprintSummary, ImportRow, Template } from '../operations/blueprints';
+import type { AppDatasets, BlueprintSummary, ImportRow, Template } from '../operations/blueprints';
 
 export function template(key: string, fields: Partial<Template> = {}): Template {
   return {
@@ -92,3 +92,25 @@ export function waitingLoad(status: 'waiting' | 'setup_failed' = 'waiting'): Imp
     },
   });
 }
+
+/** The apps on as Export lists them: two with data that travels (one of it personal) and one with nothing of its own. */
+export const EXPORT_APPS: AppDatasets[] = [
+  {
+    id: 'inventory',
+    label: 'Inventory',
+    icon: 'ion:cube-outline',
+    datasets: [
+      { key: 'inventory.category', label: 'Categories', rows: 2, personal: false },
+      { key: 'inventory.product', label: 'Products', rows: 12, personal: false },
+    ],
+    keeps_data: true,
+  },
+  {
+    id: 'customer',
+    label: 'Customers',
+    icon: 'ion:people-outline',
+    datasets: [{ key: 'customer.customer', label: 'Customers', rows: 3, personal: true }],
+    keeps_data: true,
+  },
+  { id: 'kitchen', label: 'Kitchen', icon: 'ion:flame-outline', datasets: [], keeps_data: false },
+];

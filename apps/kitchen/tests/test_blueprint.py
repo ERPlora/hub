@@ -5,25 +5,16 @@ day's numbers and the kitchen's history never travel.
 Every test runs against the real apps (Kitchen, Inventory, Taxes), in business A's own database, as production does.
 """
 
-import pytest
-
 from apps.kitchen.tests.conftest import HUB_DB, in_business_a
-from base.tenancy.tests.business import A
-from base.tests.blueprint_round_trip import app_report, call, data_of, loaded_back, owner_of
-from base.tests.blueprint_round_trip import exported as exported_apps
+from base.tests.blueprint_round_trip import app_report, call, ctx, data_of, exported, loaded_back
 
-__all__ = ["in_business_a"]
+__all__ = ["ctx", "in_business_a"]
 pytestmark = HUB_DB
 
 GRILL = {"name": "Grill", "color": "#AA3300", "destination": "both", "printer_usage": "kitchen", "printer_name": "",
          "sort_order": 1, "is_active": True}  # fmt: skip
 BAR = {"name": "Bar", "color": "#0033AA", "destination": "printer", "printer_usage": "bar", "printer_name": "",
        "sort_order": 2, "is_active": True}  # fmt: skip
-
-
-@pytest.fixture
-def ctx():
-    return owner_of(A, "olga")
 
 
 def a_kitchen(ctx):
@@ -41,14 +32,19 @@ def the_kitchen(ctx) -> dict:
     return {"stations": stations, "routes": routes}
 
 
-def test_a_backup_brings_the_stations_back_with_what_goes_to_each(ctx):
-    a_kitchen(ctx)
-    before = the_kitchen(ctx)
-    file = exported_apps(ctx, ["kitchen"])
+def emptied(ctx) -> None:
+    """No route and no station left: Kitchen deletes a station only once nothing goes to it."""
     for route in call(ctx, "kitchen.routing.list", limit=100).rows:
         call(ctx, "kitchen.routing.clear", **{f"{route.kind}_id": route.target_id})
     for row in call(ctx, "kitchen.station.list", limit=100).rows:
         call(ctx, "kitchen.station.delete", station_id=row.id)
+
+
+def test_a_backup_brings_the_stations_back_with_what_goes_to_each(ctx):
+    a_kitchen(ctx)
+    before = the_kitchen(ctx)
+    file = exported(ctx, ["kitchen"])
+    emptied(ctx)
 
     report = loaded_back(ctx, file)
 
@@ -59,7 +55,7 @@ def test_a_backup_brings_the_stations_back_with_what_goes_to_each(ctx):
 def test_loading_the_file_again_duplicates_nothing(ctx):
     a_kitchen(ctx)
 
-    report = loaded_back(ctx, exported_apps(ctx, ["kitchen"]))
+    report = loaded_back(ctx, exported(ctx, ["kitchen"]))
 
     assert [(part["created"], part["already"]) for part in app_report(report, "kitchen")["datasets"]] == [(0, 2)]
 
@@ -72,11 +68,8 @@ def test_only_the_stations_travel(ctx):
 
 def test_undoing_the_load_takes_away_the_stations_it_brought_with_their_routes(ctx):
     a_kitchen(ctx)
-    file = exported_apps(ctx, ["kitchen"])
-    for route in call(ctx, "kitchen.routing.list", limit=100).rows:
-        call(ctx, "kitchen.routing.clear", **{f"{route.kind}_id": route.target_id})
-    for row in call(ctx, "kitchen.station.list", limit=100).rows:
-        call(ctx, "kitchen.station.delete", station_id=row.id)
+    file = exported(ctx, ["kitchen"])
+    emptied(ctx)
     load = call(ctx, "base.blueprint.import", file_base64=file)
 
     call(ctx, "base.import.undo", id=load.id)

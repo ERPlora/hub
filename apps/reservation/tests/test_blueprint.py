@@ -7,14 +7,10 @@ Every test runs against the real apps, in business A's own database, as producti
 
 import datetime as dt
 
-import pytest
-
 from apps.reservation.tests.conftest import HUB_DB, in_business_a
-from base.tenancy.tests.business import A
-from base.tests.blueprint_round_trip import app_report, call, data_of, loaded_back, owner_of
-from base.tests.blueprint_round_trip import exported as exported_apps
+from base.tests.blueprint_round_trip import app_report, call, ctx, data_of, exported, loaded_back
 
-__all__ = ["in_business_a"]
+__all__ = ["ctx", "in_business_a"]
 pytestmark = HUB_DB
 
 DINNER = {"day_of_week": 4, "start_time": dt.time(20, 0), "end_time": dt.time(23, 30), "max_reservations": 12,
@@ -25,11 +21,6 @@ CHRISTMAS = {"date": dt.date(2026, 12, 25), "reason": "Christmas", "is_full_day"
              "blocked_until": None}  # fmt: skip
 PRIVATE = {"date": dt.date(2026, 11, 20), "reason": "Private event", "is_full_day": False,
            "blocked_from": dt.time(20, 0), "blocked_until": dt.time(23, 0)}  # fmt: skip
-
-
-@pytest.fixture
-def ctx():
-    return owner_of(A, "olga")
 
 
 def a_book(ctx):
@@ -61,7 +52,7 @@ def emptied(ctx) -> None:
 def test_a_backup_brings_the_book_s_slots_and_blocked_days_back(ctx):
     a_book(ctx)
     before = the_book(ctx)
-    file = exported_apps(ctx, ["reservation"])
+    file = exported(ctx, ["reservation"])
     emptied(ctx)
 
     report = loaded_back(ctx, file)
@@ -75,7 +66,7 @@ def test_a_backup_brings_the_book_s_slots_and_blocked_days_back(ctx):
 
 def test_loading_the_file_again_duplicates_nothing(ctx):
     a_book(ctx)
-    file = exported_apps(ctx, ["reservation"])
+    file = exported(ctx, ["reservation"])
 
     report = loaded_back(ctx, file)
 

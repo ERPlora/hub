@@ -5,15 +5,11 @@ them back as they were.
 Every test runs against the real apps, in business A's own database, as production does.
 """
 
-import pytest
-
-from base.tenancy.tests.business import A
-from base.tests.blueprint_round_trip import app_report, call, data_of, loaded_back, owner_of
-from base.tests.blueprint_round_trip import exported as exported_apps
+from base.tests.blueprint_round_trip import app_report, call, ctx, data_of, exported, loaded_back
 
 from apps.customer.tests.conftest import HUB_DB, in_business_a
 
-__all__ = ["in_business_a"]
+__all__ = ["ctx", "in_business_a"]
 pytestmark = HUB_DB
 
 GROUP = {"name": "VIP", "description": "Our best", "color": "#AA0000", "sort_order": 1}
@@ -21,11 +17,6 @@ TAG = {"name": "Allergic", "color": "#00AA00"}
 FIELD = {"name": "Shoe size", "field_type": "select", "options": ["38", "39"], "is_required": False, "sort_order": 2}
 LISTS = {"customer.group": ("customer.group.list", GROUP), "customer.tag": ("customer.tag.list", TAG),
          "customer.field": ("customer.field.list", FIELD)}  # fmt: skip
-
-
-@pytest.fixture
-def ctx():
-    return owner_of(A, "olga")
 
 
 def a_catalogue(ctx):
@@ -44,7 +35,7 @@ def the_catalogue(ctx) -> dict:
 def test_a_backup_brings_the_groups_tags_and_custom_fields_back(ctx):
     a_catalogue(ctx)
     before = the_catalogue(ctx)
-    file = exported_apps(ctx, ["customer"])
+    file = exported(ctx, ["customer"])
     for key, (operation, _) in LISTS.items():
         for row in call(ctx, operation, limit=100).rows:
             call(ctx, f"{key}.delete", id=row.id)
@@ -59,7 +50,7 @@ def test_a_backup_brings_the_groups_tags_and_custom_fields_back(ctx):
 def test_loading_the_file_again_duplicates_nothing(ctx):
     a_catalogue(ctx)
 
-    report = loaded_back(ctx, exported_apps(ctx, ["customer"]))
+    report = loaded_back(ctx, exported(ctx, ["customer"]))
 
     assert {part["key"]: part["already"] for part in app_report(report, "customer")["datasets"] if part["key"] in LISTS} == {
         "customer.group": 1, "customer.tag": 1, "customer.field": 1,

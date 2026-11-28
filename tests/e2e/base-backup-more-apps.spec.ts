@@ -5,12 +5,12 @@
 // product routed to it; loaded again from Import once they are deleted, they come back, the automation paused. Each
 // screen in the three sizes, and in Spanish. Its data are named `E2E Copy …` / `E2E-COPY-…` / `e2e-copy-…`, its slot
 // starts at 03:17, and `afterAll` deletes exactly them.
-import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, ARTIFACTS, capture, horizontalOverflow, hostPage, psql, shown, signedInSpanish, testid, THREE_SIZES, untilStill } from './helpers';
+import { importBack, rowsIn, snap } from './backup-file';
+import { A, api, ARTIFACTS, hostPage, psql, shown, signedInSpanish, testid, THREE_SIZES } from './helpers';
 
 test.use({ actionTimeout: 30_000 });
 
@@ -102,13 +102,6 @@ async function removeMine(context: BrowserContext): Promise<void> {
   expect((await api(context, A, 'POST', '/reservation/time_slots/delete', { id: now.slot?.id })).status).toBe(200);
 }
 
-async function snap(page: Page, name: string): Promise<void> {
-  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
-  await untilStill(page);
-  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await capture(page, name);
-}
-
 /** Settings › Data › Export: each app of the spec shows its parts with their rows once its data is ticked, and Time
  *  clock says that its data does not travel. */
 async function partsOf(context: BrowserContext, page: Page, language: 'en' | 'es', stays: string): Promise<void> {
@@ -122,11 +115,6 @@ async function partsOf(context: BrowserContext, page: Page, language: 'en' | 'es
   const attendance = shown(page).locator(`[data-testid="export-app"][data-id="${STAYS}"]`);
   await expect(attendance).toContainText(stays);
   await attendance.scrollIntoViewIfNeeded();
-}
-
-/** The rows of `part` the file `saved` carries. */
-function rowsIn(saved: string, part: string): Record<string, unknown>[] {
-  return JSON.parse(execFileSync('unzip', ['-p', saved, `data/${part}.json`], { encoding: 'utf8' }));
 }
 
 test.beforeAll(() => cleanUp());
@@ -150,10 +138,7 @@ for (const size of THREE_SIZES) {
     expect(rowsIn(saved, 'kitchen.station')).toContainEqual(expect.objectContaining({ name: STATION, products: [PRODUCT] }));
 
     await removeMine(context);
-    await testid(page, 'data-section-import').click();
-    await testid(page, 'import-file').setInputFiles(saved);
-    await expect(testid(page, 'review')).toBeVisible();
-    await testid(page, 'review-import').click();
+    await importBack(page, saved);
     for (const app of Object.keys(PARTS)) {
       const loaded = shown(page).locator(`[data-testid="report-app"][data-id="${app}"] [data-testid="report-app-status"]`);
       await expect(loaded).toContainText('Applied');
