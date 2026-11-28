@@ -97,12 +97,12 @@ export function sum(a: number, b: number, c: number, d: number): number {
 
 
 def checks(tree: Path, *args: str, database: bool = False, **env: str) -> subprocess.CompletedProcess[str]:
-    """The command as the hook runs it: the suite's own pytest settings and test database do not leak into it, and,
-    unless it needs one, no database is up."""
+    """The command as the hook runs it: the suite's own pytest settings, test database and image library do not leak
+    into it, and, unless it needs one, no database is up."""
     environment = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith("PYTEST_") and key not in {"TEST_DB_NAME", "CHECKS_DEPENDENCIES_FROM"}
+        if not key.startswith("PYTEST_") and key not in {"TEST_DB_NAME", "CHECKS_DEPENDENCIES_FROM", "CATALOG_DIR"}
     }
     environment.update(UV_PROJECT_ENVIRONMENT=sys.prefix, **env)
     if not database:
@@ -244,6 +244,40 @@ def test_a_python_change_whose_tests_read_the_component_library_passes_with_it_b
     output = done.stdout + done.stderr
     assert done.returncode == 0, output[-8000:]
     assert "apps/demo/tests/test_reads_ui.py" in output and "checks: pnpm" not in output, output[-4000:]
+
+
+#: A Python test that reads the shared image library, as the tests that load a business template do.
+READS_CATALOG_TEST = """from pathlib import Path
+
+from django.conf import settings
+
+
+def test_the_image_library_is_there():
+    assert (Path(settings.CATALOG_DIR) / "catalog.json").is_file(), settings.CATALOG_DIR
+"""
+
+
+def test_a_python_change_whose_tests_read_the_image_library_finds_the_one_beside_the_lender(head_tree):
+    """The settings look for ERPlora/blueprints beside the repository, and nothing is beside the hook's tree: the touched
+    Python tests read the one beside the checkout that lends the tree its dependencies."""
+    assert not (head_tree.parent / "blueprints").exists()  # positive control: as beside the hook's tree
+    assert (LENDER.parent / "blueprints/img/catalog.json").is_file(), "clone ERPlora/blueprints beside this checkout"
+    (head_tree / "apps/demo/tests/test_reads_catalog.py").write_text(READS_CATALOG_TEST, encoding="utf-8")
+    own = f"test_checks_{hashlib.sha256(bytes(head_tree)).hexdigest()[:6]}"
+    done = checks(head_tree, "fast", "HEAD", database=True, CHECKS_DEPENDENCIES_FROM=str(LENDER), TEST_DB_NAME=own)
+    output = done.stdout + done.stderr
+    assert done.returncode == 0, output[-8000:]
+    assert "apps/demo/tests/test_reads_catalog.py" in output, output[-4000:]
+
+
+def test_a_catalog_dir_the_push_names_wins_over_the_one_beside_the_lender(tmp_path, monkeypatch):
+    helper = load_helper()
+    monkeypatch.setenv("CHECKS_DEPENDENCIES_FROM", str(tmp_path / "lender"))
+    monkeypatch.setenv("CATALOG_DIR", str(tmp_path / "named"))
+    given = {}
+    monkeypatch.setattr(helper, "run", lambda _command, **env: given.update(env) or False)
+    helper.tests_failed([Path("apps/demo/tests/test_reads_catalog.py")])
+    assert given.get("CATALOG_DIR", os.environ["CATALOG_DIR"]) == str(tmp_path / "named")
 
 
 @needs_lent_frontend

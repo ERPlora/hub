@@ -15,7 +15,8 @@ Every check runs, and any red one fails the command. The whole suite is the CI's
 
 A tree without node_modules or packages/ui (the hook's worktree) borrows them from the checkout CHECKS_DEPENDENCIES_FROM
 names: its node_modules as a folder of links into that checkout's, and packages/ui at the commit this tree records, out
-of that checkout's clone of it.
+of that checkout's clone of it. Its pytest reads the image library beside that checkout (CATALOG_DIR) unless the push
+names one.
 Python reaches packages/live through the environment's editable install. A frontend check that still lacks one of them
 fails naming it, never skipped.
 """
@@ -154,10 +155,16 @@ def frontend_failed(code: list[str], data: list[str]) -> bool:
 
 
 def tests_failed(tests: list[Path]) -> bool:
-    checkout = Path(os.environ.get(LENDER) or ".").resolve()
+    lender = os.environ.get(LENDER)
+    checkout = Path(lender or ".").resolve()
     # Short enough for the settings to keep it whole (config/settings/backends.py), and the same for each checkout.
     database = os.environ.get("TEST_DB_NAME") or f"test_checks_{hashlib.sha256(bytes(checkout)).hexdigest()[:6]}"
-    return run([sys.executable, "-m", "pytest", "-q", "--tb=short", *map(str, tests)], TEST_DB_NAME=database)
+    env = {"TEST_DB_NAME": database}
+    if lender:
+        # The settings look for the image library beside the repository (config/settings/web.py), and nothing is
+        # beside the hook's tree.
+        env["CATALOG_DIR"] = os.environ.get("CATALOG_DIR") or str(checkout.parent / "blueprints" / "img")
+    return run([sys.executable, "-m", "pytest", "-q", "--tb=short", *map(str, tests)], **env)
 
 
 def main(argv: list[str] | None = None) -> int:
