@@ -831,7 +831,7 @@ there is no park button anywhere.
 Involved: CUSTOMER-F19, TABLE-F33
 
 ### SALE-F18 Delete an open check
-<!-- from WORKBOOK.md sha256:0ec519758a80 -->
+<!-- from WORKBOOK.md sha256:dd2d813c2362 -->
 Status: done
 Vertical: common
 Actor: manager; an empty check, also the employee; one with something ordered, the cashier with a manager's approval
@@ -853,7 +853,13 @@ cannot be voided: "That check is no longer open.". Whoever builds checks sees th
 ordering should not force calling a manager; with something ordered or charged it takes the permission to
 void or a manager's approval. If "Cancel" is pressed in "An approval is needed", the check stays in
 the list and "This needs a manager's approval." is read on top.
-Involved: TABLE-F20, TABLE-F21, BASE-F84
+Through the assistant: "delete table 3's check" (or "remove it", "void it") brings the card "Void in Sales & POS" with
+the check by its table ("3 (Dining room)"); once confirmed, the check is voided as from Open checks and the table is
+left free (TABLE-F20). If the check has something ordered or charged and whoever asks lacks the permission to void, that
+card does not come: the assistant hears first that the permission is needed and offers the one to void it with a
+manager's approval, who approves it with their PIN as on the screen (BASE-F100); if their role does not let them void,
+it tells them so.
+Involved: TABLE-F20, TABLE-F21, BASE-F84, BASE-F100
 
 ### SALE-F19 Open a table's check and leave it on the table
 <!-- from WORKBOOK.md sha256:a6d82c6f1f1a -->
