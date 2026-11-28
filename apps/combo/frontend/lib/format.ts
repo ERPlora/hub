@@ -4,7 +4,7 @@
 // forint), written with the platform's `formatMoney`: its thousands grouped from four digits on, as every screen
 // writes them. Until the business answers an amount is a dash, never the euro by default nor guessed decimals. A
 // supplement shows its sign only when the currency is known, as the till does.
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 import { formatMoney } from '../../../../base/frontend/lib/money';
 
 export type { Money };

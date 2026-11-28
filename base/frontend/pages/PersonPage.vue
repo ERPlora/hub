@@ -14,7 +14,7 @@ import { useRoute } from 'vue-router';
 
 import PersonRoleCard from '../components/PersonRoleCard.vue';
 import { createBadgeReader } from '../lib/access';
-import { type HubHome, readJsonBlock } from '../lib/home';
+import { type HubHome, readJsonBlock } from '../lib/embedded';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { accessKeys, badgeProblem, roleKey } from '../lib/people';

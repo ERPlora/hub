@@ -10,7 +10,7 @@
 // digits on («1.500»), as the till and the stock write it (hub#974).
 import type { StatusPillTone } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 import type { CartStatus, OrderStatus } from '../operations';
 

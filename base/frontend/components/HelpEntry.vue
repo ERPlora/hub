@@ -5,7 +5,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, shallowRef, watch } fro
 import { useRoute } from 'vue-router';
 
 import { PLATFORM, PLATFORM_NAME } from '../lib/help';
-import { readJsonBlock, type HubHome } from '../lib/home';
+import { readJsonBlock, type HubHome } from '../lib/embedded';
 import { useBaseI18n } from '../lib/i18n';
 
 import HelpWindow from './HelpWindow.vue';

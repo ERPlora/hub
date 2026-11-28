@@ -6,7 +6,7 @@
 // business's when it was issued), with the decimals the server counts it in (`currency_decimals`; the browser's
 // Intl gives the forint none): without one, an amount is a dash, never the euro by default nor guessed decimals. A quantity is
 // written with the platform's `formatQuantity` («2.000» → «2», «1500.000» → «1.500»), as every screen writes it.
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 
 export type { Money };

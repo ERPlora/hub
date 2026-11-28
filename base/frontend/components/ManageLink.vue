@@ -8,7 +8,7 @@
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
-import { type HubHome, readJsonBlock } from '../lib/home';
+import { type HubHome, readJsonBlock } from '../lib/embedded';
 import { managementOffered } from '../lib/management';
 import { useSaasPass } from '../lib/saas-pass';
 

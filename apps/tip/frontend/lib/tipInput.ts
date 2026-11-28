@@ -3,7 +3,7 @@
 // missing in its own words.
 import { parseMoney } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 import type { TipOut, TipPatchIn, TipRecordIn } from '../operations';
 
 /** The key of the sentence under the amount when it is no tip. */

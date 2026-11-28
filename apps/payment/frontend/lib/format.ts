@@ -7,7 +7,7 @@
 // a day.
 import type { StatusPillTone } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 import type { PaymentOut, PaymentStatus } from '../operations';
 

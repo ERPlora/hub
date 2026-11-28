@@ -12,7 +12,7 @@
 // typed shows it ungrouped (QtyStepper).
 
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 
 export type { Money };
 export { amountFilterErrors, filterCents, useBusinessMoney } from '../../../../base/frontend/lib/money';

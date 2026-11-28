@@ -8,7 +8,7 @@
 // «10», «1500.000» → «1.500»), as every screen writes it; its field shows it ungrouped, as typed.
 import { decimalMark } from '@erplora/ui/components';
 
-import type { Money } from '../../../../base/frontend/lib/home';
+import type { Money } from '../../../../base/frontend/lib/money';
 import { formatMoney as writeMoney } from '../../../../base/frontend/lib/money';
 
 export type { Money };

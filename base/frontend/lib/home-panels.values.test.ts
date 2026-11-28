@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { EUR, widget } from '../__tests__/home-fixtures';
 import type { WidgetDef } from '../operations/home';
-import { widgetView } from './home';
+import { widgetView } from './home-panels';
 
 // BASE-F06 — a value a row does not have (Cash register's «Recent discrepancies»: a session closed without a count has
 // no difference) painted as «0,00 €», a discrepancy of zero that never was. As Square, Toast, Shopify, Lightspeed or

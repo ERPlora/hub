@@ -9,7 +9,7 @@ import { HubIcon, openExternalLink, useSession } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { type HubHome, readJsonBlock } from '../lib/home';
+import { type HubHome, readJsonBlock } from '../lib/embedded';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { accessKeys, roleKey } from '../lib/people';
