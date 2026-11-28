@@ -1299,8 +1299,8 @@ Pasos:
 Entra: la importación elegida.
 Sale: borradas exactamente las filas que trajo, también lo que entró después porque esperaba a una app, y lo que aún
 esperaba ya no entra; lo creado después se queda (`base.import.undone`). Las categorías fiscales propias y sus tipos,
-los roles de Personal, los medios de pago de Ventas y los cajones de Caja que trajo se quedan, como el resto de los
-ajustes del negocio: no cuentan entre las filas que se van a borrar.
+los roles de Personal y los cajones de Caja que trajo se quedan, como el resto de los ajustes del negocio: no cuentan
+entre las filas que se van a borrar.
 Si falla: el motivo sale en la propia ventana, que no se cierra; una
 importación ya deshecha, «Esta importación ya se deshizo.».
 Implicados: BASE-F32
@@ -1331,11 +1331,11 @@ propias del negocio, cada una con sus tipos y sus recargos, nunca las de fábric
 archivo no toca; de Reservas, las franjas y los días bloqueados; de Personal, los roles en uso; de Tareas, los proyectos
 activos y las tareas abiertas, con su proyecto, la tarea de la que cuelgan, su prioridad, su fecha límite, sus etiquetas
 y su estado; de Automatizaciones, las automatizaciones, que llegan en pausa y sin ningún permiso dado, para que el dueño
-las revise; de Cocina, los puestos con los productos y las categorías que van a cada uno; de Ventas, los medios de pago,
-las secciones de precio libre y las notas rápidas; de Clientes, los grupos, las etiquetas y los campos propios en uso; de
+las revise; de Cocina, los puestos con los productos y las categorías que van a cada uno; de Ventas, las secciones de
+precio libre y las notas rápidas; de Clientes, los grupos, las etiquetas y los campos propios en uso; de
 Caja, los cajones en uso; y, solo en una copia de seguridad, los clientes. Nunca el historial (ventas, cobros, sesiones
 de caja, reservas y citas, fichajes, comandas, tareas hechas, ejecuciones), las personas y sus accesos, los PIN, los datos
-fiscales, los ajustes de cada app ni lo ligado a algo de fuera del negocio (WhatsApp, impresoras, códigos QR ya impresos,
+fiscales, los ajustes de cada app (como los medios de pago de Ventas) ni lo ligado a algo de fuera del negocio (WhatsApp, impresoras, códigos QR ya impresos,
 secretos). Cargado en otro negocio, o en este mismo (BASE-F30), devuelve lo que lleva tal como era. En el
 negocio no se guarda nada.
 Si falla: «La exportación falló:» con el motivo; sin nombre, «Escribe un nombre para el archivo.» y no se puede
@@ -1379,7 +1379,7 @@ Pasos:
      «Copias», aquí debajo.».
   3. Una fila por sección (una app) que tiene algo, con lo que tiene (cada parte y sus filas) y su total. Impuestos,
      Personal y Caja no salen como sección: sus categorías fiscales y sus tipos, sus roles y sus cajones son ajustes del
-     negocio, como los medios de pago de Ventas. De Tareas se borran las tareas abiertas y los proyectos activos; las
+     negocio. De Tareas se borran las tareas abiertas y los proyectos activos; las
      tareas hechas o canceladas se quedan, como el resto del historial.
   4. Marca las secciones y pulsa «Restablecer el negocio»: «Esto no se puede deshacer», con «Se borrarán
      definitivamente 120 filas:» y el desglose. Escribe el nombre del negocio («Escribe «Casa Ramón» para confirmar») y

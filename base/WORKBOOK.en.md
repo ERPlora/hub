@@ -1353,7 +1353,7 @@ If it fails: "The retry failed:" with the reason and the report stays in sight.
 Involved: BASE-F32
 
 ### BASE-F34 Undo an import
-<!-- from WORKBOOK.md sha256:558c893b18c3 -->
+<!-- from WORKBOOK.md sha256:bf257eb89a8e -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Reset)
@@ -1369,14 +1369,14 @@ Steps:
 In: the import chosen.
 Out: exactly the rows it brought removed, also what came in later because it waited for an app, and what it still
 waited for no longer comes in; what was created afterwards stays (`base.import.undone`). The own tax categories and
-rates, the Staff roles, the Sales payment methods and the Cash register drawers it brought stay, like the rest of the
-business's settings: they do not count among the rows to remove.
+rates, the Staff roles and the Cash register drawers it brought stay, like the rest of the business's settings: they
+do not count among the rows to remove.
 If it fails: the reason shows in the dialog itself, which does not close; an
 import already undone, "This load was undone already.".
 Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
-<!-- from WORKBOOK.md sha256:7b25f0a34321 -->
+<!-- from WORKBOOK.md sha256:f87b79e12493 -->
 Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups (Export)
@@ -1402,11 +1402,11 @@ tax categories, each with its rates and its surcharges, never the factory ones, 
 no file touches; of Reservations, the time slots and the blocked days; of Staff, the roles in use; of Tasks, the active
 projects and the open tasks, with their project, the task they hang from, their priority, due date, tags and status;
 of Automations, the automations, which arrive paused and with no permission given, for the owner to review them; of
-Kitchen, the stations with the products and categories that go to each; of Sales, the payment methods, the open price
-departments and the quick notes; of Customers, the groups, tags and own fields in use; of Cash register, the drawers in
+Kitchen, the stations with the products and categories that go to each; of Sales, the open price departments and the
+quick notes; of Customers, the groups, tags and own fields in use; of Cash register, the drawers in
 use; and, only in a backup, the customers. Never the history (sales, payments, cash sessions, reservations and
 appointments, clock-ins, kitchen tickets, done tasks, runs), the people and their access, PINs, fiscal data, each
-app's settings nor what is bound to something outside the business (WhatsApp, printers, QR codes already printed,
+app's settings (like the Sales payment methods) nor what is bound to something outside the business (WhatsApp, printers, QR codes already printed,
 secrets). Loaded
 into another business, or into this same one (BASE-F30), it brings back what it takes as it was. Nothing is kept in
 the business.
@@ -1438,7 +1438,7 @@ be exported.
 Involved: none
 
 ### BASE-F37 Reset the business by sections
-<!-- from WORKBOOK.md sha256:02540db9c5e0 -->
+<!-- from WORKBOOK.md sha256:bf73c189d3ea -->
 Status: done
 Actor: owner
 Screen: Settings · Data and backups (Reset)
@@ -1450,7 +1450,7 @@ Steps:
      full copy of the business's data is made and kept for 90 days, in «Copies» below.".
   3. One row per section (an app) that has something, with what it has (each part and its rows) and its total. Taxes,
      Staff and Cash register are no sections: their tax categories and rates, their roles and their drawers are the
-     business's settings, like the Sales payment methods. Of Tasks, the open tasks and the active projects are removed;
+     business's settings. Of Tasks, the open tasks and the active projects are removed;
      the done or cancelled tasks stay, like the rest of the history.
   4. Tick the sections and tap "Reset the business": "This cannot be undone", with "120 rows will be removed for
      good:" and the breakdown. Type the business's name ("Type «Casa Ramón» to confirm") and tap "Remove for good" (or

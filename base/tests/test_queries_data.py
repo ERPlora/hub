@@ -322,7 +322,12 @@ def test_every_app_on_is_listed_with_what_of_it_travels_and_how_many_rows(owner)
         ("inventory.category", "Categorías de productos", 6, False),
         ("inventory.product", "Productos", 16, False),
     ]
-    assert [(part.key, part.personal) for part in apps["customer"].datasets] == [("customer.customer", True)]
+    assert [(part.key, part.personal) for part in apps["customer"].datasets] == [
+        ("customer.customer", True),
+        ("customer.group", False),
+        ("customer.tag", False),
+        ("customer.field", False),
+    ]
     assert apps["printing"].datasets == []  # on, registered by an export, with nothing of its own that travels
     assert "base" not in apps
     assert list(apps) == sorted(apps, key=lambda app: apps[app].label)

@@ -1,7 +1,7 @@
-"""What of Sales travels in an export of the business (BASE-F35): the till's own setup — the departments of the open
-price with the tax category each charges at, the quick notes of a line and the payment methods the business added —
-read with Sales' own lists and written with its own creates. The checks, the sales, the refunds and the day's numbers
-never travel. A payment method has no delete: like the business's settings, one a load brought stays.
+"""What of Sales travels in an export of the business (BASE-F35): the departments of the open price with the tax
+category each charges at and the quick notes of a line, read with Sales' own lists and written with its own creates.
+The checks, the sales, the refunds, the day's numbers and the payment methods, which are the till's settings, never
+travel.
 
 Every test runs against the real apps (Sales, Taxes, Customers), in business A's own database, as production does.
 """
@@ -56,17 +56,13 @@ def test_a_backup_brings_the_departments_and_quick_notes_back(ctx):
     report = loaded_back(ctx, file)
 
     assert the_till(ctx) == before
-    assert created(report)["sale.department"] == (1, 0)
-    assert created(report)["sale.quick_note"] == (1, 0)
-    assert created(report)["sale.payment_method"][0] == 0
+    assert created(report) == {"sale.department": (1, 0), "sale.quick_note": (1, 0)}
 
 
-def test_the_payment_methods_travel_and_loading_again_duplicates_nothing(ctx):
+def test_loading_the_file_again_duplicates_nothing_and_the_payment_methods_never_travel(ctx):
     a_till(ctx)
-    methods = {row["name"] for row in data_of(ctx, ["sale"])["sale.payment_method"]}
 
     report = loaded_back(ctx, exported_apps(ctx, ["sale"]))
 
-    assert "Bizum" in methods
-    assert all(pair[0] == 0 for pair in created(report).values())
-    assert set(created(report)) == {"sale.payment_method", "sale.department", "sale.quick_note"}
+    assert created(report) == {"sale.department": (0, 1), "sale.quick_note": (0, 1)}
+    assert set(data_of(ctx, ["sale"])) == {"sale.department", "sale.quick_note"}
