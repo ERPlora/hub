@@ -94,4 +94,4 @@ class CartCheckoutConfig(LiveAppConfig):
         fiscal archive first (``fiscal_archive_models``)."""
         from apps.cart_checkout import queries  # the models are not loaded yet when this module is
 
-        return queries.keeps_fiscal_documents()
+        return queries.orders.keeps_fiscal_documents()

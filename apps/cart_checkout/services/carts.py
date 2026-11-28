@@ -14,7 +14,8 @@ from live.outbox import record_event
 
 from apps.cart_checkout import events
 from apps.cart_checkout.models import ACTOR_MAX_LENGTH, Cart, CartItem
-from apps.cart_checkout.queries import business_currency, cart_row, find_cart, state_of
+from apps.cart_checkout.queries.reads import business_currency, find_cart, state_of
+from apps.cart_checkout.queries.rows import cart_row
 from apps.cart_checkout.schemas import AbandonIn, CartIn, CartOut, CartRefIn, CleanupIn, CleanupOut
 from base.queries.people import actor_name
 
