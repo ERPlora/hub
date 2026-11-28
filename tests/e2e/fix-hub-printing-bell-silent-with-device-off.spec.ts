@@ -8,13 +8,13 @@
 // say so again, with no event and no reload (the card reads the summary every 30 s while something waits). The minute
 // and the 90 s are not waited for: `psql()` moves the receipt and the device's last news back. In each of the three
 // sizes, leaving a capture with the action center open. What it makes is «e2e Off …», deleted before and after.
-import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, test } from '@playwright/test';
 
 import { bellSays, bellTotal, featureNotice, noticeButton } from './action-center';
 import { A, api, login, psql, shown } from './helpers';
 import { capturedFitting } from './screen';
 import { streamsQuiet as settled } from './home-helpers';
-import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
+import { FLOW_VIEWPORTS, forgetDevices, printHostHello } from './printing-helpers';
 import { stamp } from './sale-helpers';
 
 test.describe.configure({ mode: 'serial' });
@@ -88,22 +88,6 @@ async function setUpDevice(context: BrowserContext, device: string): Promise<voi
 function wentOff(device: string, job: string, minutes = 2): void {
   psql(`update printing_printdevice set last_seen_at = now() - interval '${minutes} minutes' where key = encode(sha256('${device}'::bytea), 'hex')`);
   psql(`update printing_printjob set created_at = now() - interval '${minutes} minutes' where id = '${job}'`);
-}
-
-/** The device's print host connects from `page` the way the app does (/ws/print, `hello`): it is there again. */
-async function comesBack(page: Page, device: string): Promise<void> {
-  const ready = await page.evaluate(
-    ([deviceId, printerId]) =>
-      new Promise<string>((resolve, reject) => {
-        const socket = new WebSocket(`${location.origin.replace(/^http/, 'ws')}/ws/print`);
-        (window as unknown as { printSocket: WebSocket }).printSocket = socket;
-        socket.onopen = () => socket.send(JSON.stringify({ type: 'hello', session: '', deviceId, printers: [printerId] }));
-        socket.onmessage = (event) => resolve((JSON.parse(event.data as string) as { type: string }).type);
-        socket.onerror = () => reject(new Error('the print socket failed'));
-      }),
-    [device, printer],
-  );
-  expect(ready).toBe('ready');
 }
 
 /**
@@ -188,7 +172,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       // «Listo» by themselves, by the clock.
       await settled(streams);
       const onThePrinters = loads.length;
-      await comesBack(page, device);
+      await printHostHello(page, device, printer);
       const readsBack = reads.length;
       const cardReadsBack = cardReads.length;
       await bellSays(page, total, BY_THE_CLOCK);
