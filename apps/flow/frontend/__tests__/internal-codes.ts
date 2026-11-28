@@ -3,7 +3,6 @@
 // of a permission to call another system («http:https://…») or the values of a closed list as they are kept
 // («low, medium, high, urgent»). Each of them has its words. The tests of the screens and the browser walks of
 // Automations share it, so a new screen or a new line that shows one fails, whatever the site.
-import type { CatalogOut } from '../operations';
 
 /** The internal names of a business's catalog. */
 export interface CatalogNames {
@@ -19,7 +18,13 @@ const STEP_ID = /(?<![\p{L}\p{N}_.-])s\d+(?![\p{L}\p{N}_])/gu;
 const SNAKE = /(?<![\p{L}\p{N}_.@/-])[a-z][a-z0-9]*(?:_[a-z0-9]+)+(?![\p{L}\p{N}_@])/gu;
 const CALL_GRANT = /http:https?:\/\//gu;
 
-export function catalogNames(catalog: CatalogOut): CatalogNames {
+/** What of a catalog (`flow.catalog.read`) names things inside the Hub; the browser walks read it through the API. */
+export interface CatalogShape {
+  actions: readonly { name: string; fields: readonly { choices: readonly string[] }[] }[];
+  events: readonly { name: string }[];
+}
+
+export function catalogNames(catalog: CatalogShape): CatalogNames {
   return {
     operations: catalog.actions.map((action) => action.name),
     events: catalog.events.map((event) => event.name),
