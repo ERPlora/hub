@@ -53,6 +53,7 @@
 // through its apps' API with the owner's session, as in the other specs, but for what no person does.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { nameOf } from './business';
 import { WORKER_START_TIMEOUT_MS } from './global-setup';
 import { capture, OWNER, psql } from './helpers';
 import { GENERIC } from './inventory-helpers';
@@ -482,12 +483,11 @@ for (const { label, viewport } of SIZES) {
     await context.close();
 
     // In the business's Agenda, its «History» keeps its lines and ends in «Restored» (APPOINTMENT-F10). The owner booked
-    // it, and that line names the owner without their address (an account without a name: what comes before its «@»);
-    // the platform deleted it and the recovery brought it back, and those lines say the platform did it.
+    // it, and that line names the owner; the platform deleted it and the recovery brought it back, and those say so.
     const agenda = await ownerPage(browser, `/appointment/agenda?date=${aMondayAt('10:00').slice(0, 10)}`, viewport);
     await rowAction(agenda.page, 'appointment-list', appointment, 'history');
     const history = agenda.page.locator('ion-modal[data-testid=appointment-history-modal]');
-    const owner = OWNER.email.split('@')[0];
+    const owner = nameOf(OWNER);
     await expect(history.locator('[data-testid=appointment-history-entry]')).toHaveText([
       new RegExp(`^Booked.* · ${owner}$`),
       /^Deleted.* · Done by the platform$/,
