@@ -53,7 +53,7 @@
 1071 tests/e2e/helpers.ts ERPlora/erplora-next#74
 531 tests/e2e/inventory-products.spec.ts ERPlora/erplora-next#74
 694 tests/e2e/reservation-book.spec.ts ERPlora/erplora-next#74
-539 tests/e2e/staff-flows.spec.ts ERPlora/erplora-next#74
+538 tests/e2e/staff-flows.spec.ts ERPlora/erplora-next#74
 781 tests/e2e/table-flows.spec.ts ERPlora/erplora-next#74
 542 tests/e2e/verifactu-records.spec.ts ERPlora/erplora-next#74
 763 tests/e2e/website-flows.spec.ts ERPlora/erplora-next#74

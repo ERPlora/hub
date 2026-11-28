@@ -10,6 +10,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import { A, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 import { expectMarked, expectUnmarked, refuseWithTheSameWords } from './same-words-helpers';
 import { stamp, VIEWPORTS } from './sale-helpers';
+import { pickAccount } from './staff-helpers';
 
 const LAST = `E2E888${stamp()}`;
 
@@ -49,12 +50,7 @@ async function correctOneByOne(page: Page, words: string, label: string): Promis
   await capture(page, `CLOSE-STAFF-hub888-refused-${label}`);
 
   // The Hub user is chosen in its picker, from the server's search: its mark alone goes.
-  const typed = user.locator('input');
-  await typed.click();
-  await typed.fill('employee');
-  await page.locator('[data-testid^=staff-member-form-user_id-option-]', { hasText: 'employee@example.com' }).first().click();
-  await expect(page.locator('[data-testid^=staff-member-form-user_id-option-]')).toHaveCount(0);
-  await expect(typed).toHaveValue('employee@example.com');
+  await pickAccount(page, 'staff-member-form-user_id', EMPLOYEE);
   await unmarked(user);
   await marked(first);
   await marked(role);

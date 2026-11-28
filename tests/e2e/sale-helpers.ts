@@ -134,6 +134,9 @@ export async function tilePhotoLoaded(tile: Locator, name: string, src?: string)
 export const linesOf = (page: Page, product: { name: string }): Locator =>
   shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name });
 
+/** What the till says when `name`, sold out, is tapped: in English between “…”, in Spanish between «…». */
+export const soldOutNotice = (name: string): RegExp => new RegExp(`^(“${name}” is sold out|«${name}» está agotado)\\.$`);
+
 /**
  * Whether the till on screen is a phone's, once it has laid itself out for the window. It does so a frame after a
  * resize (its media query and its ResizeObserver): read straight after `setViewportSize`, the cart button is the

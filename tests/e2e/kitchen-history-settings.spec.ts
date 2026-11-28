@@ -6,7 +6,8 @@
 // deleted after it, and the settings go back to what they were.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shown } from './helpers';
+import { nameOf } from './business';
+import { A, api, OWNER, psql, shown } from './helpers';
 import { capture } from './kitchen-helpers';
 import { stamp } from './sale-helpers';
 import { ownerPage } from './service-helpers';
@@ -64,8 +65,9 @@ test('KITCHEN-F25: the History finds a cancelled ticket by part of its number an
     await expect(rows.first()).toContainText('Cancelled');
     await expect(rows.first()).toContainText('Out of salmon');
     await expect(rows.last()).toContainText('Created');
-    // «Who» is the person as they read themselves, never the id of their session («saas:…»).
-    await expect(rows.first()).toContainText('owner@example.com');
+    // «Who» is the person by their name, never the id of their session («saas:…») nor their address.
+    await expect(rows.first()).toContainText(nameOf(OWNER));
+    await expect(rows.first()).not.toContainText('@');
     await expect(rows.first()).not.toContainText('saas:');
 
     // «Cancelled» leaves only the cancel.
@@ -98,7 +100,8 @@ test('KITCHEN-F25: «Who» says «System» for what an automation did, never its
     await expect(rows.first()).toContainText('Rush');
     await expect(rows.first()).toContainText('System');
     await expect(rows.first()).not.toContainText('flow_run:');
-    await expect(rows.last()).toContainText('owner@example.com');
+    await expect(rows.last()).toContainText(nameOf(OWNER));
+    await expect(rows.last()).not.toContainText('@');
   } finally {
     await context.close();
   }
