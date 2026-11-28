@@ -3,7 +3,7 @@
 // offline, online and whether the draft has unpublished changes), and, for whoever manages it, the form: the four
 // designs, the palette (with the owner's two colours over it, if changed) and the page mode, and one block per fixed section (the optional ones with «Show»). The draft
 // is saved by hand or two seconds after the last change (`website.site.save`), and the real preview beside it
-// reloads after each save (`website.site.preview`, in a frame). «Publish» and «Take offline» ask first; «Share and
+// reloads after each save, also one made elsewhere (`website.site.preview`, in a frame). «Publish» and «Take offline» ask first; «Share and
 // QR» gives the address and its QR. On a computer the form and the preview stand side by side; on a tablet or a
 // phone a segment switches between them. Squarespace's, Wix's and Shopify's editors, reduced to fixed sections.
 import { ImageUpload, InlineFeedback, useConfirm } from '@erplora/ui/components';
@@ -37,6 +37,7 @@ import PreviewFrame from '../components/PreviewFrame.vue';
 import ReviewsEditor from '../components/ReviewsEditor.vue';
 import ShareDialog from '../components/ShareDialog.vue';
 import TemplatePicker from '../components/TemplatePicker.vue';
+import { usePreviewReload } from '../composables/usePreviewReload';
 import { useT } from '../composables/useT';
 import { copyOf, errorUnder, sameDraft, toDraft, toSaveIn } from '../lib/draft';
 import { defaultHours } from '../lib/hours';
@@ -72,7 +73,7 @@ const upload = makeUploader((input) => uploadImage.run(input));
 /** The form: a copy of the site's draft, edited here; `saved` is what the server holds of it. */
 const draft = ref<SaveIn | null>(null);
 const saved = ref<SaveIn | null>(null);
-const previewKey = ref(1);
+const previewKey = usePreviewReload(saved);
 /** The sections unfolded in the form. Kept here: Vue sets the group's `value` again on every render, and a constant
  * there folded the section being typed in at each keystroke (the field lost the focus, the page jumped). */
 const openSections = ref<string[]>(['topbar', 'hero']);
@@ -148,7 +149,6 @@ async function saveNow(): Promise<boolean> {
     return false;
   }
   saved.value = copyOf(sending);
-  previewKey.value += 1;
   return true;
 }
 
