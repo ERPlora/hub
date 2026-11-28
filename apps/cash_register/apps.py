@@ -25,7 +25,6 @@ class CashRegisterConfig(LiveAppConfig):
     label = "cash_register"
     blueprint_stays = {
         "Settings": "settings",
-        "Register": "pending",
         "SessionCounter": "internal",
         "Session": "history",
         "Movement": "history",
@@ -215,3 +214,9 @@ class CashRegisterConfig(LiveAppConfig):
         from apps.cash_register import queries  # the models are not loaded yet when this module is
 
         return queries.movements.keeps_fiscal_documents()
+
+    def blueprint_datasets(self) -> list:
+        """What of Cash register travels in an export of the business (BASE-F35): its drawers, never a session."""
+        from apps.cash_register import blueprint  # base.blueprint loads the apps' models, not loaded yet when this module is
+
+        return blueprint.DATASETS

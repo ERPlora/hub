@@ -10,7 +10,7 @@ class PaymentConfig(LiveAppConfig):
     name = "apps.payment"
     label = "payment"
     blueprint_stays = {
-        "PaymentMethod": "pending",
+        "PaymentMethod": "fiscal",
         "Payment": "history",
         "PaymentCounter": "internal",
     }
