@@ -705,3 +705,6 @@ msgstr "Cambiar los ajustes"
 
 msgid "When"
 msgstr "Cuándo"
+
+msgid "Agenda blocks"
+msgstr "Bloqueos de la agenda"

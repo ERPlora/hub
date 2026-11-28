@@ -176,3 +176,6 @@ msgstr "Ver elementos"
 
 msgid "Manage items and view their figures"
 msgstr "Gestionar elementos y ver sus cifras"
+
+msgid "Items"
+msgstr "Elementos"
