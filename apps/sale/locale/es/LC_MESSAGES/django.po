@@ -1096,3 +1096,9 @@ msgstr "Su documento fiscal sigue pendiente: abre la venta para emitirlo."
 
 msgid "Its VeriFactu record could not be read, and its paper never prints without its QR."
 msgstr "No se pudo leer su registro de VeriFactu, y su papel nunca se imprime sin su QR."
+
+msgid "Payment methods"
+msgstr "Medios de pago"
+
+msgid "Open price departments"
+msgstr "Secciones de precio libre"

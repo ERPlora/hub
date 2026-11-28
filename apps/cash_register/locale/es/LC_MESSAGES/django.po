@@ -435,3 +435,6 @@ msgstr "Cambiar los ajustes y los cajones"
 
 msgid "No receipt printer takes this report: open the session to print it on this device."
 msgstr "Ninguna impresora de recibos recibe este informe: abre la sesión para imprimirlo en este dispositivo."
+
+msgid "Drawers"
+msgstr "Cajones"
