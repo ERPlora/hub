@@ -8,19 +8,22 @@ from live.errors import InvalidPayload, NotFound
 from live.operations import operation
 from live.outbox import record_event
 
-from apps.staff import events
+from apps.staff import events, schedule_card
 from apps.staff.models import Schedule, ScheduleDay
 from apps.staff.queries.reads import resolve_member
 from apps.staff.queries.schedules import SCHEDULE_NOT_FOUND, load_schedule
+from apps.staff.queries.settings import saved_settings
 from apps.staff.schemas.fields import DeletedOut
 from apps.staff.schemas.schedules import (
     SCHEDULE_RANGE,
+    DayIn,
     ScheduleIn,
     ScheduleOut,
     ScheduleRefIn,
     ScheduleUpdateIn,
     SetActiveIn,
 )
+from apps.staff.workday import with_working_days, workday_of
 
 from .locks import _locked_live_member
 
@@ -50,10 +53,12 @@ DEFAULT_SCHEDULE_NAME = _("Regular schedule")
         "description": "Creates a weekly work schedule for a staff member (by id or by name), with the "
         "hours and break of each working day.",
         "risk": "normal",
+        "summary": schedule_card.created,
     },
 )
 def create_schedule(ctx: OperationContext, data: ScheduleIn) -> Schedule | None:
     """STAFF-F13: a new default schedule demotes the member's others in the same transaction."""
+    week = _week(data.days)
     member = resolve_member(data.member_id, data.member, lock=True)
     if data.is_default:
         member.schedules.filter(is_default=True).update(is_default=False)
@@ -64,7 +69,7 @@ def create_schedule(ctx: OperationContext, data: ScheduleIn) -> Schedule | None:
         effective_from=data.effective_from,
         effective_until=data.effective_until,
     )
-    _write_week(schedule, data.days)
+    _write_week(schedule, week)
     record_event(
         ctx,
         events.SCHEDULE_CREATED,
@@ -96,10 +101,12 @@ def create_schedule(ctx: OperationContext, data: ScheduleIn) -> Schedule | None:
         "description": "Edits a work schedule (name, validity, default) and replaces its whole week of "
         "working hours.",
         "risk": "normal",
+        "summary": schedule_card.updated,
     },
 )
 def update_schedule(ctx: OperationContext, data: ScheduleUpdateIn) -> Schedule | None:
     """STAFF-F14: what is not sent is kept, ``null`` clears a date, and the week is replaced."""
+    week = _week(data.days)
     schedule = _locked_schedule(data.id)
     sent = data.model_dump(exclude_unset=True, exclude={"id", "days"})
     if "name" in sent:
@@ -122,7 +129,7 @@ def update_schedule(ctx: OperationContext, data: ScheduleUpdateIn) -> Schedule |
         ).update(is_default=False)
     schedule.save()
     schedule.days.all().delete()
-    _write_week(schedule, data.days)
+    _write_week(schedule, week)
     record_event(
         ctx,
         events.SCHEDULE_UPDATED,
@@ -220,7 +227,12 @@ def _locked_schedule(schedule_id: UUID) -> Schedule:
     return schedule
 
 
-def _write_week(schedule: Schedule, days: list) -> None:
+def _week(days: list[DayIn]) -> list[DayIn]:
+    """The hours a day does not say are the business's default working day, as the window proposes them (STAFF-F22)."""
+    return with_working_days(days, workday_of(saved_settings()))
+
+
+def _write_week(schedule: Schedule, days: list[DayIn]) -> None:
     """Only the working days are stored: a weekday missing is a day off."""
     ScheduleDay.objects.bulk_create(
         ScheduleDay(
