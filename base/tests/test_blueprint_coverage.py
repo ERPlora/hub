@@ -36,6 +36,15 @@ def test_every_model_of_every_app_travels_in_a_dataset_or_says_why_it_stays():
     assert undeclared(module_configs()) == {}
 
 
+def silent(parts) -> list[str]:
+    """The datasets that do not say which models' rows they carry: nothing could tell history or people in them."""
+    return sorted(part.key for part in parts if not part.models)
+
+
+def test_every_dataset_says_which_models_it_carries():
+    assert silent(datasets.every_dataset()) == []
+
+
 def test_a_model_either_travels_or_stays_never_both():
     both = {
         config.label: sorted(carried_by(config.label) & set(staying_in(config)))
@@ -99,6 +108,16 @@ def test_the_check_names_a_new_kind_of_row_of_an_app_that_already_travels(instal
     installed(an_app("bookings", ("Room", "Booking", "Extra"), travels=("Room",), stays={"Booking": Stays.HISTORY}))
 
     assert undeclared(datasets.module_configs()) == {"bookings": ["Extra"]}
+
+
+def test_the_check_names_a_dataset_that_does_not_say_what_it_carries(installed):
+    """A part of an app whose models all stay (its sales, as history) cannot slip into the file by naming none."""
+    tills = an_app("tills", ("Sale",), stays={"Sale": Stays.HISTORY})
+    tills.blueprint_datasets = lambda: [Dataset(key="tills.sale", label="Sales", rows=list, count=len, load=print)]
+    installed(tills)
+
+    assert undeclared(datasets.module_configs()) == {}
+    assert silent(datasets.every_dataset()) == ["tills.sale"]
 
 
 def test_the_check_names_an_app_that_declares_nothing(installed):
