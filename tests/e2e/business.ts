@@ -1,38 +1,53 @@
 // The business a spec runs on, emptied for it and put back after: what a template brings, the plan in its photo,
 // and who is signed in on it.
+import { spawnSync } from 'node:child_process';
+
 import { type BrowserContext, expect } from '@playwright/test';
 
-import { A, api, psql } from './helpers';
+import { A, api, HUB_DIR, psql } from './helpers';
 
-/** What a template brings, last first (tables before their zones, products before their categories), each with
- * the operation's route that lists it and the one that takes a row away: the server's own (`base.blueprint`). */
-const TEMPLATE_DATA = [
-  ['/table/tables', '/table/tables/delete'],
-  ['/table/zones', '/table/zones/delete'],
-  ['/service/services', '/service/services/archive'],
-  ['/service/categories', '/service/categories/delete'],
-  ['/inventory/products', '/inventory/products/delete'],
-  ['/inventory/categories', '/inventory/categories/delete'],
-] as const;
+/** Every row a template brings, through the server's own list of what travels (`base.blueprint.datasets`): each
+ * dataset of an app that is on, last one loaded first (tables before their zones, a modifier group before the
+ * product it applies to), each row through its app's own delete or archive. Personal data stays: a template never
+ * brings it. Never a list of our own: it falls behind as soon as another app's data starts to travel. */
+const REMOVE_TEMPLATE_DATA = [
+  'from live.context import OperationContext, Scope',
+  'from base.apps_on import active_apps',
+  'from base.blueprint.datasets import every_dataset',
+  'ctx = OperationContext(scope=Scope("host", SLUG), actor="system", permissions=frozenset({"*"}), language="en")',
+  'on = active_apps(ctx.scope)',
+  'for dataset in reversed(every_dataset()):',
+  '    if dataset.removable and not dataset.personal and dataset.app in on:',
+  '        for pk in dataset.ids(ctx):',
+  '            dataset.remove(ctx, pk)',
+].join('\n');
+
+interface Datasets {
+  apps: { datasets: { key: string; rows: number; personal: boolean }[] }[];
+}
 
 /**
- * Takes away every row a template brings from the business at `origin`, through the apps' operations (their apps
- * on), until the server says the business is empty.
+ * Takes away every row a template brings from the business at `origin`, until the server says it is empty; when it
+ * does not, the error names the datasets that kept rows.
  */
 export async function emptyOfTemplateData(context: BrowserContext, origin: string): Promise<void> {
-  for (let pass = 0; pass < 5; pass += 1) {
-    for (const [list, remove] of TEMPLATE_DATA) {
-      const rows = await api<{ rows: { id: string }[] }>(context, origin, 'GET', `${list}?limit=100&offset=0`);
-      expect(rows.status, list).toBe(200);
-      for (const row of rows.data.rows) {
-        const res = await api(context, origin, 'POST', remove, { id: row.id });
-        expect(res.status, `${remove} ${row.id}`).toBeLessThan(300);
-      }
-    }
-    const catalogue = await api<{ empty: boolean }>(context, origin, 'GET', '/settings/data/blueprints');
-    if (catalogue.data.empty) return;
-  }
-  throw new Error('the business could not be emptied of what a template brings');
+  const slug = new URL(origin).hostname.split('.')[0];
+  const code = REMOVE_TEMPLATE_DATA.replace('SLUG', JSON.stringify(slug));
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', slug, '-c', code], {
+    cwd: HUB_DIR,
+    env: process.env,
+    encoding: 'utf8',
+  });
+  expect(out.status, `emptying ${slug} of what a template brings: ${out.stderr}`).toBe(0);
+  const catalogue = await api<{ empty: boolean }>(context, origin, 'GET', '/settings/data/blueprints');
+  expect(catalogue.status, '/settings/data/blueprints').toBe(200);
+  if (catalogue.data.empty) return;
+  const listed = await api<Datasets>(context, origin, 'GET', '/settings/data/datasets');
+  const kept = listed.data.apps
+    .flatMap((app) => app.datasets)
+    .filter((dataset) => dataset.rows > 0 && !dataset.personal)
+    .map((dataset) => `${dataset.key}: ${dataset.rows}`);
+  throw new Error(`the business could not be emptied of what a template brings; rows kept: ${kept.join(', ')}`);
 }
 
 /**
