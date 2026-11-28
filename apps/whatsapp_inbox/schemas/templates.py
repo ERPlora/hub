@@ -12,6 +12,7 @@ from pydantic import StringConstraints, ValidationInfo, field_validator
 from apps.whatsapp_inbox.models.templates import NAMED_VARIABLE
 from apps.whatsapp_inbox.schemas.fields import A_SAMPLE, A_TEMPLATE, TEMPLATE, Page, PageIn, _text
 from apps.whatsapp_inbox.schemas.template_samples import TemplateSampleOut
+from base.schemas.assistant import IN_OWN_WORDS
 
 TEMPLATE_NAME_RULE = _("Use lowercase letters, numbers and underscores only.")
 TEMPLATE_LANGUAGE_RULE = _("Choose the template's language.")
@@ -48,14 +49,17 @@ def template_variables(text: str) -> int:
 
 class TemplateButtonIn(Schema):
     type: Literal["QUICK_REPLY", "URL", "PHONE_NUMBER"] = Field(
-        description="QUICK_REPLY (an answer the customer taps), URL (opens a link) or PHONE_NUMBER (calls)."
+        description="QUICK_REPLY (an answer the customer taps), URL (opens a link) or PHONE_NUMBER (calls).",
+        json_schema_extra={"choices_of": "button_type"},
     )
-    text: _text(25, 1) = Field(description="What the button says, up to 25 characters.")
+    text: _text(25, 1) = Field(description="What the button says, up to 25 characters.", json_schema_extra=IN_OWN_WORDS)
     url: _text(2000) = Field(
-        "", validate_default=True, description="For URL: the https:// address it opens (no variables)."
+        "", validate_default=True, description="For URL: the https:// address it opens (no variables).",
+        json_schema_extra=IN_OWN_WORDS,
     )
     phone_number: _text(16) = Field(
-        "", validate_default=True, description="For PHONE_NUMBER: the number it calls, E.164 (+34910000000)."
+        "", validate_default=True, description="For PHONE_NUMBER: the number it calls, E.164 (+34910000000).",
+        json_schema_extra=IN_OWN_WORDS,
     )
 
     @field_validator("url")
@@ -92,7 +96,7 @@ class TemplateWriteIn(Schema):
         json_schema_extra=A_SAMPLE,
     )
     body: _text(1024, 1) = Field(description="The text, up to 1024 characters, with {{1}}, {{2}}… where the variables go.")
-    body_examples: list[_text(1024)] = Field(
+    body_examples: list[Annotated[_text(1024), Field(json_schema_extra=IN_OWN_WORDS)]] = Field(
         default_factory=list, max_length=100, description="An example of each variable, in order: Meta reviews the template with them."
     )
     footer: _text(60) = Field("", description="An optional small line at the end, up to 60 characters, without variables.")

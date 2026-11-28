@@ -18,6 +18,7 @@ from apps.flow.schemas.fields import (
 )
 from apps.flow.schemas.steps import DraftStep, _steps
 from apps.flow.schemas.triggers import Trigger
+from base.schemas.assistant import IN_OWN_WORDS
 
 
 class DraftListIn(PageIn):
@@ -43,7 +44,7 @@ class DraftProposeIn(In):
     definition: DraftDefinitionIn = Field(
         description="The draft: LINEAR, a condition that does not hold ends the run; no branch, loop or else."
     )
-    notes: list[Note] = Field(
+    notes: list[Annotated[Note, Field(json_schema_extra=IN_OWN_WORDS)]] = Field(
         default_factory=list,
         max_length=8,
         description="What you could not work out, one short sentence each, in the owner's language.",

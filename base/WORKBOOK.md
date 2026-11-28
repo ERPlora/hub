@@ -2949,6 +2949,9 @@ Pasos:
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
      vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No», con el nombre de su dato delante, también en la línea de una acción normal,
      porque solo no dice qué cambia («Exigir fondo de apertura: Sí · Exigir recuento al cierre: Sí», nunca «Sí · Sí»);
+     una cifra con decimales (un porcentaje, una cantidad, un peso, una coordenada) como la escribe su pantalla en el
+     idioma de la persona, sin los ceros que no hacen falta y con el nombre de su dato delante («Tipo (%): 5,2»,
+     «Cantidad: 0,5», «Stock contado: 1.500,25»; en inglés, «5.2»), nunca «5.2» en español ni «2.000» por dos;
      una lista que su app (el servidor) nombra, por sus elementos uno tras otro («Impresoras: Caja, Cocina»; con más
      de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
      fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); los permisos que se conceden a una
@@ -2968,15 +2971,22 @@ Pasos:
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
      porque no sabe cuál es («Servicios: Tinte»; si manda el servicio y además un nombre, dice el servicio que se
-     reserva); una lista de lo que escribió la persona, como las opciones de un campo de selección, por cada una tal
-     cual («Opciones: Terraza, Dentro»); una lista de líneas que llevan en palabras su registro, el nombre que dijo la
+     reserva); una lista de lo que escribió la persona, como las opciones de un campo de selección, las etiquetas o
+     los grupos de un cliente, las etiquetas de una tarea, las notas de un borrador de automatización o los ejemplos de
+     una plantilla de WhatsApp, por cada una tal cual («Opciones: Terraza, Dentro»; «Etiquetas: VIP, Habitual»); una
+     lista de líneas que llevan en palabras su registro, el nombre que dijo la
      persona, lo que escribió o una hora o una fecha y, al lado, solo cifras —una recepción de mercancía (producto y
      cantidad), los servicios de un bono (servicio y sesiones), los platos de una comanda hecha a mano, los tramos de
      un horario o las líneas de una factura hecha a mano—, por sus palabras seguidas de sus cifras, la cantidad como se
      escribe en el idioma de la persona, un importe como dinero y el IVA escrito a mano como porcentaje («Productos:
      Vino tinto · 6; Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; «Platos: Espresso · 2, Café con
      leche · 1»; «Tramos horarios: 9:00 · 14:00»; «Líneas: Menús de cumpleaños privado · 10 % · 1 · 681,82 €»; si una
-     línea no se puede nombrar, la lista dice cuántas lleva: se leería como una cifra suelta); los campos
+     línea no se puede nombrar, la lista dice cuántas lleva: se leería como una cifra suelta), y lo mismo con lo que
+     la línea dice en palabras además de su registro: lo que se elige en un menú que se añade a una cuenta, por lo
+     elegido y el plato del menú en que va («Platos: Ensalada mixta · Primeros, Lubina a la plancha · Segundos»), una línea de una venta con su nota, su
+     sección o su nombre, una forma de pago por su nombre y su referencia, y los botones de una plantilla de WhatsApp
+     por su tipo, como lo llama su ficha, y lo que dicen («Botones: Respuesta rápida · Sí, Llamada · Llamar ·
+     +34910000000»); los campos
      personalizados de una ficha, cada uno por su nombre y su valor como lo enseña la ficha: un sí o un no en el idioma
      de la persona, una fecha como se escribe en él y un campo que se vacía, con una raya («Campos personalizados:
      Preferencia de mesa · Terraza, VIP · Sí»; «VIP · —»); los días especiales que se cargan de golpe, por su fecha y

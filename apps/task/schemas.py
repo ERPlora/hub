@@ -27,7 +27,7 @@ from pydantic import (
 
 from apps.task.models import TEXT_MAX_LENGTH, TITLE_MAX_LENGTH, Task
 from base.business import business_zone
-from base.schemas.assistant import names, unless_given
+from base.schemas.assistant import IN_OWN_WORDS, names, unless_given
 
 T = TypeVar("T")
 
@@ -122,7 +122,7 @@ Reference = _text(255, 1)
 MemberName = _text(200, 1)
 Code = _text(40, 1)
 ProjectName = _text(200, 1)
-Tag = _text(50, 1)
+Tag = Annotated[_text(50, 1), Field(json_schema_extra=IN_OWN_WORDS)]
 Tags = Annotated[list[Tag], AfterValidator(_unique_tags)]
 # Empty, or #RRGGBB: it is painted in a style attribute, so nothing else gets in.
 Color = Annotated[str, StringConstraints(strip_whitespace=True, pattern=r"^(#[0-9A-Fa-f]{6})?$")]

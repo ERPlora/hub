@@ -43,6 +43,18 @@ msgstr "WhatsApp · {display_name}"
 msgid "WhatsApp customer waiting for an answer"
 msgstr "Cliente de WhatsApp esperando respuesta"
 
+msgctxt "whatsapp button"
+msgid "Quick reply"
+msgstr "Respuesta rápida"
+
+msgctxt "whatsapp button"
+msgid "Link"
+msgstr "Enlace"
+
+msgctxt "whatsapp button"
+msgid "Call"
+msgstr "Llamada"
+
 msgctxt "whatsapp channel"
 msgid "Not connected"
 msgstr "Sin conectar"

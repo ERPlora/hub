@@ -38,6 +38,7 @@ from apps.sale.schemas.fields import (
     _text,
 )
 from apps.sale.schemas.lines import ComboLineIn, OpenLineIn, ProductLineIn, ServiceLineIn
+from base.schemas.assistant import IN_OWN_WORDS
 from base.sensitive import COSTS
 
 
@@ -104,6 +105,7 @@ class PaymentIn(Closed):
     method: _text(60, 1) | None = Field(
         None,
         description="Its name or its type (cash, card…), when its id is not known.",
+        json_schema_extra={"name_of": "method_id"},
     )
     amount: PositiveCents | None = Field(
         None, description="What this leg pays, in cents; empty = what is left to pay."
@@ -112,14 +114,17 @@ class PaymentIn(Closed):
         None, description="Cash: what was handed over (the change comes out of it)."
     )
     reference: _text(128) = Field(
-        "", description="A free reference of the leg, e.g. the card's authorisation."
+        "", description="A free reference of the leg, e.g. the card's authorisation.", json_schema_extra=IN_OWN_WORDS
     )
     extra: Cents = Field(
         0,
         description="Leave it out: only another app's own step at the charge sheet fills it, never what someone asks.",
     )
     extra_label: _text(60) = Field(
-        "", validate_default=True, description="Leave it out: the name of that app's added amount, filled by its step."
+        "",
+        validate_default=True,
+        description="Leave it out: the name of that app's added amount, filled by its step.",
+        json_schema_extra=IN_OWN_WORDS,
     )
 
     @field_validator("extra_label")
