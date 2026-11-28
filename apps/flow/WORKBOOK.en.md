@@ -425,14 +425,16 @@ that same reason, never with "does not exist".
 Involved: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Add, order and fill in the steps
-<!-- from WORKBOOK.md sha256:f167335140a6 -->
+<!-- from WORKBOOK.md sha256:c543b2cd85d9 -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
 Steps:
 1. Press an add button; the step appears at the end, open. Drag the handle to change the order; × removes
    it.
-2. Fill in its form:
+2. Fill in its form. A piece of data that only takes some values (a task's priority, the status a query looks
+   for) is chosen from a list by their names ("Low", "Medium", "High", "Urgent"), never by typing the value as the
+   action keeps it; **Insert data** puts a piece of data of the automation in its place.
    - **Do something**: "What to do" (an action of the active apps, chosen from a list with a search box:
      "Create a task", "Write a note on a customer"…, with the name of its app under each one and never its
      code) and "With this information": a field for each piece of data the action asks for (the required
@@ -450,7 +452,8 @@ Steps:
    - **Wait**: "How long" and the unit (minutes, hours or days), counted from the previous step; from one
      minute to 30 days.
 3. In each value, **Insert data** opens "Which data?", with the notice's data and a real example from the
-   business beside it (the last notice of that kind), and the data the previous steps leave: the first-level
+   business beside it (the last notice of that kind; a yes or a no as "Yes" or "No", a date and a time at the
+   business's hour, and an empty piece of data without an example), and the data the previous steps leave: the first-level
    ones and also those a step leaves inside another piece of data, right below that piece of data and with its
    name in front ("1. Add something to a cart › Item › Unit price", "… › Cart › Total amount", the number and
    the total of a sale's invoice), never those inside a list; it is chosen, not typed. A chosen piece of data shows as a pill; the
@@ -524,7 +527,7 @@ her rules (the minimum notice, the opening hours and never a time already past).
 Involved: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16, FLOW-F37, APPOINTMENT-F01, APPOINTMENT-F04
 
 ### FLOW-F13 Try it without it doing anything
-<!-- from WORKBOOK.md sha256:e1176f770d80 -->
+<!-- from WORKBOOK.md sha256:e9c82ca5057e -->
 Status: done (server and screen)
 Actor: owner, administrator
 Screen: Automation editor
@@ -533,7 +536,8 @@ Steps:
 2. At the top: "None of this is real. Nothing is sent, nothing is charged and nothing is written down: this
    is only what your automation WOULD do." and with which data it tries ("With what really happened the
    last time: …") or "This has not happened in your business lately…".
-3. Step by step it says what it would do and with which values, and points out: if it would not even start
+3. Step by step it says what it would do and with which values (one of a closed list by its name: "Priority:
+   High"), and points out: if it would not even start
    because of its "Only when…", what would come out empty, what the action would refuse ("They would refuse
    it: …"), a condition that would stop it ("It would stop here, and that is the automation working"), what
    cannot be known because it comes from a step that has not run, a wait and a step without permission
@@ -591,7 +595,7 @@ with unsaved changes it is disabled: "Save it first: "Run now" runs what is save
 Involved: FLOW-F14, FLOW-F16, FLOW-F21
 
 ### FLOW-F16 See what it did and why it failed
-<!-- from WORKBOOK.md sha256:19e90f35d472 -->
+<!-- from WORKBOOK.md sha256:b7854a584958 -->
 Status: done
 Actor: owner, administrator, assistant
 Screen: Automation editor
@@ -603,7 +607,9 @@ Steps:
 3. Each run: its state ("Finished well", "Finished: a condition did not hold", "Stopped by an error",
    "Waiting", "Cancelled"), the day and the time, **Copy the reference** and ▾ to see its steps in words
    ("Did: Create a task", "Found 3", "Found nothing, and carried on", "Waited 1 hour", "It stopped here
-   because this was not met: Total greater than 10000").
+   because this was not met: Total greater than 10000"), each by what it does and never by its code ("Call
+   api.example.com: It could not reach…"). A call to another system or a request to the assistant says
+   "Calling…" while it goes on and, as soon as it ends, only how it went.
 4. One stopped by an error says what happened and, under it and only once, what to do, in your language even
    if the automation was saved in another ("It tried to do something you have not allowed it to do ("Create
    a task"), so it stopped." and "Open Permissions and allow what it needs."), with the action named as in

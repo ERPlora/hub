@@ -425,7 +425,9 @@ Pantalla: Editor de automatización
 Pasos:
 1. Pulsa un botón de añadir; el paso sale al final, abierto. Arrastra el asa para cambiar el orden; ×
    lo quita.
-2. Rellena su formulario:
+2. Rellena su formulario. Un dato que solo admite unos valores (la prioridad de una tarea, el estado que busca una
+   consulta) se elige en una lista por sus nombres («Baja», «Media», «Alta», «Urgente»), nunca escribiendo el valor
+   como lo guarda la acción; **Insertar un dato** pone en su lugar un dato de la automatización.
    - **Hacer algo**: «Qué hacer» (una acción de las apps activas, elegida de una lista con buscador:
      «Crear una tarea», «Apuntar una nota en un cliente»…, con el nombre de su app debajo de cada una y
      nunca su código) y «Con esta información»: un campo por cada dato que la acción pide (los
@@ -443,7 +445,8 @@ Pasos:
    - **Esperar**: «Cuánto» y la unidad (minutos, horas o días), contado desde el paso anterior; de un
      minuto a 30 días.
 3. En cada valor, **Insertar un dato** abre «¿Qué dato?», con los datos del aviso y un ejemplo real del
-   negocio al lado (el último aviso de ese tipo), y los datos que dejan los pasos anteriores: los de primer nivel
+   negocio al lado (el último aviso de ese tipo; un sí o un no como «Sí» o «No», una fecha y una hora a la hora del
+   negocio, y un dato vacío sin ejemplo), y los datos que dejan los pasos anteriores: los de primer nivel
    y también los que un paso deja dentro de otro dato, justo debajo de ese dato y con su nombre delante («1. Añadir
    algo a un carrito › Elemento › Precio unitario», «… › Carrito › Importe total», el número y el total de la
    factura de una venta), nunca los que van dentro de una lista; se elige, no se escribe. Un dato elegido se ve como una
@@ -524,7 +527,8 @@ Pasos:
 2. Arriba: «Nada de esto es real. No se envía nada, no se cobra nada y no se apunta nada: esto es solo
    lo que HARÍA tu automatización.» y con qué datos prueba («Con lo que pasó de verdad la última vez
    que …») o «Esto no ha pasado en tu negocio últimamente…».
-3. Paso a paso dice qué haría y con qué valores, y señala: si ni siquiera arrancaría por su «Solo
+3. Paso a paso dice qué haría y con qué valores (uno de una lista cerrada, por su nombre: «Prioridad: Alta»), y
+   señala: si ni siquiera arrancaría por su «Solo
    cuando…», lo que saldría vacío, lo que la acción rechazaría («Se lo rechazarían: …»), una condición
    que la pararía («Se pararía aquí, y eso es la automatización funcionando»), lo que no se puede saber
    porque sale de un paso que no ha corrido, una espera y un paso sin permiso («Todavía no le has
@@ -592,7 +596,9 @@ Pasos:
 3. Cada ejecución: su estado («Terminó bien», «Terminó: no se cumplía la condición», «Se paró por un
    error», «Esperando», «Cancelada»), el día y la hora, **Copiar la referencia** y ▾ para ver sus
    pasos en palabras («Hizo: Crear una tarea», «Encontró 3», «No encontró nada, y siguió», «Esperó 1
-   hora», «Se paró aquí porque no se cumplió esto: Total mayor que 10000»).
+   hora», «Se paró aquí porque no se cumplió esto: Total mayor que 10000»), cada uno por lo que hace y nunca
+   por su código («Llamar a api.example.com: No ha podido llegar…»). Una llamada a otro sistema o una petición
+   al asistente dice «Llamando a…» mientras sigue y, en cuanto acaba, solo cómo fue.
 4. Una parada por error dice qué pasó y, debajo y una sola vez, qué hacer, en tu idioma aunque la
    automatización se guardara en otro («Ha intentado hacer algo que no le has permitido («Crear una
    tarea»), así que ha parado.» y «Abre Permisos y concédele lo que necesita.»), con la acción nombrada
