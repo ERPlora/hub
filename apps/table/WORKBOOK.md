@@ -550,12 +550,16 @@ Pasos:
 3. La cabecera de la cuenta enseña su mesa («Mesa 4»), seguida en vivo. En la misma ventana, «Quitar de
    la mesa» la aparca (TABLE-F13), y una cuenta aparcada se vuelve a sentar tocando otra mesa
    (TABLE-F24).
-4. Con el asistente: «pon la cuenta de Ana en la mesa 4».
+4. Con el asistente: «pon la cuenta de Ana en la mesa 4». Si esa cuenta estaba aparcada, se vuelve a
+   sentar en la mesa como con «Volver a sentar», con sus comensales, su camarero y su hora de apertura.
 Entra: la cuenta (abierta) y la mesa.
-Sale: la cuenta de mesa abierta y enlazada a esa cuenta (avisa: `table.session.opened`).
+Sale: la cuenta de mesa abierta y enlazada a esa cuenta (avisa: `table.session.opened`), o la aparcada
+otra vez sentada (avisa: `table.session.restored`).
 Si falla: los de TABLE-F10, dentro de la ventana y con estas palabras; una cuenta ya cobrada o anulada:
 «Esa cuenta ya no está abierta en Ventas.»; una cuenta que ya está en otra mesa: «Esa cuenta ya está
-en la mesa N.». Las mesas Ocupadas y Bloqueadas no se pueden tocar. Llevar una cuenta a una mesa se
+en la mesa N.»; una cuenta aparcada que se quiere enlazar a una mesa que ya tiene su cuenta de mesa:
+«Esa cuenta está aparcada: vuelve a sentarla en una mesa libre.». Las mesas Ocupadas y Bloqueadas no se
+pueden tocar. Llevar una cuenta a una mesa se
 hace con el grupo delante: una automatización no puede hacerlo.
 Implicados: TABLE-F10, TABLE-F13, TABLE-F24, SALE-F19, FLOW-F12
 
@@ -751,12 +755,15 @@ Implicados: TABLE-F22
 ### TABLE-F24 Volver a sentar una cuenta aparcada
 Estado: hecho
 Actor: empleado, responsable, asistente
-Pantalla: Sesiones; también en Ventas → Vender, tocando una mesa en «Elegir mesa» con la cuenta en pantalla (SALE-F19)
+Pantalla: Sesiones; también en Ventas → Vender, tocando una mesa en «Elegir mesa» con la cuenta en pantalla (SALE-F19); asistente
 Pasos:
 1. En **Sesiones → Todas**, «Volver a sentar» en una cuenta aparcada y elige una mesa libre.
 2. La cuenta de mesa vuelve a «Abierta» en esa mesa, con sus comensales, su camarero y su hora de
    apertura, y su cuenta de Ventas toma el título de la mesa; la mesa pasa a Ocupada y, si estaba
    Reservada, su reserva se da por sentada.
+3. Con el asistente: «vuelve a sentar la cuenta aparcada en la mesa 9», o llevando su cuenta a una mesa
+   libre («los de las cañas vuelven a sentarse, ponles la cuenta en la mesa 3»): las dos vuelven a
+   sentar la misma cuenta de mesa.
 Entra: la cuenta aparcada y la mesa.
 Sale: la cuenta de mesa sentada (avisa: `table.session.restored`).
 Si falla: «Esa cuenta no está aparcada: no existe en este negocio, o ya está sentada en una mesa.»; la

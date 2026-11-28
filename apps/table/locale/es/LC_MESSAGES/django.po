@@ -354,6 +354,9 @@ msgstr "Esa cuenta ya no está abierta en Ventas."
 msgid "That check is already at table %(table)s."
 msgstr "Esa cuenta ya está en la mesa %(table)s."
 
+msgid "That check is parked: seat it again at a free table."
+msgstr "Esa cuenta está aparcada: vuelve a sentarla en una mesa libre."
+
 msgid "That table has no other open check to merge with."
 msgstr "Esa mesa no tiene ninguna otra cuenta abierta con la que fusionar."
 
